@@ -1,7 +1,8 @@
 [workspace]
-members = ["packages/*", "contracts/*"]
+# members = ["packages/*", "contracts/*"]
+members = ["packages/*"]
 
-[profile.release.package.terraswap]
+[profile.release.package.oraiswap]
 opt-level = 3
 debug = false
 debug-assertions = false

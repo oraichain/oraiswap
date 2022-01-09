@@ -1,32 +1,32 @@
-# TerraSwap
+# OraiSwap
 
-Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contracts on the [Terra](https://terra.money) blockchain.
+Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contracts on the [Orai](https://orai.money) blockchain.
 
 ## Contracts
 
-| Name                                               | Description                                  |
-| -------------------------------------------------- | -------------------------------------------- |
-| [`terraswap_factory`](contracts/terraswap_factory) |                                              |
-| [`terraswap_pair`](contracts/terraswap_pair)       |                                              |
-| [`terraswap_token`](contracts/terraswap_token)     | CW20 (ERC20 equivalent) token implementation |
+| Name                                             | Description                                  |
+| ------------------------------------------------ | -------------------------------------------- |
+| [`oraiswap_factory`](contracts/oraiswap_factory) |                                              |
+| [`oraiswap_pair`](contracts/oraiswap_pair)       |                                              |
+| [`oraiswap_token`](contracts/oraiswap_token)     | CW20 (ERC20 equivalent) token implementation |
 
-* terraswap_factory
+- oraiswap_factory
 
-   Mainnet: `terra1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
+  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
 
-   Testnet: `terra18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
 
-* terraswap_pair
+- oraiswap_pair
 
-   Mainnet (CodeID): 4
+  Mainnet (CodeID): 4
 
-   Testnet (CodeID): 7869
+  Testnet (CodeID): 7869
 
-* terraswap_token
+- oraiswap_token
 
-   Mainnet (CodeID): 3
+  Mainnet (CodeID): 3
 
-   Testnet (CodeID): 148
+  Testnet (CodeID): 148
 
 ## Running this contract
 
