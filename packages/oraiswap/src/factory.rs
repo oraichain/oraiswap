@@ -1,3 +1,4 @@
+use cosmwasm_std::HumanAddr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,13 @@ pub enum HandleMsg {
     CreatePair {
         /// Asset infos
         asset_infos: [AssetInfo; 2],
+    },
+
+    /// UpdatePair update pair contract after inited successfully
+    UpdatePair {
+        /// Asset infos
+        pair_key: Vec<u8>,
+        contract_addr: HumanAddr,
     },
 }
 

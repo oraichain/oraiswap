@@ -11,15 +11,15 @@ use orai_cosmwasm::{create_swap_msg, create_swap_send_msg};
 use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
-    SimulateSwapOperationsResponse, SwapOperation,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
+    SwapOperation,
 };
 
 #[test]
 fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         oraiswap_factory: "oraiswapfactory".to_string(),
     };
 
@@ -42,7 +42,7 @@ fn execute_swap_operations() {
         &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000000u128))],
     )]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         oraiswap_factory: "oraiswapfactory".to_string(),
     };
 
@@ -292,7 +292,7 @@ fn execute_swap_operations() {
 #[test]
 fn execute_swap_operation() {
     let mut deps = mock_dependencies(&[]);
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         oraiswap_factory: "oraiswapfactory".to_string(),
     };
 
@@ -415,7 +415,7 @@ fn execute_swap_operation() {
 fn query_buy_with_routes() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         oraiswap_factory: "oraiswapfactory".to_string(),
     };
 

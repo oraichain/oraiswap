@@ -15,11 +15,11 @@ use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::pair::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolResponse, QueryMsg,
+    Cw20HookMsg, ExecuteMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg,
     ReverseSimulationResponse, SimulationResponse,
 };
 use oraiswap::querier::query_supply;
-use oraiswap::token::InstantiateMsg as TokenInstantiateMsg;
+use oraiswap::token::InitMsg as TokenInitMsg;
 use protobuf::Message;
 use std::str::FromStr;
 
@@ -32,7 +32,7 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: InitMsg,
 ) -> StdResult<Response> {
     let pair_info: &PairInfoRaw = &PairInfoRaw {
         contract_addr: deps.api.addr_canonicalize(env.contract.address.as_str())?,
@@ -50,7 +50,7 @@ pub fn instantiate(
         msg: WasmMsg::Instantiate {
             admin: None,
             code_id: msg.token_code_id,
-            msg: to_binary(&TokenInstantiateMsg {
+            msg: to_binary(&TokenInitMsg {
                 name: "oraiswap liquidity token".to_string(),
                 symbol: "uLP".to_string(),
                 decimals: 6,

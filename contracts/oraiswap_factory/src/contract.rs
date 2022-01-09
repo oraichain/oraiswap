@@ -1,72 +1,65 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, ReplyOn, Response, StdError,
-    StdResult, SubMsg, WasmMsg,
+    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, MigrateResponse, StdError, StdResult, WasmMsg,
 };
 
 use crate::querier::query_liquidity_token;
-use crate::response::MsgInstantiateContractResponse;
 use crate::state::{pair_key, read_pairs, Config, TmpPairInfo, CONFIG, PAIRS, TMP_PAIR_INFO};
 
 use oraiswap::asset::{AssetInfo, PairInfo, PairInfoRaw};
-use oraiswap::factory::{
-    ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, PairsResponse, QueryMsg,
-};
-use oraiswap::pair::InstantiateMsg as PairInstantiateMsg;
-use protobuf::Message;
+use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, MigrateMsg, PairsResponse, QueryMsg};
+use oraiswap::pair::InitMsg as PairInitMsg;
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn instantiate(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
-) -> StdResult<Response> {
+pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let config = Config {
-        owner: deps.api.addr_canonicalize(info.sender.as_str())?,
+        owner: deps.api.canonical_address(&info.sender)?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
     };
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::new())
+    Ok(InitResponse::default())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
+pub fn handle(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: HandleMsg,
+) -> StdResult<HandleResponse> {
     match msg {
-        ExecuteMsg::UpdateConfig {
+        HandleMsg::UpdateConfig {
             owner,
             token_code_id,
             pair_code_id,
-        } => execute_update_config(deps, env, info, owner, token_code_id, pair_code_id),
-        ExecuteMsg::CreatePair { asset_infos } => execute_create_pair(deps, env, info, asset_infos),
+        } => handle_update_config(deps, env, info, owner, token_code_id, pair_code_id),
+        HandleMsg::CreatePair { asset_infos } => handle_create_pair(deps, env, info, asset_infos),
+        HandleMsg::UpdatePair {
+            pair_key,
+            contract_addr,
+        } => handle_update_pair(deps, env, info, pair_key, contract_addr),
     }
 }
 
 // Only owner can execute it
-pub fn execute_update_config(
+pub fn handle_update_config(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     owner: Option<String>,
     token_code_id: Option<u64>,
     pair_code_id: Option<u64>,
-) -> StdResult<Response> {
+) -> StdResult<HandleResponse> {
     let mut config: Config = CONFIG.load(deps.storage)?;
 
     // permission check
-    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
+    if deps.api.canonical_address(&info.sender)? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
     if let Some(owner) = owner {
-        // validate address format
-        let _ = deps.api.addr_validate(&owner)?;
-
-        config.owner = deps.api.addr_canonicalize(&owner)?;
+        config.owner = deps.api.canonical_address(&HumanAddr(owner))?;
     }
 
     if let Some(token_code_id) = token_code_id {
@@ -79,16 +72,20 @@ pub fn execute_update_config(
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::new().add_attribute("action", "update_config"))
+    Ok(HandleResponse {
+        messages: vec![],
+        attributes: vec![attr("action", "update_config")],
+        data: None,
+    })
 }
 
 // Anyone can execute it to create swap pair
-pub fn execute_create_pair(
+pub fn handle_create_pair(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     asset_infos: [AssetInfo; 2],
-) -> StdResult<Response> {
+) -> StdResult<HandleResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
         asset_infos[0].to_raw(deps.api)?,
@@ -96,71 +93,92 @@ pub fn execute_create_pair(
     ];
 
     let pair_key = pair_key(&raw_infos);
+
+    // can not update pair once updated
     if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
-        return Err(StdError::generic_err("Pair already exists"));
+        return Err(StdError::generic_err("Pair already updated"));
     }
 
+    if let Ok(Some(_)) = TMP_PAIR_INFO.may_load(deps.storage, &pair_key) {
+        return Err(StdError::generic_err(
+            "Pair is waiting for deployment address",
+        ));
+    }
     TMP_PAIR_INFO.save(
         deps.storage,
+        &pair_key,
         &TmpPairInfo {
-            pair_key,
+            creator: info.sender,
             asset_infos: raw_infos,
         },
     )?;
 
-    Ok(Response::new()
-        .add_attributes(vec![
-            ("action", "create_pair"),
-            ("pair", &format!("{}-{}", asset_infos[0], asset_infos[1])),
-        ])
-        .add_submessage(SubMsg {
-            id: 1,
-            gas_limit: None,
-            msg: WasmMsg::Instantiate {
-                code_id: config.pair_code_id,
-                funds: vec![],
-                admin: None,
-                label: "".to_string(),
-                msg: to_binary(&PairInstantiateMsg {
-                    asset_infos,
-                    token_code_id: config.token_code_id,
-                })?,
-            }
-            .into(),
-            reply_on: ReplyOn::Success,
-        }))
+    Ok(HandleResponse {
+        messages: vec![WasmMsg::Instantiate {
+            code_id: config.pair_code_id,
+            send: vec![],
+            label: None,
+            msg: to_binary(&PairInitMsg {
+                asset_infos: asset_infos.clone(),
+                token_code_id: config.token_code_id,
+            })?,
+        }
+        .into()],
+        attributes: vec![
+            attr("action", "create_pair"),
+            attr("pair", &format!("{}-{}", asset_infos[0], asset_infos[1])),
+        ],
+        data: None,
+    })
 }
 
-/// This just stores the result for future query
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
-    let tmp_pair_info = TMP_PAIR_INFO.load(deps.storage)?;
+/// This just stores the result for future query, update pair after success instantiate contract
+/// call rpc get_address from code_id after calling this
+pub fn handle_update_pair(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    pair_key: Vec<u8>,
+    contract_addr: HumanAddr,
+) -> StdResult<HandleResponse> {
+    // can not update pair once updated
+    if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
+        return Err(StdError::generic_err("Pair already updated"));
+    }
 
-    let res: MsgInstantiateContractResponse =
-        Message::parse_from_bytes(msg.result.unwrap().data.unwrap().as_slice()).map_err(|_| {
-            StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
-        })?;
+    let tmp_pair_info;
+    if let Ok(Some(pair_info)) = TMP_PAIR_INFO.may_load(deps.storage, &pair_key) {
+        // make sure creator can update their pairs
+        if pair_info.creator.ne(&info.sender) {
+            return Err(StdError::generic_err("Pair belong to other"));
+        }
+        tmp_pair_info = pair_info;
+    } else {
+        return Err(StdError::generic_err("Pair not found"));
+    }
 
-    let pair_contract = res.get_contract_address();
-    let liquidity_token = query_liquidity_token(deps.as_ref(), Addr::unchecked(pair_contract))?;
+    let liquidity_token = query_liquidity_token(deps.as_ref(), contract_addr.clone())?;
 
     PAIRS.save(
         deps.storage,
-        &tmp_pair_info.pair_key,
+        &pair_key,
         &PairInfoRaw {
-            liquidity_token: deps.api.addr_canonicalize(liquidity_token.as_str())?,
-            contract_addr: deps.api.addr_canonicalize(pair_contract)?,
+            liquidity_token: deps.api.canonical_address(&liquidity_token)?,
+            contract_addr: deps.api.canonical_address(&contract_addr)?,
             asset_infos: tmp_pair_info.asset_infos,
         },
     )?;
 
-    Ok(Response::new().add_attributes(vec![
-        ("pair_contract_addr", pair_contract),
-        ("liquidity_token_addr", liquidity_token.as_str()),
-    ]))
+    Ok(HandleResponse {
+        messages: vec![],
+        attributes: vec![
+            attr("pair_contract_addr", contract_addr.to_string()),
+            attr("liquidity_token_addr", liquidity_token.as_str()),
+        ],
+        data: None,
+    })
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -174,7 +192,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state: Config = CONFIG.load(deps.storage)?;
     let resp = ConfigResponse {
-        owner: deps.api.addr_humanize(&state.owner)?.to_string(),
+        owner: deps.api.human_address(&state.owner)?.to_string(),
         token_code_id: state.token_code_id,
         pair_code_id: state.pair_code_id,
     };
@@ -211,7 +229,6 @@ pub fn query_pairs(
     Ok(resp)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    Ok(Response::default())
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<MigrateResponse> {
+    Ok(MigrateResponse::default())
 }

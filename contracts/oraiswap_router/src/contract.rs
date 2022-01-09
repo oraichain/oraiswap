@@ -16,8 +16,8 @@ use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::query_pair_info;
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
-    SimulateSwapOperationsResponse, SwapOperation,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
+    SwapOperation,
 };
 use std::collections::HashMap;
 
@@ -26,7 +26,7 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: InitMsg,
 ) -> StdResult<Response> {
     CONFIG.save(
         deps.storage,

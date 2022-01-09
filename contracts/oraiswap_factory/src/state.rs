@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, Order, StdResult, Storage};
+use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Item, Map};
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 
@@ -17,11 +17,13 @@ pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TmpPairInfo {
-    pub pair_key: Vec<u8>,
+    // only creator can update the contract_address
+    pub creator: HumanAddr,
     pub asset_infos: [AssetInfoRaw; 2],
 }
 
-pub const TMP_PAIR_INFO: Item<TmpPairInfo> = Item::new("tmp_pair_info");
+// store temporary pair info while waiting for deployment
+pub const TMP_PAIR_INFO: Map<&[u8], TmpPairInfo> = Map::new("tmp_pair_info");
 pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pair_info");
 
 pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
@@ -73,7 +75,7 @@ mod test {
     use super::*;
 
     use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::{Api, StdResult, Storage};
+    use cosmwasm_std::{Api, HumanAddr, StdResult, Storage};
     use cosmwasm_storage::{
         bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     };
@@ -92,7 +94,10 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                owner: deps.api.addr_canonicalize("owner0000").unwrap(),
+                owner: deps
+                    .api
+                    .canonical_address(&HumanAddr("owner0000".to_string()))
+                    .unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
             },
@@ -155,11 +160,20 @@ mod test {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.addr_canonicalize("token0000").unwrap(),
+                    contract_addr: deps
+                        .api
+                        .canonical_address(&HumanAddr("token0000".to_string()))
+                        .unwrap(),
                 },
             ],
-            contract_addr: deps.api.addr_canonicalize("pair0000").unwrap(),
-            liquidity_token: deps.api.addr_canonicalize("liquidity0000").unwrap(),
+            contract_addr: deps
+                .api
+                .canonical_address(&HumanAddr("pair0000".to_string()))
+                .unwrap(),
+            liquidity_token: deps
+                .api
+                .canonical_address(&HumanAddr("liquidity0000".to_string()))
+                .unwrap(),
         };
 
         let pair_info2 = PairInfoRaw {
@@ -168,11 +182,20 @@ mod test {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.addr_canonicalize("token0001").unwrap(),
+                    contract_addr: deps
+                        .api
+                        .canonical_address(&HumanAddr("token0001".to_string()))
+                        .unwrap(),
                 },
             ],
-            contract_addr: deps.api.addr_canonicalize("pair0001").unwrap(),
-            liquidity_token: deps.api.addr_canonicalize("liquidity0001").unwrap(),
+            contract_addr: deps
+                .api
+                .canonical_address(&HumanAddr("pair0001".to_string()))
+                .unwrap(),
+            liquidity_token: deps
+                .api
+                .canonical_address(&HumanAddr("liquidity0001".to_string()))
+                .unwrap(),
         };
 
         store_pair(&mut deps.storage, &pair_info).unwrap();

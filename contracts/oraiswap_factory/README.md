@@ -2,7 +2,7 @@
 
 The factory contract can perform creation of oraiswap pair contract and also be used as directory contract for all pairs.
 
-## InstantiateMsg
+## InitMsg
 
 ```json
 {

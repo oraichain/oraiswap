@@ -13,16 +13,15 @@ use cosmwasm_std::{
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolResponse, ReverseSimulationResponse,
-    SimulationResponse,
+    Cw20HookMsg, ExecuteMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
 };
-use oraiswap::token::InstantiateMsg as TokenInstantiateMsg;
+use oraiswap::token::InitMsg as TokenInitMsg;
 
 #[test]
 fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -43,7 +42,7 @@ fn proper_initialization() {
         vec![SubMsg {
             msg: WasmMsg::Instantiate {
                 code_id: 10u64,
-                msg: to_binary(&TokenInstantiateMsg {
+                msg: to_binary(&TokenInitMsg {
                     name: "oraiswap liquidity token".to_string(),
                     symbol: "uLP".to_string(),
                     decimals: 6,
@@ -112,7 +111,7 @@ fn provide_liquidity() {
         (&"asset0000".to_string(), &[]),
     ]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -522,7 +521,7 @@ fn withdraw_liquidity() {
         ),
     ]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -643,7 +642,7 @@ fn try_native_to_token() {
         ),
     ]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -823,7 +822,7 @@ fn try_token_to_native() {
         ),
     ]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -1105,7 +1104,7 @@ fn test_query_pool() {
         ),
     ]);
 
-    let msg = InstantiateMsg {
+    let msg = InitMsg {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),

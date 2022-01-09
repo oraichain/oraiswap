@@ -1,7 +1,7 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_slice, to_binary, Api, Coin, ContractResult, Empty, OwnedDeps, Querier, QuerierResult,
-    QueryRequest, SystemError, SystemResult, WasmQuery,
+    from_slice, to_binary, Api, Coin, ContractResult, Empty, HumanAddr, OwnedDeps, Querier,
+    QuerierResult, QueryRequest, SystemError, SystemResult, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
@@ -12,8 +12,10 @@ use std::collections::HashMap;
 pub fn mock_dependencies(
     contract_balance: &[Coin],
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
-    let custom_querier: WasmMockQuerier =
-        WasmMockQuerier::new(MockQuerier::new(&[(MOCK_CONTRACT_ADDR, contract_balance)]));
+    let custom_querier: WasmMockQuerier = WasmMockQuerier::new(MockQuerier::new(&[(
+        &HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+        contract_balance,
+    )]));
 
     OwnedDeps {
         api: MockApi::default(),
@@ -73,7 +75,7 @@ impl WasmMockQuerier {
 
                 if key.to_vec() == prefix_pair_info {
                     let pair_info: PairInfo =
-                        match self.oraiswap_pair_querier.pairs.get(contract_addr) {
+                        match self.oraiswap_pair_querier.pairs.get(contract_addr.as_str()) {
                             Some(v) => v.clone(),
                             None => {
                                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -86,10 +88,10 @@ impl WasmMockQuerier {
                     let api: MockApi = MockApi::default();
                     SystemResult::Ok(ContractResult::from(to_binary(&PairInfoRaw {
                         contract_addr: api
-                            .addr_canonicalize(pair_info.contract_addr.as_str())
+                            .canonical_address(&HumanAddr(pair_info.contract_addr))
                             .unwrap(),
                         liquidity_token: api
-                            .addr_canonicalize(pair_info.liquidity_token.as_str())
+                            .canonical_address(&HumanAddr(pair_info.liquidity_token))
                             .unwrap(),
                         asset_infos: [
                             AssetInfoRaw::NativeToken {
@@ -121,10 +123,4 @@ impl WasmMockQuerier {
     pub fn with_oraiswap_pairs(&mut self, pairs: &[(&String, &PairInfo)]) {
         self.oraiswap_pair_querier = OraiswapPairQuerier::new(pairs);
     }
-
-    // pub fn with_balance(&mut self, balances: &[(&HumanAddr, &[Coin])]) {
-    //     for (addr, balance) in balances {
-    //         self.base.update_balance(addr, balance.to_vec());
-    //     }
-    // }
 }
