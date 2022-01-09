@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::{AssetInfo, PairInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {
+pub struct InitMsg {
     /// Pair contract code ID, which is used to
     pub pair_code_id: u64,
     pub token_code_id: u64,
@@ -12,7 +12,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecuteMsg {
+pub enum HandleMsg {
     /// UpdateConfig update relevant code IDs
     UpdateConfig {
         owner: Option<String>,

@@ -1,28 +1,27 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
+use cosmwasm_std::{
+    Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, StdError, StdResult,
+};
 
 use cw2::set_contract_version;
-use cw20_legacy::{
-    contract::{create_accounts, execute as cw20_execute, query as cw20_query},
-    msg::{ExecuteMsg, QueryMsg},
-    state::{MinterData, TokenInfo, TOKEN_INFO},
+use cw20_base::{
+    contract::{create_accounts, handle as cw20_handle, query as cw20_query},
+    msg::{HandleMsg, QueryMsg},
+    state::{token_info, MinterData, TokenInfo},
     ContractError,
 };
 
-use oraiswap::token::InstantiateMsg;
+use oraiswap::token::InitMsg;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn instantiate(
+pub fn init(
     mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
-) -> StdResult<Response> {
+    msg: InitMsg,
+) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -38,7 +37,7 @@ pub fn instantiate(
 
     let mint = match msg.mint {
         Some(m) => Some(MinterData {
-            minter: deps.api.addr_canonicalize(&m.minter)?,
+            minter: deps.api.canonical_address(&m.minter)?,
             cap: m.cap,
         }),
         None => None,
@@ -53,21 +52,19 @@ pub fn instantiate(
         mint,
     };
 
-    TOKEN_INFO.save(deps.storage, &data)?;
-    Ok(Response::default())
+    token_info(deps.storage).save(&data)?;
+    Ok(InitResponse::default())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(
+pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
-) -> Result<Response, ContractError> {
-    cw20_execute(deps, env, info, msg)
+    msg: HandleMsg,
+) -> Result<HandleResponse, ContractError> {
+    cw20_handle(deps, env, info, msg)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     cw20_query(deps, env, msg)
 }

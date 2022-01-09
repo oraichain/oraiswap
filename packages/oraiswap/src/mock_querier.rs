@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, HumanAddr, OwnedDeps,
+    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, HumanAddr, OwnedDeps,
     Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ pub fn mock_dependencies(
 }
 
 pub struct WasmMockQuerier {
-    base: MockQuerier<OraiQueryWrapper>,
+    base: MockQuerier,
     token_querier: TokenQuerier,
     tax_querier: TaxQuerier,
     oraiswap_factory_querier: OraiswapFactoryQuerier,
@@ -113,7 +113,7 @@ pub(crate) fn pairs_to_map(pairs: &[(&String, &PairInfo)]) -> HashMap<String, Pa
 impl Querier for WasmMockQuerier {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         // MockQuerier doesn't support Custom, so we ignore it completely here
-        let request: QueryRequest<OraiQueryWrapper> = match from_slice(bin_request) {
+        let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -127,108 +127,113 @@ impl Querier for WasmMockQuerier {
 }
 
 impl WasmMockQuerier {
-    pub fn handle_query(&self, request: &QueryRequest<OraiQueryWrapper>) -> QuerierResult {
+    pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {
         match &request {
-            QueryRequest::Custom(OraiQueryWrapper { route, query_data }) => {
-                if &OraiRoute::Treasury == route {
-                    match query_data {
-                        OraiQuery::TaxRate {} => {
-                            let res = TaxRateResponse {
-                                rate: self.tax_querier.rate,
-                            };
-                            SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => match from_binary(msg) {
+                // maybe querywrapper like custom query from smart contract
+                Ok(OraiQueryWrapper { route, query_data }) => {
+                    if route.eq(&OraiRoute::Treasury) {
+                        match query_data {
+                            OraiQuery::TaxRate {} => {
+                                let res = TaxRateResponse {
+                                    rate: self.tax_querier.rate,
+                                };
+                                SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                            }
+                            OraiQuery::TaxCap { denom } => {
+                                let cap = self
+                                    .tax_querier
+                                    .caps
+                                    .get(&denom)
+                                    .copied()
+                                    .unwrap_or_default();
+                                let res = TaxCapResponse { cap };
+                                SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                            }
+                            _ => panic!("DO NOT ENTER HERE"),
                         }
-                        OraiQuery::TaxCap { denom } => {
-                            let cap = self
-                                .tax_querier
-                                .caps
-                                .get(denom)
-                                .copied()
-                                .unwrap_or_default();
-                            let res = TaxCapResponse { cap };
-                            SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                    } else {
+                        panic!("DO NOT ENTER HERE")
+                    }
+                }
+                // try with FactoryQueryMsg
+                _ => match from_binary(msg) {
+                    Ok(FactoryQueryMsg::Pair { asset_infos }) => {
+                        let key = asset_infos[0].to_string() + asset_infos[1].to_string().as_str();
+                        match self.oraiswap_factory_querier.pairs.get(&key) {
+                            Some(v) => SystemResult::Ok(ContractResult::Ok(to_binary(&v).unwrap())),
+                            None => SystemResult::Err(SystemError::InvalidRequest {
+                                error: "No pair info exists".to_string(),
+                                request: msg.as_slice().into(),
+                            }),
+                        }
+                    }
+
+                    _ => match from_binary(msg).unwrap() {
+                        Cw20QueryMsg::TokenInfo {} => {
+                            let balances: &HashMap<String, Uint128> =
+                                match self.token_querier.balances.get(contract_addr.as_str()) {
+                                    Some(balances) => balances,
+                                    None => {
+                                        return SystemResult::Err(SystemError::InvalidRequest {
+                                            error: format!(
+                                                "No balance info exists for the contract {}",
+                                                contract_addr
+                                            ),
+                                            request: msg.as_slice().into(),
+                                        })
+                                    }
+                                };
+
+                            let mut total_supply = Uint128::zero();
+
+                            for balance in balances {
+                                total_supply += *balance.1;
+                            }
+
+                            SystemResult::Ok(ContractResult::Ok(
+                                to_binary(&TokenInfoResponse {
+                                    name: "mAAPL".to_string(),
+                                    symbol: "mAAPL".to_string(),
+                                    decimals: 6,
+                                    total_supply,
+                                })
+                                .unwrap(),
+                            ))
+                        }
+                        Cw20QueryMsg::Balance { address } => {
+                            let balances: &HashMap<String, Uint128> =
+                                match self.token_querier.balances.get(contract_addr.as_str()) {
+                                    Some(balances) => balances,
+                                    None => {
+                                        return SystemResult::Err(SystemError::InvalidRequest {
+                                            error: format!(
+                                                "No balance info exists for the contract {}",
+                                                contract_addr
+                                            ),
+                                            request: msg.as_slice().into(),
+                                        })
+                                    }
+                                };
+
+                            let balance = match balances.get(address.as_str()) {
+                                Some(v) => *v,
+                                None => {
+                                    return SystemResult::Ok(ContractResult::Ok(
+                                        to_binary(&Cw20BalanceResponse {
+                                            balance: Uint128::zero(),
+                                        })
+                                        .unwrap(),
+                                    ));
+                                }
+                            };
+
+                            SystemResult::Ok(ContractResult::Ok(
+                                to_binary(&Cw20BalanceResponse { balance }).unwrap(),
+                            ))
                         }
                         _ => panic!("DO NOT ENTER HERE"),
-                    }
-                } else {
-                    panic!("DO NOT ENTER HERE")
-                }
-            }
-            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => match from_binary(msg) {
-                Ok(FactoryQueryMsg::Pair { asset_infos }) => {
-                    let key = asset_infos[0].to_string() + asset_infos[1].to_string().as_str();
-                    match self.oraiswap_factory_querier.pairs.get(&key) {
-                        Some(v) => SystemResult::Ok(ContractResult::Ok(to_binary(&v).unwrap())),
-                        None => SystemResult::Err(SystemError::InvalidRequest {
-                            error: "No pair info exists".to_string(),
-                            request: msg.as_slice().into(),
-                        }),
-                    }
-                }
-                _ => match from_binary(msg).unwrap() {
-                    Cw20QueryMsg::TokenInfo {} => {
-                        let balances: &HashMap<String, Uint128> =
-                            match self.token_querier.balances.get(contract_addr.as_str()) {
-                                Some(balances) => balances,
-                                None => {
-                                    return SystemResult::Err(SystemError::InvalidRequest {
-                                        error: format!(
-                                            "No balance info exists for the contract {}",
-                                            contract_addr
-                                        ),
-                                        request: msg.as_slice().into(),
-                                    })
-                                }
-                            };
-
-                        let mut total_supply = Uint128::zero();
-
-                        for balance in balances {
-                            total_supply += *balance.1;
-                        }
-
-                        SystemResult::Ok(ContractResult::Ok(
-                            to_binary(&TokenInfoResponse {
-                                name: "mAAPL".to_string(),
-                                symbol: "mAAPL".to_string(),
-                                decimals: 6,
-                                total_supply,
-                            })
-                            .unwrap(),
-                        ))
-                    }
-                    Cw20QueryMsg::Balance { address } => {
-                        let balances: &HashMap<String, Uint128> =
-                            match self.token_querier.balances.get(contract_addr.as_str()) {
-                                Some(balances) => balances,
-                                None => {
-                                    return SystemResult::Err(SystemError::InvalidRequest {
-                                        error: format!(
-                                            "No balance info exists for the contract {}",
-                                            contract_addr
-                                        ),
-                                        request: msg.as_slice().into(),
-                                    })
-                                }
-                            };
-
-                        let balance = match balances.get(address.as_str()) {
-                            Some(v) => *v,
-                            None => {
-                                return SystemResult::Ok(ContractResult::Ok(
-                                    to_binary(&Cw20BalanceResponse {
-                                        balance: Uint128::zero(),
-                                    })
-                                    .unwrap(),
-                                ));
-                            }
-                        };
-
-                        SystemResult::Ok(ContractResult::Ok(
-                            to_binary(&Cw20BalanceResponse { balance }).unwrap(),
-                        ))
-                    }
-                    _ => panic!("DO NOT ENTER HERE"),
+                    },
                 },
             },
             _ => self.base.handle_query(request),
@@ -237,7 +242,7 @@ impl WasmMockQuerier {
 }
 
 impl WasmMockQuerier {
-    pub fn new(base: MockQuerier<OraiQueryWrapper>) -> Self {
+    pub fn new(base: MockQuerier<Empty>) -> Self {
         WasmMockQuerier {
             base,
             token_querier: TokenQuerier::default(),
@@ -260,10 +265,4 @@ impl WasmMockQuerier {
     pub fn with_oraiswap_pairs(&mut self, pairs: &[(&String, &PairInfo)]) {
         self.oraiswap_factory_querier = OraiswapFactoryQuerier::new(pairs);
     }
-
-    // pub fn with_balance(&mut self, balances: &[(&HumanAddr, &[Coin])]) {
-    //     for (addr, balance) in balances {
-    //         self.base.update_balance(addr, balance.to_vec());
-    //     }
-    // }
 }

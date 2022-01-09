@@ -2,20 +2,20 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{StdError, StdResult, Uint128};
-use cw20::{Cw20Coin, MinterResponse};
+use cw20::{Cw20CoinHuman, MinterResponse};
 
-/// TokenContract InstantiateMsg
+/// TokenContract InitMsg
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InstantiateMsg {
+pub struct InitMsg {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub initial_balances: Vec<Cw20Coin>,
+    pub initial_balances: Vec<Cw20CoinHuman>,
     pub mint: Option<MinterResponse>,
 }
 
 // this is InitMsg
-impl InstantiateMsg {
+impl InitMsg {
     pub fn get_cap(&self) -> Option<Uint128> {
         self.mint.as_ref().and_then(|v| v.cap)
     }

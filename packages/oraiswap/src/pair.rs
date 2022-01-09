@@ -7,7 +7,7 @@ use cosmwasm_std::{Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {
+pub struct InitMsg {
     /// Asset infos
     pub asset_infos: [AssetInfo; 2],
     /// Token contract code id for initialization
@@ -16,7 +16,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecuteMsg {
+pub enum HandleMsg {
     Receive(Cw20ReceiveMsg),
     /// ProvideLiquidity a user provides pool liquidity
     ProvideLiquidity {
