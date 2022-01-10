@@ -4,7 +4,7 @@ use crate::mock_querier::mock_dependencies;
 use crate::state::{pair_key, TmpPairInfo, TMP_PAIR_INFO};
 
 use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{attr, from_binary, to_binary, ContractResult, HumanAddr, StdError, WasmMsg};
+use cosmwasm_std::{attr, from_binary, to_binary, HumanAddr, StdError, WasmMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
 use oraiswap::pair::InitMsg as PairInitMsg;
@@ -166,79 +166,90 @@ fn create_pair() {
     );
 }
 
-// #[test]
-// fn update_test() {
-//     let mut deps = mock_dependencies(&[]);
+#[test]
+fn update_pair() {
+    let mut deps = mock_dependencies(&[]);
 
-//     let asset_infos = [
-//         AssetInfo::Token {
-//             contract_addr: "asset0000".to_string(),
-//         },
-//         AssetInfo::Token {
-//             contract_addr: "asset0001".to_string(),
-//         },
-//     ];
+    let msg = InitMsg {
+        pair_code_id: 321u64,
+        token_code_id: 123u64,
+    };
 
-//     let raw_infos = [
-//         asset_infos[0].to_raw(deps.as_ref().api).unwrap(),
-//         asset_infos[1].to_raw(deps.as_ref().api).unwrap(),
-//     ];
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
 
-//     let pair_key = pair_key(&raw_infos);
-//     TMP_PAIR_INFO
-//         .save(
-//             &mut deps.storage,
-//             &pair_key,
-//             &TmpPairInfo {
-//                 asset_infos: raw_infos,
+    // we can just call .unwrap() to assert this was a success
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
-//             },
-//         )
-//         .unwrap();
+    let asset_infos = [
+        AssetInfo::Token {
+            contract_addr: "asset0000".to_string(),
+        },
+        AssetInfo::Token {
+            contract_addr: "asset0001".to_string(),
+        },
+    ];
 
-//     let reply_msg = Reply {
-//         id: 1,
-//         result: ContractResult::Ok(SubMsgExecutionResponse {
-//             events: vec![],
-//             data: Some(vec![10, 8, 112, 97, 105, 114, 48, 48, 48, 48].into()),
-//         }),
-//     };
+    let raw_infos = [
+        asset_infos[0].to_raw(deps.as_ref().api).unwrap(),
+        asset_infos[1].to_raw(deps.as_ref().api).unwrap(),
+    ];
 
-//     // register oraiswap pair querier
-//     deps.querier.with_oraiswap_pairs(&[(
-//         &"pair0000".to_string(),
-//         &PairInfo {
-//             asset_infos: [
-//                 AssetInfo::NativeToken {
-//                     denom: "uusd".to_string(),
-//                 },
-//                 AssetInfo::NativeToken {
-//                     denom: "uusd".to_string(),
-//                 },
-//             ],
-//             contract_addr: "pair0000".to_string(),
-//             liquidity_token: "liquidity0000".to_string(),
-//         },
-//     )]);
+    let pair_key = pair_key(&raw_infos);
 
-//     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
+    let msg = HandleMsg::CreatePair {
+        asset_infos: asset_infos.clone(),
+    };
 
-//     let query_res = query(
-//         deps.as_ref(),
-//         mock_env(),
-//         QueryMsg::Pair {
-//             asset_infos: asset_infos.clone(),
-//         },
-//     )
-//     .unwrap();
+    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
 
-//     let pair_res: PairInfo = from_binary(&query_res).unwrap();
-//     assert_eq!(
-//         pair_res,
-//         PairInfo {
-//             liquidity_token: "liquidity0000".to_string(),
-//             contract_addr: "pair0000".to_string(),
-//             asset_infos,
-//         }
-//     );
-// }
+    assert_eq!(
+        TMP_PAIR_INFO.load(&deps.storage, &pair_key).unwrap(),
+        TmpPairInfo {
+            asset_infos: raw_infos.clone(),
+            creator: HumanAddr("addr0000".to_string()),
+        }
+    );
+
+    // register oraiswap pair querier, it is like deploy smart contract, let's assume pair0000 has liquidity_token address liquidity0000
+    deps.querier.with_oraiswap_pairs(&[(
+        &"pair0000".to_string(),
+        &PairInfo {
+            asset_infos: asset_infos.clone(),
+            contract_addr: "pair0000".to_string(),
+            liquidity_token: "liquidity0000".to_string(),
+        },
+    )]);
+
+    // later update pair with newly created address
+    let update_msg = HandleMsg::UpdatePair {
+        pair_key,
+        contract_addr: HumanAddr("pair0000".to_string()),
+    };
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("addr0000", &[]),
+        update_msg,
+    )
+    .unwrap();
+
+    let query_res = query(
+        deps.as_ref(),
+        mock_env(),
+        QueryMsg::Pair {
+            asset_infos: asset_infos.clone(),
+        },
+    )
+    .unwrap();
+
+    let pair_res: PairInfo = from_binary(&query_res).unwrap();
+    assert_eq!(
+        pair_res,
+        PairInfo {
+            liquidity_token: "liquidity0000".to_string(),
+            contract_addr: "pair0000".to_string(),
+            asset_infos,
+        }
+    );
+}

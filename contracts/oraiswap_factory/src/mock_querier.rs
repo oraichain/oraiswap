@@ -119,7 +119,7 @@ impl WasmMockQuerier {
         }
     }
 
-    // configure the oraiswap pair
+    // configure the oraiswap pair, with contract_address => pair info
     pub fn with_oraiswap_pairs(&mut self, pairs: &[(&String, &PairInfo)]) {
         self.oraiswap_pair_querier = OraiswapPairQuerier::new(pairs);
     }

@@ -157,6 +157,7 @@ pub fn handle_update_pair(
         return Err(StdError::generic_err("Pair not found"));
     }
 
+    // the contract must follow the standard interface
     let liquidity_token = query_liquidity_token(deps.as_ref(), contract_addr.clone())?;
 
     PAIRS.save(
@@ -229,6 +230,11 @@ pub fn query_pairs(
     Ok(resp)
 }
 
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<MigrateResponse> {
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: MigrateMsg,
+) -> StdResult<MigrateResponse> {
     Ok(MigrateResponse::default())
 }
