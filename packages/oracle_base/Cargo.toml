@@ -1,5 +1,5 @@
 [package]
-name = "oraiswap_oracle_base"
+name = "oracle_base"
 version = "2.2.0"
 authors = [
     "Yun Yeo <YunSuk-Yeo@users.noreply.github.com>",

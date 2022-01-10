@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use oraiswap_oracle_base::{
+use oracle_base::{
     OracleContract, OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse,
 };
 

@@ -43,7 +43,7 @@ schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
 oraiswap = { path = "../../packages/oraiswap", default-features = false }
-oraiswap_oracle_base = { path = "../../packages/oraiswap_oracle_base" }
+oracle_base = { path = "../../packages/oracle_base" }
 
 [dev-dependencies]
 cosmwasm-schema = "0.13.2"

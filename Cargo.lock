@@ -173,6 +173,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "oracle_base"
+version = "2.2.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "oraiswap"
 version = "2.4.1"
 dependencies = [
@@ -181,7 +192,7 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw20",
- "oraiswap_oracle_base",
+ "oracle_base",
  "schemars",
  "serde",
  "thiserror",
@@ -212,8 +223,8 @@ dependencies = [
  "cw2",
  "cw20",
  "integer-sqrt",
+ "oracle_base",
  "oraiswap",
- "oraiswap_oracle_base",
  "schemars",
  "serde",
  "thiserror",
@@ -234,17 +245,6 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "oraiswap_oracle_base"
-version = "2.2.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "schemars",
- "serde",
 ]
 
 [[package]]

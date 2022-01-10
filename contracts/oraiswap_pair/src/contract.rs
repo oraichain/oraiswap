@@ -9,6 +9,7 @@ use cosmwasm_std::{
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
+use oracle_base::OracleContract;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg, ReverseSimulationResponse,
@@ -17,7 +18,6 @@ use oraiswap::pair::{
 use oraiswap::querier::query_supply;
 use oraiswap::token::InitMsg as TokenInitMsg;
 use oraiswap::{Decimal256, Uint256};
-use oraiswap_oracle_base::OracleContract;
 use std::str::FromStr;
 
 /// Default commission rate == 0.3%

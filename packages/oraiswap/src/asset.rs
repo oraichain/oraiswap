@@ -11,8 +11,8 @@ use cosmwasm_std::{
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
-// use oraiswap_oracle_base::OraiQuerier;
-use oraiswap_oracle_base::OracleContract;
+// use oracle_base::OraiQuerier;
+use oracle_base::OracleContract;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {

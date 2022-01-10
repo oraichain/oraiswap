@@ -8,9 +8,7 @@ use std::collections::HashMap;
 use crate::asset::PairInfo;
 use crate::factory::QueryMsg as FactoryQueryMsg;
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use oraiswap_oracle_base::{
-    OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse,
-};
+use oracle_base::{OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.

@@ -112,6 +112,7 @@ fn provide_liquidity() {
     ]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -126,7 +127,7 @@ fn provide_liquidity() {
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
     let reply_msg = Reply {
@@ -536,7 +537,7 @@ fn withdraw_liquidity() {
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
     let reply_msg = Reply {
@@ -657,7 +658,7 @@ fn try_native_to_token() {
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
     let reply_msg = Reply {
@@ -837,7 +838,7 @@ fn try_token_to_native() {
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
     let reply_msg = Reply {
@@ -997,7 +998,7 @@ fn try_token_to_native() {
 
     // failed due to non asset token contract try to execute sell
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr0000".to_string(),
+        sender: HumanAddr("addr0000".to_string()),
         amount: offer_amount,
         msg: to_binary(&Cw20HookMsg::Swap {
             belief_price: None,
@@ -1105,6 +1106,7 @@ fn test_query_pool() {
     ]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -1119,7 +1121,7 @@ fn test_query_pool() {
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
     let reply_msg = Reply {

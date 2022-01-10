@@ -3,7 +3,7 @@ use cosmwasm_std::{
     InitResponse, MessageInfo, Order, StdError, StdResult, KV,
 };
 
-use oraiswap_oracle_base::{ContractInfoResponse, OraiMsgWrapper, OraiQuery, OraiQueryWrapper};
+use oracle_base::{ContractInfoResponse, OraiMsgWrapper, OraiQuery, OraiQueryWrapper};
 
 use crate::check_size;
 use crate::error::ContractError;

@@ -2,7 +2,7 @@ use std::env::current_dir;
 use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
-use oraiswap_oracle_base::{
+use oracle_base::{
     ExchangeRatesResponse, OraiMsg, OraiMsgWrapper, OraiQuery, OraiQueryWrapper, OraiRoute,
     SwapResponse, TaxCapResponse, TaxRateResponse,
 };

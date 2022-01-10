@@ -7,7 +7,7 @@ use crate::querier::{
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 use cosmwasm_std::{to_binary, BankMsg, Coin, CosmosMsg, Decimal, HumanAddr, Uint128, WasmMsg};
 use cw20::Cw20HandleMsg;
-use oraiswap_oracle_base::OracleContract;
+use oracle_base::OracleContract;
 
 #[test]
 fn token_balance_querier() {
