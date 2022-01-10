@@ -1,19 +1,24 @@
 use crate::contract::{
-    assert_max_spread, execute, instantiate, query_pair_info, query_pool, query_reverse_simulation,
-    query_simulation, reply,
+    assert_max_spread,
+    handle,
+    init,
+    query_pair_info,
+    query_pool,
+    query_reverse_simulation,
+    query_simulation, //reply,
 };
 use crate::error::ContractError;
 use crate::mock_querier::mock_dependencies;
 
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, Reply, ReplyOn, Response,
-    StdError, SubMsg, SubMsgExecutionResponse, Uint128, WasmMsg,
+    attr, to_binary, BankMsg, Coin, ContractResult, CosmosMsg, Decimal, HandleResponse, HumanAddr,
+    InitResponse, StdError, Uint128, WasmMsg,
 };
-use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
+use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::{
-    Cw20HookMsg, ExecuteMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
+    Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
 };
 use oraiswap::token::InitMsg as TokenInitMsg;
 
@@ -22,6 +27,7 @@ fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -36,32 +42,26 @@ fn proper_initialization() {
     // we can just call .unwrap() to assert this was a success
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
-    let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+    let res = init(deps.as_mut(), env, info, msg).unwrap();
     assert_eq!(
         res.messages,
-        vec![SubMsg {
-            msg: WasmMsg::Instantiate {
-                code_id: 10u64,
-                msg: to_binary(&TokenInitMsg {
-                    name: "oraiswap liquidity token".to_string(),
-                    symbol: "uLP".to_string(),
-                    decimals: 6,
-                    initial_balances: vec![],
-                    mint: Some(MinterResponse {
-                        minter: MOCK_CONTRACT_ADDR.to_string(),
-                        cap: None,
-                    }),
-                })
-                .unwrap(),
-                funds: vec![],
-                label: "".to_string(),
-                admin: None,
-            }
-            .into(),
-            gas_limit: None,
-            id: 1,
-            reply_on: ReplyOn::Success,
-        }]
+        vec![WasmMsg::Instantiate {
+            code_id: 10u64,
+            msg: to_binary(&TokenInitMsg {
+                name: "oraiswap liquidity token".to_string(),
+                symbol: "uLP".to_string(),
+                decimals: 6,
+                initial_balances: vec![],
+                mint: Some(MinterResponse {
+                    minter: HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+                    cap: None,
+                }),
+            })
+            .unwrap(),
+            send: vec![],
+            label: None,
+        }
+        .into(),]
     );
 
     // store liquidity token
@@ -145,7 +145,7 @@ fn provide_liquidity() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // successfully provide liquidity for the exist pool
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -179,7 +179,7 @@ fn provide_liquidity() {
         transfer_from_msg,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+            msg: to_binary(&Cw20HandleMsg::TransferFrom {
                 owner: "addr0000".to_string(),
                 recipient: MOCK_CONTRACT_ADDR.to_string(),
                 amount: Uint128::from(100u128),
@@ -192,7 +192,7 @@ fn provide_liquidity() {
         mint_msg,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "liquidity0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Mint {
+            msg: to_binary(&Cw20HandleMsg::Mint {
                 recipient: "addr0000".to_string(),
                 amount: Uint128::from(100u128),
             })
@@ -224,7 +224,7 @@ fn provide_liquidity() {
         ),
     ]);
 
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -260,7 +260,7 @@ fn provide_liquidity() {
         transfer_from_msg,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+            msg: to_binary(&Cw20HandleMsg::TransferFrom {
                 owner: "addr0000".to_string(),
                 recipient: MOCK_CONTRACT_ADDR.to_string(),
                 amount: Uint128::from(100u128),
@@ -273,7 +273,7 @@ fn provide_liquidity() {
         mint_msg,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "liquidity0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Mint {
+            msg: to_binary(&Cw20HandleMsg::Mint {
                 recipient: "staking0000".to_string(), // LP tokens sent to specified receiver
                 amount: Uint128::from(50u128),
             })
@@ -283,7 +283,7 @@ fn provide_liquidity() {
     );
 
     // check wrong argument
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -342,7 +342,7 @@ fn provide_liquidity() {
     ]);
 
     // failed because the price is under slippage_tolerance
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -385,7 +385,7 @@ fn provide_liquidity() {
     )]);
 
     // failed because the price is under slippage_tolerance
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -430,7 +430,7 @@ fn provide_liquidity() {
     )]);
 
     // successfully provides
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -469,7 +469,7 @@ fn provide_liquidity() {
     )]);
 
     // successfully provides
-    let msg = ExecuteMsg::ProvideLiquidity {
+    let msg = HandleMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -555,7 +555,7 @@ fn withdraw_liquidity() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // withdraw liquidity
-    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".to_string(),
         msg: to_binary(&Cw20HookMsg::WithdrawLiquidity {}).unwrap(),
         amount: Uint128::from(100u128),
@@ -583,7 +583,7 @@ fn withdraw_liquidity() {
         msg_refund_1,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_binary(&Cw20HandleMsg::Transfer {
                 recipient: "addr0000".to_string(),
                 amount: Uint128::from(100u128),
             })
@@ -595,7 +595,7 @@ fn withdraw_liquidity() {
         msg_burn_liquidity,
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "liquidity0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Burn {
+            msg: to_binary(&Cw20HandleMsg::Burn {
                 amount: Uint128::from(100u128),
             })
             .unwrap(),
@@ -676,7 +676,7 @@ fn try_native_to_token() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // normal swap
-    let msg = ExecuteMsg::Swap {
+    let msg = HandleMsg::Swap {
         offer_asset: Asset {
             info: AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
@@ -781,7 +781,7 @@ fn try_native_to_token() {
     assert_eq!(
         &SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_binary(&Cw20HandleMsg::Transfer {
                 recipient: "addr0000".to_string(),
                 amount: expected_return_amount,
             })
@@ -856,7 +856,7 @@ fn try_token_to_native() {
     let _res = reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
 
     // unauthorized access; can not execute swap directly for token swap
-    let msg = ExecuteMsg::Swap {
+    let msg = HandleMsg::Swap {
         offer_asset: Asset {
             info: AssetInfo::Token {
                 contract_addr: "asset0000".to_string(),
@@ -876,7 +876,7 @@ fn try_token_to_native() {
     }
 
     // normal sell
-    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".to_string(),
         amount: offer_amount,
         msg: to_binary(&Cw20HookMsg::Swap {
@@ -996,7 +996,7 @@ fn try_token_to_native() {
     );
 
     // failed due to non asset token contract try to execute sell
-    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".to_string(),
         amount: offer_amount,
         msg: to_binary(&Cw20HookMsg::Swap {

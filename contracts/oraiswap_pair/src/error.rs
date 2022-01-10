@@ -1,4 +1,5 @@
-use cosmwasm_std::{OverflowError, StdError};
+use cosmwasm_std::StdError;
+use oraiswap::error::OverflowError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]

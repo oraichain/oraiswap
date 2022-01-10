@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ExecuteMsg",
+  "title": "HandleMsg",
   "anyOf": [
     {
       "type": "object",
@@ -166,7 +166,7 @@
       "type": "string"
     },
     "Cw20ReceiveMsg": {
-      "description": "Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
+      "description": "Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg",
       "type": "object",
       "required": [
         "amount",

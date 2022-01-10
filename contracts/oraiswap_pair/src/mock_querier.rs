@@ -1,20 +1,24 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, OwnedDeps, Querier,
-    QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, HumanAddr, OwnedDeps,
+    Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use orai_cosmwasm::{OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse};
+use oraiswap_oracle_base::{
+    OracleContract, OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse,
+};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.
 pub fn mock_dependencies(
     contract_balance: &[Coin],
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
-    let custom_querier: WasmMockQuerier =
-        WasmMockQuerier::new(MockQuerier::new(&[(MOCK_CONTRACT_ADDR, contract_balance)]));
+    let custom_querier: WasmMockQuerier = WasmMockQuerier::new(MockQuerier::new(&[(
+        &HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+        contract_balance,
+    )]));
 
     OwnedDeps {
         storage: MockStorage::default(),
@@ -24,7 +28,7 @@ pub fn mock_dependencies(
 }
 
 pub struct WasmMockQuerier {
-    base: MockQuerier<OraiQueryWrapper>,
+    base: MockQuerier<Empty>,
     token_querier: TokenQuerier,
     tax_querier: TaxQuerier,
 }
@@ -85,7 +89,7 @@ pub(crate) fn caps_to_map(caps: &[(&String, &Uint128)]) -> HashMap<String, Uint1
 impl Querier for WasmMockQuerier {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         // MockQuerier doesn't support Custom, so we ignore it completely here
-        let request: QueryRequest<OraiQueryWrapper> = match from_slice(bin_request) {
+        let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -99,38 +103,40 @@ impl Querier for WasmMockQuerier {
 }
 
 impl WasmMockQuerier {
-    pub fn handle_query(&self, request: &QueryRequest<OraiQueryWrapper>) -> QuerierResult {
+    pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {
         match &request {
-            QueryRequest::Custom(OraiQueryWrapper { route, query_data }) => {
-                if route == &OraiRoute::Treasury {
-                    match query_data {
-                        OraiQuery::TaxRate {} => {
-                            let res = TaxRateResponse {
-                                rate: self.tax_querier.rate,
-                            };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
+            // move this to oracle wrapper to fake return from a deployed contract
+            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => match from_binary(msg) {
+                Ok(OraiQueryWrapper { route, query_data }) => {
+                    if route.eq(&OraiRoute::Treasury) {
+                        match query_data {
+                            OraiQuery::TaxRate {} => {
+                                let res = TaxRateResponse {
+                                    rate: self.tax_querier.rate,
+                                };
+                                SystemResult::Ok(ContractResult::from(to_binary(&res)))
+                            }
+                            OraiQuery::TaxCap { denom } => {
+                                let cap = self
+                                    .tax_querier
+                                    .caps
+                                    .get(&denom)
+                                    .copied()
+                                    .unwrap_or_default();
+                                let res = TaxCapResponse { cap };
+                                SystemResult::Ok(ContractResult::from(to_binary(&res)))
+                            }
+                            _ => panic!("DO NOT ENTER HERE"),
                         }
-                        OraiQuery::TaxCap { denom } => {
-                            let cap = self
-                                .tax_querier
-                                .caps
-                                .get(denom)
-                                .copied()
-                                .unwrap_or_default();
-                            let res = TaxCapResponse { cap };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                        }
-                        _ => panic!("DO NOT ENTER HERE"),
+                    } else {
+                        panic!("DO NOT ENTER HERE")
                     }
-                } else {
-                    panic!("DO NOT ENTER HERE")
                 }
-            }
-            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
-                match from_binary(msg).unwrap() {
+
+                _ => match from_binary(msg).unwrap() {
                     Cw20QueryMsg::TokenInfo {} => {
                         let balances: &HashMap<String, Uint128> =
-                            match self.token_querier.balances.get(contract_addr) {
+                            match self.token_querier.balances.get(contract_addr.as_str()) {
                                 Some(balances) => balances,
                                 None => {
                                     return SystemResult::Err(SystemError::InvalidRequest {
@@ -161,7 +167,7 @@ impl WasmMockQuerier {
                     }
                     Cw20QueryMsg::Balance { address } => {
                         let balances: &HashMap<String, Uint128> =
-                            match self.token_querier.balances.get(contract_addr) {
+                            match self.token_querier.balances.get(contract_addr.as_str()) {
                                 Some(balances) => balances,
                                 None => {
                                     return SystemResult::Err(SystemError::InvalidRequest {
@@ -174,7 +180,7 @@ impl WasmMockQuerier {
                                 }
                             };
 
-                        let balance = match balances.get(&address) {
+                        let balance = match balances.get(address.as_str()) {
                             Some(v) => *v,
                             None => {
                                 return SystemResult::Ok(ContractResult::Ok(
@@ -191,15 +197,15 @@ impl WasmMockQuerier {
                         ))
                     }
                     _ => panic!("DO NOT ENTER HERE"),
-                }
-            }
+                },
+            },
             _ => self.base.handle_query(request),
         }
     }
 }
 
 impl WasmMockQuerier {
-    pub fn new(base: MockQuerier<OraiQueryWrapper>) -> Self {
+    pub fn new(base: MockQuerier<Empty>) -> Self {
         WasmMockQuerier {
             base,
             token_querier: TokenQuerier::default(),

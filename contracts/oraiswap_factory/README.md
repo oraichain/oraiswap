@@ -15,7 +15,7 @@ The factory contract can perform creation of oraiswap pair contract and also be 
 }
 ```
 
-## ExecuteMsg
+## HandleMsg
 
 ### `update_config`
 

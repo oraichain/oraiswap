@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::{Asset, AssetInfo};
 
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -12,11 +12,18 @@ pub struct InitMsg {
     pub asset_infos: [AssetInfo; 2],
     /// Token contract code id for initialization
     pub token_code_id: u64,
+
+    /// Oracle contract for query oracle information
+    pub oracle_address: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
+    /// liquidity token address after instantiated
+    Update {
+        contract_address: HumanAddr,
+    },
     Receive(Cw20ReceiveMsg),
     /// ProvideLiquidity a user provides pool liquidity
     ProvideLiquidity {

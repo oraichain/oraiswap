@@ -14,6 +14,7 @@ fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -35,6 +36,7 @@ fn update_config() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -102,6 +104,7 @@ fn create_pair() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -139,6 +142,7 @@ fn create_pair() {
         res.messages,
         vec![WasmMsg::Instantiate {
             msg: to_binary(&PairInitMsg {
+                oracle_address: HumanAddr("oracle0000".to_string()),
                 asset_infos: asset_infos.clone(),
                 token_code_id: 123u64,
             })
@@ -171,6 +175,7 @@ fn update_pair() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
+        oracle_address: HumanAddr("oracle0000".to_string()),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };

@@ -16,7 +16,7 @@ use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::query_pair_info;
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
+    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
     SwapOperation,
 };
 use std::collections::HashMap;
@@ -43,11 +43,11 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
+    msg: HandleMsg,
 ) -> StdResult<Response<OraiMsgWrapper>> {
     match msg {
-        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-        ExecuteMsg::ExecuteSwapOperations {
+        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        HandleMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
@@ -62,7 +62,7 @@ pub fn execute(
                 optional_addr_validate(api, to)?,
             )
         }
-        ExecuteMsg::ExecuteSwapOperation { operation, to } => {
+        HandleMsg::ExecuteSwapOperation { operation, to } => {
             let api = deps.api;
             execute_swap_operation(
                 deps,
@@ -72,7 +72,7 @@ pub fn execute(
                 optional_addr_validate(api, to)?.map(|v| v.to_string()),
             )
         }
-        ExecuteMsg::AssertMinimumReceive {
+        HandleMsg::AssertMinimumReceive {
             asset_info,
             prev_balance,
             minimum_receive,
@@ -150,7 +150,7 @@ pub fn execute_swap_operations(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: env.contract.address.to_string(),
                 funds: vec![],
-                msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
+                msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: op,
                     to: if operation_index == operations_len {
                         Some(to.to_string())
@@ -169,7 +169,7 @@ pub fn execute_swap_operations(
         messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: env.contract.address.to_string(),
             funds: vec![],
-            msg: to_binary(&ExecuteMsg::AssertMinimumReceive {
+            msg: to_binary(&HandleMsg::AssertMinimumReceive {
                 asset_info: target_asset_info,
                 prev_balance: receiver_balance,
                 minimum_receive,

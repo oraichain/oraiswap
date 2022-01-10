@@ -6,10 +6,10 @@ use cosmwasm_std::{
 use crate::querier::compute_tax;
 use crate::state::{Config, CONFIG};
 
-use cw20::Cw20ExecuteMsg;
+use cw20::Cw20HandleMsg;
 use orai_cosmwasm::{create_swap_msg, create_swap_send_msg, OraiMsgWrapper};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
-use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
+use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::querier::{query_balance, query_pair_info, query_token_balance};
 use oraiswap::router::SwapOperation;
 
@@ -115,7 +115,7 @@ pub fn asset_into_swap_msg(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: pair_contract.to_string(),
                 funds: vec![Coin { denom, amount }],
-                msg: to_binary(&PairExecuteMsg::Swap {
+                msg: to_binary(&PairHandleMsg::Swap {
                     offer_asset: Asset {
                         amount,
                         ..offer_asset
@@ -129,10 +129,10 @@ pub fn asset_into_swap_msg(
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr,
             funds: vec![],
-            msg: to_binary(&Cw20ExecuteMsg::Send {
+            msg: to_binary(&Cw20HandleMsg::Send {
                 contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
-                msg: to_binary(&PairExecuteMsg::Swap {
+                msg: to_binary(&PairHandleMsg::Swap {
                     offer_asset,
                     belief_price: None,
                     max_spread,

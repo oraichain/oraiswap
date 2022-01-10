@@ -87,6 +87,7 @@ impl WasmMockQuerier {
 
                     let api: MockApi = MockApi::default();
                     SystemResult::Ok(ContractResult::from(to_binary(&PairInfoRaw {
+                        creator: HumanAddr("creator0000".to_string()),
                         contract_addr: api
                             .canonical_address(&HumanAddr(pair_info.contract_addr))
                             .unwrap(),

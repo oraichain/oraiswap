@@ -2,7 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::querier::{query_balance, query_token_balance};
+use crate::{
+    error::OverflowError,
+    querier::{query_balance, query_token_balance},
+};
 use cosmwasm_std::{
     to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, HumanAddr, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
@@ -30,18 +33,22 @@ impl Asset {
         self.info.is_native_token()
     }
 
-    fn checked_sub(left: Uint128, right: Uint128) -> StdResult<Uint128> {
+    pub fn checked_sub(left: Uint128, right: Uint128) -> StdResult<Uint128> {
         left.0.checked_sub(right.0).map(Uint128).ok_or_else(|| {
-            StdError::generic_err(format!(
-                "OverflowError {{ operation: Sub, operand1: \"{}\", operand2: \"{}\" }}",
-                left, right
-            ))
+            StdError::generic_err(
+                OverflowError {
+                    operation: crate::error::OverflowOperation::Sub,
+                    operand1: left.to_string(),
+                    operand2: right.to_string(),
+                }
+                .to_string(),
+            )
         })
     }
 
     pub fn compute_tax(
         &self,
-        orai_querier: &OracleContract,
+        oracle_querier: &OracleContract,
         querier: &QuerierWrapper,
     ) -> StdResult<Uint128> {
         let amount = self.amount;
@@ -49,9 +56,9 @@ impl Asset {
             if denom == "uluna" {
                 Ok(Uint128::zero())
             } else {
-                let tax_rate: Decimal = (orai_querier.query_tax_rate(querier)?).rate;
+                let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;
                 let tax_cap: Uint128 =
-                    (orai_querier.query_tax_cap(querier, denom.to_string())?).cap;
+                    (oracle_querier.query_tax_cap(querier, denom.to_string())?).cap;
                 Ok(std::cmp::min(
                     Self::checked_sub(
                         amount,
@@ -70,14 +77,14 @@ impl Asset {
 
     pub fn deduct_tax(
         &self,
-        orai_querier: &OracleContract,
+        oracle_querier: &OracleContract,
         querier: &QuerierWrapper,
     ) -> StdResult<Coin> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
             Ok(Coin {
                 denom: denom.to_string(),
-                amount: Self::checked_sub(amount, self.compute_tax(orai_querier, querier)?)?,
+                amount: Self::checked_sub(amount, self.compute_tax(oracle_querier, querier)?)?,
             })
         } else {
             Err(StdError::generic_err("cannot deduct tax from token asset"))
@@ -86,7 +93,7 @@ impl Asset {
 
     pub fn into_msg(
         self,
-        orai_querier: &OracleContract,
+        oracle_querier: &OracleContract,
         querier: &QuerierWrapper,
         sender: HumanAddr,
         recipient: HumanAddr,
@@ -105,7 +112,7 @@ impl Asset {
             AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
                 from_address: HumanAddr(sender.to_string()),
                 to_address: HumanAddr(recipient.to_string()),
-                amount: vec![self.deduct_tax(orai_querier, querier)?],
+                amount: vec![self.deduct_tax(oracle_querier, querier)?],
             })),
         }
     }
@@ -297,6 +304,10 @@ pub struct PairInfoRaw {
     pub asset_infos: [AssetInfoRaw; 2],
     pub contract_addr: CanonicalAddr,
     pub liquidity_token: CanonicalAddr,
+
+    // we use this to later update the smart contract
+    // because can not get initiated contract result
+    pub creator: HumanAddr,
 }
 
 impl PairInfoRaw {

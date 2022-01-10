@@ -12,6 +12,7 @@ use oraiswap::pair::InitMsg as PairInitMsg;
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let config = Config {
+        oracle_address: msg.oracle_address,
         owner: deps.api.canonical_address(&info.sender)?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
@@ -119,6 +120,7 @@ pub fn handle_create_pair(
             send: vec![],
             label: None,
             msg: to_binary(&PairInitMsg {
+                oracle_address: HumanAddr("oracle0000".to_string()),
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
             })?,
@@ -164,6 +166,7 @@ pub fn handle_update_pair(
         deps.storage,
         &pair_key,
         &PairInfoRaw {
+            creator: info.sender,
             liquidity_token: deps.api.canonical_address(&liquidity_token)?,
             contract_addr: deps.api.canonical_address(&contract_addr)?,
             asset_infos: tmp_pair_info.asset_infos,

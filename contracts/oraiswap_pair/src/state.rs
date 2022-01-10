@@ -1,15 +1,17 @@
+use cosmwasm_std::HumanAddr;
 use cw_storage_plus::Item;
 use oraiswap::asset::PairInfoRaw;
 
 // put the length bytes at the first for compatibility with legacy singleton store
 pub const PAIR_INFO: Item<PairInfoRaw> = Item::new("\u{0}\u{9}pair_info");
+pub const ORACLE_INFO: Item<HumanAddr> = Item::new("oracle_info");
 
 #[cfg(test)]
 mod test {
     use super::*;
 
     use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::{Api, StdResult, Storage};
+    use cosmwasm_std::{Api, HumanAddr, StdResult, Storage};
     use cosmwasm_storage::{singleton, singleton_read};
     use oraiswap::asset::AssetInfoRaw;
     const KEY_PAIR_INFO: &[u8] = b"pair_info";
@@ -27,16 +29,28 @@ mod test {
         store_pair_info(
             &mut deps.storage,
             &PairInfoRaw {
+                creator: HumanAddr("creator0000".to_string()),
                 asset_infos: [
                     AssetInfoRaw::NativeToken {
                         denom: "uusd".to_string(),
                     },
                     AssetInfoRaw::Token {
-                        contract_addr: deps.api.addr_canonicalize("token0000").unwrap(),
+                        contract_addr: deps
+                            .api
+                            .canonical_address(&HumanAddr::from("token0000".to_string()))
+                            .unwrap(),
                     },
                 ],
-                contract_addr: deps.api.addr_canonicalize("pair0000").unwrap(),
-                liquidity_token: deps.api.addr_canonicalize("liquidity0000").unwrap(),
+
+                contract_addr: deps
+                    .api
+                    .canonical_address(&HumanAddr::from("pair0000".to_string()))
+                    .unwrap(),
+
+                liquidity_token: deps
+                    .api
+                    .canonical_address(&HumanAddr::from("liquidity0000".to_string()))
+                    .unwrap(),
             },
         )
         .unwrap();

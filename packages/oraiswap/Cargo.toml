@@ -22,7 +22,9 @@ cosmwasm-storage = { version = "0.13.2" }
 oraiswap_oracle_base = { path = "../oraiswap_oracle_base" }
 cosmwasm-std = { version = "0.13.2" }
 schemars = "0.7"
+bigint = "4"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
 cosmwasm-schema = "0.13.2"

@@ -8,6 +8,7 @@ use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
+    pub oracle_address: HumanAddr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
 }
@@ -94,6 +95,7 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
+                oracle_address: HumanAddr("oracle0000".to_string()),
                 owner: deps
                     .api
                     .canonical_address(&HumanAddr("owner0000".to_string()))
@@ -155,6 +157,7 @@ mod test {
     fn pair_info_legacy_compatibility() {
         let mut deps = mock_dependencies(&[]);
         let pair_info = PairInfoRaw {
+            creator: HumanAddr("creator0000".to_string()),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
@@ -170,6 +173,7 @@ mod test {
                 .api
                 .canonical_address(&HumanAddr("pair0000".to_string()))
                 .unwrap(),
+
             liquidity_token: deps
                 .api
                 .canonical_address(&HumanAddr("liquidity0000".to_string()))
@@ -177,6 +181,7 @@ mod test {
         };
 
         let pair_info2 = PairInfoRaw {
+            creator: HumanAddr("creator0000".to_string()),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
