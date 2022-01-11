@@ -91,11 +91,13 @@ pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
 }
 
 pub fn query_tax_rate(deps: Deps) -> StdResult<TaxRateResponse> {
+    // TODO : implemented here https://github.com/terra-money/core/tree/main/x/treasury/spec
     let rate = TAX_RATE.load(deps.storage)?;
     Ok(TaxRateResponse { rate })
 }
 
 pub fn query_tax_cap(deps: Deps, denom: String) -> StdResult<TaxCapResponse> {
+    // TODO : implemented here https://github.com/terra-money/core/tree/main/x/treasury/spec
     let cap = TAX_CAP.load(deps.storage, denom.as_bytes())?;
     Ok(TaxCapResponse { cap })
 }
@@ -113,6 +115,8 @@ pub fn query_exchange_rates(
     base_denom: String,
     quote_denoms: Vec<String>,
 ) -> StdResult<ExchangeRatesResponse> {
+    // TODO: implemented here https://github.com/terra-money/core/tree/main/x/oracle/spec
+
     let mut res = ExchangeRatesResponse {
         base_denom: base_denom.clone(),
         exchange_rates: vec![],
