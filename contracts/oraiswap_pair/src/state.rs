@@ -1,8 +1,7 @@
 use cw_storage_plus::Item;
 use oraiswap::asset::PairInfoRaw;
 
-// put the length bytes at the first for compatibility with legacy singleton store
-pub const PAIR_INFO: Item<PairInfoRaw> = Item::new("\u{0}\u{9}pair_info");
+pub const PAIR_INFO: Item<PairInfoRaw> = Item::new("pair_info");
 
 #[cfg(test)]
 mod test {

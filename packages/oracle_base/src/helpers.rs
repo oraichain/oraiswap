@@ -106,11 +106,8 @@ impl OracleContract {
     pub fn query_contract_info<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,
-        contract_address: T,
     ) -> StdResult<ContractInfoResponse> {
-        let request = OracleQuery::Contract(OracleContractQuery::ContractInfo {
-            contract_address: contract_address.into(),
-        });
+        let request = OracleQuery::Contract(OracleContractQuery::ContractInfo {});
 
         self.query(querier, request)
     }

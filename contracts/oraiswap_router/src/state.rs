@@ -9,8 +9,7 @@ pub struct Config {
     pub factory_addr: CanonicalAddr,
 }
 
-// put the length bytes at the first for compatibility with legacy singleton store
-pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 #[cfg(test)]
 mod test {

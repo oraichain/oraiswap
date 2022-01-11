@@ -1,26 +1,22 @@
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdError, StdResult, KV,
+    to_binary, Binary, Coin, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, StdResult,
 };
 
 use oracle_base::{
-    ContractInfoResponse, OracleMsgWrapper, OracleQuery, OracleQueryWrapper, OracleRoute,
+    ContractInfoResponse, ExchangeRateItem, ExchangeRatesResponse, OracleContractQuery,
+    OracleExchangeQuery, OracleMarketMsg, OracleMarketQuery, OracleMsg, OracleQuery,
+    OracleTreasuryQuery, SwapResponse, TaxCapResponse, TaxRateResponse,
 };
 
-use crate::check_size;
-use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
-use crate::state::{
-    decrement_tokens, increment_tokens, num_tokens, tokens, TokenInfo, CONTRACT_INFO,
-};
-use cw_storage_plus::Bound;
+use oraiswap::oracle::InitMsg;
+
+// use crate::msg::{HandleMsg, InitMsg};
+use crate::state::{CONTRACT_INFO, EXCHANGE_RATES, TAX_CAP, TAX_RATE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:oraiswap_oracle";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const DEFAULT_LIMIT: u32 = 10;
-const MAX_LIMIT: u32 = 30;
-const MAX_CHARS_SIZE: usize = 1024;
 
 pub fn init(
     deps: DepsMut,
@@ -28,12 +24,10 @@ pub fn init(
     msg_info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let creator = msg_info.sender.to_string();
     let info = ContractInfoResponse {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
-        creator,
-        admin: msg.admin.unwrap_or(creator),
+        creator: msg_info.sender.clone(),
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
     Ok(InitResponse::default())
@@ -43,51 +37,99 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
-    match msg {}
-}
-
-pub fn query(deps: Deps, env: Env, msg: OracleQueryWrapper) -> StdResult<Binary> {
-    let OracleQueryWrapper { route, query_data } = msg;
-    match route {
-        OracleRoute::Treasury => match query_data {
-            OracleQuery::TaxRate {} => {
-                let res = TaxRateResponse {
-                    rate: self.tax_querier.rate,
-                };
-            }
-            OracleQuery::TaxCap { denom } => {
-                let res = TaxCapResponse { cap };
-            }
-            OracleQuery::Swap {
+    msg: OracleMsg,
+) -> StdResult<HandleResponse> {
+    match msg {
+        OracleMsg::Market(handle_data) => match handle_data {
+            OracleMarketMsg::Swap {
                 offer_coin,
                 ask_denom,
-            } => todo!(),
-            OracleQuery::ExchangeRates {
-                base_denom,
-                quote_denoms,
-            } => todo!(),
-            OracleQuery::ContractInfo { contract_address } => todo!(),
-        },
-        OracleRoute::Market => match query_data {
-            OracleQuery::Swap {
+            } => handle_swap(deps, info, env.contract.address, offer_coin, ask_denom),
+            OracleMarketMsg::SwapSend {
+                to_address,
                 offer_coin,
-                ask_denom: _,
-            } => {
-                let res = SwapResponse {
-                    receive: offer_coin.clone(),
-                };
-            }
-            OracleQuery::TaxRate {} => todo!(),
-            OracleQuery::TaxCap { denom } => todo!(),
-            OracleQuery::ExchangeRates {
+                ask_denom,
+            } => handle_swap(deps, info, to_address, offer_coin, ask_denom),
+        },
+    }
+}
+
+// Only owner can execute it
+pub fn handle_swap(
+    deps: DepsMut,
+    info: MessageInfo,
+    to_address: HumanAddr,
+    offer_coin: Coin,
+    ask_denom: String,
+) -> StdResult<HandleResponse> {
+    // TODO: implemented from here https://github.com/terra-money/core/blob/main/x/market/keeper/msg_server.go
+    Ok(HandleResponse::default())
+}
+
+pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
+    match msg {
+        OracleQuery::Treasury(query_data) => match query_data {
+            OracleTreasuryQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
+            OracleTreasuryQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
+        },
+        OracleQuery::Market(query_data) => match query_data {
+            OracleMarketQuery::Swap {
+                offer_coin,
+                ask_denom,
+            } => to_binary(&query_swap(deps, offer_coin, ask_denom)?),
+        },
+        OracleQuery::Exchange(query_data) => match query_data {
+            OracleExchangeQuery::ExchangeRates {
                 base_denom,
                 quote_denoms,
-            } => todo!(),
-            OracleQuery::ContractInfo { contract_address } => todo!(),
+            } => to_binary(&query_exchange_rates(deps, base_denom, quote_denoms)?),
         },
-        OracleRoute::Oracle => todo!(),
-        OracleRoute::Wasm => todo!(),
+        OracleQuery::Contract(query_data) => match query_data {
+            OracleContractQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+        },
     }
+}
+
+pub fn query_tax_rate(deps: Deps) -> StdResult<TaxRateResponse> {
+    let rate = TAX_RATE.load(deps.storage)?;
+    Ok(TaxRateResponse { rate })
+}
+
+pub fn query_tax_cap(deps: Deps, denom: String) -> StdResult<TaxCapResponse> {
+    let cap = TAX_CAP.load(deps.storage, denom.as_bytes())?;
+    Ok(TaxCapResponse { cap })
+}
+
+pub fn query_swap(deps: Deps, offer_coin: Coin, ask_denom: String) -> StdResult<SwapResponse> {
+    // TODO: implemented here https://github.com/terra-money/core/blob/main/x/market/keeper/querier.go
+    // with offer_coin, ask for denom, will return receive, based on swap rate
+    Ok(SwapResponse {
+        receive: offer_coin.clone(),
+    })
+}
+
+pub fn query_exchange_rates(
+    deps: Deps,
+    base_denom: String,
+    quote_denoms: Vec<String>,
+) -> StdResult<ExchangeRatesResponse> {
+    let mut res = ExchangeRatesResponse {
+        base_denom: base_denom.clone(),
+        exchange_rates: vec![],
+    };
+
+    for quote_denom in quote_denoms {
+        let key = [base_denom.as_bytes(), quote_denom.as_bytes()].concat();
+        let exchange_rate = EXCHANGE_RATES.load(deps.storage, &key)?;
+        res.exchange_rates.push(ExchangeRateItem {
+            quote_denom,
+            exchange_rate,
+        });
+    }
+
+    Ok(res)
+}
+
+pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
+    CONTRACT_INFO.load(deps.storage)
 }

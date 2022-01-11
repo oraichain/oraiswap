@@ -13,8 +13,7 @@ pub struct Config {
     pub token_code_id: u64,
 }
 
-// put the length bytes at the first for compatibility with legacy singleton store
-pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TmpPairInfo {

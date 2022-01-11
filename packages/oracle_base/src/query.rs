@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, Decimal, Uint128};
+use cosmwasm_std::{Coin, Decimal, HumanAddr, Uint128};
 
 /// OracleQuery is defines available query datas
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -38,7 +38,7 @@ pub enum OracleExchangeQuery {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OracleContractQuery {
-    ContractInfo { contract_address: String },
+    ContractInfo {},
 }
 
 /// SwapResponse is data format returned from SwapRequest::Simulate query
@@ -78,6 +78,5 @@ pub struct ExchangeRatesResponse {
 pub struct ContractInfoResponse {
     pub name: String,
     pub version: String,
-    pub creator: String,
-    pub admin: String,
+    pub creator: HumanAddr,
 }

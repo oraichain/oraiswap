@@ -271,6 +271,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
  "oracle_base",
+ "oraiswap",
  "schemars",
  "serde",
  "thiserror",
