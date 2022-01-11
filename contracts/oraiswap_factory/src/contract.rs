@@ -12,7 +12,7 @@ use oraiswap::pair::InitMsg as PairInitMsg;
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let config = Config {
-        oracle_address: msg.oracle_address,
+        oracle_addr: msg.oracle_addr,
         owner: deps.api.canonical_address(&info.sender)?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
@@ -52,7 +52,7 @@ pub fn handle_update_config(
     token_code_id: Option<u64>,
     pair_code_id: Option<u64>,
 ) -> StdResult<HandleResponse> {
-    let mut config: Config = CONFIG.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
 
     // permission check
     if deps.api.canonical_address(&info.sender)? != config.owner {
@@ -120,7 +120,7 @@ pub fn handle_create_pair(
             send: vec![],
             label: None,
             msg: to_binary(&PairInitMsg {
-                oracle_address: HumanAddr("oracle0000".to_string()),
+                oracle_addr: config.oracle_addr,
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
             })?,
@@ -161,12 +161,13 @@ pub fn handle_update_pair(
 
     // the contract must follow the standard interface
     let liquidity_token = query_liquidity_token(deps.as_ref(), contract_addr.clone())?;
-
+    let config = CONFIG.load(deps.storage)?;
     PAIRS.save(
         deps.storage,
         &pair_key,
         &PairInfoRaw {
-            creator: info.sender,
+            oracle_addr: deps.api.canonical_address(&config.oracle_addr)?,
+            creator: deps.api.canonical_address(&info.sender)?,
             liquidity_token: deps.api.canonical_address(&liquidity_token)?,
             contract_addr: deps.api.canonical_address(&contract_addr)?,
             asset_infos: tmp_pair_info.asset_infos,

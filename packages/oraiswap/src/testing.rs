@@ -5,7 +5,7 @@ use crate::querier::{
 };
 
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
-use cosmwasm_std::{to_binary, BankMsg, Coin, CosmosMsg, Decimal, HumanAddr, Uint128, WasmMsg};
+use cosmwasm_std::{to_binary, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
 use cw20::Cw20HandleMsg;
 use oracle_base::OracleContract;
 
@@ -22,8 +22,8 @@ fn token_balance_querier() {
         Uint128::from(123u128),
         query_token_balance(
             &deps.as_ref().querier,
-            HumanAddr("liquidity0000".to_string()),
-            HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+            "liquidity0000".into(),
+            MOCK_CONTRACT_ADDR.into(),
         )
         .unwrap()
     );
@@ -39,7 +39,7 @@ fn balance_querier() {
     assert_eq!(
         query_balance(
             &deps.as_ref().querier,
-            HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+            MOCK_CONTRACT_ADDR.into(),
             "uusd".to_string()
         )
         .unwrap(),
@@ -61,11 +61,7 @@ fn all_balances_querier() {
     ]);
 
     assert_eq!(
-        query_all_balances(
-            &deps.as_ref().querier,
-            HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
-        )
-        .unwrap(),
+        query_all_balances(&deps.as_ref().querier, MOCK_CONTRACT_ADDR.into(),).unwrap(),
         vec![
             Coin {
                 denom: "uusd".to_string(),
@@ -94,11 +90,7 @@ fn supply_querier() {
     )]);
 
     assert_eq!(
-        query_supply(
-            &deps.as_ref().querier,
-            HumanAddr("liquidity0000".to_string())
-        )
-        .unwrap(),
+        query_supply(&deps.as_ref().querier, "liquidity0000".into()).unwrap(),
         Uint128::from(492u128)
     )
 }
@@ -141,19 +133,13 @@ fn test_asset_info() {
 
     assert_eq!(
         token_info
-            .query_pool(
-                &deps.as_ref().querier,
-                HumanAddr(MOCK_CONTRACT_ADDR.to_string())
-            )
+            .query_pool(&deps.as_ref().querier, MOCK_CONTRACT_ADDR.into())
             .unwrap(),
         Uint128::from(123u128)
     );
     assert_eq!(
         native_token_info
-            .query_pool(
-                &deps.as_ref().querier,
-                HumanAddr(MOCK_CONTRACT_ADDR.to_string())
-            )
+            .query_pool(&deps.as_ref().querier, MOCK_CONTRACT_ADDR.into())
             .unwrap(),
         Uint128::from(123u128)
     );
@@ -195,7 +181,7 @@ fn test_asset() {
         },
     };
 
-    let orai_oracle = OracleContract(HumanAddr(MOCK_CONTRACT_ADDR.to_string()));
+    let orai_oracle = OracleContract(MOCK_CONTRACT_ADDR.into());
 
     assert_eq!(
         token_asset
@@ -225,14 +211,14 @@ fn test_asset() {
             .into_msg(
                 &orai_oracle,
                 &deps.as_ref().querier,
-                HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
-                HumanAddr("addr0000".to_string())
+                MOCK_CONTRACT_ADDR.into(),
+                "addr0000".into()
             )
             .unwrap(),
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: HumanAddr("asset0000".to_string()),
+            contract_addr: "asset0000".into(),
             msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: HumanAddr("addr0000".to_string()),
+                recipient: "addr0000".into(),
                 amount: Uint128::from(123123u128),
             })
             .unwrap(),
@@ -245,13 +231,13 @@ fn test_asset() {
             .into_msg(
                 &orai_oracle,
                 &deps.as_ref().querier,
-                HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
-                HumanAddr("addr0000".to_string())
+                MOCK_CONTRACT_ADDR.into(),
+                "addr0000".into()
             )
             .unwrap(),
         CosmosMsg::Bank(BankMsg::Send {
-            from_address: HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
-            to_address: HumanAddr("addr0000".to_string()),
+            from_address: MOCK_CONTRACT_ADDR.into(),
+            to_address: "addr0000".into(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(121903u128),
@@ -275,14 +261,16 @@ fn query_oraiswap_pair_contract() {
                     denom: "uusd".to_string(),
                 },
             ],
-            contract_addr: "pair0000".to_string(),
-            liquidity_token: "liquidity0000".to_string(),
+            creator: "addr0000".into(),
+            oracle_addr: "oracle0000".into(),
+            contract_addr: "pair0000".into(),
+            liquidity_token: "liquidity0000".into(),
         },
     )]);
 
     let pair_info: PairInfo = query_pair_info(
         &deps.as_ref().querier,
-        HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+        MOCK_CONTRACT_ADDR.into(),
         &[
             AssetInfo::Token {
                 contract_addr: "asset0000".to_string(),

@@ -8,7 +8,7 @@ use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
-    pub oracle_address: HumanAddr,
+    pub oracle_addr: HumanAddr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
 }
@@ -76,7 +76,7 @@ mod test {
     use super::*;
 
     use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::{Api, HumanAddr, StdResult, Storage};
+    use cosmwasm_std::{Api, StdResult, Storage};
     use cosmwasm_storage::{
         bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     };
@@ -95,11 +95,8 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                oracle_address: HumanAddr("oracle0000".to_string()),
-                owner: deps
-                    .api
-                    .canonical_address(&HumanAddr("owner0000".to_string()))
-                    .unwrap(),
+                oracle_addr: "oracle0000".into(),
+                owner: deps.api.canonical_address(&"owner0000".into()).unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
             },
@@ -157,50 +154,34 @@ mod test {
     fn pair_info_legacy_compatibility() {
         let mut deps = mock_dependencies(&[]);
         let pair_info = PairInfoRaw {
-            creator: HumanAddr("creator0000".to_string()),
+            creator: deps.api.canonical_address(&"creator0000".into()).unwrap(),
+            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps
-                        .api
-                        .canonical_address(&HumanAddr("token0000".to_string()))
-                        .unwrap(),
+                    contract_addr: deps.api.canonical_address(&"token0000".into()).unwrap(),
                 },
             ],
-            contract_addr: deps
-                .api
-                .canonical_address(&HumanAddr("pair0000".to_string()))
-                .unwrap(),
+            contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
 
-            liquidity_token: deps
-                .api
-                .canonical_address(&HumanAddr("liquidity0000".to_string()))
-                .unwrap(),
+            liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
         };
 
         let pair_info2 = PairInfoRaw {
-            creator: HumanAddr("creator0000".to_string()),
+            creator: deps.api.canonical_address(&"creator0000".into()).unwrap(),
+            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps
-                        .api
-                        .canonical_address(&HumanAddr("token0001".to_string()))
-                        .unwrap(),
+                    contract_addr: deps.api.canonical_address(&"token0001".into()).unwrap(),
                 },
             ],
-            contract_addr: deps
-                .api
-                .canonical_address(&HumanAddr("pair0001".to_string()))
-                .unwrap(),
-            liquidity_token: deps
-                .api
-                .canonical_address(&HumanAddr("liquidity0001".to_string()))
-                .unwrap(),
+            contract_addr: deps.api.canonical_address(&"pair0001".into()).unwrap(),
+            liquidity_token: deps.api.canonical_address(&"liquidity0001".into()).unwrap(),
         };
 
         store_pair(&mut deps.storage, &pair_info).unwrap();

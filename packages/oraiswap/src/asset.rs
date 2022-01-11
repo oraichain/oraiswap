@@ -102,16 +102,16 @@ impl Asset {
 
         match &self.info {
             AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: HumanAddr(contract_addr.to_string()),
+                contract_addr: contract_addr.to_owned().into(),
                 msg: to_binary(&Cw20HandleMsg::Transfer {
-                    recipient: HumanAddr(recipient.to_string()),
+                    recipient: recipient.into(),
                     amount,
                 })?,
                 send: vec![],
             })),
             AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr(sender.to_string()),
-                to_address: HumanAddr(recipient.to_string()),
+                from_address: sender.into(),
+                to_address: recipient.into(),
                 amount: vec![self.deduct_tax(oracle_querier, querier)?],
             })),
         }
@@ -147,7 +147,7 @@ impl Asset {
                     denom: denom.to_string(),
                 },
                 AssetInfo::Token { contract_addr } => AssetInfoRaw::Token {
-                    contract_addr: api.canonical_address(&HumanAddr(contract_addr.to_string()))?,
+                    contract_addr: api.canonical_address(&contract_addr.to_owned().into())?,
                 },
             },
             amount: self.amount,
@@ -180,7 +180,7 @@ impl AssetInfo {
                 denom: denom.to_string(),
             }),
             AssetInfo::Token { contract_addr } => Ok(AssetInfoRaw::Token {
-                contract_addr: api.canonical_address(&HumanAddr(contract_addr.to_string()))?,
+                contract_addr: api.canonical_address(&contract_addr.to_owned().into())?,
             }),
         }
     }
@@ -194,7 +194,7 @@ impl AssetInfo {
     pub fn query_pool(&self, querier: &QuerierWrapper, pool_addr: HumanAddr) -> StdResult<Uint128> {
         match self {
             AssetInfo::Token { contract_addr, .. } => {
-                query_token_balance(querier, HumanAddr(contract_addr.to_string()), pool_addr)
+                query_token_balance(querier, contract_addr.to_owned().into(), pool_addr)
             }
             AssetInfo::NativeToken { denom, .. } => {
                 query_balance(querier, pool_addr, denom.to_string())
@@ -295,8 +295,13 @@ impl AssetInfoRaw {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PairInfo {
     pub asset_infos: [AssetInfo; 2],
-    pub contract_addr: String,
-    pub liquidity_token: String,
+    pub contract_addr: HumanAddr,
+    pub liquidity_token: HumanAddr,
+
+    pub oracle_addr: HumanAddr,
+    // we use this to later update the smart contract
+    // because can not get initiated contract result
+    pub creator: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -305,16 +310,20 @@ pub struct PairInfoRaw {
     pub contract_addr: CanonicalAddr,
     pub liquidity_token: CanonicalAddr,
 
+    // oracle contract
+    pub oracle_addr: CanonicalAddr,
     // we use this to later update the smart contract
     // because can not get initiated contract result
-    pub creator: HumanAddr,
+    pub creator: CanonicalAddr,
 }
 
 impl PairInfoRaw {
     pub fn to_normal(&self, api: &dyn Api) -> StdResult<PairInfo> {
         Ok(PairInfo {
-            liquidity_token: api.human_address(&self.liquidity_token)?.to_string(),
-            contract_addr: api.human_address(&self.contract_addr)?.to_string(),
+            liquidity_token: api.human_address(&self.liquidity_token)?,
+            contract_addr: api.human_address(&self.contract_addr)?,
+            creator: api.human_address(&self.creator)?,
+            oracle_addr: api.human_address(&self.oracle_addr)?,
             asset_infos: [
                 self.asset_infos[0].to_normal(api)?,
                 self.asset_infos[1].to_normal(api)?,

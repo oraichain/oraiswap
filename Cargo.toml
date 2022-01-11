@@ -5,6 +5,7 @@ members = [
     "contracts/oraiswap_token",
     "contracts/oraiswap_factory",
     "contracts/oraiswap_pair",
+    "contracts/oraiswap_router",
 ]
 
 [profile.release.package.oraiswap]

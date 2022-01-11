@@ -1,5 +1,5 @@
 use crate::error::ContractError;
-use crate::state::{ORACLE_INFO, PAIR_INFO};
+use crate::state::PAIR_INFO;
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps, DepsMut,
@@ -26,7 +26,8 @@ const COMMISSION_RATE: &str = "0.003";
 
 pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let pair_info = &PairInfoRaw {
-        creator: info.sender,
+        creator: deps.api.canonical_address(&info.sender)?,
+        oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
         contract_addr: deps.api.canonical_address(&env.contract.address)?,
         liquidity_token: CanonicalAddr::from(vec![]),
         asset_infos: [
@@ -36,8 +37,6 @@ pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResu
     };
 
     PAIR_INFO.save(deps.storage, pair_info)?;
-
-    ORACLE_INFO.save(deps.storage, &msg.oracle_address)?;
 
     Ok(InitResponse {
         // Create LP token
@@ -176,7 +175,7 @@ pub fn update_pair(
     let mut pair_info = PAIR_INFO.load(deps.storage)?;
 
     // only creator can update the liquidity_token address
-    if pair_info.creator.ne(&info.sender) {
+    if pair_info.creator.ne(&api.canonical_address(&info.sender)?) {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -225,7 +224,7 @@ pub fn provide_liquidity(
         // If the pool is token contract, then we need to execute TransferFrom msg to receive funds
         if let AssetInfo::Token { contract_addr, .. } = &pool.info {
             messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: HumanAddr(contract_addr.to_string()),
+                contract_addr: contract_addr.to_owned().into(),
                 msg: to_binary(&Cw20HandleMsg::TransferFrom {
                     owner: info.sender.clone(),
                     recipient: env.contract.address.clone(),
@@ -312,8 +311,7 @@ pub fn withdraw_liquidity(
         })
         .collect();
 
-    let oracle_address = ORACLE_INFO.load(deps.storage)?;
-    let oracle_querier = OracleContract(oracle_address);
+    let oracle_querier = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
 
     // update pool info
     Ok(HandleResponse {
@@ -409,8 +407,7 @@ pub fn swap(
         amount: return_amount,
     };
 
-    let oracle_address = ORACLE_INFO.load(deps.storage)?;
-    let oracle_querier = OracleContract(oracle_address);
+    let oracle_querier = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
 
     let tax_amount = return_asset.compute_tax(&oracle_querier, &deps.querier)?;
     let receiver = to.unwrap_or_else(|| sender.clone());

@@ -4,7 +4,7 @@ use crate::mock_querier::mock_dependencies;
 use crate::state::{pair_key, TmpPairInfo, TMP_PAIR_INFO};
 
 use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{attr, from_binary, to_binary, HumanAddr, StdError, WasmMsg};
+use cosmwasm_std::{attr, from_binary, to_binary, StdError, WasmMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
 use oraiswap::pair::InitMsg as PairInitMsg;
@@ -14,7 +14,7 @@ fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oracle_address: HumanAddr("oracle0000".to_string()),
+        oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -36,7 +36,7 @@ fn update_config() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oracle_address: HumanAddr("oracle0000".to_string()),
+        oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -104,7 +104,7 @@ fn create_pair() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oracle_address: HumanAddr("oracle0000".to_string()),
+        oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -142,7 +142,7 @@ fn create_pair() {
         res.messages,
         vec![WasmMsg::Instantiate {
             msg: to_binary(&PairInitMsg {
-                oracle_address: HumanAddr("oracle0000".to_string()),
+                oracle_addr: "oracle0000".into(),
                 asset_infos: asset_infos.clone(),
                 token_code_id: 123u64,
             })
@@ -165,7 +165,7 @@ fn create_pair() {
         TMP_PAIR_INFO.load(&deps.storage, &pair_key).unwrap(),
         TmpPairInfo {
             asset_infos: raw_infos.clone(),
-            creator: HumanAddr("addr0000".to_string()),
+            creator: "addr0000".into(),
         }
     );
 }
@@ -175,7 +175,7 @@ fn update_pair() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oracle_address: HumanAddr("oracle0000".to_string()),
+        oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
     };
@@ -212,7 +212,7 @@ fn update_pair() {
         TMP_PAIR_INFO.load(&deps.storage, &pair_key).unwrap(),
         TmpPairInfo {
             asset_infos: raw_infos.clone(),
-            creator: HumanAddr("addr0000".to_string()),
+            creator: "addr0000".into(),
         }
     );
 
@@ -220,16 +220,18 @@ fn update_pair() {
     deps.querier.with_oraiswap_pairs(&[(
         &"pair0000".to_string(),
         &PairInfo {
+            creator: "addr0000".into(),
+            oracle_addr: "oracle0000".into(),
             asset_infos: asset_infos.clone(),
-            contract_addr: "pair0000".to_string(),
-            liquidity_token: "liquidity0000".to_string(),
+            contract_addr: "pair0000".into(),
+            liquidity_token: "liquidity0000".into(),
         },
     )]);
 
     // later update pair with newly created address
     let update_msg = HandleMsg::UpdatePair {
         pair_key,
-        contract_addr: HumanAddr("pair0000".to_string()),
+        contract_addr: "pair0000".into(),
     };
     let _res = handle(
         deps.as_mut(),
@@ -252,8 +254,10 @@ fn update_pair() {
     assert_eq!(
         pair_res,
         PairInfo {
-            liquidity_token: "liquidity0000".to_string(),
-            contract_addr: "pair0000".to_string(),
+            creator: "addr0000".into(),
+            oracle_addr: "oracle0000".into(),
+            liquidity_token: "liquidity0000".into(),
+            contract_addr: "pair0000".into(),
             asset_infos,
         }
     );

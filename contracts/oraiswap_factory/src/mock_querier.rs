@@ -1,7 +1,7 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_slice, to_binary, Api, Coin, ContractResult, Empty, HumanAddr, OwnedDeps, Querier,
-    QuerierResult, QueryRequest, SystemError, SystemResult, WasmQuery,
+    from_slice, to_binary, Api, Coin, ContractResult, Empty, OwnedDeps, Querier, QuerierResult,
+    QueryRequest, SystemError, SystemResult, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
@@ -13,7 +13,7 @@ pub fn mock_dependencies(
     contract_balance: &[Coin],
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
     let custom_querier: WasmMockQuerier = WasmMockQuerier::new(MockQuerier::new(&[(
-        &HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+        &MOCK_CONTRACT_ADDR.into(),
         contract_balance,
     )]));
 
@@ -87,13 +87,10 @@ impl WasmMockQuerier {
 
                     let api: MockApi = MockApi::default();
                     SystemResult::Ok(ContractResult::from(to_binary(&PairInfoRaw {
-                        creator: HumanAddr("creator0000".to_string()),
-                        contract_addr: api
-                            .canonical_address(&HumanAddr(pair_info.contract_addr))
-                            .unwrap(),
-                        liquidity_token: api
-                            .canonical_address(&HumanAddr(pair_info.liquidity_token))
-                            .unwrap(),
+                        creator: api.canonical_address(&"creator0000".into()).unwrap(),
+                        oracle_addr: api.canonical_address(&"oracle0000".into()).unwrap(),
+                        contract_addr: api.canonical_address(&pair_info.contract_addr).unwrap(),
+                        liquidity_token: api.canonical_address(&pair_info.liquidity_token).unwrap(),
                         asset_infos: [
                             AssetInfoRaw::NativeToken {
                                 denom: "uusd".to_string(),

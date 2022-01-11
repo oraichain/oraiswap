@@ -231,6 +231,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraiswap-router"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw20",
+ "integer-sqrt",
+ "oracle_base",
+ "oraiswap",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "oraiswap-token"
 version = "0.0.0"
 dependencies = [

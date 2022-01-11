@@ -14,7 +14,7 @@ pub struct InitMsg {
     pub token_code_id: u64,
 
     /// Oracle contract for query oracle information
-    pub oracle_address: HumanAddr,
+    pub oracle_addr: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

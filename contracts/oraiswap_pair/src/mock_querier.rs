@@ -1,14 +1,12 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, HumanAddr, OwnedDeps,
-    Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, OwnedDeps, Querier,
+    QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use oracle_base::{
-    OracleContract, OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse,
-};
+use oracle_base::{OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.
@@ -16,7 +14,7 @@ pub fn mock_dependencies(
     contract_balance: &[Coin],
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
     let custom_querier: WasmMockQuerier = WasmMockQuerier::new(MockQuerier::new(&[(
-        &HumanAddr(MOCK_CONTRACT_ADDR.to_string()),
+        &MOCK_CONTRACT_ADDR.into(),
         contract_balance,
     )]));
 
