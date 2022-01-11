@@ -3,8 +3,9 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 use oracle_base::{
-    ExchangeRatesResponse, OraiMsg, OraiMsgWrapper, OraiQuery, OraiQueryWrapper, OraiRoute,
-    SwapResponse, TaxCapResponse, TaxRateResponse,
+    ExchangeRatesResponse, OracleContractQuery, OracleExchangeQuery, OracleMarketMsg,
+    OracleMarketQuery, OracleMsg, OracleQuery, OracleTreasuryQuery, SwapResponse, TaxCapResponse,
+    TaxRateResponse,
 };
 
 fn main() {
@@ -13,11 +14,13 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema(&schema_for!(OraiMsgWrapper), &out_dir);
-    export_schema(&schema_for!(OraiMsg), &out_dir);
-    export_schema(&schema_for!(OraiQueryWrapper), &out_dir);
-    export_schema(&schema_for!(OraiQuery), &out_dir);
-    export_schema(&schema_for!(OraiRoute), &out_dir);
+    export_schema(&schema_for!(OracleMsg), &out_dir);
+    export_schema(&schema_for!(OracleMarketMsg), &out_dir);
+    export_schema(&schema_for!(OracleQuery), &out_dir);
+    export_schema(&schema_for!(OracleContractQuery), &out_dir);
+    export_schema(&schema_for!(OracleExchangeQuery), &out_dir);
+    export_schema(&schema_for!(OracleMarketQuery), &out_dir);
+    export_schema(&schema_for!(OracleTreasuryQuery), &out_dir);
     export_schema(&schema_for!(SwapResponse), &out_dir);
     export_schema(&schema_for!(TaxCapResponse), &out_dir);
     export_schema(&schema_for!(TaxRateResponse), &out_dir);

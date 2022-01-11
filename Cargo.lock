@@ -264,6 +264,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraiswap_oracle"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "oracle_base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -9,11 +9,6 @@ use cosmwasm_std::{
     OwnedDeps, WasmMsg,
 };
 
-use cw721::{
-    ApprovedForAllResponse, ContractInfoResponse, Cw721ReceiveMsg, Expiration, NftInfoResponse,
-    NumTokensResponse, OwnerOfResponse, TokensResponse,
-};
-
 const MINTER: &str = "orai1up8ct7kk2hr6x9l37ev6nfgrtqs268tdrevk3d";
 const OWNER: &str = "owner";
 const CONTRACT_NAME: &str = "Magic Power";

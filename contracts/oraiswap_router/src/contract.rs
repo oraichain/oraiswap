@@ -1,13 +1,13 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    from_binary, to_binary, Binary, Coin, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
 };
 
-use crate::operations::{assert_operations, handle_swap_operation, handle_swap_operations};
+use crate::operations::{handle_swap_operation, handle_swap_operations};
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
-use oracle_base::{OracleContract, OraiMsgWrapper, SwapResponse};
+use oracle_base::{OracleContract, SwapResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
@@ -15,13 +15,12 @@ use oraiswap::router::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
     SwapOperation,
 };
-use std::collections::HashMap;
 
 pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     CONFIG.save(
         deps.storage,
         &Config {
-            factory_addr: deps.api.canonical_address(&msg.factory_addr.into())?,
+            factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
         },
     )?;
 
@@ -33,28 +32,18 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> StdResult<HandleResponse<OraiMsgWrapper>> {
+) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         HandleMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
-        } => {
-            let api = deps.api;
-            handle_swap_operations(
-                deps,
-                env,
-                info.sender,
-                operations,
-                minimum_receive,
-                to.map(HumanAddr),
-            )
-        }
+        } => handle_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
         HandleMsg::ExecuteSwapOperation { operation, to } => {
-            let api = deps.api;
-            handle_swap_operation(deps, env, info, operation, to.map(HumanAddr))
+            handle_swap_operation(deps, env, info, operation, to)
         }
+
         HandleMsg::AssertMinimumReceive {
             asset_info,
             prev_balance,
@@ -75,24 +64,21 @@ pub fn receive_cw20(
     env: Env,
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse<OraiMsgWrapper>> {
+) -> StdResult<HandleResponse> {
     // throw empty data as well when decoding
     match from_binary(&cw20_msg.msg.unwrap_or_default())? {
         Cw20HookMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
-        } => {
-            let api = deps.api;
-            handle_swap_operations(
-                deps,
-                env,
-                cw20_msg.sender,
-                operations,
-                minimum_receive,
-                to.map(HumanAddr),
-            )
-        }
+        } => handle_swap_operations(
+            deps,
+            env,
+            cw20_msg.sender,
+            operations,
+            minimum_receive,
+            to.map(HumanAddr),
+        ),
     }
 }
 
@@ -102,7 +88,7 @@ fn assert_minium_receive(
     prev_balance: Uint128,
     minium_receive: Uint128,
     receiver: HumanAddr,
-) -> StdResult<HandleResponse<OraiMsgWrapper>> {
+) -> StdResult<HandleResponse> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
     let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
 
@@ -142,7 +128,7 @@ fn simulate_swap_operations(
 ) -> StdResult<SimulateSwapOperationsResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
     let factory_addr = deps.api.human_address(&config.factory_addr)?;
-    let pair_config = query_pair_config(&deps.querier, factory_addr)?;
+    let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
     let oracle_querier = OracleContract(pair_config.oracle_addr);
 
     let operations_len = operations.len();
@@ -164,7 +150,9 @@ fn simulate_swap_operations(
                 // because last swap is swap_send
                 if operation_index == operations_len {
                     let return_asset = Asset {
-                        info: AssetInfo::NativeToken { denom: offer_denom },
+                        info: AssetInfo::NativeToken {
+                            denom: offer_denom.clone(),
+                        },
                         amount: offer_amount,
                     };
 
@@ -236,101 +224,4 @@ fn simulate_swap_operations(
     Ok(SimulateSwapOperationsResponse {
         amount: offer_amount,
     })
-}
-
-#[test]
-fn test_invalid_operations() {
-    // empty error
-    assert!(assert_operations(&[]).is_err());
-
-    // orai output
-    assert!(assert_operations(&vec![
-        SwapOperation::NativeSwap {
-            offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
-            },
-        }
-    ])
-    .is_ok());
-
-    // asset0002 output
-    assert!(assert_operations(&vec![
-        SwapOperation::NativeSwap {
-            offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
-            },
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: "asset0002".to_string(),
-            },
-        },
-    ])
-    .is_ok());
-
-    // multiple output token types error
-    assert!(assert_operations(&vec![
-        SwapOperation::NativeSwap {
-            offer_denom: "uusd".to_string(),
-            ask_denom: "ukrw".to_string(),
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "ukrw".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::Token {
-                contract_addr: "asset0001".to_string(),
-            },
-            ask_asset_info: AssetInfo::NativeToken {
-                denom: "uaud".to_string(),
-            },
-        },
-        SwapOperation::OraiSwap {
-            offer_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
-            },
-            ask_asset_info: AssetInfo::Token {
-                contract_addr: "asset0002".to_string(),
-            },
-        },
-    ])
-    .is_err());
 }

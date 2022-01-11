@@ -86,7 +86,7 @@ You may want your contract to perform messages such as `MsgSwap` and `MsgSwapSen
 
 ```rust
 use cosmwasm_std::CosmosMsg;
-use orai_cosmwasm::{create_swap_msg, OraiMsgWrapper};
+use orai_cosmwasm::{create_swap_msg, OracleMsgWrapper};
 ​
 ...
 ​
@@ -94,10 +94,10 @@ pub fn try_something<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     offer: &Coin
-) -> StdResult<HandleResponse<OraiMsgWrapper>> {
+) -> StdResult<HandleResponse<OracleMsgWrapper>> {
     ...
 ​
-    let msg: CosmosMsg<OraiMsgWrapper> = create_swap_msg(contract_addr, offer_coin, ask_denom);
+    let msg: CosmosMsg<OracleMsgWrapper> = create_swap_msg(contract_addr, offer_coin, ask_denom);
     let res = HandleResponse {
         messages: vec![msg],
         log: vec![],

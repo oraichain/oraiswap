@@ -8,7 +8,7 @@ use crate::asset::AssetInfo;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
-    pub factory_addr: String,
+    pub factory_addr: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -45,14 +45,14 @@ pub enum HandleMsg {
     ExecuteSwapOperations {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
-        to: Option<String>,
+        to: Option<HumanAddr>,
     },
 
     /// Internal use
     /// Swap all offer tokens to ask token
     ExecuteSwapOperation {
         operation: SwapOperation,
-        to: Option<String>,
+        to: Option<HumanAddr>,
     },
     /// Internal use
     /// Check the swap amount is exceed minimum_receive
@@ -60,7 +60,7 @@ pub enum HandleMsg {
         asset_info: AssetInfo,
         prev_balance: Uint128,
         minimum_receive: Uint128,
-        receiver: String,
+        receiver: HumanAddr,
     },
 }
 

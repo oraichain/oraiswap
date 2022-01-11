@@ -2,11 +2,12 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::query::{
-    ContractInfoResponse, ExchangeRatesResponse, OraiQuery, OraiQueryWrapper, SwapResponse,
-    TaxCapResponse, TaxRateResponse,
+    ContractInfoResponse, ExchangeRatesResponse, OracleContractQuery, OracleExchangeQuery,
+    OracleMarketQuery, OracleQuery, OracleTreasuryQuery, SwapResponse, TaxCapResponse,
+    TaxRateResponse,
 };
-use crate::route::OraiRoute;
-use crate::OraiMsgWrapper;
+
+use crate::OracleMsg;
 
 use cosmwasm_std::{
     to_binary, Api, CanonicalAddr, Coin, CosmosMsg, HumanAddr, QuerierWrapper, StdResult, WasmMsg,
@@ -31,7 +32,7 @@ impl OracleContract {
         Ok(OracleCanonicalContract(canon))
     }
 
-    pub fn call(&self, msg: OraiMsgWrapper) -> StdResult<CosmosMsg> {
+    pub fn call(&self, msg: OracleMsg) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg)?;
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
@@ -44,7 +45,7 @@ impl OracleContract {
     pub fn query<T: DeserializeOwned>(
         &self,
         querier: &QuerierWrapper,
-        req: OraiQueryWrapper,
+        req: OracleQuery,
     ) -> StdResult<T> {
         let query = WasmQuery::Smart {
             contract_addr: self.addr(),
@@ -62,14 +63,10 @@ impl OracleContract {
         offer_coin: Coin,
         ask_denom: T,
     ) -> StdResult<SwapResponse> {
-        let request = OraiQueryWrapper {
-            route: OraiRoute::Market,
-            query_data: OraiQuery::Swap {
-                offer_coin,
-                ask_denom: ask_denom.into(),
-            },
-        }
-        .into();
+        let request = OracleQuery::Market(OracleMarketQuery::Swap {
+            offer_coin,
+            ask_denom: ask_denom.into(),
+        });
 
         self.query(querier, request)
     }
@@ -79,23 +76,15 @@ impl OracleContract {
         querier: &QuerierWrapper,
         denom: T,
     ) -> StdResult<TaxCapResponse> {
-        let request = OraiQueryWrapper {
-            route: OraiRoute::Treasury,
-            query_data: OraiQuery::TaxCap {
-                denom: denom.into(),
-            },
-        }
-        .into();
+        let request = OracleQuery::Treasury(OracleTreasuryQuery::TaxCap {
+            denom: denom.into(),
+        });
 
         self.query(querier, request)
     }
 
     pub fn query_tax_rate(&self, querier: &QuerierWrapper) -> StdResult<TaxRateResponse> {
-        let request = OraiQueryWrapper {
-            route: OraiRoute::Treasury,
-            query_data: OraiQuery::TaxRate {},
-        }
-        .into();
+        let request = OracleQuery::Treasury(OracleTreasuryQuery::TaxRate {});
 
         self.query(querier, request)
     }
@@ -106,14 +95,10 @@ impl OracleContract {
         base_denom: T,
         quote_denoms: Vec<T>,
     ) -> StdResult<ExchangeRatesResponse> {
-        let request = OraiQueryWrapper {
-            route: OraiRoute::Oracle,
-            query_data: OraiQuery::ExchangeRates {
-                base_denom: base_denom.into(),
-                quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
-            },
-        }
-        .into();
+        let request = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRates {
+            base_denom: base_denom.into(),
+            quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
+        });
 
         self.query(querier, request)
     }
@@ -123,13 +108,9 @@ impl OracleContract {
         querier: &QuerierWrapper,
         contract_address: T,
     ) -> StdResult<ContractInfoResponse> {
-        let request = OraiQueryWrapper {
-            route: OraiRoute::Wasm,
-            query_data: OraiQuery::ContractInfo {
-                contract_address: contract_address.into(),
-            },
-        }
-        .into();
+        let request = OracleQuery::Contract(OracleContractQuery::ContractInfo {
+            contract_address: contract_address.into(),
+        });
 
         self.query(querier, request)
     }

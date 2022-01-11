@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::asset::PairInfo;
 use crate::factory::QueryMsg as FactoryQueryMsg;
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use oracle_base::{OraiQuery, OraiQueryWrapper, OraiRoute, TaxCapResponse, TaxRateResponse};
+use oracle_base::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.
@@ -129,31 +129,25 @@ impl WasmMockQuerier {
         match &request {
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => match from_binary(msg) {
                 // maybe querywrapper like custom query from smart contract
-                Ok(OraiQueryWrapper { route, query_data }) => {
-                    if route.eq(&OraiRoute::Treasury) {
-                        match query_data {
-                            OraiQuery::TaxRate {} => {
-                                let res = TaxRateResponse {
-                                    rate: self.tax_querier.rate,
-                                };
-                                SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
-                            }
-                            OraiQuery::TaxCap { denom } => {
-                                let cap = self
-                                    .tax_querier
-                                    .caps
-                                    .get(&denom)
-                                    .copied()
-                                    .unwrap_or_default();
-                                let res = TaxCapResponse { cap };
-                                SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
-                            }
-                            _ => panic!("DO NOT ENTER HERE"),
-                        }
-                    } else {
-                        panic!("DO NOT ENTER HERE")
+                Ok(OracleQuery::Treasury(query_data)) => match query_data {
+                    OracleTreasuryQuery::TaxRate {} => {
+                        let res = TaxRateResponse {
+                            rate: self.tax_querier.rate,
+                        };
+                        SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
                     }
-                }
+                    OracleTreasuryQuery::TaxCap { denom } => {
+                        let cap = self
+                            .tax_querier
+                            .caps
+                            .get(&denom)
+                            .copied()
+                            .unwrap_or_default();
+                        let res = TaxCapResponse { cap };
+                        SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                    }
+                },
+
                 // try with FactoryQueryMsg
                 _ => match from_binary(msg) {
                     Ok(FactoryQueryMsg::Pair { asset_infos }) => {

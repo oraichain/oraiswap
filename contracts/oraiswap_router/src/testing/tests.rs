@@ -1,13 +1,12 @@
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{
-    from_binary, to_binary, Coin, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
-};
+use cosmwasm_std::{from_binary, to_binary, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg};
 
-use crate::contract::{execute, instantiate, query};
+use crate::contract::{handle, init, query};
+use crate::operations::assert_operations;
 use crate::testing::mock_querier::mock_dependencies;
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use orai_cosmwasm::{create_swap_msg, create_swap_send_msg};
+use oracle_base::{create_swap_msg, create_swap_send_msg};
 use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::router::{
@@ -20,18 +19,18 @@ fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oraiswap_factory: "oraiswapfactory".to_string(),
+        factory_addr: "oraiswapfactory".into(),
     };
 
     let info = mock_info("addr0000", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // it worked, let's query the state
     let config: ConfigResponse =
         from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap();
-    assert_eq!("oraiswapfactory", config.oraiswap_factory.as_str());
+    assert_eq!("oraiswapfactory", config.factory_addr.as_str());
 }
 
 #[test]
@@ -43,13 +42,13 @@ fn handle_swap_operations() {
     )]);
 
     let msg = InitMsg {
-        oraiswap_factory: "oraiswapfactory".to_string(),
+        factory_addr: "oraiswapfactory".into(),
     };
 
     let info = mock_info("addr0000", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::ExecuteSwapOperations {
         operations: vec![],
@@ -58,7 +57,7 @@ fn handle_swap_operations() {
     };
 
     let info = mock_info("addr0000", &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg);
+    let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "must provide operations"),
         _ => panic!("DO NOT ENTER HERE"),
@@ -75,12 +74,12 @@ fn handle_swap_operations() {
                     denom: "ukrw".to_string(),
                 },
                 ask_asset_info: AssetInfo::Token {
-                    contract_addr: "asset0001".to_string(),
+                    contract_addr: "asset0001".into(),
                 },
             },
             SwapOperation::OraiSwap {
                 offer_asset_info: AssetInfo::Token {
-                    contract_addr: "asset0001".to_string(),
+                    contract_addr: "asset0001".into(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
                     denom: "orai".to_string(),
@@ -91,7 +90,7 @@ fn handle_swap_operations() {
                     denom: "orai".to_string(),
                 },
                 ask_asset_info: AssetInfo::Token {
-                    contract_addr: "asset0002".to_string(),
+                    contract_addr: "asset0002".into(),
                 },
             },
         ],
@@ -100,13 +99,13 @@ fn handle_swap_operations() {
     };
 
     let info = mock_info("addr0000", &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
         vec![
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::NativeSwap {
                         offer_denom: "uusd".to_string(),
@@ -115,30 +114,30 @@ fn handle_swap_operations() {
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
                             denom: "ukrw".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0001".to_string(),
+                            contract_addr: "asset0001".into(),
                         },
                     },
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0001".to_string(),
+                            contract_addr: "asset0001".into(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
                             denom: "orai".to_string(),
@@ -147,41 +146,41 @@ fn handle_swap_operations() {
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
                             denom: "orai".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0002".to_string(),
+                            contract_addr: "asset0002".into(),
                         },
                     },
-                    to: Some("addr0000".to_string()),
+                    to: Some("addr0000".into()),
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::AssertMinimumReceive {
                     asset_info: AssetInfo::Token {
-                        contract_addr: "asset0002".to_string(),
+                        contract_addr: "asset0002".into(),
                     },
                     prev_balance: Uint128::zero(),
                     minimum_receive: Uint128::from(1000000u128),
-                    receiver: "addr0000".to_string(),
+                    receiver: "addr0000".into(),
                 })
                 .unwrap(),
-            })),
+            }),
         ]
     );
 
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr0000".to_string(),
+        sender: "addr0000".into(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::ExecuteSwapOperations {
             operations: vec![
@@ -194,12 +193,12 @@ fn handle_swap_operations() {
                         denom: "ukrw".to_string(),
                     },
                     ask_asset_info: AssetInfo::Token {
-                        contract_addr: "asset0001".to_string(),
+                        contract_addr: "asset0001".into(),
                     },
                 },
                 SwapOperation::OraiSwap {
                     offer_asset_info: AssetInfo::Token {
-                        contract_addr: "asset0001".to_string(),
+                        contract_addr: "asset0001".into(),
                     },
                     ask_asset_info: AssetInfo::NativeToken {
                         denom: "orai".to_string(),
@@ -210,24 +209,24 @@ fn handle_swap_operations() {
                         denom: "orai".to_string(),
                     },
                     ask_asset_info: AssetInfo::Token {
-                        contract_addr: "asset0002".to_string(),
+                        contract_addr: "asset0002".into(),
                     },
                 },
             ],
             minimum_receive: None,
-            to: Some("addr0002".to_string()),
+            to: Some("addr0002".into()),
         })
-        .unwrap(),
+        .ok(),
     });
 
     let info = mock_info("asset0000", &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
         vec![
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::NativeSwap {
                         offer_denom: "uusd".to_string(),
@@ -236,30 +235,30 @@ fn handle_swap_operations() {
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
                             denom: "ukrw".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0001".to_string(),
+                            contract_addr: "asset0001".into(),
                         },
                     },
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0001".to_string(),
+                            contract_addr: "asset0001".into(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
                             denom: "orai".to_string(),
@@ -268,23 +267,23 @@ fn handle_swap_operations() {
                     to: None,
                 })
                 .unwrap(),
-            })),
-            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.to_string(),
-                funds: vec![],
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: MOCK_CONTRACT_ADDR.into(),
+                send: vec![],
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
                             denom: "orai".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
-                            contract_addr: "asset0002".to_string(),
+                            contract_addr: "asset0002".into(),
                         },
                     },
-                    to: Some("addr0002".to_string()),
+                    to: Some("addr0002".into()),
                 })
                 .unwrap(),
-            }))
+            })
         ]
     );
 }
@@ -293,13 +292,13 @@ fn handle_swap_operations() {
 fn handle_swap_operation() {
     let mut deps = mock_dependencies(&[]);
     let msg = InitMsg {
-        oraiswap_factory: "oraiswapfactory".to_string(),
+        factory_addr: "oraiswapfactory".into(),
     };
 
     let info = mock_info("addr0000", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     deps.querier
         .with_oraiswap_pairs(&[(&"uusdasset".to_string(), &"pair".to_string())]);
@@ -323,23 +322,24 @@ fn handle_swap_operation() {
         to: None,
     };
     let info = mock_info("addr0000", &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
+    let res = handle(deps.as_mut(), mock_env(), info, msg.clone());
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
         _ => panic!("DO NOT ENTER HERE"),
     }
 
     let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
-        vec![SubMsg::new(create_swap_msg(
+        vec![create_swap_msg(
+            "oracle0000".into(),
             Coin {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(1000000u128),
             },
             "orai".to_string()
-        ))],
+        )],
     );
 
     // optional to address
@@ -349,20 +349,21 @@ fn handle_swap_operation() {
             offer_denom: "uusd".to_string(),
             ask_denom: "orai".to_string(),
         },
-        to: Some("addr0000".to_string()),
+        to: Some("addr0000".into()),
     };
     let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
-        vec![SubMsg::new(create_swap_send_msg(
-            "addr0000".to_string(),
+        vec![create_swap_send_msg(
+            "oracle0000".into(),
+            "addr0000".into(),
             Coin {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(952380u128), // deduct tax
             },
             "orai".to_string()
-        ))],
+        )],
     );
     deps.querier
         .with_oraiswap_pairs(&[(&"assetuusd".to_string(), &"pair".to_string())]);
@@ -374,40 +375,40 @@ fn handle_swap_operation() {
     let msg = HandleMsg::ExecuteSwapOperation {
         operation: SwapOperation::OraiSwap {
             offer_asset_info: AssetInfo::Token {
-                contract_addr: "asset".to_string(),
+                contract_addr: "asset".into(),
             },
             ask_asset_info: AssetInfo::NativeToken {
                 denom: "uusd".to_string(),
             },
         },
-        to: Some("addr0000".to_string()),
+        to: Some("addr0000".into()),
     };
 
     let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
-        vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset".to_string(),
-            funds: vec![],
+        vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "asset".into(),
+            send: vec![],
             msg: to_binary(&Cw20HandleMsg::Send {
-                contract: "pair".to_string(),
+                contract: "pair".into(),
                 amount: Uint128::from(1000000u128),
                 msg: to_binary(&PairHandleMsg::Swap {
                     offer_asset: Asset {
                         info: AssetInfo::Token {
-                            contract_addr: "asset".to_string(),
+                            contract_addr: "asset".into(),
                         },
                         amount: Uint128::from(1000000u128),
                     },
                     belief_price: None,
                     max_spread: None,
-                    to: Some("addr0000".to_string()),
+                    to: Some("addr0000".into()),
                 })
-                .unwrap()
+                .ok()
             })
             .unwrap()
-        }))]
+        })]
     );
 }
 
@@ -416,13 +417,13 @@ fn query_buy_with_routes() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        oraiswap_factory: "oraiswapfactory".to_string(),
+        factory_addr: "oraiswapfactory".into(),
     };
 
     let info = mock_info("addr0000", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // set tax rate as 5%
     deps.querier.with_tax(
@@ -445,12 +446,12 @@ fn query_buy_with_routes() {
                     denom: "ukrw".to_string(),
                 },
                 ask_asset_info: AssetInfo::Token {
-                    contract_addr: "asset0000".to_string(),
+                    contract_addr: "asset0000".into(),
                 },
             },
             SwapOperation::OraiSwap {
                 offer_asset_info: AssetInfo::Token {
-                    contract_addr: "asset0000".to_string(),
+                    contract_addr: "asset0000".into(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
                     denom: "orai".to_string(),
@@ -516,9 +517,9 @@ fn assert_minimum_receive_native_token() {
         },
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000000u128),
-        receiver: "addr0000".to_string(),
+        receiver: "addr0000".into(),
     };
-    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
     // assertion failed; native token
     let msg = HandleMsg::AssertMinimumReceive {
@@ -527,9 +528,9 @@ fn assert_minimum_receive_native_token() {
         },
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000001u128),
-        receiver: "addr0000".to_string(),
+        receiver: "addr0000".into(),
     };
-    let res = execute(deps.as_mut(), mock_env(), info, msg);
+    let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(
             msg,
@@ -551,24 +552,24 @@ fn assert_minimum_receive_token() {
     // success
     let msg = HandleMsg::AssertMinimumReceive {
         asset_info: AssetInfo::Token {
-            contract_addr: "token0000".to_string(),
+            contract_addr: "token0000".into(),
         },
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000000u128),
-        receiver: "addr0000".to_string(),
+        receiver: "addr0000".into(),
     };
-    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
     // assertion failed; native token
     let msg = HandleMsg::AssertMinimumReceive {
         asset_info: AssetInfo::Token {
-            contract_addr: "token0000".to_string(),
+            contract_addr: "token0000".into(),
         },
         prev_balance: Uint128::zero(),
         minimum_receive: Uint128::from(1000001u128),
-        receiver: "addr0000".to_string(),
+        receiver: "addr0000".into(),
     };
-    let res = execute(deps.as_mut(), mock_env(), info, msg);
+    let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(
             msg,
@@ -576,4 +577,101 @@ fn assert_minimum_receive_token() {
         ),
         _ => panic!("DO NOT ENTER HERE"),
     }
+}
+
+#[test]
+fn test_invalid_operations() {
+    // empty error
+    assert!(assert_operations(&[]).is_err());
+
+    // orai output
+    assert!(assert_operations(&vec![
+        SwapOperation::NativeSwap {
+            offer_denom: "uusd".to_string(),
+            ask_denom: "orai".to_string(),
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: "ukrw".to_string(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+            ask_asset_info: AssetInfo::NativeToken {
+                denom: "orai".to_string(),
+            },
+        }
+    ])
+    .is_ok());
+
+    // asset0002 output
+    assert!(assert_operations(&vec![
+        SwapOperation::NativeSwap {
+            offer_denom: "uusd".to_string(),
+            ask_denom: "orai".to_string(),
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: "ukrw".to_string(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+            ask_asset_info: AssetInfo::NativeToken {
+                denom: "orai".to_string(),
+            },
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: "orai".to_string(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: "asset0002".into(),
+            },
+        },
+    ])
+    .is_ok());
+
+    // multiple output token types error
+    assert!(assert_operations(&vec![
+        SwapOperation::NativeSwap {
+            offer_denom: "uusd".to_string(),
+            ask_denom: "ukrw".to_string(),
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: "ukrw".to_string(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::Token {
+                contract_addr: "asset0001".into(),
+            },
+            ask_asset_info: AssetInfo::NativeToken {
+                denom: "uaud".to_string(),
+            },
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: "orai".to_string(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: "asset0002".into(),
+            },
+        },
+    ])
+    .is_err());
 }

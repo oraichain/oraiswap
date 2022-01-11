@@ -1,39 +1,44 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::route::OraiRoute;
-use cosmwasm_std::{Coin, CustomQuery, Decimal, Uint128};
+use cosmwasm_std::{Coin, Decimal, Uint128};
 
-/// OraiQueryWrapper is an override of QueryRequest::Custom to access Orai-specific modules
+/// OracleQuery is defines available query datas
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct OraiQueryWrapper {
-    pub route: OraiRoute,
-    pub query_data: OraiQuery,
+pub enum OracleQuery {
+    Market(OracleMarketQuery),
+    Treasury(OracleTreasuryQuery),
+    Exchange(OracleExchangeQuery),
+    Contract(OracleContractQuery),
 }
 
-// implement custom query
-impl CustomQuery for OraiQueryWrapper {}
-
-/// OraiQuery is defines available query datas
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum OraiQuery {
-    Swap {
-        offer_coin: Coin,
-        ask_denom: String,
-    },
+pub enum OracleMarketQuery {
+    Swap { offer_coin: Coin, ask_denom: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OracleTreasuryQuery {
     TaxRate {},
-    TaxCap {
-        denom: String,
-    },
+    TaxCap { denom: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OracleExchangeQuery {
     ExchangeRates {
         base_denom: String,
         quote_denoms: Vec<String>,
     },
-    ContractInfo {
-        contract_address: String,
-    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OracleContractQuery {
+    ContractInfo { contract_address: String },
 }
 
 /// SwapResponse is data format returned from SwapRequest::Simulate query
