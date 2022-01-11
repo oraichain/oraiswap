@@ -8,7 +8,7 @@ use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: CanonicalAddr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
 }
@@ -95,7 +95,7 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                oracle_addr: "oracle0000".into(),
+                oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
                 owner: deps.api.canonical_address(&"owner0000".into()).unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,

@@ -27,7 +27,7 @@ Swap KRT => UST => mABNB
 
 ```
 {
-   "execute_swap_operations":{
+   "handle_swap_operations":{
       "operations":[
          {
             "native_swap":{

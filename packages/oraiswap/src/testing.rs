@@ -98,7 +98,7 @@ fn supply_querier() {
 #[test]
 fn test_asset_info() {
     let token_info: AssetInfo = AssetInfo::Token {
-        contract_addr: "asset0000".to_string(),
+        contract_addr: "asset0000".into(),
     };
     let native_token_info: AssetInfo = AssetInfo::NativeToken {
         denom: "uusd".to_string(),
@@ -107,11 +107,11 @@ fn test_asset_info() {
     assert!(!token_info.equal(&native_token_info));
 
     assert!(!token_info.equal(&AssetInfo::Token {
-        contract_addr: "asset0001".to_string(),
+        contract_addr: "asset0001".into(),
     }));
 
     assert!(token_info.equal(&AssetInfo::Token {
-        contract_addr: "asset0000".to_string(),
+        contract_addr: "asset0000".into(),
     }));
 
     assert!(native_token_info.is_native_token());
@@ -170,7 +170,7 @@ fn test_asset() {
     let token_asset = Asset {
         amount: Uint128::from(123123u128),
         info: AssetInfo::Token {
-            contract_addr: "asset0000".to_string(),
+            contract_addr: "asset0000".into(),
         },
     };
 
@@ -255,7 +255,7 @@ fn query_oraiswap_pair_contract() {
         &PairInfo {
             asset_infos: [
                 AssetInfo::Token {
-                    contract_addr: "asset0000".to_string(),
+                    contract_addr: "asset0000".into(),
                 },
                 AssetInfo::NativeToken {
                     denom: "uusd".to_string(),
@@ -273,7 +273,7 @@ fn query_oraiswap_pair_contract() {
         MOCK_CONTRACT_ADDR.into(),
         &[
             AssetInfo::Token {
-                contract_addr: "asset0000".to_string(),
+                contract_addr: "asset0000".into(),
             },
             AssetInfo::NativeToken {
                 denom: "uusd".to_string(),

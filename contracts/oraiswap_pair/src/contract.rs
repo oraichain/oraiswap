@@ -86,8 +86,6 @@ pub fn handle(
                 return Err(ContractError::Unauthorized {});
             }
 
-            let to_addr = to.map(HumanAddr);
-
             swap(
                 deps,
                 env,
@@ -96,7 +94,7 @@ pub fn handle(
                 offer_asset,
                 belief_price,
                 max_spread,
-                to_addr,
+                to,
             )
         }
     }
@@ -141,9 +139,7 @@ pub fn receive_cw20(
                 info,
                 cw20_msg.sender,
                 Asset {
-                    info: AssetInfo::Token {
-                        contract_addr: contract_addr.to_string(),
-                    },
+                    info: AssetInfo::Token { contract_addr },
                     amount: cw20_msg.amount,
                 },
                 belief_price,
@@ -197,7 +193,7 @@ pub fn provide_liquidity(
     info: MessageInfo,
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
-    receiver: Option<String>,
+    receiver: Option<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
     for asset in assets.iter() {
         asset.assert_sent_native_token_balance(&info)?;
@@ -265,11 +261,11 @@ pub fn provide_liquidity(
     }
 
     // mint LP token to sender
-    let receiver = receiver.unwrap_or_else(|| info.sender.to_string());
+    let receiver = receiver.unwrap_or(info.sender.clone());
     messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: deps.api.human_address(&pair_info.liquidity_token)?,
         msg: to_binary(&Cw20HandleMsg::Mint {
-            recipient: HumanAddr(receiver.clone()),
+            recipient: receiver.clone(),
             amount: share,
         })?,
         send: vec![],

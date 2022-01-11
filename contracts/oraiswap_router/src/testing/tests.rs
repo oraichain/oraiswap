@@ -35,7 +35,7 @@ fn proper_initialization() {
 }
 
 #[test]
-fn execute_swap_operations() {
+fn handle_swap_operations() {
     let mut deps = mock_dependencies(&[]);
     deps.querier.with_token_balances(&[(
         &"asset0002".to_string(),
@@ -83,12 +83,12 @@ fn execute_swap_operations() {
                     contract_addr: "asset0001".to_string(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
+                    denom: "orai".to_string(),
                 },
             },
             SwapOperation::OraiSwap {
                 offer_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
+                    denom: "orai".to_string(),
                 },
                 ask_asset_info: AssetInfo::Token {
                     contract_addr: "asset0002".to_string(),
@@ -141,7 +141,7 @@ fn execute_swap_operations() {
                             contract_addr: "asset0001".to_string(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
+                            denom: "orai".to_string(),
                         },
                     },
                     to: None,
@@ -154,7 +154,7 @@ fn execute_swap_operations() {
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
+                            denom: "orai".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
                             contract_addr: "asset0002".to_string(),
@@ -202,12 +202,12 @@ fn execute_swap_operations() {
                         contract_addr: "asset0001".to_string(),
                     },
                     ask_asset_info: AssetInfo::NativeToken {
-                        denom: "uluna".to_string(),
+                        denom: "orai".to_string(),
                     },
                 },
                 SwapOperation::OraiSwap {
                     offer_asset_info: AssetInfo::NativeToken {
-                        denom: "uluna".to_string(),
+                        denom: "orai".to_string(),
                     },
                     ask_asset_info: AssetInfo::Token {
                         contract_addr: "asset0002".to_string(),
@@ -262,7 +262,7 @@ fn execute_swap_operations() {
                             contract_addr: "asset0001".to_string(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
+                            denom: "orai".to_string(),
                         },
                     },
                     to: None,
@@ -275,7 +275,7 @@ fn execute_swap_operations() {
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
-                            denom: "uluna".to_string(),
+                            denom: "orai".to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
                             contract_addr: "asset0002".to_string(),
@@ -290,7 +290,7 @@ fn execute_swap_operations() {
 }
 
 #[test]
-fn execute_swap_operation() {
+fn handle_swap_operation() {
     let mut deps = mock_dependencies(&[]);
     let msg = InitMsg {
         oraiswap_factory: "oraiswapfactory".to_string(),
@@ -318,7 +318,7 @@ fn execute_swap_operation() {
     let msg = HandleMsg::ExecuteSwapOperation {
         operation: SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "uluna".to_string(),
+            ask_denom: "orai".to_string(),
         },
         to: None,
     };
@@ -338,7 +338,7 @@ fn execute_swap_operation() {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(1000000u128),
             },
-            "uluna".to_string()
+            "orai".to_string()
         ))],
     );
 
@@ -347,7 +347,7 @@ fn execute_swap_operation() {
     let msg = HandleMsg::ExecuteSwapOperation {
         operation: SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "uluna".to_string(),
+            ask_denom: "orai".to_string(),
         },
         to: Some("addr0000".to_string()),
     };
@@ -361,7 +361,7 @@ fn execute_swap_operation() {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(952380u128), // deduct tax
             },
-            "uluna".to_string()
+            "orai".to_string()
         ))],
     );
     deps.querier
@@ -453,7 +453,7 @@ fn query_buy_with_routes() {
                     contract_addr: "asset0000".to_string(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
-                    denom: "uluna".to_string(),
+                    denom: "orai".to_string(),
                 },
             },
         ],
@@ -461,7 +461,7 @@ fn query_buy_with_routes() {
 
     deps.querier.with_oraiswap_pairs(&[
         (&"ukrwasset0000".to_string(), &"pair0000".to_string()),
-        (&"asset0000uluna".to_string(), &"pair0001".to_string()),
+        (&"asset0000orai".to_string(), &"pair0001".to_string()),
     ]);
 
     let res: SimulateSwapOperationsResponse =
@@ -469,7 +469,7 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
-            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => asset0000, asset0000 => uluna
+            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => asset0000, asset0000 => orai
         }
     );
 
@@ -482,7 +482,7 @@ fn query_buy_with_routes() {
             },
             SwapOperation::NativeSwap {
                 offer_denom: "ukrw".to_string(),
-                ask_denom: "uluna".to_string(),
+                ask_denom: "orai".to_string(),
             },
         ],
     };
@@ -492,7 +492,7 @@ fn query_buy_with_routes() {
     assert_eq!(
         res,
         SimulateSwapOperationsResponse {
-            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => uluna
+            amount: Uint128::from(952380u128), // tax charged 1 times uusd => ukrw, ukrw => orai
         }
     );
 }

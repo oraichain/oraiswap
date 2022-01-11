@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::route::OraiRoute;
-use cosmwasm_std::{Coin, CosmosMsg};
+use cosmwasm_std::{Coin, CosmosMsg, HumanAddr};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -27,7 +27,7 @@ pub enum OraiMsg {
         ask_denom: String,
     },
     SwapSend {
-        to_address: String,
+        to_address: HumanAddr,
         offer_coin: Coin,
         ask_denom: String,
     },
@@ -47,7 +47,7 @@ pub fn create_swap_msg(offer_coin: Coin, ask_denom: String) -> CosmosMsg<OraiMsg
 
 // create_swap_send_msg returns wrapped swap send msg
 pub fn create_swap_send_msg(
-    to_address: String,
+    to_address: HumanAddr,
     offer_coin: Coin,
     ask_denom: String,
 ) -> CosmosMsg<OraiMsgWrapper> {

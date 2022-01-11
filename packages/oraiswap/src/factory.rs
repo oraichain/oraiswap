@@ -51,7 +51,8 @@ pub enum QueryMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub owner: String,
+    pub owner: HumanAddr,
+    pub oracle_addr: HumanAddr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
 }

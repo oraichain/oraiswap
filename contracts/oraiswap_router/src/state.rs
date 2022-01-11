@@ -6,7 +6,7 @@ use cw_storage_plus::Item;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
-    pub oraiswap_factory: CanonicalAddr,
+    pub factory_addr: CanonicalAddr,
 }
 
 // put the length bytes at the first for compatibility with legacy singleton store
@@ -34,7 +34,7 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                oraiswap_factory: deps.api.addr_canonicalize("addr0000").unwrap(),
+                factory_addr: deps.api.canonical_address(&"addr0000".into()).unwrap(),
             },
         )
         .unwrap();

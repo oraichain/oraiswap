@@ -1,30 +1,36 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{
-    to_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg,
+    to_binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    MessageInfo, StdError, StdResult, Uint128, WasmMsg,
 };
 
-use crate::querier::compute_tax;
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20HandleMsg;
-use orai_cosmwasm::{create_swap_msg, create_swap_send_msg, OraiMsgWrapper};
+use oracle_base::{create_swap_msg, create_swap_send_msg, OracleContract, OraiMsgWrapper};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
-use oraiswap::querier::{query_balance, query_pair_info, query_token_balance};
-use oraiswap::router::SwapOperation;
+use oraiswap::querier::{query_balance, query_pair_config, query_pair_info, query_token_balance};
+use oraiswap::router::{HandleMsg, SwapOperation};
 
 /// Execute swap operation
 /// swap all offer asset to ask asset
-pub fn execute_swap_operation(
+pub fn handle_swap_operation(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     operation: SwapOperation,
-    to: Option<String>,
-) -> StdResult<Response<OraiMsgWrapper>> {
+    to: Option<HumanAddr>,
+) -> StdResult<HandleResponse<OraiMsgWrapper>> {
     if env.contract.address != info.sender {
         return Err(StdError::generic_err("unauthorized"));
     }
+
+    let config: Config = CONFIG.load(deps.storage)?;
+    let factory_addr = deps.api.human_address(&config.factory_addr)?;
+    let pair_config = query_pair_config(&deps.querier, factory_addr)?;
+    let oracle_querier = OracleContract(pair_config.oracle_addr);
 
     let messages: Vec<CosmosMsg<OraiMsgWrapper>> = match operation {
         SwapOperation::NativeSwap {
@@ -34,10 +40,19 @@ pub fn execute_swap_operation(
             let amount =
                 query_balance(&deps.querier, env.contract.address, offer_denom.to_string())?;
             if let Some(to) = to {
+                let return_asset = Asset {
+                    info: AssetInfo::NativeToken {
+                        denom: offer_denom.clone(),
+                    },
+                    amount,
+                };
+
                 // if the operation is last, and requires send
                 // deduct tax from the offer_coin
-                let amount =
-                    amount.checked_sub(compute_tax(&deps.querier, amount, offer_denom.clone())?)?;
+                let amount = Asset::checked_sub(
+                    amount,
+                    return_asset.compute_tax(&oracle_querier, &deps.querier)?,
+                )?;
                 vec![create_swap_send_msg(
                     to,
                     Coin {
@@ -60,11 +75,9 @@ pub fn execute_swap_operation(
             offer_asset_info,
             ask_asset_info,
         } => {
-            let config: Config = CONFIG.load(deps.as_ref().storage)?;
-            let oraiswap_factory = deps.api.addr_humanize(&config.oraiswap_factory)?;
             let pair_info: PairInfo = query_pair_info(
                 &deps.querier,
-                oraiswap_factory,
+                factory_addr,
                 &[offer_asset_info.clone(), ask_asset_info],
             )?;
 
@@ -72,11 +85,9 @@ pub fn execute_swap_operation(
                 AssetInfo::NativeToken { denom } => {
                     query_balance(&deps.querier, env.contract.address, denom)?
                 }
-                AssetInfo::Token { contract_addr } => query_token_balance(
-                    &deps.querier,
-                    deps.api.addr_validate(contract_addr.as_str())?,
-                    env.contract.address,
-                )?,
+                AssetInfo::Token { contract_addr } => {
+                    query_token_balance(&deps.querier, contract_addr.into(), env.contract.address)?
+                }
             };
             let offer_asset: Asset = Asset {
                 info: offer_asset_info,
@@ -85,7 +96,7 @@ pub fn execute_swap_operation(
 
             vec![asset_into_swap_msg(
                 deps.as_ref(),
-                Addr::unchecked(pair_info.contract_addr),
+                pair_info.contract_addr,
                 offer_asset,
                 None,
                 to,
@@ -93,28 +104,101 @@ pub fn execute_swap_operation(
         }
     };
 
-    Ok(Response::new().add_messages(messages))
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![],
+        data: None,
+    })
 }
 
-pub fn asset_into_swap_msg(
+pub fn handle_swap_operations(
+    deps: DepsMut,
+    env: Env,
+    sender: HumanAddr,
+    operations: Vec<SwapOperation>,
+    minimum_receive: Option<Uint128>,
+    to: Option<HumanAddr>,
+) -> StdResult<HandleResponse<OraiMsgWrapper>> {
+    let operations_len = operations.len();
+    if operations_len == 0 {
+        return Err(StdError::generic_err("must provide operations"));
+    }
+
+    // Assert the operations are properly set
+    assert_operations(&operations)?;
+
+    let to = to.unwrap_or(sender);
+    let target_asset_info = operations.last().unwrap().get_target_asset_info();
+
+    let mut operation_index = 0;
+    let mut messages: Vec<CosmosMsg<OraiMsgWrapper>> = operations
+        .into_iter()
+        .map(|op| {
+            operation_index += 1;
+            Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: env.contract.address.clone(),
+                send: vec![],
+                msg: to_binary(&HandleMsg::ExecuteSwapOperation {
+                    operation: op,
+                    to: if operation_index == operations_len {
+                        Some(to.to_string())
+                    } else {
+                        None
+                    },
+                })?,
+            }))
+        })
+        .collect::<StdResult<Vec<CosmosMsg<OraiMsgWrapper>>>>()?;
+
+    // Execute minimum amount assertion
+    if let Some(minimum_receive) = minimum_receive {
+        let receiver_balance = target_asset_info.query_pool(&deps.querier, to.clone())?;
+
+        messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: env.contract.address.clone(),
+            send: vec![],
+            msg: to_binary(&HandleMsg::AssertMinimumReceive {
+                asset_info: target_asset_info,
+                prev_balance: receiver_balance,
+                minimum_receive,
+                receiver: to.to_string(),
+            })?,
+        }))
+    }
+
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![],
+        data: None,
+    })
+}
+
+fn asset_into_swap_msg(
     deps: Deps,
-    pair_contract: Addr,
+    oracle_querier: &OracleContract,
+    pair_contract: HumanAddr,
     offer_asset: Asset,
     max_spread: Option<Decimal>,
-    to: Option<String>,
+    to: Option<HumanAddr>,
 ) -> StdResult<CosmosMsg<OraiMsgWrapper>> {
     match offer_asset.info.clone() {
         AssetInfo::NativeToken { denom } => {
+            let return_asset = Asset {
+                info: AssetInfo::NativeToken {
+                    denom: denom.clone(),
+                },
+                amount: offer_asset.amount,
+            };
+
             // deduct tax first
-            let amount = offer_asset.amount.checked_sub(compute_tax(
-                &deps.querier,
+            let amount = Asset::checked_sub(
                 offer_asset.amount,
-                denom.clone(),
-            )?)?;
+                return_asset.compute_tax(oracle_querier, &deps.querier)?,
+            )?;
 
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: pair_contract.to_string(),
-                funds: vec![Coin { denom, amount }],
+                contract_addr: pair_contract,
+                send: vec![Coin { denom, amount }],
                 msg: to_binary(&PairHandleMsg::Swap {
                     offer_asset: Asset {
                         amount,
@@ -128,7 +212,7 @@ pub fn asset_into_swap_msg(
         }
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr,
-            funds: vec![],
+            send: vec![],
             msg: to_binary(&Cw20HandleMsg::Send {
                 contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
@@ -141,4 +225,38 @@ pub fn asset_into_swap_msg(
             })?,
         })),
     }
+}
+
+fn assert_operations(operations: &[SwapOperation]) -> StdResult<()> {
+    let mut ask_asset_map: HashMap<String, bool> = HashMap::new();
+    for operation in operations.iter() {
+        let (offer_asset, ask_asset) = match operation {
+            SwapOperation::NativeSwap {
+                offer_denom,
+                ask_denom,
+            } => (
+                AssetInfo::NativeToken {
+                    denom: offer_denom.clone(),
+                },
+                AssetInfo::NativeToken {
+                    denom: ask_denom.clone(),
+                },
+            ),
+            SwapOperation::OraiSwap {
+                offer_asset_info,
+                ask_asset_info,
+            } => (offer_asset_info.clone(), ask_asset_info.clone()),
+        };
+
+        ask_asset_map.remove(&offer_asset.to_string());
+        ask_asset_map.insert(ask_asset.to_string(), true);
+    }
+
+    if ask_asset_map.keys().len() != 1 {
+        return Err(StdError::generic_err(
+            "invalid operations; multiple output token",
+        ));
+    }
+
+    Ok(())
 }

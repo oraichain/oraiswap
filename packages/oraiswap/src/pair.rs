@@ -29,14 +29,14 @@ pub enum HandleMsg {
     ProvideLiquidity {
         assets: [Asset; 2],
         slippage_tolerance: Option<Decimal>,
-        receiver: Option<String>,
+        receiver: Option<HumanAddr>,
     },
     /// Swap an offer asset to the other
     Swap {
         offer_asset: Asset,
         belief_price: Option<Decimal>,
         max_spread: Option<Decimal>,
-        to: Option<String>,
+        to: Option<HumanAddr>,
     },
 }
 

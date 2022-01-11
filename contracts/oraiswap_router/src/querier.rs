@@ -19,3 +19,33 @@ pub fn compute_tax(querier: &QuerierWrapper, amount: Uint128, denom: String) -> 
         tax_cap,
     ))
 }
+
+
+pub fn compute_tax(
+    &self,
+    oracle_querier: &OracleContract,
+    querier: &QuerierWrapper,
+) -> StdResult<Uint128> {
+    let amount = self.amount;
+    if let AssetInfo::NativeToken { denom } = &self.info {
+        if denom == "orai" {
+            Ok(Uint128::zero())
+        } else {
+            let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;
+            let tax_cap: Uint128 =
+                (oracle_querier.query_tax_cap(querier, denom.to_string())?).cap;
+            Ok(std::cmp::min(
+                Self::checked_sub(
+                    amount,
+                    amount.multiply_ratio(
+                        DECIMAL_FRACTION,
+                        DECIMAL_FRACTION * tax_rate + DECIMAL_FRACTION,
+                    ),
+                )?,
+                tax_cap,
+            ))
+        }
+    } else {
+        Ok(Uint128::zero())
+    }
+}

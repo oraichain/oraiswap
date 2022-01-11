@@ -63,7 +63,7 @@ pub fn try_something<S: Storage, A: Api, Q: Querier>(
     let swap_rate: SwapResponse = querier.query_swap(offer.clone(), "uusd")?;
     let tax_cap: TaxCapResponse = querier.query_tax_cap("usdr")?;
     let tax_rate: TaxRateResponse = querier.query_tax_rate()?;
-    let exchange_rates: ExchangeRatesResponse = querier.query_exchange_rates("uusd", vec!["uluna", "ukrw"])?;
+    let exchange_rates: ExchangeRatesResponse = querier.query_exchange_rates("uusd", vec!["orai", "ukrw"])?;
     ...
 }
 ```

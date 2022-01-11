@@ -11,7 +11,6 @@ use cosmwasm_std::{
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
-// use oracle_base::OraiQuerier;
 use oracle_base::OracleContract;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -53,7 +52,7 @@ impl Asset {
     ) -> StdResult<Uint128> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
-            if denom == "uluna" {
+            if denom == "orai" {
                 Ok(Uint128::zero())
             } else {
                 let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;
@@ -160,7 +159,7 @@ impl Asset {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetInfo {
-    Token { contract_addr: String },
+    Token { contract_addr: HumanAddr },
     NativeToken { denom: String },
 }
 
@@ -236,7 +235,7 @@ impl AssetRaw {
                     denom: denom.to_string(),
                 },
                 AssetInfoRaw::Token { contract_addr } => AssetInfo::Token {
-                    contract_addr: api.human_address(contract_addr)?.to_string(),
+                    contract_addr: api.human_address(contract_addr)?,
                 },
             },
             amount: self.amount,
@@ -257,7 +256,7 @@ impl AssetInfoRaw {
                 denom: denom.to_string(),
             }),
             AssetInfoRaw::Token { contract_addr } => Ok(AssetInfo::Token {
-                contract_addr: api.human_address(contract_addr)?.to_string(),
+                contract_addr: api.human_address(contract_addr)?,
             }),
         }
     }

@@ -28,7 +28,7 @@ fn proper_initialization() {
     let config_res: ConfigResponse = from_binary(&query_res).unwrap();
     assert_eq!(123u64, config_res.token_code_id);
     assert_eq!(321u64, config_res.pair_code_id);
-    assert_eq!("addr0000".to_string(), config_res.owner);
+    assert_eq!("addr0000", config_res.owner.as_str());
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn update_config() {
     let config_res: ConfigResponse = from_binary(&query_res).unwrap();
     assert_eq!(123u64, config_res.token_code_id);
     assert_eq!(321u64, config_res.pair_code_id);
-    assert_eq!("addr0001".to_string(), config_res.owner);
+    assert_eq!("addr0001", config_res.owner.as_str());
 
     // update left items
     let env = mock_env();
@@ -81,7 +81,7 @@ fn update_config() {
     let config_res: ConfigResponse = from_binary(&query_res).unwrap();
     assert_eq!(200u64, config_res.token_code_id);
     assert_eq!(100u64, config_res.pair_code_id);
-    assert_eq!("addr0001".to_string(), config_res.owner);
+    assert_eq!("addr0001", config_res.owner.as_str());
 
     // Unauthorized err
     let env = mock_env();
@@ -117,10 +117,10 @@ fn create_pair() {
 
     let asset_infos = [
         AssetInfo::Token {
-            contract_addr: "asset0000".to_string(),
+            contract_addr: "asset0000".into(),
         },
         AssetInfo::Token {
-            contract_addr: "asset0001".to_string(),
+            contract_addr: "asset0001".into(),
         },
     ];
 
@@ -188,10 +188,10 @@ fn update_pair() {
 
     let asset_infos = [
         AssetInfo::Token {
-            contract_addr: "asset0000".to_string(),
+            contract_addr: "asset0000".into(),
         },
         AssetInfo::Token {
-            contract_addr: "asset0001".to_string(),
+            contract_addr: "asset0001".into(),
         },
     ];
 

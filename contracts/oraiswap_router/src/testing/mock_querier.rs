@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg};
-use orai_cosmwasm::{
+use oracle_base::{
     OraiQuery, OraiQueryWrapper, OraiRoute, SwapResponse, TaxCapResponse, TaxRateResponse,
 };
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
@@ -185,6 +185,8 @@ impl WasmMockQuerier {
                     let key = asset_infos[0].to_string() + asset_infos[1].to_string().as_str();
                     match self.oraiswap_factory_querier.pairs.get(&key) {
                         Some(v) => SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
+                            creator: "creator0000".into(),
+                            oracle_addr: "oracle0000".into(),
                             contract_addr: v.clone(),
                             liquidity_token: "liquidity".to_string(),
                             asset_infos: [
