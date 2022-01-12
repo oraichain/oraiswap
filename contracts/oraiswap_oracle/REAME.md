@@ -22,3 +22,4 @@ adjust demand through adjusting reward, using multisig
 ## Oracle: provides the Oraiswap with an up-to-date and accurate price feed of exchange rates
 
 - Using multisig to vote for exchange rate
+- Reward for the whitelist in multisig contract
