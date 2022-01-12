@@ -11,7 +11,7 @@ adjust demand through arbitrage and market maker
 adjust demand through adjusting reward, using multisig
 
 - Tax Rewards: Income generated from transaction fees (stability fee)
-- Seigniorage Rewards: Amount of seignorage generated from Orai swaps to Orai ow20 during the epoch that is destined for ballot rewards inside the Oracle rewards
+- Seigniorage Rewards: Amount of seignorage generated from Orai swaps to Orai ow20 that is destined for multisig rewards inside the Oracle rewards
 - Total Staked Orai: total Orai that has been staked by users and bonded by their delegated validators.
 
 #### State
