@@ -1,5 +1,6 @@
 use crate::asset::{Asset, AssetInfo, PairInfo};
 use crate::mock_querier::mock_dependencies;
+use crate::oracle::OracleContract;
 use crate::querier::{
     query_all_balances, query_balance, query_pair_info, query_supply, query_token_balance,
 };
@@ -7,7 +8,6 @@ use crate::querier::{
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 use cosmwasm_std::{to_binary, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
 use cw20::Cw20HandleMsg;
-use oracle_base::OracleContract;
 
 #[test]
 fn token_balance_querier() {

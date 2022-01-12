@@ -7,8 +7,8 @@ use crate::operations::{handle_swap_operation, handle_swap_operations};
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
-use oracle_base::{OracleContract, SwapResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
+use oraiswap::oracle::{OracleContract, SwapResponse};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
 use oraiswap::router::{

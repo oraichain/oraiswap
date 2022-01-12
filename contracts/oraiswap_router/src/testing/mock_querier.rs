@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg};
-use oracle_base::{
+use oraiswap::asset::{AssetInfo, PairInfo};
+use oraiswap::factory::{ConfigResponse, QueryMsg as FactoryQueryMsg};
+use oraiswap::oracle::{
     OracleMarketQuery, OracleQuery, OracleTreasuryQuery, SwapResponse, TaxCapResponse,
     TaxRateResponse,
 };
-use oraiswap::asset::{AssetInfo, PairInfo};
-use oraiswap::factory::{ConfigResponse, QueryMsg as FactoryQueryMsg};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies

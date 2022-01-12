@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20HandleMsg;
-use oracle_base::{create_swap_msg, create_swap_send_msg, OracleContract};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
+use oraiswap::oracle::{create_swap_msg, create_swap_send_msg, OracleContract};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::querier::{query_balance, query_pair_config, query_pair_info, query_token_balance};
 use oraiswap::router::{HandleMsg, SwapOperation};

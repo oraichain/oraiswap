@@ -6,7 +6,7 @@ use crate::operations::assert_operations;
 use crate::testing::mock_querier::mock_dependencies;
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oracle_base::{create_swap_msg, create_swap_send_msg};
+use oraiswap::oracle::{create_swap_msg, create_swap_send_msg};
 use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::router::{

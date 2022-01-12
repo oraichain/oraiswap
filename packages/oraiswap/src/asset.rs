@@ -2,16 +2,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::oracle::OracleContract;
 use crate::{
     error::OverflowError,
     querier::{query_balance, query_token_balance},
 };
+
 use cosmwasm_std::{
     to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, HumanAddr, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
-use oracle_base::OracleContract;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {

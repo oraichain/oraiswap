@@ -7,7 +7,7 @@ use crate::contract::{
     query_reverse_simulation,
     query_simulation, //reply,
 };
-use crate::error::ContractError;
+
 use crate::mock_querier::mock_dependencies;
 
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
@@ -15,8 +15,9 @@ use cosmwasm_std::{
     attr, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
-use oracle_base::OracleContract;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
+use oraiswap::error::ContractError;
+use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
 };

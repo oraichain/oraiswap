@@ -1,4 +1,3 @@
-use crate::error::ContractError;
 use crate::state::PAIR_INFO;
 
 use cosmwasm_std::{
@@ -9,8 +8,9 @@ use cosmwasm_std::{
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
-use oracle_base::OracleContract;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, PairInfoRaw};
+use oraiswap::error::ContractError;
+use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg, ReverseSimulationResponse,
     SimulationResponse,

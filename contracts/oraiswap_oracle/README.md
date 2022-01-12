@@ -19,7 +19,7 @@ adjust demand through adjusting reward, using multisig
 - TaxRate
 - TaxCap: map a denom to an Uint128 that that represents that maximum income that can be generated from taxes on a transaction in that denomination
 
-## Oracle: provides the Oraiswap with an up-to-date and accurate price feed of exchange rates
+## Exchange: provides the Oraiswap with an up-to-date and accurate price feed of exchange rates
 
 - Using multisig to vote for exchange rate
 - Reward for the whitelist in multisig contract

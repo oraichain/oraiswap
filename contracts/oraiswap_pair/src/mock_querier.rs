@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use std::collections::HashMap;
 
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-use oracle_base::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
+use oraiswap::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.

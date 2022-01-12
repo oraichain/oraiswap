@@ -19,7 +19,6 @@ backtraces = ["cosmwasm-std/backtraces"]
 [dependencies]
 cw20 = { version = "0.5.0" }
 cosmwasm-storage = { version = "0.13.2" }
-oracle_base = { path = "../oracle_base" }
 cosmwasm-std = { version = "0.13.2" }
 schemars = "0.7"
 bigint = "4"
