@@ -13,7 +13,8 @@ pub struct Config {
     pub token_code_id: u64,
 }
 
-pub const CONFIG: Item<Config> = Item::new("config");
+// put the length bytes at the first for compatibility with legacy singleton store
+pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TmpPairInfo {
@@ -24,7 +25,7 @@ pub struct TmpPairInfo {
 
 // store temporary pair info while waiting for deployment
 pub const TMP_PAIR_INFO: Map<&[u8], TmpPairInfo> = Map::new("tmp_pair_info");
-pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pair_info");
+pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pairs");
 
 pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
     let mut asset_infos = asset_infos.to_vec();
@@ -108,12 +109,12 @@ mod test {
         );
     }
 
-    const PREFIX_PAIR_INFO: &[u8] = b"pair_info";
+    const PREFIX_PAIRS: &[u8] = b"pairs";
     pub fn store_pair(storage: &mut dyn Storage, data: &PairInfoRaw) -> StdResult<()> {
         let mut asset_infos = data.asset_infos.clone().to_vec();
         asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
 
-        let mut pair_bucket: Bucket<PairInfoRaw> = bucket(storage, PREFIX_PAIR_INFO);
+        let mut pair_bucket: Bucket<PairInfoRaw> = bucket(storage, PREFIX_PAIRS);
         pair_bucket.save(
             &[asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat(),
             data,
@@ -126,7 +127,7 @@ mod test {
         let mut asset_infos = asset_infos.clone().to_vec();
         asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
 
-        let pair_bucket: ReadonlyBucket<PairInfoRaw> = bucket_read(storage, PREFIX_PAIR_INFO);
+        let pair_bucket: ReadonlyBucket<PairInfoRaw> = bucket_read(storage, PREFIX_PAIRS);
         pair_bucket.load(&[asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat())
     }
 
@@ -136,7 +137,7 @@ mod test {
         start_after: Option<[AssetInfoRaw; 2]>,
         limit: Option<u32>,
     ) -> StdResult<Vec<PairInfo>> {
-        let pair_bucket: ReadonlyBucket<PairInfoRaw> = bucket_read(storage, PREFIX_PAIR_INFO);
+        let pair_bucket: ReadonlyBucket<PairInfoRaw> = bucket_read(storage, PREFIX_PAIRS);
         let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
         let start = calc_range_start(start_after);
         pair_bucket

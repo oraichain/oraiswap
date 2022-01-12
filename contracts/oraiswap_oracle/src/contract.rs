@@ -28,6 +28,7 @@ pub fn init(
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
         creator: msg_info.sender.clone(),
+        admin: msg.admin.unwrap_or(msg_info.sender),
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
     Ok(InitResponse::default())

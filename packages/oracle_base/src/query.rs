@@ -79,4 +79,6 @@ pub struct ContractInfoResponse {
     pub name: String,
     pub version: String,
     pub creator: HumanAddr,
+    // admin can update the parameter, may be multisig
+    pub admin: HumanAddr,
 }

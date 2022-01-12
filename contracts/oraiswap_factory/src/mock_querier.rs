@@ -71,9 +71,8 @@ impl WasmMockQuerier {
         match &request {
             QueryRequest::Wasm(WasmQuery::Raw { contract_addr, key }) => {
                 let key: &[u8] = key.as_slice();
-                let prefix_pair_info = to_length_prefixed(b"pair_info").to_vec();
-
-                if key.to_vec() == prefix_pair_info {
+                let prefix_pair_info = to_length_prefixed(b"pair_info");
+                if key.eq(&prefix_pair_info) {
                     let pair_info: PairInfo =
                         match self.oraiswap_pair_querier.pairs.get(contract_addr.as_str()) {
                             Some(v) => v.clone(),
