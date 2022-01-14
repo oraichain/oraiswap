@@ -13,6 +13,9 @@ pub struct InitMsg {
     pub version: Option<String>,
     pub creator: HumanAddr,
     pub admin: Option<HumanAddr>,
+
+    pub min_rate: Option<Decimal>,
+    pub max_rate: Option<Decimal>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -49,10 +52,19 @@ pub enum OracleExchangeMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum OracleTreasuryMsg {
+    UpdateTaxCap { denom: String, cap: Uint128 },
+    // RateMax: 1%
+    UpdateTaxRate { rate: Decimal },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum OracleMsg {
     Market(OracleMarketMsg),
     Contract(OracleContractMsg),
     Exchange(OracleExchangeMsg),
+    Treasury(OracleTreasuryMsg),
 }
 
 /// OracleQuery is defines available query datas
@@ -145,6 +157,10 @@ pub struct ContractInfo {
     pub creator: CanonicalAddr,
     // admin can update the parameter, may be multisig
     pub admin: CanonicalAddr,
+
+    // constraint
+    pub min_rate: Decimal,
+    pub max_rate: Decimal,
 }
 
 /// ContractInfoResponse is data format returned from WasmRequest::ContractInfo query
@@ -155,6 +171,9 @@ pub struct ContractInfoResponse {
     pub creator: HumanAddr,
     // admin can update the parameter, may be multisig
     pub admin: HumanAddr,
+
+    pub min_rate: Decimal,
+    pub max_rate: Decimal,
 }
 
 // create_swap_msg returns wrapped swap msg

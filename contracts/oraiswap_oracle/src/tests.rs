@@ -17,6 +17,8 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
         version: None,
         creator: OWNER.into(),
         admin: None,
+        min_rate: None,
+        max_rate: None,
     };
     let info = mock_info(OWNER, &[]);
     let res = init(deps.as_mut(), mock_env(), info, msg).unwrap();

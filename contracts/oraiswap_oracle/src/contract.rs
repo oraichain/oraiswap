@@ -9,11 +9,12 @@ use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
     ExchangeRatesResponse, OracleContractMsg, OracleContractQuery, OracleExchangeMsg,
     OracleExchangeQuery, OracleMarketMsg, OracleMarketQuery, OracleMsg, OracleQuery,
-    OracleTreasuryQuery, SwapResponse, TaxCapResponse, TaxRateResponse,
+    OracleTreasuryMsg, OracleTreasuryQuery, SwapResponse, TaxCapResponse, TaxRateResponse,
 };
 
 use oraiswap::error::ContractError;
 use oraiswap::oracle::InitMsg;
+
 // use crate::msg::{HandleMsg, InitMsg};
 use crate::state::{CONTRACT_INFO, EXCHANGE_RATES, TAX_CAP, TAX_RATE};
 
@@ -24,6 +25,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // 10^18 is maximum decimal that we support
 const DECIMAL_FRACTIONAL: Uint128 = Uint128(1_000_000_000_000_000_000);
 
+// whitelist of denom?
+// base on denom address as ow20 can call burn
 pub fn init(
     deps: DepsMut,
     _env: Env,
@@ -41,6 +44,10 @@ pub fn init(
         } else {
             creator
         },
+        min_rate: msg
+            .min_rate
+            .unwrap_or(Decimal::from_ratio(5u128, 10000u128)), // 0.05%
+        max_rate: msg.max_rate.unwrap_or(Decimal::percent(1)), // 1%
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
 
@@ -67,6 +74,14 @@ pub fn handle(
                 handle_delete_exchange_rate(deps, info, denom)
             }
         },
+        OracleMsg::Treasury(handle_data) => match handle_data {
+            OracleTreasuryMsg::UpdateTaxCap { cap, denom } => {
+                handle_update_tax_cap(deps, info, denom, cap)
+            }
+            OracleTreasuryMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
+        },
+
+        // base on swap, call market module or somewhere in the contract logic to swap
         OracleMsg::Market(handle_data) => match handle_data {
             OracleMarketMsg::Swap {
                 offer_coin,
@@ -82,6 +97,48 @@ pub fn handle(
             OracleContractMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
         },
     }
+}
+
+pub fn handle_update_tax_cap(
+    deps: DepsMut,
+    info: MessageInfo,
+    denom: String,
+    cap: Uint128,
+) -> Result<HandleResponse, ContractError> {
+    let contract_info = CONTRACT_INFO.load(deps.storage)?;
+    let sender_addr = deps.api.canonical_address(&info.sender)?;
+
+    // check authorized
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // update tax cap
+    TAX_CAP.save(deps.storage, denom.as_bytes(), &cap)?;
+
+    // return nothing new
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_update_tax_rate(
+    deps: DepsMut,
+    info: MessageInfo,
+    rate: Decimal,
+) -> Result<HandleResponse, ContractError> {
+    let contract_info = CONTRACT_INFO.load(deps.storage)?;
+    let sender_addr = deps.api.canonical_address(&info.sender)?;
+
+    // check authorized, TODO: min and max tax_rate
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // update tax cap
+    let rate = rate.clamp(contract_info.min_rate, contract_info.max_rate);
+    TAX_RATE.save(deps.storage, &rate)?;
+
+    // return nothing new
+    Ok(HandleResponse::default())
 }
 
 pub fn handle_update_admin(
@@ -267,9 +324,16 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         name: info.name,
         admin: deps.api.human_address(&info.admin)?,
         creator: deps.api.human_address(&info.creator)?,
+        min_rate: info.min_rate,
+        max_rate: info.max_rate,
     })
 }
 
 pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
     deps.querier.query_balance(env.contract.address, &denom)
 }
+
+// ComputeInternalSwap returns the amount of asked DecCoin should be returned for a given offerCoin at the effective
+// exchange rate registered with the oracle.
+// Different from ComputeSwap, ComputeInternalSwap does not charge a spread as its use is system internal.
+// retAmount := offerCoin.Amount.Mul(exchange_rate)
