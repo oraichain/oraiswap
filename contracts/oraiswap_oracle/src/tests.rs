@@ -3,6 +3,7 @@ use cosmwasm_std::testing::{
     mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
 };
 use cosmwasm_std::{coins, from_binary, Decimal, OwnedDeps};
+use oraiswap::asset::ORAI_DENOM;
 use oraiswap::oracle::{
     ExchangeRateResponse, InitMsg, OracleExchangeMsg, OracleExchangeQuery, OracleMsg, OracleQuery,
 };
@@ -10,7 +11,7 @@ use oraiswap::oracle::{
 const OWNER: &str = "owner0000";
 
 fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&coins(100000, "orai"));
+    let mut deps = mock_dependencies(&coins(100000, ORAI_DENOM));
 
     let msg = InitMsg {
         name: None,
@@ -39,7 +40,7 @@ fn proper_initialization() {
 
     let msg = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRate {
         base_denom: "usdt".to_string(),
-        quote_denom: "orai".to_string(),
+        quote_denom: ORAI_DENOM.to_string(),
     });
 
     let res = query(deps.as_ref(), mock_env(), msg).unwrap();

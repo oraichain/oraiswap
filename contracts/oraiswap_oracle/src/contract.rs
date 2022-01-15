@@ -1,10 +1,12 @@
 use std::ops::Mul;
+use std::os::unix::prelude::OsStrExt;
 
 use cosmwasm_std::{
     to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, StdResult, Uint128,
+    MessageInfo, StdError, StdResult, Uint128,
 };
 
+use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
     ExchangeRatesResponse, OracleContractMsg, OracleContractQuery, OracleExchangeMsg,
@@ -15,15 +17,13 @@ use oraiswap::oracle::{
 use oraiswap::error::ContractError;
 use oraiswap::oracle::InitMsg;
 
+use crate::operations::get_orai_exchange_rate;
 // use crate::msg::{HandleMsg, InitMsg};
 use crate::state::{CONTRACT_INFO, EXCHANGE_RATES, TAX_CAP, TAX_RATE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:oraiswap_oracle";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// 10^18 is maximum decimal that we support
-const DECIMAL_FRACTIONAL: Uint128 = Uint128(1_000_000_000_000_000_000);
 
 // whitelist of denom?
 // base on denom address as ow20 can call burn
@@ -52,7 +52,7 @@ pub fn init(
     CONTRACT_INFO.save(deps.storage, &info)?;
 
     // defaul is orai/orai 1:1 (no tax)
-    EXCHANGE_RATES.save(deps.storage, b"orai", &Decimal::one())?;
+    EXCHANGE_RATES.save(deps.storage, ORAI_DENOM.as_bytes(), &Decimal::one())?;
 
     // return default
     Ok(InitResponse::default())
@@ -257,9 +257,23 @@ pub fn query_tax_cap(deps: Deps, denom: String) -> StdResult<TaxCapResponse> {
 pub fn query_swap(deps: Deps, offer_coin: Coin, ask_denom: String) -> StdResult<SwapResponse> {
     // TODO: implemented here https://github.com/terra-money/core/blob/main/x/market/keeper/querier.go
     // with offer_coin, ask for denom, will return receive, based on swap rate
-    Ok(SwapResponse {
-        receive: offer_coin.clone(),
-    })
+
+    // swapCoin, spread, err := k.ComputeSwap(ctx, offerCoin, askDenom)
+    // if err != nil {
+    // 	return sdk.Coin{}, sdkerrors.Wrap(sdkerrors.ErrPanic, err.Error())
+    // }
+
+    // if spread.IsPositive() {
+    // 	swapFeeAmt := spread.Mul(swapCoin.Amount)
+    // 	if swapFeeAmt.IsPositive() {
+    // 		swapFee := sdk.NewDecCoinFromDec(swapCoin.Denom, swapFeeAmt)
+    // 		swapCoin = swapCoin.Sub(swapFee)
+    // 	}
+    // }
+
+    // retCoin, _ := swapCoin.TruncateDecimal()
+
+    Ok(SwapResponse { receive: ret_coin })
 }
 
 pub fn query_exchange_rate(
@@ -267,14 +281,14 @@ pub fn query_exchange_rate(
     base_denom: String,
     quote_denom: String,
 ) -> StdResult<ExchangeRateResponse> {
-    let base_rate = EXCHANGE_RATES
-        .load(deps.storage, &base_denom.as_bytes())?
-        .mul(DECIMAL_FRACTIONAL);
-    let quote_rate = EXCHANGE_RATES
-        .load(deps.storage, &quote_denom.as_bytes())?
-        .mul(DECIMAL_FRACTIONAL);
+    let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
+    let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
 
-    let exchange_rate = Decimal::from_ratio(quote_rate, base_rate);
+    // quote = ask, offer = base
+    let exchange_rate = Decimal::from_ratio(
+        quote_rate.mul(DECIMAL_FRACTION),
+        base_rate.mul(DECIMAL_FRACTION),
+    );
 
     let res = ExchangeRateResponse {
         base_denom: base_denom.clone(),
@@ -297,16 +311,15 @@ pub fn query_exchange_rates(
         items: vec![],
     };
 
-    let base_rate = EXCHANGE_RATES
-        .load(deps.storage, &base_denom.as_bytes())?
-        .mul(DECIMAL_FRACTIONAL);
+    let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
 
     for quote_denom in quote_denoms {
-        let quote_rate = EXCHANGE_RATES
-            .load(deps.storage, &quote_denom.as_bytes())?
-            .mul(DECIMAL_FRACTIONAL);
+        let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
 
-        let exchange_rate = Decimal::from_ratio(quote_rate, base_rate);
+        let exchange_rate = Decimal::from_ratio(
+            quote_rate.mul(DECIMAL_FRACTION),
+            base_rate.mul(DECIMAL_FRACTION),
+        );
 
         res.items.push(ExchangeRateItem {
             quote_denom,
@@ -332,8 +345,3 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
 pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
     deps.querier.query_balance(env.contract.address, &denom)
 }
-
-// ComputeInternalSwap returns the amount of asked DecCoin should be returned for a given offerCoin at the effective
-// exchange rate registered with the oracle.
-// Different from ComputeSwap, ComputeInternalSwap does not charge a spread as its use is system internal.
-// retAmount := offerCoin.Amount.Mul(exchange_rate)

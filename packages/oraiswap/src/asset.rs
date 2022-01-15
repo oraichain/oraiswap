@@ -14,6 +14,9 @@ use cosmwasm_std::{
 };
 use cw20::Cw20HandleMsg;
 
+pub static DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
+pub const ORAI_DENOM: &str = "orai";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {
     pub info: AssetInfo,
@@ -25,8 +28,6 @@ impl fmt::Display for Asset {
         write!(f, "{}{}", self.amount, self.info)
     }
 }
-
-static DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 
 impl Asset {
     pub fn is_native_token(&self) -> bool {
@@ -53,7 +54,7 @@ impl Asset {
     ) -> StdResult<Uint128> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
-            if denom == "orai" {
+            if denom == ORAI_DENOM {
                 Ok(Uint128::zero())
             } else {
                 let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;

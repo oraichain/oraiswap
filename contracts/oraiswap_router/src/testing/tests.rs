@@ -6,8 +6,8 @@ use crate::operations::assert_operations;
 use crate::testing::mock_querier::mock_dependencies;
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::oracle::{create_swap_msg, create_swap_send_msg};
-use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::router::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
@@ -82,12 +82,12 @@ fn handle_swap_operations() {
                     contract_addr: "asset0001".into(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
-                    denom: "orai".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
             },
             SwapOperation::OraiSwap {
                 offer_asset_info: AssetInfo::NativeToken {
-                    denom: "orai".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 ask_asset_info: AssetInfo::Token {
                     contract_addr: "asset0002".into(),
@@ -140,7 +140,7 @@ fn handle_swap_operations() {
                             contract_addr: "asset0001".into(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
-                            denom: "orai".to_string(),
+                            denom: ORAI_DENOM.to_string(),
                         },
                     },
                     to: None,
@@ -153,7 +153,7 @@ fn handle_swap_operations() {
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
-                            denom: "orai".to_string(),
+                            denom: ORAI_DENOM.to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
                             contract_addr: "asset0002".into(),
@@ -201,12 +201,12 @@ fn handle_swap_operations() {
                         contract_addr: "asset0001".into(),
                     },
                     ask_asset_info: AssetInfo::NativeToken {
-                        denom: "orai".to_string(),
+                        denom: ORAI_DENOM.to_string(),
                     },
                 },
                 SwapOperation::OraiSwap {
                     offer_asset_info: AssetInfo::NativeToken {
-                        denom: "orai".to_string(),
+                        denom: ORAI_DENOM.to_string(),
                     },
                     ask_asset_info: AssetInfo::Token {
                         contract_addr: "asset0002".into(),
@@ -261,7 +261,7 @@ fn handle_swap_operations() {
                             contract_addr: "asset0001".into(),
                         },
                         ask_asset_info: AssetInfo::NativeToken {
-                            denom: "orai".to_string(),
+                            denom: ORAI_DENOM.to_string(),
                         },
                     },
                     to: None,
@@ -274,7 +274,7 @@ fn handle_swap_operations() {
                 msg: to_binary(&HandleMsg::ExecuteSwapOperation {
                     operation: SwapOperation::OraiSwap {
                         offer_asset_info: AssetInfo::NativeToken {
-                            denom: "orai".to_string(),
+                            denom: ORAI_DENOM.to_string(),
                         },
                         ask_asset_info: AssetInfo::Token {
                             contract_addr: "asset0002".into(),
@@ -317,7 +317,7 @@ fn handle_swap_operation() {
     let msg = HandleMsg::ExecuteSwapOperation {
         operation: SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
+            ask_denom: ORAI_DENOM.to_string(),
         },
         to: None,
     };
@@ -338,7 +338,7 @@ fn handle_swap_operation() {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(1000000u128),
             },
-            "orai".to_string()
+            ORAI_DENOM.to_string()
         )],
     );
 
@@ -347,7 +347,7 @@ fn handle_swap_operation() {
     let msg = HandleMsg::ExecuteSwapOperation {
         operation: SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
+            ask_denom: ORAI_DENOM.to_string(),
         },
         to: Some("addr0000".into()),
     };
@@ -362,7 +362,7 @@ fn handle_swap_operation() {
                 denom: "uusd".to_string(),
                 amount: Uint128::from(952380u128), // deduct tax
             },
-            "orai".to_string()
+            ORAI_DENOM.to_string()
         )],
     );
     deps.querier
@@ -454,7 +454,7 @@ fn query_buy_with_routes() {
                     contract_addr: "asset0000".into(),
                 },
                 ask_asset_info: AssetInfo::NativeToken {
-                    denom: "orai".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
             },
         ],
@@ -483,7 +483,7 @@ fn query_buy_with_routes() {
             },
             SwapOperation::NativeSwap {
                 offer_denom: "ukrw".to_string(),
-                ask_denom: "orai".to_string(),
+                ask_denom: ORAI_DENOM.to_string(),
             },
         ],
     };
@@ -588,7 +588,7 @@ fn test_invalid_operations() {
     assert!(assert_operations(&vec![
         SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
+            ask_denom: ORAI_DENOM.to_string(),
         },
         SwapOperation::OraiSwap {
             offer_asset_info: AssetInfo::NativeToken {
@@ -603,7 +603,7 @@ fn test_invalid_operations() {
                 contract_addr: "asset0001".into(),
             },
             ask_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
         }
     ])
@@ -613,7 +613,7 @@ fn test_invalid_operations() {
     assert!(assert_operations(&vec![
         SwapOperation::NativeSwap {
             offer_denom: "uusd".to_string(),
-            ask_denom: "orai".to_string(),
+            ask_denom: ORAI_DENOM.to_string(),
         },
         SwapOperation::OraiSwap {
             offer_asset_info: AssetInfo::NativeToken {
@@ -628,12 +628,12 @@ fn test_invalid_operations() {
                 contract_addr: "asset0001".into(),
             },
             ask_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
         },
         SwapOperation::OraiSwap {
             offer_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             ask_asset_info: AssetInfo::Token {
                 contract_addr: "asset0002".into(),
@@ -666,7 +666,7 @@ fn test_invalid_operations() {
         },
         SwapOperation::OraiSwap {
             offer_asset_info: AssetInfo::NativeToken {
-                denom: "orai".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             ask_asset_info: AssetInfo::Token {
                 contract_addr: "asset0002".into(),
