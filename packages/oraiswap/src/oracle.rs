@@ -16,6 +16,8 @@ pub struct InitMsg {
 
     pub min_rate: Option<Decimal>,
     pub max_rate: Option<Decimal>,
+    // pub min_stability_spread: Option<Decimal>,
+    // pub base_pool: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -47,6 +49,10 @@ pub enum OracleExchangeMsg {
     },
     DeleteExchangeRate {
         denom: String,
+    },
+    UpdateTobinTax {
+        denom: String,
+        tobin_tax: Decimal,
     },
 }
 
@@ -100,6 +106,9 @@ pub enum OracleExchangeQuery {
     ExchangeRates {
         base_denom: String,
         quote_denoms: Vec<String>,
+    },
+    TobinTax {
+        denom: String,
     },
 }
 
@@ -157,10 +166,11 @@ pub struct ContractInfo {
     pub creator: CanonicalAddr,
     // admin can update the parameter, may be multisig
     pub admin: CanonicalAddr,
-
     // constraint
     pub min_rate: Decimal,
     pub max_rate: Decimal,
+    // pub min_stability_spread: Decimal,
+    // pub base_pool: Uint128,
 }
 
 /// ContractInfoResponse is data format returned from WasmRequest::ContractInfo query
@@ -171,9 +181,10 @@ pub struct ContractInfoResponse {
     pub creator: HumanAddr,
     // admin can update the parameter, may be multisig
     pub admin: HumanAddr,
-
     pub min_rate: Decimal,
     pub max_rate: Decimal,
+    // pub min_stability_spread: Decimal,
+    // pub base_pool: Uint128,
 }
 
 // create_swap_msg returns wrapped swap msg

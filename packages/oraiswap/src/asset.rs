@@ -14,7 +14,7 @@ use cosmwasm_std::{
 };
 use cw20::Cw20HandleMsg;
 
-pub static DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
+pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 pub const ORAI_DENOM: &str = "orai";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
