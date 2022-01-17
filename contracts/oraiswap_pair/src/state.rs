@@ -6,12 +6,14 @@ pub const PAIR_INFO: Item<PairInfoRaw> = Item::new("\u{0}\u{9}pair_info");
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     use cosmwasm_std::testing::mock_dependencies;
     use cosmwasm_std::{Api, StdResult, Storage};
     use cosmwasm_storage::{singleton, singleton_read};
     use oraiswap::asset::AssetInfoRaw;
+    use oraiswap::pair::DEFAULT_COMMISSION_RATE;
     const KEY_PAIR_INFO: &[u8] = b"pair_info";
 
     pub fn store_pair_info(storage: &mut dyn Storage, config: &PairInfoRaw) -> StdResult<()> {
@@ -39,6 +41,7 @@ mod test {
                 ],
                 contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
                 liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
+                commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
             },
         )
         .unwrap();

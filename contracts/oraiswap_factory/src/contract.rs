@@ -8,7 +8,7 @@ use crate::state::{pair_key, read_pairs, Config, TmpPairInfo, CONFIG, PAIRS, TMP
 
 use oraiswap::asset::{AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, MigrateMsg, PairsResponse, QueryMsg};
-use oraiswap::pair::InitMsg as PairInitMsg;
+use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let config = Config {
@@ -16,6 +16,9 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
         owner: deps.api.canonical_address(&info.sender)?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
+        commission_rate: msg
+            .commission_rate
+            .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -123,6 +126,7 @@ pub fn handle_create_pair(
                 oracle_addr: deps.api.human_address(&config.oracle_addr)?,
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
+                commission_rate: Some(config.commission_rate),
             })?,
         }
         .into()],
@@ -171,6 +175,7 @@ pub fn handle_update_pair(
             liquidity_token: deps.api.canonical_address(&liquidity_token)?,
             contract_addr: deps.api.canonical_address(&contract_addr)?,
             asset_infos: tmp_pair_info.asset_infos,
+            commission_rate: config.commission_rate,
         },
     )?;
 

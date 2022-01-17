@@ -11,6 +11,7 @@ pub struct Config {
     pub oracle_addr: CanonicalAddr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
+    pub commission_rate: String,
 }
 
 // put the length bytes at the first for compatibility with legacy singleton store
@@ -80,6 +81,7 @@ mod test {
     use cosmwasm_storage::{
         bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     };
+    use oraiswap::pair::DEFAULT_COMMISSION_RATE;
     const KEY_CONFIG: &[u8] = b"config";
 
     pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
@@ -99,6 +101,7 @@ mod test {
                 owner: deps.api.canonical_address(&"owner0000".into()).unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
+                commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
             },
         )
         .unwrap();
@@ -165,8 +168,8 @@ mod test {
                 },
             ],
             contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
-
             liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
+            commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 
         let pair_info2 = PairInfoRaw {
@@ -182,6 +185,7 @@ mod test {
             ],
             contract_addr: deps.api.canonical_address(&"pair0001".into()).unwrap(),
             liquidity_token: deps.api.canonical_address(&"liquidity0001".into()).unwrap(),
+            commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 
         store_pair(&mut deps.storage, &pair_info).unwrap();

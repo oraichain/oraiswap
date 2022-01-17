@@ -5,6 +5,7 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::to_length_prefixed;
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
+use oraiswap::pair::DEFAULT_COMMISSION_RATE;
 use std::collections::HashMap;
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
@@ -98,6 +99,7 @@ impl WasmMockQuerier {
                                 denom: "uusd".to_string(),
                             },
                         ],
+                        commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
                     })))
                 } else {
                     panic!("DO NOT ENTER HERE")

@@ -10,6 +10,7 @@ pub struct InitMsg {
     pub pair_code_id: u64,
     pub token_code_id: u64,
     pub oracle_addr: HumanAddr,
+    pub commission_rate: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

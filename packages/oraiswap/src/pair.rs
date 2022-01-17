@@ -6,6 +6,10 @@ use crate::asset::{Asset, AssetInfo};
 use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
 
+/// Default commission rate == 0.3%
+/// in the future need to update ?
+pub const DEFAULT_COMMISSION_RATE: &str = "0.003";
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
     /// Asset infos
@@ -15,6 +19,8 @@ pub struct InitMsg {
 
     /// Oracle contract for query oracle information
     pub oracle_addr: HumanAddr,
+
+    pub commission_rate: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

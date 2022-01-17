@@ -1,10 +1,6 @@
 # Concepts
 
-## Market
-
-swap from orai native to orai ow20 then do mint, burn for liquidity pool
-then later update the pool
-adjust demand through arbitrage and market maker
+Store all params managed by multisig wallet.
 
 ## Treasury: acts as the central bank
 
@@ -16,7 +12,7 @@ adjust demand through adjusting reward, using multisig
 
 #### State
 
-- TaxRate
+- TaxRate: tax rate is constant and normally fixed at 0.003%
 - TaxCap: map a denom to an Uint128 that that represents that maximum income that can be generated from taxes on a transaction in that denomination
 
 ## Exchange: provides the Oraiswap with an up-to-date and accurate price feed of exchange rates

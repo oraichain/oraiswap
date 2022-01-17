@@ -38,6 +38,7 @@ fn proper_initialization() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     // we can just call .unwrap() to assert this was a success
@@ -112,6 +113,7 @@ fn provide_liquidity() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     // we can just call .unwrap() to assert this was a success
@@ -513,6 +515,7 @@ fn withdraw_liquidity() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     let env = mock_env();
@@ -629,6 +632,7 @@ fn try_native_to_token() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     let env = mock_env();
@@ -799,6 +803,7 @@ fn try_token_to_native() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     let env = mock_env();
@@ -1023,6 +1028,7 @@ fn test_deduct() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
@@ -1097,6 +1103,7 @@ fn test_query_pool() {
             },
         ],
         token_code_id: 10u64,
+        commission_rate: None,
     };
 
     let env = mock_env();

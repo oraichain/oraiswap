@@ -7,7 +7,7 @@ use cosmwasm_std::testing::{mock_env, mock_info};
 use cosmwasm_std::{attr, from_binary, to_binary, StdError, WasmMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
-use oraiswap::pair::InitMsg as PairInitMsg;
+use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
 
 #[test]
 fn proper_initialization() {
@@ -17,6 +17,7 @@ fn proper_initialization() {
         oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
+        commission_rate: None,
     };
 
     let info = mock_info("addr0000", &[]);
@@ -39,6 +40,7 @@ fn update_config() {
         oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
+        commission_rate: None,
     };
 
     let info = mock_info("addr0000", &[]);
@@ -107,6 +109,7 @@ fn create_pair() {
         oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
+        commission_rate: None,
     };
 
     let env = mock_env();
@@ -145,6 +148,7 @@ fn create_pair() {
                 oracle_addr: "oracle0000".into(),
                 asset_infos: asset_infos.clone(),
                 token_code_id: 123u64,
+                commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
             })
             .unwrap(),
             code_id: 321u64,
@@ -178,6 +182,7 @@ fn update_pair() {
         oracle_addr: "oracle0000".into(),
         pair_code_id: 321u64,
         token_code_id: 123u64,
+        commission_rate: None,
     };
 
     let env = mock_env();

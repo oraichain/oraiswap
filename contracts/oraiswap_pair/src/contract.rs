@@ -13,16 +13,12 @@ use oraiswap::error::ContractError;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg, ReverseSimulationResponse,
-    SimulationResponse,
+    SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
 use oraiswap::token::InitMsg as TokenInitMsg;
 use oraiswap::{Decimal256, Uint256};
 use std::str::FromStr;
-
-/// Default commission rate == 0.3%
-/// in the future need to update ?
-const COMMISSION_RATE: &str = "0.003";
 
 pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let pair_info = &PairInfoRaw {
@@ -38,6 +34,10 @@ pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResu
             msg.asset_infos[0].to_raw(deps.api)?,
             msg.asset_infos[1].to_raw(deps.api)?,
         ],
+
+        commission_rate: msg
+            .commission_rate
+            .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
     };
 
     PAIR_INFO.save(deps.storage, pair_info)?;
@@ -396,9 +396,14 @@ pub fn swap(
         return Err(ContractError::AssetMismatch {});
     }
 
+    let commission_rate = Decimal256::from_str(&pair_info.commission_rate)?;
     let offer_amount = offer_asset.amount;
-    let (return_amount, spread_amount, commission_amount) =
-        compute_swap(offer_pool.amount, ask_pool.amount, offer_amount);
+    let (return_amount, spread_amount, commission_amount) = compute_swap(
+        offer_pool.amount,
+        ask_pool.amount,
+        offer_amount,
+        commission_rate,
+    );
 
     // check max spread limit if exist
     assert_max_spread(
@@ -509,8 +514,13 @@ pub fn query_simulation(
         return Err(ContractError::AssetMismatch {});
     }
 
-    let (return_amount, spread_amount, commission_amount) =
-        compute_swap(offer_pool.amount, ask_pool.amount, offer_asset.amount);
+    let commission_rate = Decimal256::from_str(&pair_info.commission_rate)?;
+    let (return_amount, spread_amount, commission_amount) = compute_swap(
+        offer_pool.amount,
+        ask_pool.amount,
+        offer_asset.amount,
+        commission_rate,
+    );
 
     Ok(SimulationResponse {
         return_amount,
@@ -540,8 +550,13 @@ pub fn query_reverse_simulation(
         return Err(ContractError::AssetMismatch {});
     }
 
-    let (offer_amount, spread_amount, commission_amount) =
-        compute_offer_amount(offer_pool.amount, ask_pool.amount, ask_asset.amount)?;
+    let commission_rate = Decimal256::from_str(&pair_info.commission_rate)?;
+    let (offer_amount, spread_amount, commission_amount) = compute_offer_amount(
+        offer_pool.amount,
+        ask_pool.amount,
+        ask_asset.amount,
+        commission_rate,
+    )?;
 
     Ok(ReverseSimulationResponse {
         offer_amount,
@@ -561,13 +576,12 @@ fn compute_swap(
     offer_pool: Uint128,
     ask_pool: Uint128,
     offer_amount: Uint128,
+    commission_rate: Decimal256,
 ) -> (Uint128, Uint128, Uint128) {
     // convert to uint256
     let offer_pool: Uint256 = offer_pool.into();
     let ask_pool: Uint256 = ask_pool.into();
     let offer_amount: Uint256 = offer_amount.into();
-
-    let commission_rate = Decimal256::from_str(COMMISSION_RATE).unwrap();
 
     // offer => ask
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
@@ -596,7 +610,13 @@ fn test_compute_swap_with_huge_pool_variance() {
     let ask_pool = Uint128::from(317u128);
 
     assert_eq!(
-        compute_swap(offer_pool, ask_pool, Uint128::from(1u128)).0,
+        compute_swap(
+            offer_pool,
+            ask_pool,
+            Uint128::from(1u128),
+            Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap()
+        )
+        .0,
         Uint128::zero()
     );
 }
@@ -605,12 +625,11 @@ fn compute_offer_amount(
     offer_pool: Uint128,
     ask_pool: Uint128,
     ask_amount: Uint128,
+    commission_rate: Decimal256,
 ) -> Result<(Uint128, Uint128, Uint128), ContractError> {
     let offer_pool: Uint256 = offer_pool.into();
     let ask_pool: Uint256 = ask_pool.into();
     let ask_amount: Uint256 = ask_amount.into();
-
-    let commission_rate = Decimal256::from_str(COMMISSION_RATE).unwrap();
 
     // ask => offer
     // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool

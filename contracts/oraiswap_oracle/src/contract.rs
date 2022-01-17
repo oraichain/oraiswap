@@ -49,7 +49,7 @@ pub fn init(
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
 
-    // defaul is orai/orai 1:1 (no tax)
+    // defaul is orai/orai 1:1 (no tax), this is for swap Orai native to Orai token
     EXCHANGE_RATES.save(deps.storage, ORAI_DENOM.as_bytes(), &Decimal::one())?;
 
     // return default

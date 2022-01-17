@@ -319,6 +319,8 @@ pub struct PairInfoRaw {
     // we use this to later update the smart contract
     // because can not get initiated contract result
     pub creator: CanonicalAddr,
+
+    pub commission_rate: String,
 }
 
 impl PairInfoRaw {
