@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, HumanAddr, QuerierWrapper, StdResult,
+    to_binary, Api, CanonicalAddr, CosmosMsg, Decimal, HumanAddr, QuerierWrapper, StdResult,
     Uint128, WasmMsg, WasmQuery,
 };
 
@@ -13,25 +13,8 @@ pub struct InitMsg {
     pub version: Option<String>,
     pub creator: HumanAddr,
     pub admin: Option<HumanAddr>,
-
     pub min_rate: Option<Decimal>,
     pub max_rate: Option<Decimal>,
-    // pub min_stability_spread: Option<Decimal>,
-    // pub base_pool: Option<Uint128>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OracleMarketMsg {
-    Swap {
-        offer_coin: Coin,
-        ask_denom: String,
-    },
-    SwapSend {
-        to_address: HumanAddr,
-        offer_coin: Coin,
-        ask_denom: String,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -50,10 +33,6 @@ pub enum OracleExchangeMsg {
     DeleteExchangeRate {
         denom: String,
     },
-    UpdateTobinTax {
-        denom: String,
-        tobin_tax: Decimal,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -67,7 +46,6 @@ pub enum OracleTreasuryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OracleMsg {
-    Market(OracleMarketMsg),
     Contract(OracleContractMsg),
     Exchange(OracleExchangeMsg),
     Treasury(OracleTreasuryMsg),
@@ -77,16 +55,9 @@ pub enum OracleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OracleQuery {
-    Market(OracleMarketQuery),
     Treasury(OracleTreasuryQuery),
     Exchange(OracleExchangeQuery),
     Contract(OracleContractQuery),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OracleMarketQuery {
-    Swap { offer_coin: Coin, ask_denom: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -107,9 +78,6 @@ pub enum OracleExchangeQuery {
         base_denom: String,
         quote_denoms: Vec<String>,
     },
-    TobinTax {
-        denom: String,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -117,12 +85,6 @@ pub enum OracleExchangeQuery {
 pub enum OracleContractQuery {
     ContractInfo {},
     RewardPool { denom: String },
-}
-
-/// SwapResponse is data format returned from SwapRequest::Simulate query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct SwapResponse {
-    pub receive: Coin,
 }
 
 /// TaxRateResponse is data format returned from TreasuryRequest::TaxRate query
@@ -187,38 +149,6 @@ pub struct ContractInfoResponse {
     // pub base_pool: Uint128,
 }
 
-// create_swap_msg returns wrapped swap msg
-pub fn create_swap_msg(oracle_addr: HumanAddr, offer_coin: Coin, ask_denom: String) -> CosmosMsg {
-    CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: oracle_addr,
-        msg: to_binary(&OracleMsg::Market(OracleMarketMsg::Swap {
-            offer_coin,
-            ask_denom,
-        }))
-        .unwrap(),
-        send: vec![],
-    })
-}
-
-// create_swap_send_msg returns wrapped swap send msg
-pub fn create_swap_send_msg(
-    oracle_addr: HumanAddr,
-    to_address: HumanAddr,
-    offer_coin: Coin,
-    ask_denom: String,
-) -> CosmosMsg {
-    CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: oracle_addr,
-        msg: to_binary(&OracleMsg::Market(OracleMarketMsg::SwapSend {
-            to_address,
-            offer_coin,
-            ask_denom,
-        }))
-        .unwrap(),
-        send: vec![],
-    })
-}
-
 /// OracleContract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with this.
 ///
@@ -262,20 +192,6 @@ impl OracleContract {
 
     /*** queries ***/
 
-    pub fn query_swap<T: Into<String>>(
-        &self,
-        querier: &QuerierWrapper,
-        offer_coin: Coin,
-        ask_denom: T,
-    ) -> StdResult<SwapResponse> {
-        let request = OracleQuery::Market(OracleMarketQuery::Swap {
-            offer_coin,
-            ask_denom: ask_denom.into(),
-        });
-
-        self.query(querier, request)
-    }
-
     pub fn query_tax_cap<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,
@@ -294,6 +210,7 @@ impl OracleContract {
         self.query(querier, request)
     }
 
+    // this is for CEX
     pub fn query_exchange_rates<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,

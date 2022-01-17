@@ -14,11 +14,6 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SwapOperation {
-    // swap native token
-    NativeSwap {
-        offer_denom: String,
-        ask_denom: String,
-    },
     // swap cw20 token
     OraiSwap {
         offer_asset_info: AssetInfo,
@@ -29,9 +24,6 @@ pub enum SwapOperation {
 impl SwapOperation {
     pub fn get_target_asset_info(&self) -> AssetInfo {
         match self {
-            SwapOperation::NativeSwap { ask_denom, .. } => AssetInfo::NativeToken {
-                denom: ask_denom.clone(),
-            },
             SwapOperation::OraiSwap { ask_asset_info, .. } => ask_asset_info.clone(),
         }
     }

@@ -1051,7 +1051,7 @@ fn test_deduct() {
     );
 
     let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
-    let oracle_querier = OracleContract(pair_info.oracle_addr);
+    let oracle_contract = OracleContract(pair_info.oracle_addr);
 
     let after_amount = (Asset {
         info: AssetInfo::NativeToken {
@@ -1059,7 +1059,7 @@ fn test_deduct() {
         },
         amount,
     })
-    .deduct_tax(&oracle_querier, &deps.as_ref().querier)
+    .deduct_tax(&oracle_contract, &deps.as_ref().querier)
     .unwrap();
 
     assert_eq!(expected_after_amount, after_amount.amount);

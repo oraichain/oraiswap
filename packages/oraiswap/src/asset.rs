@@ -9,7 +9,7 @@ use crate::{
 };
 
 use cosmwasm_std::{
-    to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, HumanAddr, MessageInfo,
+    to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, HumanAddr, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
@@ -49,7 +49,7 @@ impl Asset {
 
     pub fn compute_tax(
         &self,
-        oracle_querier: &OracleContract,
+        oracle_contract: &OracleContract,
         querier: &QuerierWrapper,
     ) -> StdResult<Uint128> {
         let amount = self.amount;
@@ -57,9 +57,11 @@ impl Asset {
             if denom == ORAI_DENOM {
                 Ok(Uint128::zero())
             } else {
-                let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;
-                let tax_cap: Uint128 =
-                    (oracle_querier.query_tax_cap(querier, denom.to_string())?).cap;
+                // get oracle params from oracle contract
+                let tax_rate = oracle_contract.query_tax_rate(querier)?.rate;
+                let tax_cap = oracle_contract
+                    .query_tax_cap(querier, denom.to_string())?
+                    .cap;
                 Ok(std::cmp::min(
                     Self::checked_sub(
                         amount,
@@ -78,23 +80,24 @@ impl Asset {
 
     pub fn deduct_tax(
         &self,
-        oracle_querier: &OracleContract,
+        oracle_contract: &OracleContract,
         querier: &QuerierWrapper,
     ) -> StdResult<Coin> {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
             Ok(Coin {
                 denom: denom.to_string(),
-                amount: Self::checked_sub(amount, self.compute_tax(oracle_querier, querier)?)?,
+                amount: Self::checked_sub(amount, self.compute_tax(oracle_contract, querier)?)?,
             })
         } else {
             Err(StdError::generic_err("cannot deduct tax from token asset"))
         }
     }
 
+    /// create a CosmosMsg send message to receiver
     pub fn into_msg(
         self,
-        oracle_querier: &OracleContract,
+        oracle_contract: &OracleContract,
         querier: &QuerierWrapper,
         sender: HumanAddr,
         recipient: HumanAddr,
@@ -113,7 +116,7 @@ impl Asset {
             AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
                 from_address: sender.into(),
                 to_address: recipient.into(),
-                amount: vec![self.deduct_tax(oracle_querier, querier)?],
+                amount: vec![self.deduct_tax(oracle_contract, querier)?],
             })),
         }
     }

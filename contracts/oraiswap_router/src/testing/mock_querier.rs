@@ -10,10 +10,7 @@ use std::collections::HashMap;
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, QueryMsg as FactoryQueryMsg};
-use oraiswap::oracle::{
-    OracleMarketQuery, OracleQuery, OracleTreasuryQuery, SwapResponse, TaxCapResponse,
-    TaxRateResponse,
-};
+use oraiswap::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
@@ -155,17 +152,6 @@ impl WasmMockQuerier {
                             .copied()
                             .unwrap_or_default();
                         let res = TaxCapResponse { cap };
-                        SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                    }
-                },
-                Ok(OracleQuery::Market(query_data)) => match query_data {
-                    OracleMarketQuery::Swap {
-                        offer_coin,
-                        ask_denom: _,
-                    } => {
-                        let res = SwapResponse {
-                            receive: offer_coin.clone(),
-                        };
                         SystemResult::Ok(ContractResult::from(to_binary(&res)))
                     }
                 },

@@ -22,7 +22,7 @@ pub fn compute_tax(querier: &QuerierWrapper, amount: Uint128, denom: String) -> 
 
 pub fn compute_tax(
     &self,
-    oracle_querier: &OracleContract,
+    oracle_contract: &OracleContract,
     querier: &QuerierWrapper,
 ) -> StdResult<Uint128> {
     let amount = self.amount;
@@ -30,8 +30,8 @@ pub fn compute_tax(
         if denom == ORAI_DENOM {
             Ok(Uint128::zero())
         } else {
-            let tax_rate: Decimal = (oracle_querier.query_tax_rate(querier)?).rate;
-            let tax_cap: Uint128 = (oracle_querier.query_tax_cap(querier, denom.to_string())?).cap;
+            let tax_rate: Decimal = (oracle_contract.query_tax_rate(querier)?).rate;
+            let tax_cap: Uint128 = (oracle_contract.query_tax_cap(querier, denom.to_string())?).cap;
             Ok(std::cmp::min(
                 Self::checked_sub(
                     amount,

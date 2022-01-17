@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Coin, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
+    from_binary, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
 };
 
 use crate::operations::{handle_swap_operation, handle_swap_operations};
@@ -8,7 +8,7 @@ use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
-use oraiswap::oracle::{OracleContract, SwapResponse};
+use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
 use oraiswap::router::{
@@ -129,50 +129,16 @@ fn simulate_swap_operations(
     let config: Config = CONFIG.load(deps.storage)?;
     let factory_addr = deps.api.human_address(&config.factory_addr)?;
     let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
-    let oracle_querier = OracleContract(pair_config.oracle_addr);
+    let oracle_contract = OracleContract(pair_config.oracle_addr);
 
     let operations_len = operations.len();
     if operations_len == 0 {
         return Err(StdError::generic_err("must provide operations"));
     }
 
-    let mut operation_index = 0;
     let mut offer_amount = offer_amount;
     for operation in operations.into_iter() {
-        operation_index += 1;
-
         match operation {
-            SwapOperation::NativeSwap {
-                offer_denom,
-                ask_denom,
-            } => {
-                // Deduct tax before query simulation
-                // because last swap is swap_send
-                if operation_index == operations_len {
-                    let return_asset = Asset {
-                        info: AssetInfo::NativeToken {
-                            denom: offer_denom.clone(),
-                        },
-                        amount: offer_amount,
-                    };
-
-                    offer_amount = Asset::checked_sub(
-                        offer_amount,
-                        return_asset.compute_tax(&oracle_querier, &deps.querier)?,
-                    )?;
-                }
-
-                let res: SwapResponse = oracle_querier.query_swap(
-                    &deps.querier,
-                    Coin {
-                        denom: offer_denom,
-                        amount: offer_amount,
-                    },
-                    ask_denom,
-                )?;
-
-                offer_amount = res.receive.amount;
-            }
             SwapOperation::OraiSwap {
                 offer_asset_info,
                 ask_asset_info,
@@ -191,7 +157,7 @@ fn simulate_swap_operations(
                 // Deduct tax before querying simulation
                 offer_amount = Asset::checked_sub(
                     offer_amount,
-                    return_asset.compute_tax(&oracle_querier, &deps.querier)?,
+                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
                 )?;
 
                 let mut res: SimulationResponse =
@@ -213,7 +179,7 @@ fn simulate_swap_operations(
                 // Deduct tax after querying simulation
                 res.return_amount = Asset::checked_sub(
                     res.return_amount,
-                    return_asset.compute_tax(&oracle_querier, &deps.querier)?,
+                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
                 )?;
 
                 offer_amount = res.return_amount;

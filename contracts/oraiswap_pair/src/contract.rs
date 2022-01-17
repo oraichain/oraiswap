@@ -27,9 +27,13 @@ const COMMISSION_RATE: &str = "0.003";
 pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let pair_info = &PairInfoRaw {
         creator: deps.api.canonical_address(&info.sender)?,
+        // return infomation from oracle, update by multisig wallet
         oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
+        // the current contract address
         contract_addr: deps.api.canonical_address(&env.contract.address)?,
+        // liquidity token address is ow20 to reward, mint and burn
         liquidity_token: CanonicalAddr::from(vec![]),
+        // pair info
         asset_infos: [
             msg.asset_infos[0].to_raw(deps.api)?,
             msg.asset_infos[1].to_raw(deps.api)?,
@@ -49,6 +53,7 @@ pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResu
                 symbol: "uLP".to_string(),
                 decimals: 6,
                 initial_balances: vec![],
+                // only this pair contract can mint
                 mint: Some(MinterResponse {
                     minter: env.contract.address,
                     cap: None,
@@ -69,13 +74,17 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
+        // when liquidity token is deploy, need to update the address
         HandleMsg::Update { contract_address } => update_pair(deps, env, info, contract_address),
+        // when transfer ow20 token to this contract
         HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        // add more liquidity
         HandleMsg::ProvideLiquidity {
             assets,
             slippage_tolerance,
             receiver,
         } => provide_liquidity(deps, env, info, assets, slippage_tolerance, receiver),
+        // swap token, can not swap native token directly
         HandleMsg::Swap {
             offer_asset,
             belief_price,
@@ -121,8 +130,9 @@ pub fn receive_cw20(
                 config.query_pools(&deps.querier, deps.api, env.contract.address.clone())?;
             for pool in pools.iter() {
                 if let AssetInfo::Token { contract_addr, .. } = &pool.info {
-                    if contract_addr == info.sender.as_str() {
+                    if info.sender.eq(contract_addr) {
                         authorized = true;
+                        break;
                     }
                 }
             }
@@ -147,6 +157,7 @@ pub fn receive_cw20(
                 to_addr,
             )
         }
+        // remove liquidity
         Ok(Cw20HookMsg::WithdrawLiquidity {}) => {
             let config: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
             if deps.api.canonical_address(&info.sender)? != config.liquidity_token {
@@ -307,19 +318,19 @@ pub fn withdraw_liquidity(
         })
         .collect();
 
-    let oracle_querier = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
+    let oracle_contract = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
 
     // update pool info
     Ok(HandleResponse {
         messages: vec![
             refund_assets[0].clone().into_msg(
-                &oracle_querier,
+                &oracle_contract,
                 &deps.querier,
                 env.contract.address.clone(),
                 sender.clone(),
             )?,
             refund_assets[1].clone().into_msg(
-                &oracle_querier,
+                &oracle_contract,
                 &deps.querier,
                 env.contract.address,
                 sender.clone(),
@@ -344,7 +355,8 @@ pub fn withdraw_liquidity(
     })
 }
 
-// CONTRACT - a user must do token approval
+/// CONTRACT - a user must do token approval
+/// some params retrieving from oracle contract
 #[allow(clippy::too_many_arguments)]
 pub fn swap(
     deps: DepsMut,
@@ -403,15 +415,16 @@ pub fn swap(
         amount: return_amount,
     };
 
-    let oracle_querier = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
+    let oracle_contract = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
 
-    let tax_amount = return_asset.compute_tax(&oracle_querier, &deps.querier)?;
+    let tax_amount = return_asset.compute_tax(&oracle_contract, &deps.querier)?;
     let receiver = to.unwrap_or_else(|| sender.clone());
 
+    // update oracle_contract
     let mut messages: Vec<CosmosMsg> = vec![];
     if !return_amount.is_zero() {
         messages.push(return_asset.into_msg(
-            &oracle_querier,
+            &oracle_contract,
             &deps.querier,
             env.contract.address,
             receiver.clone(),
