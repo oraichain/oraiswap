@@ -7,10 +7,18 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 | Name                                             | Description                                  |
 | ------------------------------------------------ | -------------------------------------------- |
 | [`oraiswap_factory`](contracts/oraiswap_factory) |                                              |
+| [`oraiswap_oracle`](contracts/oraiswap_oracle)   |                                              |
 | [`oraiswap_pair`](contracts/oraiswap_pair)       |                                              |
+| [`oraiswap_router`](contracts/oraiswap_router)   |                                              |
 | [`oraiswap_token`](contracts/oraiswap_token)     | CW20 (ERC20 equivalent) token implementation |
 
 - oraiswap_factory
+
+  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
+
+  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+
+- oraiswap_oracle
 
   Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
 
@@ -21,6 +29,12 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
   Mainnet (CodeID): 4
 
   Testnet (CodeID): 7869
+
+- oraiswap_route
+
+  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
+
+  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
 
 - oraiswap_token
 
