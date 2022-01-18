@@ -14,7 +14,9 @@ It creates liquidity token contract as init response, and execute init hook to r
     pub asset_infos: [AssetInfo; 2],
     /// Token code ID for liqudity token creation
     pub token_code_id: u64,
-    /// Hook for post initalization
+    /// Oracle contract address for global parameters
+    pub oracle_addr: HumanAddr,
+    /// Hook for post initalization, such as update the instance contract address to proxy contract map
     pub init_hook: Option<InitHook>,
 }
 ```
@@ -29,9 +31,9 @@ When providing liquidity from a smart contract, the most important thing to keep
 
 > Note before executing the `provide_liqudity` operation, a user must allow the contract to use the liquidity amount of asset in the token contract.
 
-#### Slipage Tolerance
+#### Slippage Tolerance
 
-If a user specify the slipage tolerance at provide liquidity msg, the contract restricts the operation when the exchange rate is dropped more than the tolerance.
+If a user specify the slippage tolerance at provide liquidity msg, the contract restricts the operation when the exchange rate is dropped more than the tolerance.
 
 So, at a 1% tolerance level, if a user sends a transaction with 200 UST and 1 ASSET, amountUSTMin should be set to e.g. 198 UST, and amountASSETMin should be set to .99 ASSET. This means that, at worst, liquidity will be added at a rate between 198 ASSET/1 UST and 202.02 UST/1 ASSET (200 UST/.99 ASSET).
 
@@ -107,7 +109,7 @@ Any user can swap an asset by sending `swap` or invoking `send` msg to token con
 
 - Native Token => Token
 
-  ```json
+  ```rust
   {
       "swap": {
           "offer_asset": {

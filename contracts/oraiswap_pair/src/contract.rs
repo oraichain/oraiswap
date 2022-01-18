@@ -714,7 +714,7 @@ fn assert_slippage_tolerance(
     if let Some(slippage_tolerance) = *slippage_tolerance {
         let slippage_tolerance: Decimal256 = slippage_tolerance.into();
         if slippage_tolerance > Decimal256::one() {
-            return Err(StdError::generic_err("slippage_tolerance cannot bigger than 1").into());
+            return Err(ContractError::InvalidExceedOneSlippage {});
         }
 
         let one_minus_slippage_tolerance = Decimal256::one() - slippage_tolerance;

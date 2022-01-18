@@ -60,6 +60,9 @@ pub enum ContractError {
     #[error("Max slippage assertion")]
     MaxSlippageAssertion {},
 
+    #[error("Slippage_tolerance cannot bigger than 1")]
+    InvalidExceedOneSlippage {},
+
     #[error("Asset mismatch")]
     AssetMismatch {},
 
