@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{StdError, StdResult, Uint128};
 use cw20::{Cw20CoinHuman, MinterResponse};
 
+use crate::hook::InitHook;
+
 /// TokenContract InitMsg
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {
@@ -12,6 +14,9 @@ pub struct InitMsg {
     pub decimals: u8,
     pub initial_balances: Vec<Cw20CoinHuman>,
     pub mint: Option<MinterResponse>,
+
+    /// call after work
+    pub init_hook: Option<InitHook>,
 }
 
 // this is InitMsg

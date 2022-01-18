@@ -261,7 +261,7 @@ fn query_oraiswap_pair_contract() {
                     denom: "uusd".to_string(),
                 },
             ],
-            creator: "addr0000".into(),
+
             oracle_addr: "oracle0000".into(),
             contract_addr: "pair0000".into(),
             liquidity_token: "liquidity0000".into(),

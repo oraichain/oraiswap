@@ -1,10 +1,11 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, MigrateResponse, StdError, StdResult, WasmMsg,
+    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, WasmMsg,
 };
+use oraiswap::hook::InitHook;
 
 use crate::querier::query_liquidity_token;
-use crate::state::{pair_key, read_pairs, Config, TmpPairInfo, CONFIG, PAIRS, TMP_PAIR_INFO};
+use crate::state::{pair_key, read_pairs, Config, CONFIG, PAIRS};
 
 use oraiswap::asset::{AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, MigrateMsg, PairsResponse, QueryMsg};
@@ -39,10 +40,7 @@ pub fn handle(
             pair_code_id,
         } => handle_update_config(deps, env, info, owner, token_code_id, pair_code_id),
         HandleMsg::CreatePair { asset_infos } => handle_create_pair(deps, env, info, asset_infos),
-        HandleMsg::UpdatePair {
-            pair_key,
-            contract_addr,
-        } => handle_update_pair(deps, env, info, pair_key, contract_addr),
+        HandleMsg::Register { asset_infos } => handle_register_pair(deps, env, info, asset_infos),
     }
 }
 
@@ -86,8 +84,8 @@ pub fn handle_update_config(
 // Anyone can execute it to create swap pair
 pub fn handle_create_pair(
     deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
+    env: Env,
+    _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
 ) -> StdResult<HandleResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
@@ -100,24 +98,23 @@ pub fn handle_create_pair(
 
     // can not update pair once updated
     if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
-        return Err(StdError::generic_err("Pair already updated"));
+        return Err(StdError::generic_err("Pair already exists"));
     }
 
-    if let Ok(Some(_)) = TMP_PAIR_INFO.may_load(deps.storage, &pair_key) {
-        return Err(StdError::generic_err(
-            "Pair is waiting for deployment address",
-        ));
-    }
-    TMP_PAIR_INFO.save(
+    PAIRS.save(
         deps.storage,
         &pair_key,
-        &TmpPairInfo {
-            creator: info.sender,
+        &PairInfoRaw {
+            oracle_addr: config.oracle_addr.clone(),
+            liquidity_token: CanonicalAddr::default(),
+            contract_addr: CanonicalAddr::default(),
             asset_infos: raw_infos,
+            commission_rate: config.commission_rate.clone(),
         },
     )?;
 
     Ok(HandleResponse {
+        // instantiate pair with hook to call register after work
         messages: vec![WasmMsg::Instantiate {
             code_id: config.pair_code_id,
             send: vec![],
@@ -127,6 +124,12 @@ pub fn handle_create_pair(
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
                 commission_rate: Some(config.commission_rate),
+                init_hook: Some(InitHook {
+                    contract_addr: env.contract.address,
+                    msg: to_binary(&HandleMsg::Register {
+                        asset_infos: asset_infos.clone(),
+                    })?,
+                }),
             })?,
         }
         .into()],
@@ -140,49 +143,35 @@ pub fn handle_create_pair(
 
 /// This just stores the result for future query, update pair after success instantiate contract
 /// call rpc get_address from code_id after calling this
-pub fn handle_update_pair(
+pub fn handle_register_pair(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    pair_key: Vec<u8>,
-    contract_addr: HumanAddr,
+    asset_infos: [AssetInfo; 2],
 ) -> StdResult<HandleResponse> {
-    // can not update pair once updated
-    if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
-        return Err(StdError::generic_err("Pair already updated"));
-    }
+    let raw_infos = [
+        asset_infos[0].to_raw(deps.api)?,
+        asset_infos[1].to_raw(deps.api)?,
+    ];
+    let pair_key = pair_key(&raw_infos);
 
-    let tmp_pair_info;
-    if let Ok(Some(pair_info)) = TMP_PAIR_INFO.may_load(deps.storage, &pair_key) {
-        // make sure creator can update their pairs
-        if pair_info.creator.ne(&info.sender) {
-            return Err(StdError::generic_err("Pair belong to other"));
-        }
-        tmp_pair_info = pair_info;
-    } else {
-        return Err(StdError::generic_err("Pair not found"));
+    let mut pair_info = PAIRS.load(deps.storage, &pair_key)?;
+    // make sure creator can update their pairs
+    if pair_info.contract_addr != CanonicalAddr::default() {
+        return Err(StdError::generic_err("Pair was already registered"));
     }
 
     // the contract must follow the standard interface
-    let liquidity_token = query_liquidity_token(deps.as_ref(), contract_addr.clone())?;
-    let config = CONFIG.load(deps.storage)?;
-    PAIRS.save(
-        deps.storage,
-        &pair_key,
-        &PairInfoRaw {
-            oracle_addr: config.oracle_addr,
-            creator: deps.api.canonical_address(&info.sender)?,
-            liquidity_token: deps.api.canonical_address(&liquidity_token)?,
-            contract_addr: deps.api.canonical_address(&contract_addr)?,
-            asset_infos: tmp_pair_info.asset_infos,
-            commission_rate: config.commission_rate,
-        },
-    )?;
+    let liquidity_token = query_liquidity_token(deps.as_ref(), info.sender.clone())?;
+
+    pair_info.contract_addr = deps.api.canonical_address(&info.sender)?;
+    pair_info.liquidity_token = deps.api.canonical_address(&liquidity_token)?;
+    PAIRS.save(deps.storage, &pair_key, &pair_info)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
-            attr("pair_contract_addr", contract_addr.to_string()),
+            attr("pair_contract_addr", info.sender.to_string()),
             attr("liquidity_token_addr", liquidity_token.as_str()),
         ],
         data: None,

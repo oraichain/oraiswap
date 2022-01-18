@@ -42,7 +42,7 @@ The factory contract can perform creation of oraiswap pair contract and also be 
       },
       {
         "native_token": {
-          "denom": "uusd"
+          "denom": "orai"
         }
       }
     ]
@@ -63,7 +63,7 @@ The factory contract can perform creation of oraiswap pair contract and also be 
       },
       {
         "native_token": {
-          "denom": "uusd"
+          "denom": "orai"
         }
       }
     ]
@@ -94,7 +94,7 @@ The factory contract can perform creation of oraiswap pair contract and also be 
       },
       {
         "native_token": {
-          "denom": "uusd"
+          "denom": "orai"
         }
       }
     ]
@@ -143,7 +143,7 @@ When a user execute `CreatePair` operation, it creates `Pair` contract and `LP(l
       },
       {
         "native_token": {
-          "denom": "uusd"
+          "denom": "orai"
         }
       }
     ]
@@ -158,14 +158,15 @@ When a user executes `CreatePair` operation, it passes `InitHook` to `Pair` cont
 Once a `Pair` contract invokes it, the sender address is registered as `Pair` contract address for the given asset_infos.
 
 ```json
-{ "register":
+{
+  "register":
     "asset_infos": [{
         "token": {
             "contract_addr": "orai1~~",
             }
         }, {
             "native_token": {
-                "denom": "uusd",
+                "denom": "orai",
             }
     }],
 }

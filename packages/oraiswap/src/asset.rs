@@ -303,9 +303,6 @@ pub struct PairInfo {
     pub liquidity_token: HumanAddr,
 
     pub oracle_addr: HumanAddr,
-    // we use this to later update the smart contract
-    // because can not get initiated contract result
-    pub creator: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -316,10 +313,6 @@ pub struct PairInfoRaw {
 
     // oracle contract
     pub oracle_addr: CanonicalAddr,
-    // we use this to later update the smart contract
-    // because can not get initiated contract result
-    pub creator: CanonicalAddr,
-
     pub commission_rate: String,
 }
 
@@ -328,7 +321,6 @@ impl PairInfoRaw {
         Ok(PairInfo {
             liquidity_token: api.human_address(&self.liquidity_token)?,
             contract_addr: api.human_address(&self.contract_addr)?,
-            creator: api.human_address(&self.creator)?,
             oracle_addr: api.human_address(&self.oracle_addr)?,
             asset_infos: [
                 self.asset_infos[0].to_normal(api)?,

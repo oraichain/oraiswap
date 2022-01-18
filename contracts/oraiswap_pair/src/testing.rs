@@ -17,6 +17,7 @@ use cosmwasm_std::{
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::error::ContractError;
+use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
@@ -39,6 +40,7 @@ fn proper_initialization() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     // we can just call .unwrap() to assert this was a success
@@ -56,6 +58,10 @@ fn proper_initialization() {
                     minter: MOCK_CONTRACT_ADDR.into(),
                     cap: None,
                 }),
+                init_hook: Some(InitHook {
+                    msg: to_binary(&HandleMsg::PostInitialize {}).unwrap(),
+                    contract_addr: MOCK_CONTRACT_ADDR.into(),
+                }),
             })
             .unwrap(),
             send: vec![],
@@ -65,11 +71,15 @@ fn proper_initialization() {
     );
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // it worked, let's query the state
     let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
@@ -114,17 +124,22 @@ fn provide_liquidity() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     // we can just call .unwrap() to assert this was a success
     let _res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // successfully provide liquidity for the exist pool
     let msg = HandleMsg::ProvideLiquidity {
@@ -516,6 +531,7 @@ fn withdraw_liquidity() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     let env = mock_env();
@@ -524,11 +540,15 @@ fn withdraw_liquidity() {
     let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // withdraw liquidity
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
@@ -633,6 +653,7 @@ fn try_native_to_token() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     let env = mock_env();
@@ -641,11 +662,15 @@ fn try_native_to_token() {
     let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // normal swap
     let msg = HandleMsg::Swap {
@@ -804,6 +829,7 @@ fn try_token_to_native() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     let env = mock_env();
@@ -812,11 +838,15 @@ fn try_token_to_native() {
     let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // unauthorized access; can not execute swap directly for token swap
     let msg = HandleMsg::Swap {
@@ -1029,6 +1059,7 @@ fn test_deduct() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
     let env = mock_env();
     let info = mock_info("addr0000", &[]);
@@ -1036,11 +1067,15 @@ fn test_deduct() {
     let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
+    let msg = HandleMsg::PostInitialize {};
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     // fake tax_rate
     let tax_rate = Decimal::percent(2);
@@ -1104,6 +1139,7 @@ fn test_query_pool() {
         ],
         token_code_id: 10u64,
         commission_rate: None,
+        init_hook: None,
     };
 
     let env = mock_env();
@@ -1112,11 +1148,14 @@ fn test_query_pool() {
     let _res = init(deps.as_mut(), env, info, msg).unwrap();
 
     // store liquidity token
-    let msg = HandleMsg::Update {
-        contract_address: "liquidity0000".into(),
-    };
-
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let msg = HandleMsg::PostInitialize {};
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
 
     let res: PoolResponse = query_pool(deps.as_ref()).unwrap();
 

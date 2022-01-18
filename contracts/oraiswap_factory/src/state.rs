@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, Order, StdResult, Storage};
+use cosmwasm_std::{Api, CanonicalAddr, Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Item, Map};
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 
@@ -17,15 +17,7 @@ pub struct Config {
 // put the length bytes at the first for compatibility with legacy singleton store
 pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct TmpPairInfo {
-    // only creator can update the contract_address
-    pub creator: HumanAddr,
-    pub asset_infos: [AssetInfoRaw; 2],
-}
-
 // store temporary pair info while waiting for deployment
-pub const TMP_PAIR_INFO: Map<&[u8], TmpPairInfo> = Map::new("tmp_pair_info");
 pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pairs");
 
 pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
@@ -157,7 +149,6 @@ mod test {
     fn pair_info_legacy_compatibility() {
         let mut deps = mock_dependencies(&[]);
         let pair_info = PairInfoRaw {
-            creator: deps.api.canonical_address(&"creator0000".into()).unwrap(),
             oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
@@ -173,7 +164,6 @@ mod test {
         };
 
         let pair_info2 = PairInfoRaw {
-            creator: deps.api.canonical_address(&"creator0000".into()).unwrap(),
             oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {

@@ -27,13 +27,8 @@ pub enum HandleMsg {
         /// Asset infos
         asset_infos: [AssetInfo; 2],
     },
-
-    /// UpdatePair update pair contract after inited successfully
-    UpdatePair {
-        /// Asset infos
-        pair_key: Vec<u8>,
-        contract_addr: HumanAddr,
-    },
+    /// Register is invoked from created pair contract after initialzation
+    Register { asset_infos: [AssetInfo; 2] },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

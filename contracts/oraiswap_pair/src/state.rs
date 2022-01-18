@@ -29,7 +29,6 @@ mod test {
         store_pair_info(
             &mut deps.storage,
             &PairInfoRaw {
-                creator: deps.api.canonical_address(&"creator0000".into()).unwrap(),
                 oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
                 asset_infos: [
                     AssetInfoRaw::NativeToken {

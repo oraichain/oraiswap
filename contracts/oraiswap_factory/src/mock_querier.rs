@@ -87,7 +87,6 @@ impl WasmMockQuerier {
 
                     let api: MockApi = MockApi::default();
                     SystemResult::Ok(ContractResult::from(to_binary(&PairInfoRaw {
-                        creator: api.canonical_address(&"creator0000".into()).unwrap(),
                         oracle_addr: api.canonical_address(&"oracle0000".into()).unwrap(),
                         contract_addr: api.canonical_address(&pair_info.contract_addr).unwrap(),
                         liquidity_token: api.canonical_address(&pair_info.liquidity_token).unwrap(),

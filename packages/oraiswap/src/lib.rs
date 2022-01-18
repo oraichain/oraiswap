@@ -1,6 +1,7 @@
 pub mod asset;
 pub mod error;
 pub mod factory;
+pub mod hook;
 pub mod oracle;
 pub mod pair;
 pub mod querier;

@@ -2,14 +2,15 @@ use crate::state::PAIR_INFO;
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError,
-    StdResult, Uint128, WasmMsg,
+    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdResult, Uint128,
+    WasmMsg,
 };
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::error::ContractError;
+use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg, ReverseSimulationResponse,
@@ -20,15 +21,14 @@ use oraiswap::token::InitMsg as TokenInitMsg;
 use oraiswap::{Decimal256, Uint256};
 use std::str::FromStr;
 
-pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     let pair_info = &PairInfoRaw {
-        creator: deps.api.canonical_address(&info.sender)?,
         // return infomation from oracle, update by multisig wallet
         oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
         // the current contract address
         contract_addr: deps.api.canonical_address(&env.contract.address)?,
         // liquidity token address is ow20 to reward, mint and burn
-        liquidity_token: CanonicalAddr::from(vec![]),
+        liquidity_token: CanonicalAddr::default(),
         // pair info
         asset_infos: [
             msg.asset_infos[0].to_raw(deps.api)?,
@@ -42,27 +42,43 @@ pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResu
 
     PAIR_INFO.save(deps.storage, pair_info)?;
 
+    // Create LP token, with PostInitialize msg to update the liquidity token address
+    let mut messages = vec![WasmMsg::Instantiate {
+        code_id: msg.token_code_id,
+        msg: to_binary(&TokenInitMsg {
+            name: "oraiswap liquidity token".to_string(),
+            symbol: "uLP".to_string(),
+            decimals: 6,
+            initial_balances: vec![],
+            // only this pair contract can mint
+            mint: Some(MinterResponse {
+                minter: env.contract.address.clone(),
+                cap: None,
+            }),
+            init_hook: Some(InitHook {
+                msg: to_binary(&HandleMsg::PostInitialize {})?,
+                contract_addr: env.contract.address,
+            }),
+        })?,
+        send: vec![],
+        label: None,
+    }
+    .into()];
+
+    // when init is done, will get the deployed address to update
+    if let Some(hook) = msg.init_hook {
+        messages.push(
+            WasmMsg::Execute {
+                contract_addr: hook.contract_addr,
+                msg: hook.msg,
+                send: vec![],
+            }
+            .into(),
+        );
+    }
+
     Ok(InitResponse {
-        // Create LP token
-        // when init is done, will get the deployed address
-        // to update
-        messages: vec![WasmMsg::Instantiate {
-            code_id: msg.token_code_id,
-            msg: to_binary(&TokenInitMsg {
-                name: "oraiswap liquidity token".to_string(),
-                symbol: "uLP".to_string(),
-                decimals: 6,
-                initial_balances: vec![],
-                // only this pair contract can mint
-                mint: Some(MinterResponse {
-                    minter: env.contract.address,
-                    cap: None,
-                }),
-            })?,
-            send: vec![],
-            label: None,
-        }
-        .into()],
+        messages,
         attributes: vec![],
     })
 }
@@ -75,7 +91,7 @@ pub fn handle(
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         // when liquidity token is deploy, need to update the address
-        HandleMsg::Update { contract_address } => update_pair(deps, env, info, contract_address),
+        HandleMsg::PostInitialize {} => try_post_initialize(deps, env, info),
         // when transfer ow20 token to this contract
         HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         // add more liquidity
@@ -171,27 +187,25 @@ pub fn receive_cw20(
 }
 
 /// This just stores the result for future query, after the smart contract is instantiated
-pub fn update_pair(
+pub fn try_post_initialize(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    contract_address: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     // borrow dynamic
-    let api = deps.api;
     let mut pair_info = PAIR_INFO.load(deps.storage)?;
 
-    // only creator can update the liquidity_token address
-    if pair_info.creator.ne(&api.canonical_address(&info.sender)?) {
+    // permission check
+    if pair_info.liquidity_token != CanonicalAddr::default() {
         return Err(ContractError::Unauthorized {});
     }
 
     // update liquidity_token
-    pair_info.liquidity_token = api.canonical_address(&contract_address)?;
+    pair_info.liquidity_token = deps.api.canonical_address(&info.sender)?;
     PAIR_INFO.save(deps.storage, &pair_info)?;
 
     Ok(HandleResponse {
-        attributes: vec![attr("liquidity_token_addr", contract_address)],
+        attributes: vec![attr("liquidity_token_addr", info.sender.to_string())],
         messages: vec![],
         data: None,
     })

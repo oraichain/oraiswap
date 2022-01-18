@@ -186,7 +186,6 @@ impl WasmMockQuerier {
                             match self.oraiswap_factory_querier.pairs.get(&key) {
                                 Some(v) => {
                                     SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
-                                        creator: "creator0000".into(),
                                         oracle_addr: "oracle0000".into(),
                                         contract_addr: v.to_owned().into(),
                                         liquidity_token: "liquidity".into(),

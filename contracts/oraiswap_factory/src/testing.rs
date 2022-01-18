@@ -1,12 +1,11 @@
 use crate::contract::{handle, init, query};
 use crate::mock_querier::mock_dependencies;
 
-use crate::state::{pair_key, TmpPairInfo, TMP_PAIR_INFO};
-
-use cosmwasm_std::testing::{mock_env, mock_info};
+use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{attr, from_binary, to_binary, StdError, WasmMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
+use oraiswap::hook::InitHook;
 use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
 
 #[test]
@@ -149,6 +148,13 @@ fn create_pair() {
                 asset_infos: asset_infos.clone(),
                 token_code_id: 123u64,
                 commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
+                init_hook: Some(InitHook {
+                    contract_addr: MOCK_CONTRACT_ADDR.into(),
+                    msg: to_binary(&HandleMsg::Register {
+                        asset_infos: asset_infos.clone(),
+                    })
+                    .unwrap(),
+                }),
             })
             .unwrap(),
             code_id: 321u64,
@@ -156,21 +162,6 @@ fn create_pair() {
             label: None,
         }
         .into()]
-    );
-
-    let raw_infos = [
-        asset_infos[0].to_raw(deps.as_ref().api).unwrap(),
-        asset_infos[1].to_raw(deps.as_ref().api).unwrap(),
-    ];
-
-    let pair_key = pair_key(&raw_infos);
-
-    assert_eq!(
-        TMP_PAIR_INFO.load(&deps.storage, &pair_key).unwrap(),
-        TmpPairInfo {
-            asset_infos: raw_infos.clone(),
-            creator: "addr0000".into(),
-        }
     );
 }
 
@@ -200,32 +191,19 @@ fn update_pair() {
         },
     ];
 
-    let raw_infos = [
-        asset_infos[0].to_raw(deps.as_ref().api).unwrap(),
-        asset_infos[1].to_raw(deps.as_ref().api).unwrap(),
-    ];
-
-    let pair_key = pair_key(&raw_infos);
-
     let msg = HandleMsg::CreatePair {
         asset_infos: asset_infos.clone(),
     };
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
-
-    assert_eq!(
-        TMP_PAIR_INFO.load(&deps.storage, &pair_key).unwrap(),
-        TmpPairInfo {
-            asset_infos: raw_infos.clone(),
-            creator: "addr0000".into(),
-        }
-    );
+    // create pair
+    let env = mock_env();
+    let info = mock_info("addr0000", &[]);
+    let _res = handle(deps.as_mut(), env, info, msg).unwrap();
 
     // register oraiswap pair querier, it is like deploy smart contract, let's assume pair0000 has liquidity_token address liquidity0000
     deps.querier.with_oraiswap_pairs(&[(
         &"pair0000".to_string(),
         &PairInfo {
-            creator: "addr0000".into(),
             oracle_addr: "oracle0000".into(),
             asset_infos: asset_infos.clone(),
             contract_addr: "pair0000".into(),
@@ -234,14 +212,13 @@ fn update_pair() {
     )]);
 
     // later update pair with newly created address
-    let update_msg = HandleMsg::UpdatePair {
-        pair_key,
-        contract_addr: "pair0000".into(),
+    let update_msg = HandleMsg::Register {
+        asset_infos: asset_infos.clone(),
     };
     let _res = handle(
         deps.as_mut(),
         mock_env(),
-        mock_info("addr0000", &[]),
+        mock_info("pair0000", &[]),
         update_msg,
     )
     .unwrap();
@@ -259,7 +236,6 @@ fn update_pair() {
     assert_eq!(
         pair_res,
         PairInfo {
-            creator: "addr0000".into(),
             oracle_addr: "oracle0000".into(),
             liquidity_token: "liquidity0000".into(),
             contract_addr: "pair0000".into(),

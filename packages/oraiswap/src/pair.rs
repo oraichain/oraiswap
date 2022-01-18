@@ -1,7 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::{Asset, AssetInfo};
+use crate::{
+    asset::{Asset, AssetInfo},
+    hook::InitHook,
+};
 
 use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
@@ -21,16 +24,17 @@ pub struct InitMsg {
     pub oracle_addr: HumanAddr,
 
     pub commission_rate: Option<String>,
+
+    /// Hook for post initalization
+    pub init_hook: Option<InitHook>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    /// liquidity token address after instantiated
-    Update {
-        contract_address: HumanAddr,
-    },
     Receive(Cw20ReceiveMsg),
+    /// Post initize step to allow user to set controlled contract address after creating it
+    PostInitialize {},
     /// ProvideLiquidity a user provides pool liquidity
     ProvideLiquidity {
         assets: [Asset; 2],
