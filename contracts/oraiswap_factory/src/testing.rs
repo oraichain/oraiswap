@@ -2,8 +2,9 @@ use crate::contract::{handle, init, query};
 use crate::mock_querier::mock_dependencies;
 
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{attr, from_binary, to_binary, StdError, WasmMsg};
+use cosmwasm_std::{attr, from_binary, to_binary, WasmMsg};
 use oraiswap::asset::{AssetInfo, PairInfo};
+use oraiswap::error::ContractError;
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
 use oraiswap::hook::InitHook;
 use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
@@ -95,7 +96,7 @@ fn update_config() {
 
     let res = handle(deps.as_mut(), env, info, msg);
     match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
+        Err(err) => assert_eq!(err, ContractError::Unauthorized {}),
         _ => panic!("Must return unauthorized error"),
     }
 }

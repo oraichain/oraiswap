@@ -1,5 +1,6 @@
 use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{from_binary, to_binary, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg};
+use cosmwasm_std::{from_binary, to_binary, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
+use oraiswap::error::ContractError;
 
 use crate::contract::{handle, init, query};
 use crate::operations::assert_operations;
@@ -58,7 +59,7 @@ fn handle_swap_operations() {
     let info = mock_info("addr0000", &[]);
     let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "must provide operations"),
+        Err(err) => assert_eq!(err, ContractError::NoSwapOperation {}),
         _ => panic!("DO NOT ENTER HERE"),
     }
 
@@ -421,9 +422,12 @@ fn assert_minimum_receive_native_token() {
     };
     let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(
-            msg,
-            "assertion failed; minimum receive amount: 1000001, swap amount: 1000000"
+        Err(err) => assert_eq!(
+            err,
+            ContractError::SwapAssertionFailure {
+                minium_receive: 1000001u128.into(),
+                swap_amount: 1000000u128.into()
+            }
         ),
         _ => panic!("DO NOT ENTER HERE"),
     }
@@ -460,9 +464,12 @@ fn assert_minimum_receive_token() {
     };
     let res = handle(deps.as_mut(), mock_env(), info, msg);
     match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(
-            msg,
-            "assertion failed; minimum receive amount: 1000001, swap amount: 1000000"
+        Err(err) => assert_eq!(
+            err,
+            ContractError::SwapAssertionFailure {
+                minium_receive: 1000001u128.into(),
+                swap_amount: 1000000u128.into()
+            }
         ),
         _ => panic!("DO NOT ENTER HERE"),
     }

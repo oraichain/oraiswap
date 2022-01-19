@@ -4,6 +4,7 @@ use cosmwasm_std::{
     to_binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, StdError, StdResult, Uint128, WasmMsg,
 };
+use oraiswap::error::ContractError;
 
 use crate::state::{Config, CONFIG};
 
@@ -22,9 +23,9 @@ pub fn handle_swap_operation(
     info: MessageInfo,
     operation: SwapOperation,
     to: Option<HumanAddr>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if env.contract.address != info.sender {
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized {});
     }
 
     let config: Config = CONFIG.load(deps.storage)?;
@@ -82,10 +83,10 @@ pub fn handle_swap_operations(
     operations: Vec<SwapOperation>,
     minimum_receive: Option<Uint128>,
     to: Option<HumanAddr>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let operations_len = operations.len();
     if operations_len == 0 {
-        return Err(StdError::generic_err("must provide operations"));
+        return Err(ContractError::NoSwapOperation {});
     }
 
     // Assert the operations are properly set

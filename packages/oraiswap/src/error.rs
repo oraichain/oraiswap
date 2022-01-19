@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{StdError, Uint128};
 use std::fmt;
 use thiserror::Error;
 
@@ -68,4 +68,21 @@ pub enum ContractError {
 
     #[error("Too small offer amount")]
     TooSmallOfferAmount {},
+
+    #[error("Pair already exists")]
+    PairExisted {},
+
+    #[error("Pair was already registered")]
+    PairRegistered {},
+
+    #[error(
+        "Assertion failed; minimum receive amount: {minium_receive}, swap amount: {swap_amount}"
+    )]
+    SwapAssertionFailure {
+        minium_receive: Uint128,
+        swap_amount: Uint128,
+    },
+
+    #[error("must provide operations")]
+    NoSwapOperation {},
 }

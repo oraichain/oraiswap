@@ -1,7 +1,8 @@
 use cosmwasm_std::{
     attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, WasmMsg,
+    InitResponse, MessageInfo, MigrateResponse, StdResult, WasmMsg,
 };
+use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 
 use crate::querier::query_liquidity_token;
@@ -32,7 +33,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::UpdateConfig {
             owner,
@@ -52,12 +53,12 @@ pub fn handle_update_config(
     owner: Option<String>,
     token_code_id: Option<u64>,
     pair_code_id: Option<u64>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
     // permission check
     if deps.api.canonical_address(&info.sender)? != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized {});
     }
 
     if let Some(owner) = owner {
@@ -87,7 +88,7 @@ pub fn handle_create_pair(
     env: Env,
     _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
         asset_infos[0].to_raw(deps.api)?,
@@ -98,7 +99,7 @@ pub fn handle_create_pair(
 
     // can not update pair once updated
     if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
-        return Err(StdError::generic_err("Pair already exists"));
+        return Err(ContractError::PairExisted {});
     }
 
     PAIRS.save(
@@ -148,7 +149,7 @@ pub fn handle_register_pair(
     _env: Env,
     info: MessageInfo,
     asset_infos: [AssetInfo; 2],
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let raw_infos = [
         asset_infos[0].to_raw(deps.api)?,
         asset_infos[1].to_raw(deps.api)?,
@@ -158,7 +159,7 @@ pub fn handle_register_pair(
     let mut pair_info = PAIRS.load(deps.storage, &pair_key)?;
     // make sure creator can update their pairs
     if pair_info.contract_addr != CanonicalAddr::default() {
-        return Err(StdError::generic_err("Pair was already registered"));
+        return Err(ContractError::PairRegistered {});
     }
 
     // the contract must follow the standard interface

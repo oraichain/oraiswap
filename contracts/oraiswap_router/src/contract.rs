@@ -2,6 +2,7 @@ use cosmwasm_std::{
     from_binary, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
     MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
 };
+use oraiswap::error::ContractError;
 
 use crate::operations::{handle_swap_operation, handle_swap_operations};
 use crate::state::{Config, CONFIG};
@@ -32,7 +33,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         HandleMsg::ExecuteSwapOperations {
@@ -64,7 +65,7 @@ pub fn receive_cw20(
     env: Env,
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // throw empty data as well when decoding
     match from_binary(&cw20_msg.msg.unwrap_or_default())? {
         Cw20HookMsg::ExecuteSwapOperations {
@@ -88,15 +89,15 @@ fn assert_minium_receive(
     prev_balance: Uint128,
     minium_receive: Uint128,
     receiver: HumanAddr,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
     let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
 
     if swap_amount < minium_receive {
-        return Err(StdError::generic_err(format!(
-            "assertion failed; minimum receive amount: {}, swap amount: {}",
-            minium_receive, swap_amount
-        )));
+        return Err(ContractError::SwapAssertionFailure {
+            minium_receive,
+            swap_amount,
+        });
     }
 
     Ok(HandleResponse::default())
@@ -133,7 +134,9 @@ fn simulate_swap_operations(
 
     let operations_len = operations.len();
     if operations_len == 0 {
-        return Err(StdError::generic_err("must provide operations"));
+        return Err(StdError::generic_err(
+            ContractError::NoSwapOperation {}.to_string(),
+        ));
     }
 
     let mut offer_amount = offer_amount;
