@@ -21,14 +21,6 @@ You can run unit tests on this via:
 
 `cargo test`
 
-Once you are happy with the content, you can compile it to wasm via:
-
-```
-./build_release.sh contracts/oraiswap_token true
-```
-
-The optimized contracts are generated in the `artifacts/` directory.
-
 ## Importing this contract
 
 You can also import much of the logic of this contract to build another

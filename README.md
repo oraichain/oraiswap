@@ -56,7 +56,7 @@ cargo integration-test
 Once you are happy with the content, you can compile it to wasm on each contracts directory via:
 
 ```bash
-./build_release.sh contracts/oraiswap_token true
+./build_release.sh contracts/oraiswap_[package] true
 ```
 
 The optimized contracts are generated in the artifacts/ directory.
