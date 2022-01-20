@@ -149,6 +149,10 @@ pub struct ContractInfoResponse {
     // pub base_pool: Uint128,
 }
 
+/// We currently take no arguments for migrations
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
+
 /// OracleContract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with this.
 ///

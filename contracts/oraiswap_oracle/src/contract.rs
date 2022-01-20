@@ -2,13 +2,13 @@ use std::ops::Mul;
 
 use cosmwasm_std::{
     to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, StdResult, Uint128,
+    MessageInfo, MigrateResponse, StdResult, Uint128,
 };
 
 use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
-    ExchangeRatesResponse, OracleContractMsg, OracleContractQuery, OracleExchangeMsg,
+    ExchangeRatesResponse, MigrateMsg, OracleContractMsg, OracleContractQuery, OracleExchangeMsg,
     OracleExchangeQuery, OracleMsg, OracleQuery, OracleTreasuryMsg, OracleTreasuryQuery,
     TaxCapResponse, TaxRateResponse,
 };
@@ -295,4 +295,13 @@ fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {
     }
 
     EXCHANGE_RATES.load(deps.storage, denom.as_bytes())
+}
+
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: MigrateMsg,
+) -> Result<MigrateResponse, ContractError> {
+    Ok(MigrateResponse::default())
 }

@@ -24,20 +24,7 @@ You can run unit tests on this via:
 Once you are happy with the content, you can compile it to wasm via:
 
 ```
-RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/cw20_base.wasm .
-ls -l cw20_base.wasm
-sha256sum cw20_base.wasm
-```
-
-Or for a production-ready (compressed) build, run the following from the
-repository root:
-
-```
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.2
+./build_release.sh contracts/oraiswap_token true
 ```
 
 The optimized contracts are generated in the `artifacts/` directory.
