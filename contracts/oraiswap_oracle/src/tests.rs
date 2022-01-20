@@ -16,7 +16,6 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let msg = InitMsg {
         name: None,
         version: None,
-        creator: OWNER.into(),
         admin: None,
         min_rate: None,
         max_rate: None,

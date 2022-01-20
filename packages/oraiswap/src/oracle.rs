@@ -11,7 +11,6 @@ pub struct InitMsg {
     /// name of the NFT contract, can use default
     pub name: Option<String>,
     pub version: Option<String>,
-    pub creator: HumanAddr,
     pub admin: Option<HumanAddr>,
     pub min_rate: Option<Decimal>,
     pub max_rate: Option<Decimal>,
