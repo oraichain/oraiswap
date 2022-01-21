@@ -205,7 +205,7 @@ pub fn try_post_initialize(
     PAIR_INFO.save(deps.storage, &pair_info)?;
 
     Ok(HandleResponse {
-        attributes: vec![attr("liquidity_token_addr", info.sender.to_string())],
+        attributes: vec![attr("liquidity_token_address", info.sender.to_string())],
         messages: vec![],
         data: None,
     })

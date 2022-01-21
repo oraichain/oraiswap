@@ -172,8 +172,8 @@ pub fn handle_register_pair(
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
-            attr("pair_contract_addr", info.sender.to_string()),
-            attr("liquidity_token_addr", liquidity_token.as_str()),
+            attr("pair_contract_address", info.sender.to_string()),
+            attr("liquidity_token_address", liquidity_token.as_str()),
         ],
         data: None,
     })

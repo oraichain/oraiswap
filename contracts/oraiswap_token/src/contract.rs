@@ -1,11 +1,14 @@
 use cosmwasm_std::{
-    Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, StdError, StdResult,
+    Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, MigrateResponse,
+    StdError, StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
 use cw20_base::{
-    contract::{create_accounts, handle as cw20_handle, query as cw20_query},
-    msg::{HandleMsg, QueryMsg},
+    contract::{
+        create_accounts, handle as cw20_handle, migrate as cw20_migrate, query as cw20_query,
+    },
+    msg::{HandleMsg, MigrateMsg, QueryMsg},
     state::{token_info, MinterData, TokenInfo},
     ContractError,
 };
@@ -29,6 +32,7 @@ pub fn init(
     // create initial accounts
     let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
 
+    // Check supply cap
     if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
             return Err(StdError::generic_err("Initial supply greater than cap"));
@@ -53,7 +57,21 @@ pub fn init(
     };
 
     token_info(deps.storage).save(&data)?;
-    Ok(InitResponse::default())
+
+    // do hook ?
+    if let Some(hook) = msg.init_hook {
+        Ok(InitResponse {
+            messages: vec![WasmMsg::Execute {
+                contract_addr: hook.contract_addr,
+                msg: hook.msg,
+                send: vec![],
+            }
+            .into()],
+            attributes: vec![],
+        })
+    } else {
+        Ok(InitResponse::default())
+    }
 }
 
 pub fn handle(
@@ -67,4 +85,13 @@ pub fn handle(
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     cw20_query(deps, env, msg)
+}
+
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: MigrateMsg,
+) -> StdResult<MigrateResponse> {
+    cw20_migrate(deps, env, info, msg)
 }
