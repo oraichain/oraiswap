@@ -2,7 +2,7 @@ use std::ops::Mul;
 
 use cosmwasm_std::{
     to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, MigrateResponse, StdResult, Uint128,
+    MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
 
 use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
@@ -218,13 +218,23 @@ pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
 }
 
 pub fn query_tax_rate(deps: Deps) -> StdResult<TaxRateResponse> {
-    let rate = TAX_RATE.load(deps.storage)?;
-    Ok(TaxRateResponse { rate })
+    if let Ok(Some(rate)) = TAX_RATE.may_load(deps.storage) {
+        return Ok(TaxRateResponse { rate });
+    }
+
+    Err(StdError::NotFound {
+        kind: "Tax rate not set".to_string(),
+    })
 }
 
 pub fn query_tax_cap(deps: Deps, denom: String) -> StdResult<TaxCapResponse> {
-    let cap = TAX_CAP.load(deps.storage, denom.as_bytes())?;
-    Ok(TaxCapResponse { cap })
+    if let Ok(Some(cap)) = TAX_CAP.may_load(deps.storage, denom.as_bytes()) {
+        return Ok(TaxCapResponse { cap });
+    }
+
+    Err(StdError::NotFound {
+        kind: format!("Tax cap not found for denom: {}", denom),
+    })
 }
 
 pub fn query_exchange_rate(
