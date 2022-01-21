@@ -4,7 +4,7 @@ use cosmwasm_std::{
     QueryRequest, SystemError, SystemResult, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
-use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
+use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw, ORAI_DENOM};
 use oraiswap::pair::DEFAULT_COMMISSION_RATE;
 use std::collections::HashMap;
 
@@ -92,10 +92,10 @@ impl WasmMockQuerier {
                         liquidity_token: api.canonical_address(&pair_info.liquidity_token).unwrap(),
                         asset_infos: [
                             AssetInfoRaw::NativeToken {
-                                denom: "uusd".to_string(),
+                                denom: ORAI_DENOM.to_string(),
                             },
                             AssetInfoRaw::NativeToken {
-                                denom: "uusd".to_string(),
+                                denom: ORAI_DENOM.to_string(),
                             },
                         ],
                         commission_rate: DEFAULT_COMMISSION_RATE.to_string(),

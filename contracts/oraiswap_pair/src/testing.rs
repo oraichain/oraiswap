@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::contract::{
     assert_max_spread,
     handle,
@@ -15,14 +17,16 @@ use cosmwasm_std::{
     attr, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
-use oraiswap::asset::{Asset, AssetInfo, PairInfo};
+use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
 use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
-    Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse, SimulationResponse,
+    compute_swap, Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse,
+    SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::token::InitMsg as TokenInitMsg;
+use oraiswap::Decimal256;
 
 #[test]
 fn proper_initialization() {
@@ -32,7 +36,7 @@ fn proper_initialization() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -88,7 +92,7 @@ fn proper_initialization() {
         pair_info.asset_infos,
         [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into()
@@ -100,7 +104,7 @@ fn proper_initialization() {
 #[test]
 fn provide_liquidity() {
     let mut deps = mock_dependencies(&[Coin {
-        denom: "uusd".to_string(),
+        denom: ORAI_DENOM.to_string(),
         amount: Uint128::from(200u128),
     }]);
 
@@ -116,7 +120,7 @@ fn provide_liquidity() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -152,7 +156,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -165,7 +169,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0000",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128),
         }],
     );
@@ -204,7 +208,7 @@ fn provide_liquidity() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(
                 200u128 + 200u128, /* user deposit must be pre-applied */
             ),
@@ -232,7 +236,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(200u128),
             },
@@ -245,7 +249,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0000",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(200u128),
         }],
     );
@@ -291,7 +295,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(50u128),
             },
@@ -304,7 +308,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0000",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128),
         }],
     );
@@ -321,7 +325,7 @@ fn provide_liquidity() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(
                 100u128 + 100u128, /* user deposit must be pre-applied */
             ),
@@ -350,7 +354,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -363,7 +367,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0001",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128),
         }],
     );
@@ -377,7 +381,7 @@ fn provide_liquidity() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128 + 98u128 /* user deposit must be pre-applied */),
         }],
     )]);
@@ -393,7 +397,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(98u128),
             },
@@ -406,7 +410,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0001",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(98u128),
         }],
     );
@@ -420,7 +424,7 @@ fn provide_liquidity() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(
                 100u128 + 100u128, /* user deposit must be pre-applied */
             ),
@@ -438,7 +442,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -451,7 +455,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0001",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128),
         }],
     );
@@ -461,7 +465,7 @@ fn provide_liquidity() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128 + 99u128 /* user deposit must be pre-applied */),
         }],
     )]);
@@ -477,7 +481,7 @@ fn provide_liquidity() {
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128::from(99u128),
             },
@@ -490,7 +494,7 @@ fn provide_liquidity() {
     let info = mock_info(
         "addr0001",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(99u128),
         }],
     );
@@ -500,13 +504,13 @@ fn provide_liquidity() {
 #[test]
 fn withdraw_liquidity() {
     let mut deps = mock_dependencies(&[Coin {
-        denom: "uusd".to_string(),
+        denom: ORAI_DENOM.to_string(),
         amount: Uint128::from(100u128),
     }]);
 
     deps.querier.with_tax(
         Decimal::zero(),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
+        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
     );
     deps.querier.with_token_balances(&[
         (
@@ -523,7 +527,7 @@ fn withdraw_liquidity() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -571,7 +575,7 @@ fn withdraw_liquidity() {
             from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: "addr0000".into(),
             amount: vec![Coin {
-                denom: "uusd".into(),
+                denom: ORAI_DENOM.into(),
                 amount: Uint128::from(100u128),
             }],
         })
@@ -621,13 +625,13 @@ fn try_native_to_token() {
     let offer_amount = Uint128::from(1500000000u128);
 
     let mut deps = mock_dependencies(&[Coin {
-        denom: "uusd".to_string(),
+        denom: ORAI_DENOM.to_string(),
         amount: collateral_pool_amount + offer_amount, /* user deposit must be pre-applied */
     }]);
 
     deps.querier.with_tax(
         Decimal::zero(),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
+        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
     );
 
     deps.querier.with_token_balances(&[
@@ -645,7 +649,7 @@ fn try_native_to_token() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -676,7 +680,7 @@ fn try_native_to_token() {
     let msg = HandleMsg::Swap {
         offer_asset: Asset {
             info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             amount: offer_amount,
         },
@@ -688,7 +692,7 @@ fn try_native_to_token() {
     let info = mock_info(
         "addr0000",
         &[Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: offer_amount,
         }],
     );
@@ -709,7 +713,7 @@ fn try_native_to_token() {
     deps.querier.with_balance(&[(
         &MOCK_CONTRACT_ADDR.to_string(),
         vec![Coin {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
             amount: collateral_pool_amount, /* user deposit must be pre-applied */
         }],
     )]);
@@ -718,7 +722,7 @@ fn try_native_to_token() {
         deps.as_ref(),
         Asset {
             info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             amount: offer_amount,
         },
@@ -763,7 +767,7 @@ fn try_native_to_token() {
             attr("action", "swap"),
             attr("sender", "addr0000"),
             attr("receiver", "addr0000"),
-            attr("offer_asset", "uusd"),
+            attr("offer_asset", ORAI_DENOM),
             attr("ask_asset", "asset0000"),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
@@ -796,12 +800,12 @@ fn try_token_to_native() {
     let offer_amount = Uint128::from(1500000000u128);
 
     let mut deps = mock_dependencies(&[Coin {
-        denom: "uusd".to_string(),
+        denom: ORAI_DENOM.to_string(),
         amount: collateral_pool_amount,
     }]);
     deps.querier.with_tax(
         Decimal::percent(1),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
+        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
     );
     deps.querier.with_token_balances(&[
         (
@@ -821,7 +825,7 @@ fn try_token_to_native() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -934,7 +938,7 @@ fn try_token_to_native() {
         Asset {
             amount: expected_return_amount,
             info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
         },
     )
@@ -963,7 +967,7 @@ fn try_token_to_native() {
             attr("sender", "addr0000"),
             attr("receiver", "addr0000"),
             attr("offer_asset", "asset0000"),
-            attr("ask_asset", "uusd"),
+            attr("ask_asset", ORAI_DENOM),
             attr("offer_amount", offer_amount.to_string()),
             attr("return_amount", expected_return_amount.to_string()),
             attr("tax_amount", expected_tax_amount.to_string()),
@@ -977,7 +981,7 @@ fn try_token_to_native() {
             from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: "addr0000".into(),
             amount: vec![Coin {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
                 amount: Asset::checked_sub(expected_return_amount, expected_tax_amount).unwrap(),
             }],
         }),
@@ -1051,7 +1055,7 @@ fn test_deduct() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -1082,7 +1086,7 @@ fn test_deduct() {
     let tax_cap = Uint128::from(1_000_000u128);
     deps.querier.with_tax(
         Decimal::percent(2),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
+        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
     );
 
     let amount = Uint128::from(1_000_000_000u128);
@@ -1096,7 +1100,7 @@ fn test_deduct() {
 
     let after_amount = (Asset {
         info: AssetInfo::NativeToken {
-            denom: "uusd".to_string(),
+            denom: ORAI_DENOM.to_string(),
         },
         amount,
     })
@@ -1112,7 +1116,7 @@ fn test_query_pool() {
     let asset_0_amount = Uint128::from(222u128);
     let asset_1_amount = Uint128::from(333u128);
     let mut deps = mock_dependencies(&[Coin {
-        denom: "uusd".to_string(),
+        denom: ORAI_DENOM.to_string(),
         amount: asset_0_amount,
     }]);
 
@@ -1131,7 +1135,7 @@ fn test_query_pool() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -1164,7 +1168,7 @@ fn test_query_pool() {
         [
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: asset_0_amount
             },
@@ -1177,4 +1181,21 @@ fn test_query_pool() {
         ]
     );
     assert_eq!(res.total_share, total_share_amount);
+}
+
+#[test]
+fn test_compute_swap_with_huge_pool_variance() {
+    let offer_pool = Uint128::from(395451850234u128);
+    let ask_pool = Uint128::from(317u128);
+
+    assert_eq!(
+        compute_swap(
+            offer_pool,
+            ask_pool,
+            Uint128::from(1u128),
+            Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap()
+        )
+        .0,
+        Uint128::zero()
+    );
 }

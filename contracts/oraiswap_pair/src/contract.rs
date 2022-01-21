@@ -13,8 +13,8 @@ use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
-    Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg, ReverseSimulationResponse,
-    SimulationResponse, DEFAULT_COMMISSION_RATE,
+    compute_swap, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg,
+    ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
 use oraiswap::token::InitMsg as TokenInitMsg;
@@ -584,55 +584,6 @@ pub fn amount_of(coins: &[Coin], denom: String) -> Uint128 {
         Some(coin) => coin.amount,
         None => Uint128::zero(),
     }
-}
-
-fn compute_swap(
-    offer_pool: Uint128,
-    ask_pool: Uint128,
-    offer_amount: Uint128,
-    commission_rate: Decimal256,
-) -> (Uint128, Uint128, Uint128) {
-    // convert to uint256
-    let offer_pool: Uint256 = offer_pool.into();
-    let ask_pool: Uint256 = ask_pool.into();
-    let offer_amount: Uint256 = offer_amount.into();
-
-    // offer => ask
-    // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
-    let cp: Uint256 = offer_pool * ask_pool;
-    let return_amount: Uint256 = (Decimal256::from_uint256(ask_pool)
-        - Decimal256::from_ratio(cp, offer_pool + offer_amount))
-        * Uint256::one();
-
-    // calculate spread & commission
-    let spread_amount: Uint256 =
-        (offer_amount * Decimal256::from_ratio(ask_pool, offer_pool)) - return_amount;
-    let commission_amount: Uint256 = return_amount * commission_rate;
-
-    // commission will be absorbed to pool
-    let return_amount: Uint256 = return_amount - commission_amount;
-    (
-        return_amount.into(),
-        spread_amount.into(),
-        commission_amount.into(),
-    )
-}
-
-#[test]
-fn test_compute_swap_with_huge_pool_variance() {
-    let offer_pool = Uint128::from(395451850234u128);
-    let ask_pool = Uint128::from(317u128);
-
-    assert_eq!(
-        compute_swap(
-            offer_pool,
-            ask_pool,
-            Uint128::from(1u128),
-            Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap()
-        )
-        .0,
-        Uint128::zero()
-    );
 }
 
 fn compute_offer_amount(

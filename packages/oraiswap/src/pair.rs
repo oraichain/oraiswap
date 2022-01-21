@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     asset::{Asset, AssetInfo},
     hook::InitHook,
+    Decimal256, Uint256,
 };
 
 use cosmwasm_std::{Decimal, HumanAddr, Uint128};
@@ -97,3 +98,35 @@ pub struct ReverseSimulationResponse {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}
+
+pub fn compute_swap(
+    offer_pool: Uint128,
+    ask_pool: Uint128,
+    offer_amount: Uint128,
+    commission_rate: Decimal256,
+) -> (Uint128, Uint128, Uint128) {
+    // convert to uint256
+    let offer_pool: Uint256 = offer_pool.into();
+    let ask_pool: Uint256 = ask_pool.into();
+    let offer_amount: Uint256 = offer_amount.into();
+
+    // offer => ask
+    // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
+    let cp: Uint256 = offer_pool * ask_pool;
+    let return_amount: Uint256 = (Decimal256::from_uint256(ask_pool)
+        - Decimal256::from_ratio(cp, offer_pool + offer_amount))
+        * Uint256::one();
+
+    // calculate spread & commission
+    let spread_amount: Uint256 =
+        (offer_amount * Decimal256::from_ratio(ask_pool, offer_pool)) - return_amount;
+    let commission_amount: Uint256 = return_amount * commission_rate;
+
+    // commission will be absorbed to pool
+    let return_amount: Uint256 = return_amount - commission_amount;
+    (
+        return_amount.into(),
+        spread_amount.into(),
+        commission_amount.into(),
+    )
+}
