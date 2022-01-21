@@ -157,7 +157,7 @@ fn simulate_swap_operations(
                     amount: offer_amount,
                 };
 
-                // Deduct tax before querying simulation
+                // Deduct tax before querying simulation, with native token only
                 offer_amount = Asset::checked_sub(
                     offer_amount,
                     return_asset.compute_tax(&oracle_contract, &deps.querier)?,
@@ -179,7 +179,7 @@ fn simulate_swap_operations(
                     amount: res.return_amount,
                 };
 
-                // Deduct tax after querying simulation
+                // Deduct tax after querying simulation, with native token only
                 res.return_amount = Asset::checked_sub(
                     res.return_amount,
                     return_asset.compute_tax(&oracle_contract, &deps.querier)?,

@@ -612,7 +612,7 @@ fn withdraw_liquidity() {
     );
     assert_eq!(
         log_refund_assets,
-        &attr("refund_assets", "100uusd, 100asset0000")
+        &attr("refund_assets", format!("100{}, 100asset0000", ORAI_DENOM))
     );
 }
 
@@ -898,7 +898,8 @@ fn try_token_to_native() {
     let expected_return_amount =
         Asset::checked_sub(expected_ret_amount, expected_commission_amount).unwrap();
     let expected_tax_amount = std::cmp::min(
-        Uint128::from(1000000u128),
+        // Uint128::from(1000000u128),
+        Uint128::zero(), // native orai tax is zero
         Asset::checked_sub(
             expected_return_amount,
             expected_return_amount.multiply_ratio(Uint128::from(100u128), Uint128::from(101u128)),
@@ -1055,7 +1056,7 @@ fn test_deduct() {
         oracle_addr: "oracle0000".into(),
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
+                denom: "ibc_orai".to_string(),
             },
             AssetInfo::Token {
                 contract_addr: "asset0000".into(),
@@ -1086,7 +1087,7 @@ fn test_deduct() {
     let tax_cap = Uint128::from(1_000_000u128);
     deps.querier.with_tax(
         Decimal::percent(2),
-        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
+        &[(&"ibc_orai".to_string(), &Uint128::from(1000000u128))],
     );
 
     let amount = Uint128::from(1_000_000_000u128);
@@ -1100,7 +1101,7 @@ fn test_deduct() {
 
     let after_amount = (Asset {
         info: AssetInfo::NativeToken {
-            denom: ORAI_DENOM.to_string(),
+            denom: "ibc_orai".to_string(),
         },
         amount,
     })
