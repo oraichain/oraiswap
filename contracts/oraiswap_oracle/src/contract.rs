@@ -194,11 +194,19 @@ pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
             OracleExchangeQuery::ExchangeRate {
                 base_denom,
                 quote_denom,
-            } => to_binary(&query_exchange_rate(deps, base_denom, quote_denom)?),
+            } => to_binary(&query_exchange_rate(
+                deps,
+                base_denom.unwrap_or(ORAI_DENOM.to_string()),
+                quote_denom,
+            )?),
             OracleExchangeQuery::ExchangeRates {
                 base_denom,
                 quote_denoms,
-            } => to_binary(&query_exchange_rates(deps, base_denom, quote_denoms)?),
+            } => to_binary(&query_exchange_rates(
+                deps,
+                base_denom.unwrap_or(ORAI_DENOM.to_string()),
+                quote_denoms,
+            )?),
         },
         OracleQuery::Contract(query_data) => match query_data {
             OracleContractQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
@@ -285,6 +293,7 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
     })
 }
 
+/// query_contract_balance: return native balance, currently only Orai denom
 pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
     deps.querier.query_balance(env.contract.address, &denom)
 }

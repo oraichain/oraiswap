@@ -70,11 +70,11 @@ pub enum OracleTreasuryQuery {
 #[serde(rename_all = "snake_case")]
 pub enum OracleExchangeQuery {
     ExchangeRate {
-        base_denom: String,
+        base_denom: Option<String>,
         quote_denom: String,
     },
     ExchangeRates {
-        base_denom: String,
+        base_denom: Option<String>,
         quote_denoms: Vec<String>,
     },
 }
@@ -221,7 +221,7 @@ impl OracleContract {
         quote_denoms: Vec<T>,
     ) -> StdResult<ExchangeRatesResponse> {
         let request = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRates {
-            base_denom: base_denom.into(),
+            base_denom: Some(base_denom.into()),
             quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
         });
 

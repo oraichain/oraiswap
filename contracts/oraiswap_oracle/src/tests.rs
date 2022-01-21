@@ -38,7 +38,7 @@ fn proper_initialization() {
     let _res = handle(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
 
     let msg = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRate {
-        base_denom: "usdt".to_string(),
+        base_denom: Some("usdt".to_string()),
         quote_denom: ORAI_DENOM.to_string(),
     });
 
