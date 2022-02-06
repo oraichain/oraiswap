@@ -123,7 +123,7 @@ impl Asset {
 
     pub fn assert_sent_native_token_balance(&self, message_info: &MessageInfo) -> StdResult<()> {
         if let AssetInfo::NativeToken { denom } = &self.info {
-            match message_info.sent_funds.iter().find(|x| x.denom == *denom) {
+            match message_info.sent_funds.iter().find(|x| x.denom.eq(denom)) {
                 Some(coin) => {
                     if self.amount == coin.amount {
                         Ok(())
