@@ -63,6 +63,9 @@ pub enum ContractError {
     #[error("Slippage_tolerance cannot bigger than 1")]
     InvalidExceedOneSlippage {},
 
+    #[error("Withdraw amount is too small compared to the total share")]
+    InvalidZeroRatio {},
+
     #[error("Asset mismatch")]
     AssetMismatch {},
 

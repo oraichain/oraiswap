@@ -324,6 +324,9 @@ pub fn withdraw_liquidity(
     let total_share: Uint128 = query_supply(&deps.querier, liquidity_addr)?;
 
     let share_ratio: Decimal = Decimal::from_ratio(amount, total_share);
+    if share_ratio.is_zero() {
+        return Err(ContractError::InvalidZeroRatio {});
+    }
     let refund_assets: Vec<Asset> = pools
         .iter()
         .map(|a| Asset {

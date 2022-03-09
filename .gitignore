@@ -16,3 +16,5 @@ target/
 .cargo-ok
 
 artifacts
+
+.env
