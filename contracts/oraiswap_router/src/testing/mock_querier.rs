@@ -197,6 +197,7 @@ impl WasmMockQuerier {
                                                 denom: "uusd".to_string(),
                                             },
                                         ],
+                                        commission_rate: "1".into(),
                                     })))
                                 }
                                 None => SystemResult::Err(SystemError::InvalidRequest {

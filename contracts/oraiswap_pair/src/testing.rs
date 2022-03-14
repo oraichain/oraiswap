@@ -17,7 +17,7 @@ use cosmwasm_std::{
     attr, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
-use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, PairInfo, ATOM_DENOM, ORAI_DENOM};
 use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
@@ -99,6 +99,93 @@ fn proper_initialization() {
             }
         ]
     );
+}
+
+#[test]
+fn provide_liquidity_both_native() {
+    let mut deps = mock_dependencies(&[
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(200u128),
+        },
+        Coin {
+            denom: ATOM_DENOM.to_string(),
+            amount: Uint128::from(200u128),
+        },
+    ]);
+
+    deps.querier.with_token_balances(&[
+        (
+            &"liquidity0000".to_string(),
+            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::zero())],
+        ),
+        (&"asset0000".to_string(), &[]),
+    ]);
+
+    let msg = InitMsg {
+        oracle_addr: "oracle0000".into(),
+        asset_infos: [
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+            AssetInfo::NativeToken {
+                denom: ATOM_DENOM.to_string(),
+            },
+        ],
+        token_code_id: 10u64,
+        commission_rate: None,
+        init_hook: None,
+    };
+
+    // we can just call .unwrap() to assert this was a success
+    let _res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+
+    // store liquidity token
+    let msg = HandleMsg::PostInitialize {};
+
+    let _res = handle(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("liquidity0000", &[]),
+        msg,
+    )
+    .unwrap();
+
+    // successfully provide liquidity for the exist pool
+    let msg = HandleMsg::ProvideLiquidity {
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                amount: Uint128::from(100u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(100u128),
+            },
+        ],
+        slippage_tolerance: None,
+        receiver: None,
+    };
+
+    let env = mock_env();
+    let info = mock_info(
+        "addr0000",
+        &[
+            Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+            Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+        ],
+    );
+    handle(deps.as_mut(), env, info, msg).unwrap();
 }
 
 #[test]

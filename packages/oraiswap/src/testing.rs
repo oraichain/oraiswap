@@ -265,6 +265,7 @@ fn query_oraiswap_pair_contract() {
             oracle_addr: "oracle0000".into(),
             contract_addr: "pair0000".into(),
             liquidity_token: "liquidity0000".into(),
+            commission_rate: "1".to_string(),
         },
     )]);
 

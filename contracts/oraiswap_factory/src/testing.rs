@@ -209,6 +209,7 @@ fn update_pair() {
             asset_infos: asset_infos.clone(),
             contract_addr: "pair0000".into(),
             liquidity_token: "liquidity0000".into(),
+            commission_rate: "1".into(),
         },
     )]);
 
@@ -241,6 +242,7 @@ fn update_pair() {
             liquidity_token: "liquidity0000".into(),
             contract_addr: "pair0000".into(),
             asset_infos,
+            commission_rate: "1".into()
         }
     );
 }

@@ -16,6 +16,7 @@ use cw20::Cw20HandleMsg;
 
 pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 pub const ORAI_DENOM: &str = "orai";
+pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {
@@ -55,7 +56,7 @@ impl Asset {
         let amount = self.amount;
         if let AssetInfo::NativeToken { denom } = &self.info {
             if denom == ORAI_DENOM {
-                Ok(Uint128::zero())
+                Ok(Uint128::from(0u64))
             } else {
                 // get oracle params from oracle contract
                 let tax_rate = oracle_contract.query_tax_rate(querier)?.rate;
@@ -74,7 +75,7 @@ impl Asset {
                 ))
             }
         } else {
-            Ok(Uint128::zero())
+            Ok(Uint128::from(0u64))
         }
     }
 
@@ -303,6 +304,7 @@ pub struct PairInfo {
     pub liquidity_token: HumanAddr,
 
     pub oracle_addr: HumanAddr,
+    pub commission_rate: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -326,6 +328,7 @@ impl PairInfoRaw {
                 self.asset_infos[0].to_normal(api)?,
                 self.asset_infos[1].to_normal(api)?,
             ],
+            commission_rate: self.commission_rate.clone(),
         })
     }
 

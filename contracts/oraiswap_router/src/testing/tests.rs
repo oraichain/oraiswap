@@ -7,7 +7,7 @@ use crate::operations::assert_operations;
 use crate::testing::mock_querier::mock_dependencies;
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, ATOM_DENOM, ORAI_DENOM};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::router::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
@@ -31,6 +31,49 @@ fn proper_initialization() {
     let config: ConfigResponse =
         from_binary(&query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap();
     assert_eq!("oraiswapfactory", config.factory_addr.as_str());
+}
+
+#[test]
+fn simulate_swap_operations_test() {
+    let mut deps = mock_dependencies(&[]);
+
+    let msg = InitMsg {
+        factory_addr: "oraiswapfactory".into(),
+    };
+
+    let info = mock_info("addr0000", &[]);
+
+    // we can just call .unwrap() to assert this was a success
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set tax rate as 5%
+    deps.querier.with_tax(
+        Decimal::permille(3),
+        &[
+            (&ORAI_DENOM.to_string(), &Uint128::from(10000000u128)),
+            (&ATOM_DENOM.to_string(), &Uint128::from(10000000u128)),
+        ],
+    );
+
+    let msg = QueryMsg::SimulateSwapOperations {
+        offer_amount: Uint128::from(100u128),
+        operations: vec![SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+            ask_asset_info: AssetInfo::NativeToken {
+                denom: ATOM_DENOM.to_string(),
+            },
+        }],
+    };
+
+    deps.querier.with_oraiswap_pairs(&[(
+        &format!("{}{}", ORAI_DENOM.to_string(), ATOM_DENOM.to_string()),
+        &ATOM_DENOM.to_string(),
+    )]);
+
+    let res: SimulateSwapOperationsResponse =
+        from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
 }
 
 #[test]
