@@ -46,6 +46,11 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 
 You will need Rust 1.44.1+ with wasm32-unknown-unknown target installed.
 
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add wasm32-unknown-unknown
+```
+
 You can run unit tests on this on each contracts directory via :
 
 ```
@@ -60,3 +65,11 @@ Once you are happy with the content, you can compile it to wasm on each contract
 ```
 
 The optimized contracts are generated in the artifacts/ directory.
+
+## Gen schema and typescript definitions
+
+```bash
+yarn
+# gen oraiswap_pair typescript and schema
+yarn gen-ts contracts/oraiswap_pair
+```

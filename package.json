@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "gen-ts": "node gen-ts.js"
+  },
+  "dependencies": {
+    "json-schema-to-typescript": "^10.1.5"
+  }
+}
