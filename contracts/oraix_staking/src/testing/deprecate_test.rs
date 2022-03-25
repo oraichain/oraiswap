@@ -16,7 +16,7 @@ fn test_deprecate() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),

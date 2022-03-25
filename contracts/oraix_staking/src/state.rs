@@ -15,7 +15,7 @@ static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
-    pub mirror_token: CanonicalAddr,
+    pub oraix_token: CanonicalAddr,
     pub mint_contract: CanonicalAddr,
     pub oracle_contract: CanonicalAddr,
     pub oraiswap_factory: CanonicalAddr,

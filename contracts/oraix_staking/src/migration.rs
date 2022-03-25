@@ -71,9 +71,9 @@ mod migrate_tests {
         let mut deps = mock_dependencies(&[]);
         let mut legacy_store = pool_infos_old_store(&mut deps.storage);
 
-        let asset_1 = deps.api.addr_canonicalize("asset1").unwrap();
+        let asset_1 = deps.api.canonical_address(&"asset1".into()).unwrap();
         let pool_info_1 = LegacyPoolInfo {
-            staking_token: deps.api.addr_canonicalize("staking1").unwrap(),
+            staking_token: deps.api.canonical_address(&"staking1".into()).unwrap(),
             total_bond_amount: Uint128::from(1u128),
             total_short_amount: Uint128::from(1u128),
             reward_index: Decimal::percent(1),
@@ -84,9 +84,9 @@ mod migrate_tests {
             short_reward_weight: Decimal::percent(1),
             premium_updated_time: 1,
         };
-        let asset_2 = deps.api.addr_canonicalize("asset2").unwrap();
+        let asset_2 = deps.api.canonical_address(&"asset2".into()).unwrap();
         let pool_info_2 = LegacyPoolInfo {
-            staking_token: deps.api.addr_canonicalize("staking2").unwrap(),
+            staking_token: deps.api.canonical_address(&"staking2".into()).unwrap(),
             total_bond_amount: Uint128::from(2u128),
             total_short_amount: Uint128::from(2u128),
             reward_index: Decimal::percent(2),
@@ -109,7 +109,7 @@ mod migrate_tests {
         assert_eq!(
             new_pool_info_1,
             PoolInfo {
-                staking_token: deps.api.addr_canonicalize("staking1").unwrap(),
+                staking_token: deps.api.canonical_address(&"staking1".into()).unwrap(),
                 total_bond_amount: Uint128::from(1u128),
                 total_short_amount: Uint128::from(1u128),
                 reward_index: Decimal::percent(1),
@@ -125,7 +125,7 @@ mod migrate_tests {
         assert_eq!(
             new_pool_info_2,
             PoolInfo {
-                staking_token: deps.api.addr_canonicalize("staking2").unwrap(),
+                staking_token: deps.api.canonical_address(&"staking2".into()).unwrap(),
                 total_bond_amount: Uint128::from(2u128),
                 total_short_amount: Uint128::from(2u128),
                 reward_index: Decimal::percent(2),

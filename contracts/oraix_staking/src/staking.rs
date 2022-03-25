@@ -61,9 +61,9 @@ pub fn unbond(
 
     Ok(HandleResponse {
         messages: vec![WasmMsg::Execute {
-            contract_addr: staking_token_addr,
+            contract_addr: staking_token_addr.clone(),
             msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: staker_addr,
+                recipient: staker_addr.clone(),
                 amount,
             })?,
             send: vec![],
@@ -202,7 +202,7 @@ pub fn auto_stake(
     // get current lp token amount to later compute the recived amount
     let prev_staking_token_amount = query_token_balance(
         &deps.querier,
-        oraiswap_pair.liquidity_token,
+        oraiswap_pair.liquidity_token.clone(),
         env.contract.address.clone(),
     )?;
 
@@ -218,19 +218,19 @@ pub fn auto_stake(
     Ok(HandleResponse {
         messages: vec![
             WasmMsg::Execute {
-                contract_addr: token_addr,
+                contract_addr: token_addr.clone(),
                 msg: to_binary(&Cw20HandleMsg::TransferFrom {
-                    owner: info.sender,
-                    recipient: env.contract.address,
+                    owner: info.sender.clone(),
+                    recipient: env.contract.address.clone(),
                     amount: token_amount,
                 })?,
                 send: vec![],
             }
             .into(),
             WasmMsg::Execute {
-                contract_addr: token_addr,
+                contract_addr: token_addr.clone(),
                 msg: to_binary(&Cw20HandleMsg::IncreaseAllowance {
-                    spender: oraiswap_pair.contract_addr,
+                    spender: oraiswap_pair.contract_addr.clone(),
                     amount: token_amount,
                     expires: None,
                 })?,
@@ -238,7 +238,7 @@ pub fn auto_stake(
             }
             .into(),
             WasmMsg::Execute {
-                contract_addr: oraiswap_pair.contract_addr,
+                contract_addr: oraiswap_pair.contract_addr.clone(),
                 msg: to_binary(&PairHandleMsg::ProvideLiquidity {
                     assets: [
                         Asset {
@@ -248,7 +248,7 @@ pub fn auto_stake(
                         Asset {
                             amount: token_amount,
                             info: AssetInfo::Token {
-                                contract_addr: token_addr,
+                                contract_addr: token_addr.clone(),
                             },
                         },
                     ],
@@ -264,7 +264,7 @@ pub fn auto_stake(
             WasmMsg::Execute {
                 contract_addr: env.contract.address,
                 msg: to_binary(&HandleMsg::AutoStakeHook {
-                    asset_token: token_addr,
+                    asset_token: token_addr.clone(),
                     staking_token: oraiswap_pair.liquidity_token,
                     staker_addr: info.sender,
                     prev_staking_token_amount,

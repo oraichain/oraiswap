@@ -19,7 +19,7 @@ fn test_bond_tokens() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -167,7 +167,7 @@ fn test_unbond() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -289,7 +289,7 @@ fn test_increase_short_token() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -394,7 +394,7 @@ fn test_decrease_short_token() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -508,7 +508,7 @@ fn test_auto_stake() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),

@@ -7,14 +7,14 @@ use oraiswap::asset::Asset;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
-    pub owner: String,
-    pub oraix_token: String,
-    pub mint_contract: String,
-    pub oracle_contract: String,
-    pub oraiswap_factory: String,
+    pub owner: HumanAddr,
+    pub oraix_token: HumanAddr,
+    pub mint_contract: HumanAddr,
+    pub oracle_contract: HumanAddr,
+    pub oraiswap_factory: HumanAddr,
     pub base_denom: String,
     pub premium_min_update_interval: u64,
-    pub short_reward_contract: String,
+    pub short_reward_contract: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -26,30 +26,30 @@ pub enum HandleMsg {
     /// Owner operations ///
     ////////////////////////
     UpdateConfig {
-        owner: Option<String>,
+        owner: Option<HumanAddr>,
         premium_min_update_interval: Option<u64>,
-        short_reward_contract: Option<String>,
+        short_reward_contract: Option<HumanAddr>,
     },
     RegisterAsset {
-        asset_token: String,
-        staking_token: String,
+        asset_token: HumanAddr,
+        staking_token: HumanAddr,
     },
     DeprecateStakingToken {
-        asset_token: String,
-        new_staking_token: String,
+        asset_token: HumanAddr,
+        new_staking_token: HumanAddr,
     },
 
     ////////////////////////
     /// User operations ///
     ////////////////////////
     Unbond {
-        asset_token: String,
+        asset_token: HumanAddr,
         amount: Uint128,
     },
     /// Withdraw pending rewards
     Withdraw {
         // If the asset token is not given, then all rewards are withdrawn
-        asset_token: Option<String>,
+        asset_token: Option<HumanAddr>,
     },
     /// Provides liquidity and automatically stakes the LP tokens
     AutoStake {

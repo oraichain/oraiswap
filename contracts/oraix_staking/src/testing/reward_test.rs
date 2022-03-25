@@ -18,7 +18,7 @@ fn test_deposit_reward() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -158,7 +158,7 @@ fn test_deposit_reward_when_no_bonding() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -277,7 +277,7 @@ fn test_before_share_changes() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -420,7 +420,7 @@ fn test_withdraw() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -505,7 +505,7 @@ fn withdraw_multiple_rewards() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -735,7 +735,7 @@ fn test_adjust_premium() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),

@@ -9,7 +9,7 @@ fn proper_initialization() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -29,7 +29,7 @@ fn proper_initialization() {
     assert_eq!(
         ConfigResponse {
             owner: "owner".to_string(),
-            mirror_token: "reward".to_string(),
+            oraix_token: "reward".to_string(),
             mint_contract: "mint".to_string(),
             oracle_contract: "oracle".to_string(),
             oraiswap_factory: "oraiswap_factory".to_string(),
@@ -47,7 +47,7 @@ fn update_config() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),
@@ -76,7 +76,7 @@ fn update_config() {
     assert_eq!(
         ConfigResponse {
             owner: "owner2".to_string(),
-            mirror_token: "reward".to_string(),
+            oraix_token: "reward".to_string(),
             mint_contract: "mint".to_string(),
             oracle_contract: "oracle".to_string(),
             oraiswap_factory: "oraiswap_factory".to_string(),
@@ -108,7 +108,7 @@ fn test_register() {
 
     let msg = InitMsg {
         owner: "owner".to_string(),
-        mirror_token: "reward".to_string(),
+        oraix_token: "reward".to_string(),
         mint_contract: "mint".to_string(),
         oracle_contract: "oracle".to_string(),
         oraiswap_factory: "oraiswap_factory".to_string(),

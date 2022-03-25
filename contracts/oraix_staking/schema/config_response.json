@@ -5,7 +5,7 @@
   "required": [
     "base_denom",
     "mint_contract",
-    "mirror_token",
+    "oraix_token",
     "oracle_contract",
     "owner",
     "premium_min_update_interval",
@@ -19,7 +19,7 @@
     "mint_contract": {
       "type": "string"
     },
-    "mirror_token": {
+    "oraix_token": {
       "type": "string"
     },
     "oracle_contract": {

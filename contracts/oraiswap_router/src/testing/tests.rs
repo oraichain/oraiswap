@@ -72,7 +72,7 @@ fn simulate_swap_operations_test() {
         &ATOM_DENOM.to_string(),
     )]);
 
-    let res: SimulateSwapOperationsResponse =
+    let _res: SimulateSwapOperationsResponse =
         from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
 }
 
