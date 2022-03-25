@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::Asset;
 
@@ -58,9 +58,9 @@ pub enum HandleMsg {
     },
     /// Hook to stake the minted LP tokens
     AutoStakeHook {
-        asset_token: String,
-        staking_token: String,
-        staker_addr: String,
+        asset_token: HumanAddr,
+        staking_token: HumanAddr,
+        staker_addr: HumanAddr,
         prev_staking_token_amount: Uint128,
     },
 
@@ -68,20 +68,20 @@ pub enum HandleMsg {
     /// Permission-less operations ///
     //////////////////////////////////
     AdjustPremium {
-        asset_tokens: Vec<String>,
+        asset_tokens: Vec<HumanAddr>,
     },
 
     ////////////////////////////////
     /// Mint contract operations ///
     ////////////////////////////////
     IncreaseShortToken {
-        asset_token: String,
-        staker_addr: String,
+        asset_token: HumanAddr,
+        staker_addr: HumanAddr,
         amount: Uint128,
     },
     DecreaseShortToken {
-        asset_token: String,
-        staker_addr: String,
+        asset_token: HumanAddr,
+        staker_addr: HumanAddr,
         amount: Uint128,
     },
 }
@@ -89,15 +89,15 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    Bond { asset_token: String },
-    DepositReward { rewards: Vec<(String, Uint128)> },
+    Bond { asset_token: HumanAddr },
+    DepositReward { rewards: Vec<(HumanAddr, Uint128)> },
 }
 
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub asset_token_to_deprecate: String,
-    pub new_staking_token: String,
+    pub asset_token_to_deprecate: HumanAddr,
+    pub new_staking_token: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -105,32 +105,32 @@ pub struct MigrateMsg {
 pub enum QueryMsg {
     Config {},
     PoolInfo {
-        asset_token: String,
+        asset_token: HumanAddr,
     },
     RewardInfo {
-        staker_addr: String,
-        asset_token: Option<String>,
+        staker_addr: HumanAddr,
+        asset_token: Option<HumanAddr>,
     },
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub owner: String,
-    pub oraix_token: String,
-    pub mint_contract: String,
-    pub oracle_contract: String,
-    pub oraiswap_factory: String,
+    pub owner: HumanAddr,
+    pub oraix_token: HumanAddr,
+    pub mint_contract: HumanAddr,
+    pub oracle_contract: HumanAddr,
+    pub oraiswap_factory: HumanAddr,
     pub base_denom: String,
     pub premium_min_update_interval: u64,
-    pub short_reward_contract: String,
+    pub short_reward_contract: HumanAddr,
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfoResponse {
-    pub asset_token: String,
-    pub staking_token: String,
+    pub asset_token: HumanAddr,
+    pub staking_token: HumanAddr,
     pub total_bond_amount: Uint128,
     pub total_short_amount: Uint128,
     pub reward_index: Decimal,
@@ -141,19 +141,19 @@ pub struct PoolInfoResponse {
     pub short_reward_weight: Decimal,
     pub premium_updated_time: u64,
     pub migration_index_snapshot: Option<Decimal>,
-    pub migration_deprecated_staking_token: Option<String>,
+    pub migration_deprecated_staking_token: Option<HumanAddr>,
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfoResponse {
-    pub staker_addr: String,
+    pub staker_addr: HumanAddr,
     pub reward_infos: Vec<RewardInfoResponseItem>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfoResponseItem {
-    pub asset_token: String,
+    pub asset_token: HumanAddr,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
     pub is_short: bool,

@@ -38,7 +38,7 @@ cosmwasm-std = { version = "0.13.2" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
-oraiswap = { path = "../../packages/oraiswap", version = "2.4.1" }
+oraiswap = { path = "../../packages/oraiswap" }
 
 [dev-dependencies]
 # we only need to enable this if we use integration tests

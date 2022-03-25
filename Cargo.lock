@@ -289,6 +289,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraix-staking"
+version = "2.1.1"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "oraiswap",
+ "oraix-protocol",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
