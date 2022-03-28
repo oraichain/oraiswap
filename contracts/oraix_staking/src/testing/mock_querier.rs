@@ -1,18 +1,18 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Addr, Coin, ContractResult, Decimal, OwnedDeps, Querier,
-    QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, HumanAddr, OwnedDeps,
+    Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
+use oraiswap::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 use oraiswap::{asset::Asset, asset::AssetInfo, asset::PairInfo, pair::PoolResponse};
 use oraix_protocol::oracle::PriceResponse;
 use oraix_protocol::short_reward::ShortRewardWeightResponse;
 use serde::Deserialize;
-use terra_cosmwasm::{TaxCapResponse, TaxRateResponse, TerraQuery, TerraQueryWrapper, TerraRoute};
 
 pub struct WasmMockQuerier {
-    base: MockQuerier<TerraQueryWrapper>,
-    pair_addr: Addr,
+    base: MockQuerier<Empty>,
+    pair_addr: HumanAddr,
     pool_assets: [Asset; 2],
     oracle_price: Decimal,
     token_balance: Uint128,
@@ -23,8 +23,10 @@ pub struct WasmMockQuerier {
 pub fn mock_dependencies_with_querier(
     contract_balance: &[Coin],
 ) -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
-    let custom_querier: WasmMockQuerier =
-        WasmMockQuerier::new(MockQuerier::new(&[(MOCK_CONTRACT_ADDR, contract_balance)]));
+    let custom_querier: WasmMockQuerier = WasmMockQuerier::new(MockQuerier::new(&[(
+        &MOCK_CONTRACT_ADDR.into(),
+        contract_balance,
+    )]));
 
     OwnedDeps {
         api: MockApi::default(),
@@ -36,7 +38,7 @@ pub fn mock_dependencies_with_querier(
 impl Querier for WasmMockQuerier {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         // MockQuerier doesn't support Custom, so we ignore it completely here
-        let request: QueryRequest<TerraQueryWrapper> = match from_slice(bin_request) {
+        let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -69,60 +71,57 @@ pub enum MockQueryMsg {
 }
 
 impl WasmMockQuerier {
-    pub fn handle_query(&self, request: &QueryRequest<TerraQueryWrapper>) -> QuerierResult {
+    pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {
         match &request {
-            QueryRequest::Custom(TerraQueryWrapper { route, query_data }) => {
-                if route == &TerraRoute::Treasury {
-                    match query_data {
-                        TerraQuery::TaxRate {} => {
-                            let res = TaxRateResponse { rate: self.tax.0 };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                        }
-                        TerraQuery::TaxCap { .. } => {
-                            let res = TaxCapResponse { cap: self.tax.1 };
-                            SystemResult::Ok(ContractResult::from(to_binary(&res)))
-                        }
-                        _ => panic!("DO NOT ENTER HERE"),
+            QueryRequest::Wasm(WasmQuery::Smart { msg, .. }) => match from_binary(msg) {
+                // maybe querywrapper like custom query from smart contract
+                Ok(OracleQuery::Treasury(query_data)) => match query_data {
+                    OracleTreasuryQuery::TaxRate {} => {
+                        let res = TaxRateResponse { rate: self.tax.0 };
+                        SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
                     }
-                } else {
-                    panic!("DO NOT ENTER HERE")
-                }
-            }
-            QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: _,
-                msg,
-            }) => match from_binary(msg).unwrap() {
-                MockQueryMsg::Pair { asset_infos } => {
-                    SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
-                        asset_infos,
-                        contract_addr: self.pair_addr.to_string(),
-                        liquidity_token: "lptoken".to_string(),
-                    })))
-                }
-                MockQueryMsg::ShortRewardWeight { .. } => SystemResult::Ok(ContractResult::from(
-                    to_binary(&ShortRewardWeightResponse {
-                        short_reward_weight: self.short_reward_weight,
-                    }),
-                )),
-                MockQueryMsg::Pool {} => {
-                    SystemResult::Ok(ContractResult::from(to_binary(&PoolResponse {
-                        assets: self.pool_assets.clone(),
-                        total_share: Uint128::zero(),
-                    })))
-                }
-                MockQueryMsg::Price {
-                    base_asset: _,
-                    quote_asset: _,
-                } => SystemResult::Ok(ContractResult::from(to_binary(&PriceResponse {
-                    rate: self.oracle_price,
-                    last_updated_base: 100,
-                    last_updated_quote: 100,
-                }))),
-                MockQueryMsg::Balance { address: _ } => {
-                    SystemResult::Ok(ContractResult::from(to_binary(&cw20::BalanceResponse {
-                        balance: self.token_balance,
-                    })))
-                }
+                    OracleTreasuryQuery::TaxCap { .. } => {
+                        let res = TaxCapResponse { cap: self.tax.1 };
+                        SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                    }
+                },
+
+                // try with FactoryQueryMsg
+                _ => match from_binary(msg).unwrap() {
+                    MockQueryMsg::Pair { asset_infos } => {
+                        SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
+                            asset_infos,
+                            oracle_addr: "oracle0000".into(),
+                            contract_addr: self.pair_addr.clone(),
+                            liquidity_token: "lptoken".into(),
+                            commission_rate: "1".into(),
+                        })))
+                    }
+                    MockQueryMsg::ShortRewardWeight { .. } => SystemResult::Ok(
+                        ContractResult::from(to_binary(&ShortRewardWeightResponse {
+                            short_reward_weight: self.short_reward_weight,
+                        })),
+                    ),
+                    MockQueryMsg::Pool {} => {
+                        SystemResult::Ok(ContractResult::from(to_binary(&PoolResponse {
+                            assets: self.pool_assets.clone(),
+                            total_share: Uint128::zero(),
+                        })))
+                    }
+                    MockQueryMsg::Price {
+                        base_asset: _,
+                        quote_asset: _,
+                    } => SystemResult::Ok(ContractResult::from(to_binary(&PriceResponse {
+                        rate: self.oracle_price,
+                        last_updated_base: 100,
+                        last_updated_quote: 100,
+                    }))),
+                    MockQueryMsg::Balance { address: _ } => {
+                        SystemResult::Ok(ContractResult::from(to_binary(&cw20::BalanceResponse {
+                            balance: self.token_balance,
+                        })))
+                    }
+                },
             },
 
             QueryRequest::Wasm(WasmQuery::Raw {
@@ -143,10 +142,10 @@ impl WasmMockQuerier {
 }
 
 impl WasmMockQuerier {
-    pub fn new(base: MockQuerier<TerraQueryWrapper>) -> Self {
+    pub fn new(base: MockQuerier<Empty>) -> Self {
         WasmMockQuerier {
             base,
-            pair_addr: Addr::unchecked(""),
+            pair_addr: "".into(),
             pool_assets: [
                 Asset {
                     info: AssetInfo::NativeToken {
@@ -156,19 +155,19 @@ impl WasmMockQuerier {
                 },
                 Asset {
                     info: AssetInfo::Token {
-                        contract_addr: "asset".to_string(),
+                        contract_addr: "asset".into(),
                     },
                     amount: Uint128::zero(),
                 },
             ],
             oracle_price: Decimal::zero(),
             token_balance: Uint128::zero(),
-            tax: (Decimal::percent(1), Uint128::new(1000000)),
+            tax: (Decimal::percent(1), Uint128(1000000)),
             short_reward_weight: Decimal::percent(20),
         }
     }
 
-    pub fn with_pair_info(&mut self, pair_addr: Addr) {
+    pub fn with_pair_info(&mut self, pair_addr: HumanAddr) {
         self.pair_addr = pair_addr;
     }
 

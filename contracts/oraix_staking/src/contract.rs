@@ -57,42 +57,27 @@ pub fn handle(
         HandleMsg::RegisterAsset {
             asset_token,
             staking_token,
-        } => {
-            let api = deps.api;
-            register_asset(deps, info, asset_token, staking_token)
-        }
+        } => register_asset(deps, info, asset_token, staking_token),
         HandleMsg::DeprecateStakingToken {
             asset_token,
             new_staking_token,
-        } => {
-            let api = deps.api;
-            deprecate_staking_token(deps, info, asset_token, new_staking_token)
-        }
+        } => deprecate_staking_token(deps, info, asset_token, new_staking_token),
         HandleMsg::Unbond {
             asset_token,
             amount,
-        } => {
-            let api = deps.api;
-            unbond(deps, info.sender, asset_token, amount)
-        }
+        } => unbond(deps, info.sender, asset_token, amount),
         HandleMsg::Withdraw { asset_token } => withdraw_reward(deps, info, asset_token),
         HandleMsg::AdjustPremium { asset_tokens } => adjust_premium(deps, env, asset_tokens),
         HandleMsg::IncreaseShortToken {
             staker_addr,
             asset_token,
             amount,
-        } => {
-            let api = deps.api;
-            increase_short_token(deps, info, staker_addr, asset_token, amount)
-        }
+        } => increase_short_token(deps, info, staker_addr, asset_token, amount),
         HandleMsg::DecreaseShortToken {
             staker_addr,
             asset_token,
             amount,
-        } => {
-            let api = deps.api;
-            decrease_short_token(deps, info, staker_addr, asset_token, amount)
-        }
+        } => decrease_short_token(deps, info, staker_addr, asset_token, amount),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -102,18 +87,15 @@ pub fn handle(
             staking_token,
             staker_addr,
             prev_staking_token_amount,
-        } => {
-            let api = deps.api;
-            auto_stake_hook(
-                deps,
-                env,
-                info,
-                asset_token,
-                staking_token,
-                staker_addr,
-                prev_staking_token_amount,
-            )
-        }
+        } => auto_stake_hook(
+            deps,
+            env,
+            info,
+            asset_token,
+            staking_token,
+            staker_addr,
+            prev_staking_token_amount,
+        ),
     }
 }
 
@@ -145,7 +127,6 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("unauthorized"));
             }
 
-            let api = deps.api;
             bond(deps, cw20_msg.sender, asset_token, cw20_msg.amount)
         }
         Ok(Cw20HookMsg::DepositReward { rewards }) => {
