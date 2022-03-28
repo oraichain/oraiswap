@@ -5,7 +5,7 @@ use cosmwasm_std::{attr, from_binary, to_binary, Coin, Decimal, StdError, Uint12
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
-use oraix_protocol::staking::{
+use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
@@ -22,7 +22,7 @@ fn test_bond_tokens() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -170,7 +170,7 @@ fn test_unbond() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -293,7 +293,7 @@ fn test_increase_short_token() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -398,7 +398,7 @@ fn test_decrease_short_token() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -512,7 +512,7 @@ fn test_auto_stake() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);

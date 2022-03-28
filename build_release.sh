@@ -1,14 +1,20 @@
 #!/bin/bash
-command -v shellcheck >/dev/null && shellcheck "$0"
 
-echo "Info: sccache stats before build"
-sccache -s
-if [ $? -eq 0 ]; then
-    export RUSTC_WRAPPER=sccache
+
+if [ ! -z `command -v sccache` ]
+then
+    echo "Info: sccache stats before build"
+    sccache -s
+    if [ $? -eq 0 ]; then
+        export RUSTC_WRAPPER=sccache
+    fi
+else 
+    echo "Run: 'cargo install sccache' for faster build"
 fi
+
 set -o errexit -o nounset -o pipefail
 
-contractdir=$(realpath "$1")
+contractdir="$1"
 
 basedir=$(pwd)
 build_release="${3:-true}"
@@ -55,6 +61,6 @@ if [ "$build_schema" == 'true' ]; then
 fi
 
 # show content
-du -h "$contractdir/artifacts/$name.wasm"
+du -h "$basedir/$contractdir/artifacts/$name.wasm"
 
 echo "done"

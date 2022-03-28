@@ -1,7 +1,6 @@
 use crate::math::{decimal_division, decimal_subtraction};
 use cosmwasm_std::{
-    to_binary, Decimal, Deps, HumanAddr, QuerierWrapper, QueryRequest, StdResult, Uint128,
-    WasmQuery,
+    to_binary, Decimal, Deps, HumanAddr, QueryRequest, StdResult, Uint128, WasmQuery,
 };
 use oraiswap::{
     asset::AssetInfo,
@@ -11,8 +10,6 @@ use oraiswap::{
     pair::QueryMsg as PairQueryMsg,
     querier::{query_pair_info, query_token_info},
 };
-
-use oraix_protocol::short_reward::{QueryMsg as ShortRewardQueryMsg, ShortRewardWeightResponse};
 
 pub fn compute_premium_rate(
     deps: Deps,
@@ -64,9 +61,10 @@ pub fn compute_premium_rate(
     if oracle_price.is_zero() {
         Ok((Decimal::zero(), true))
     } else if oraiswap_price > oracle_price {
+        // adjust (oraiswap_price - oracle_price) /  oracle_price => percentage gain of oraiswap_price compare to oracle_price
         Ok((
             decimal_division(
-                decimal_subtraction(oraiswap_price, oracle_price),
+                decimal_subtraction(oraiswap_price, oracle_price)?,
                 oracle_price,
             ),
             false,
@@ -74,17 +72,4 @@ pub fn compute_premium_rate(
     } else {
         Ok((Decimal::zero(), false))
     }
-}
-
-pub fn compute_short_reward_weight(
-    querier: &QuerierWrapper,
-    short_reward_contract: HumanAddr,
-    premium_rate: Decimal,
-) -> StdResult<Decimal> {
-    let res: ShortRewardWeightResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: short_reward_contract,
-        msg: to_binary(&ShortRewardQueryMsg::ShortRewardWeight { premium_rate })?,
-    }))?;
-
-    Ok(res.short_reward_weight)
 }

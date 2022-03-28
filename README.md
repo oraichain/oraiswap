@@ -61,7 +61,7 @@ cargo integration-test
 Once you are happy with the content, you can compile it to wasm on each contracts directory via:
 
 ```bash
-./build_release.sh contracts/oraiswap_[package] true
+yarn build contracts/oraiswap_[package]
 ```
 
 The optimized contracts are generated in the artifacts/ directory.
@@ -71,5 +71,5 @@ The optimized contracts are generated in the artifacts/ directory.
 ```bash
 yarn
 # gen oraiswap_pair typescript and schema
-yarn gen-ts contracts/oraiswap_pair
+yarn gen-ts contracts/oraiswap_[package]
 ```

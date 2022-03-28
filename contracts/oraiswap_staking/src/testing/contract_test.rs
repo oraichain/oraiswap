@@ -1,7 +1,7 @@
 use crate::contract::{handle, init, query};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{attr, from_binary, Decimal, StdError, Uint128};
-use oraix_protocol::staking::{ConfigResponse, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg};
+use oraiswap::staking::{ConfigResponse, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg};
 
 #[test]
 fn proper_initialization() {
@@ -15,7 +15,7 @@ fn proper_initialization() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".into(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -35,7 +35,6 @@ fn proper_initialization() {
             oraiswap_factory: "oraiswap_factory".into(),
             base_denom: "uusd".into(),
             premium_min_update_interval: 3600,
-            short_reward_contract: "short_reward".into(),
         },
         config
     );
@@ -53,7 +52,7 @@ fn update_config() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".into(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -64,7 +63,7 @@ fn update_config() {
     let msg = HandleMsg::UpdateConfig {
         owner: Some("owner2".into()),
         premium_min_update_interval: Some(7200),
-        short_reward_contract: Some("new_short_reward".into()),
+        short_reward_bound: None,
     };
 
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -82,7 +81,6 @@ fn update_config() {
             oraiswap_factory: "oraiswap_factory".into(),
             base_denom: "uusd".into(),
             premium_min_update_interval: 7200,
-            short_reward_contract: "new_short_reward".into(),
         },
         config
     );
@@ -92,7 +90,7 @@ fn update_config() {
     let msg = HandleMsg::UpdateConfig {
         owner: None,
         premium_min_update_interval: Some(7200),
-        short_reward_contract: None,
+        short_reward_bound: None,
     };
 
     let res = handle(deps.as_mut(), mock_env(), info, msg);
@@ -114,7 +112,7 @@ fn test_register() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".into(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);

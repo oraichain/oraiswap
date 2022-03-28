@@ -1,15 +1,15 @@
+use crate::math::compute_short_reward_weight;
+use crate::querier::compute_premium_rate;
+use crate::state::{
+    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_pool_info,
+    Config, PoolInfo, RewardInfo,
+};
 use cosmwasm_std::{
     attr, to_binary, Api, CanonicalAddr, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, Order, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use oraiswap::asset::Asset;
-
-use crate::querier::{compute_premium_rate, compute_short_reward_weight};
-use crate::state::{
-    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_pool_info,
-    Config, PoolInfo, RewardInfo,
-};
-use oraix_protocol::staking::{RewardInfoResponse, RewardInfoResponseItem};
+use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
 
 use cw20::Cw20HandleMsg;
 
@@ -21,7 +21,7 @@ pub fn adjust_premium(
     let config: Config = read_config(deps.storage)?;
     let oracle_contract = deps.api.human_address(&config.oracle_contract)?;
     let oraiswap_factory = deps.api.human_address(&config.oraiswap_factory)?;
-    let short_reward_contract = deps.api.human_address(&config.short_reward_contract)?;
+
     for asset_token in asset_tokens.iter() {
         let asset_token_raw = deps.api.canonical_address(&asset_token)?;
         let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_token_raw)?;
@@ -43,7 +43,12 @@ pub fn adjust_premium(
         let short_reward_weight = if no_price_feed {
             Decimal::zero()
         } else {
-            compute_short_reward_weight(&deps.querier, short_reward_contract.clone(), premium_rate)?
+            // maximum short reward when premium rate > 7%
+            if premium_rate > config.short_reward_bound.0 {
+                config.short_reward_bound.1
+            } else {
+                compute_short_reward_weight(premium_rate)?
+            }
         };
 
         store_pool_info(

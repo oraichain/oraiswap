@@ -12,7 +12,7 @@ use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::querier::{query_pair_info, query_token_balance};
-use oraix_protocol::staking::HandleMsg;
+use oraiswap::staking::HandleMsg;
 
 pub fn bond(
     deps: DepsMut,

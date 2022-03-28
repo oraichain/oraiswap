@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "gen-ts": "node gen-ts.js"
+    "gen-ts": "node gen-ts.js",
+    "build": "bash build_release.sh"
   },
   "dependencies": {
     "json-schema-to-typescript": "^10.1.5"

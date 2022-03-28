@@ -3,7 +3,7 @@ use crate::state::{read_pool_info, store_pool_info, PoolInfo};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraix_protocol::staking::{
+use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
@@ -20,7 +20,7 @@ fn test_deprecate() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".into(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);

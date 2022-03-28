@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::asset::Asset;
 use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
-use oraiswap::asset::Asset;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
@@ -14,7 +14,7 @@ pub struct InitMsg {
     pub oraiswap_factory: HumanAddr,
     pub base_denom: String,
     pub premium_min_update_interval: u64,
-    pub short_reward_contract: HumanAddr,
+    pub short_reward_bound: Option<(Decimal, Decimal)>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -28,7 +28,7 @@ pub enum HandleMsg {
     UpdateConfig {
         owner: Option<HumanAddr>,
         premium_min_update_interval: Option<u64>,
-        short_reward_contract: Option<HumanAddr>,
+        short_reward_bound: Option<(Decimal, Decimal)>,
     },
     RegisterAsset {
         asset_token: HumanAddr,
@@ -123,7 +123,6 @@ pub struct ConfigResponse {
     pub oraiswap_factory: HumanAddr,
     pub base_denom: String,
     pub premium_min_update_interval: u64,
-    pub short_reward_contract: HumanAddr,
 }
 
 // We define a custom struct for each query response

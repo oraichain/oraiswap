@@ -7,7 +7,7 @@ use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo};
-use oraix_protocol::staking::{
+use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
@@ -24,7 +24,7 @@ fn test_deposit_reward() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -164,7 +164,7 @@ fn test_deposit_reward_when_no_bonding() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".into(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -283,7 +283,7 @@ fn test_before_share_changes() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -426,7 +426,7 @@ fn test_withdraw() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -512,7 +512,7 @@ fn withdraw_multiple_rewards() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -743,7 +743,7 @@ fn test_adjust_premium() {
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: "uusd".to_string(),
         premium_min_update_interval: 3600,
-        short_reward_contract: "short_reward".into(),
+        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);

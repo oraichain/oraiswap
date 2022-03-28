@@ -11,7 +11,7 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
-use oraix_protocol::staking::{
+use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
 
@@ -28,7 +28,10 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
             oraiswap_factory: deps.api.canonical_address(&msg.oraiswap_factory)?,
             base_denom: msg.base_denom,
             premium_min_update_interval: msg.premium_min_update_interval,
-            short_reward_contract: deps.api.canonical_address(&msg.short_reward_contract)?,
+            // premium rate > 7% then reward_weight = 40%
+            short_reward_bound: msg
+                .short_reward_bound
+                .unwrap_or((Decimal::percent(7), Decimal::percent(40))),
         },
     )?;
 
@@ -46,13 +49,13 @@ pub fn handle(
         HandleMsg::UpdateConfig {
             owner,
             premium_min_update_interval,
-            short_reward_contract,
+            short_reward_bound,
         } => update_config(
             deps,
             info,
             owner,
             premium_min_update_interval,
-            short_reward_contract,
+            short_reward_bound,
         ),
         HandleMsg::RegisterAsset {
             asset_token,
@@ -157,7 +160,7 @@ pub fn update_config(
     info: MessageInfo,
     owner: Option<HumanAddr>,
     premium_min_update_interval: Option<u64>,
-    short_reward_contract: Option<HumanAddr>,
+    short_reward_bound: Option<(Decimal, Decimal)>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -173,8 +176,8 @@ pub fn update_config(
         config.premium_min_update_interval = premium_min_update_interval;
     }
 
-    if let Some(short_reward_contract) = short_reward_contract {
-        config.short_reward_contract = deps.api.canonical_address(&short_reward_contract)?;
+    if let Some(short_reward_bound) = short_reward_bound {
+        config.short_reward_bound = short_reward_bound;
     }
 
     store_config(deps.storage, &config)?;
@@ -298,7 +301,6 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         oraiswap_factory: deps.api.human_address(&state.oraiswap_factory)?,
         base_denom: state.base_denom,
         premium_min_update_interval: state.premium_min_update_interval,
-        short_reward_contract: deps.api.human_address(&state.short_reward_contract)?,
     };
 
     Ok(resp)

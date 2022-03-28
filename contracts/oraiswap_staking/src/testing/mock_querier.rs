@@ -12,7 +12,7 @@ use oraiswap::{
     asset::Asset, asset::AssetInfo, asset::PairInfo, asset::ORAI_DENOM, oracle::ExchangeRateItem,
     pair::PoolResponse,
 };
-use oraix_protocol::short_reward::ShortRewardWeightResponse;
+
 use serde::Deserialize;
 
 pub struct WasmMockQuerier {
@@ -22,7 +22,6 @@ pub struct WasmMockQuerier {
     oracle_price: Decimal,
     token_balance: Uint128,
     tax: (Decimal, Uint128),
-    short_reward_weight: Decimal,
 }
 
 pub fn mock_dependencies_with_querier(
@@ -62,7 +61,6 @@ impl Querier for WasmMockQuerier {
 pub enum MockQueryMsg {
     Pair { asset_infos: [AssetInfo; 2] },
     Pool {},
-    ShortRewardWeight { premium_rate: Decimal },
     Balance { address: String },
     TokenInfo {},
 }
@@ -111,11 +109,6 @@ impl WasmMockQuerier {
                             commission_rate: "1".into(),
                         })))
                     }
-                    MockQueryMsg::ShortRewardWeight { .. } => SystemResult::Ok(
-                        ContractResult::from(to_binary(&ShortRewardWeightResponse {
-                            short_reward_weight: self.short_reward_weight,
-                        })),
-                    ),
                     MockQueryMsg::Pool {} => {
                         SystemResult::Ok(ContractResult::from(to_binary(&PoolResponse {
                             assets: self.pool_assets.clone(),
@@ -178,7 +171,6 @@ impl WasmMockQuerier {
             oracle_price: Decimal::zero(),
             token_balance: Uint128::zero(),
             tax: (Decimal::percent(1), Uint128(1000000)),
-            short_reward_weight: Decimal::percent(20),
         }
     }
 
