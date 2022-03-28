@@ -9,8 +9,9 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 | [`oraiswap_factory`](contracts/oraiswap_factory) | Proxy contract to creat oraiswap_pair instance           |
 | [`oraiswap_oracle`](contracts/oraiswap_oracle)   | Global parameters updated by multisig wallet             |
 | [`oraiswap_pair`](contracts/oraiswap_pair)       | Logic for building liquidity pool and trade between pair |
-| [`oraiswap_router`](contracts/oraiswap_router)   | facilitate multi-hop swap operations                     |
-| [`oraiswap_token`](contracts/oraiswap_token)     | CW20 (ERC20 equivalent) token implementation             |
+| [`oraiswap_router`](contracts/oraiswap_router)   | Facilitate multi-hop swap operations                     |
+| [`oraiswap_staking`](contracts/oraiswap_staking) | Stake LPs to get ORAIX reward                            |
+| [`oraiswap_token`](contracts/oraiswap_token)     | (ERC20 equivalent) token implementation, AIRI, ORAIX     |
 
 - oraiswap_factory
 
