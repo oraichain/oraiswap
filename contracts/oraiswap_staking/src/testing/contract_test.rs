@@ -1,6 +1,7 @@
 use crate::contract::{handle, init, query};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{attr, from_binary, Decimal, StdError, Uint128};
+use oraiswap::asset::ORAI_DENOM;
 use oraiswap::staking::{ConfigResponse, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg};
 
 #[test]
@@ -13,7 +14,7 @@ fn proper_initialization() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".into(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -33,7 +34,7 @@ fn proper_initialization() {
             mint_contract: "mint".into(),
             oracle_contract: "oracle".into(),
             oraiswap_factory: "oraiswap_factory".into(),
-            base_denom: "uusd".into(),
+            base_denom: ORAI_DENOM.to_string(),
             premium_min_update_interval: 3600,
         },
         config
@@ -50,7 +51,7 @@ fn update_config() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".into(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -79,7 +80,7 @@ fn update_config() {
             mint_contract: "mint".into(),
             oracle_contract: "oracle".into(),
             oraiswap_factory: "oraiswap_factory".into(),
-            base_denom: "uusd".into(),
+            base_denom: ORAI_DENOM.to_string(),
             premium_min_update_interval: 7200,
         },
         config
@@ -110,7 +111,7 @@ fn test_register() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".into(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };

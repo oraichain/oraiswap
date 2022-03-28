@@ -22,7 +22,7 @@ fn test_deposit_reward() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -162,7 +162,7 @@ fn test_deposit_reward_when_no_bonding() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".into(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -281,7 +281,7 @@ fn test_before_share_changes() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -424,7 +424,7 @@ fn test_withdraw() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -510,7 +510,7 @@ fn withdraw_multiple_rewards() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -741,7 +741,7 @@ fn test_adjust_premium() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };

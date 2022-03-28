@@ -18,7 +18,7 @@ fn test_deprecate() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".into(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };

@@ -12,7 +12,7 @@ pub struct InitMsg {
     pub mint_contract: HumanAddr,
     pub oracle_contract: HumanAddr,
     pub oraiswap_factory: HumanAddr,
-    pub base_denom: String,
+    pub base_denom: Option<String>,
     pub premium_min_update_interval: u64,
     pub short_reward_bound: Option<(Decimal, Decimal)>,
 }

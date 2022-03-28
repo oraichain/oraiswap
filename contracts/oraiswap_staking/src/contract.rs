@@ -11,6 +11,7 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
+use oraiswap::asset::ORAI_DENOM;
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
@@ -26,7 +27,7 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
             mint_contract: deps.api.canonical_address(&msg.mint_contract)?,
             oracle_contract: deps.api.canonical_address(&msg.oracle_contract)?,
             oraiswap_factory: deps.api.canonical_address(&msg.oraiswap_factory)?,
-            base_denom: msg.base_denom,
+            base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
             premium_min_update_interval: msg.premium_min_update_interval,
             // premium rate > 7% then reward_weight = 40%
             short_reward_bound: msg

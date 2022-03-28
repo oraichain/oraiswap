@@ -20,7 +20,7 @@ fn test_bond_tokens() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -168,7 +168,7 @@ fn test_unbond() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -291,7 +291,7 @@ fn test_increase_short_token() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -396,7 +396,7 @@ fn test_decrease_short_token() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
@@ -510,7 +510,7 @@ fn test_auto_stake() {
         mint_contract: "mint".into(),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
-        base_denom: "uusd".to_string(),
+        base_denom: None,
         premium_min_update_interval: 3600,
         short_reward_bound: None,
     };
