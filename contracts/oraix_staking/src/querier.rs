@@ -4,15 +4,19 @@ use cosmwasm_std::{
     WasmQuery,
 };
 use oraiswap::{
-    asset::AssetInfo, asset::PairInfo, pair::PoolResponse, pair::QueryMsg as PairQueryMsg,
-    querier::query_pair_info,
+    asset::AssetInfo,
+    asset::PairInfo,
+    oracle::OracleContract,
+    pair::PoolResponse,
+    pair::QueryMsg as PairQueryMsg,
+    querier::{query_pair_info, query_token_info},
 };
-use oraix_protocol::oracle::{PriceResponse, QueryMsg as OracleQueryMsg};
+
 use oraix_protocol::short_reward::{QueryMsg as ShortRewardQueryMsg, ShortRewardWeightResponse};
 
 pub fn compute_premium_rate(
     deps: Deps,
-    oracle_contract: HumanAddr,
+    oracle_addr: HumanAddr,
     factory_contract: HumanAddr,
     asset_token: HumanAddr,
     base_denom: String,
@@ -47,7 +51,15 @@ pub fn compute_premium_rate(
         Decimal::from_ratio(pool.assets[1].amount, pool.assets[0].amount)
     };
 
-    let oracle_price: Decimal = query_price(deps, oracle_contract, asset_token, base_denom)?;
+    // get denom from token contract
+    let asset_token_info = query_token_info(&deps.querier, asset_token)?;
+    let oracle_contract = OracleContract(oracle_addr);
+
+    // oracle price in exchange rate format
+    let oracle_price: Decimal = oracle_contract
+        .query_exchange_rate(&deps.querier, asset_token_info.symbol, base_denom)?
+        .item
+        .exchange_rate;
 
     if oracle_price.is_zero() {
         Ok((Decimal::zero(), true))
@@ -75,21 +87,4 @@ pub fn compute_short_reward_weight(
     }))?;
 
     Ok(res.short_reward_weight)
-}
-
-pub fn query_price(
-    deps: Deps,
-    oracle: HumanAddr,
-    base_asset: HumanAddr,
-    quote_asset: String, // may be contract or denom
-) -> StdResult<Decimal> {
-    let res: PriceResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: oracle,
-        msg: to_binary(&OracleQueryMsg::Price {
-            base_asset,
-            quote_asset,
-        })?,
-    }))?;
-
-    Ok(res.rate)
 }

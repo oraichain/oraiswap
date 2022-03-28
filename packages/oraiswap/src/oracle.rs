@@ -214,6 +214,20 @@ impl OracleContract {
     }
 
     // this is for CEX
+    pub fn query_exchange_rate<T: Into<String>>(
+        &self,
+        querier: &QuerierWrapper,
+        base_denom: T,
+        quote_denom: T,
+    ) -> StdResult<ExchangeRateResponse> {
+        let request = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRate {
+            base_denom: Some(base_denom.into()),
+            quote_denom: quote_denom.into(),
+        });
+
+        self.query(querier, request)
+    }
+
     pub fn query_exchange_rates<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,

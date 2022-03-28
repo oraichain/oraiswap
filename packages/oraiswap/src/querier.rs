@@ -49,14 +49,20 @@ pub fn query_token_balance(
     Ok(res.balance)
 }
 
-pub fn query_supply(querier: &QuerierWrapper, contract_addr: HumanAddr) -> StdResult<Uint128> {
+pub fn query_token_info(
+    querier: &QuerierWrapper,
+    contract_addr: HumanAddr,
+) -> StdResult<TokenInfoResponse> {
     // load price form the oracle
-    let token_info: TokenInfoResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+    querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr,
         msg: to_binary(&Cw20QueryMsg::TokenInfo {})?,
-    }))?;
+    }))
+}
 
-    Ok(token_info.total_supply)
+pub fn query_supply(querier: &QuerierWrapper, contract_addr: HumanAddr) -> StdResult<Uint128> {
+    // load price form the oracle
+    query_token_info(querier, contract_addr).map(|token_info| token_info.total_supply)
 }
 
 pub fn query_pair_info(

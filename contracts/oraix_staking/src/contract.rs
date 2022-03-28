@@ -9,7 +9,7 @@ use crate::state::{
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, StdError, StdResult, Uint128,
+    InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
 use oraix_protocol::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
@@ -330,7 +330,13 @@ pub fn query_pool_info(deps: Deps, asset_token: HumanAddr) -> StdResult<PoolInfo
     })
 }
 
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<HandleResponse> {
+// migrate contract
+pub fn migrate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: MigrateMsg,
+) -> StdResult<MigrateResponse> {
     migrate_pool_infos(deps.storage)?;
 
     // when the migration is executed, deprecate directly the MIR pool
@@ -340,6 +346,7 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<HandleRes
         sent_funds: vec![],
     };
 
+    // depricate old one
     deprecate_staking_token(
         deps,
         self_info,
@@ -347,5 +354,5 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<HandleRes
         msg.new_staking_token,
     )?;
 
-    Ok(HandleResponse::default())
+    Ok(MigrateResponse::default())
 }

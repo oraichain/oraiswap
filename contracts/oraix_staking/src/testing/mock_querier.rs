@@ -4,9 +4,14 @@ use cosmwasm_std::{
     Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
-use oraiswap::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
-use oraiswap::{asset::Asset, asset::AssetInfo, asset::PairInfo, pair::PoolResponse};
-use oraix_protocol::oracle::PriceResponse;
+use oraiswap::oracle::{
+    ExchangeRateResponse, OracleExchangeQuery, OracleQuery, OracleTreasuryQuery, TaxCapResponse,
+    TaxRateResponse,
+};
+use oraiswap::{
+    asset::Asset, asset::AssetInfo, asset::PairInfo, asset::ORAI_DENOM, oracle::ExchangeRateItem,
+    pair::PoolResponse,
+};
 use oraix_protocol::short_reward::ShortRewardWeightResponse;
 use serde::Deserialize;
 
@@ -51,29 +56,21 @@ impl Querier for WasmMockQuerier {
     }
 }
 
+// use mock format so we do not have to try multiple other formats
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MockQueryMsg {
-    Pair {
-        asset_infos: [AssetInfo; 2],
-    },
-    Price {
-        base_asset: String,
-        quote_asset: String,
-    },
+    Pair { asset_infos: [AssetInfo; 2] },
     Pool {},
-    ShortRewardWeight {
-        premium_rate: Decimal,
-    },
-    Balance {
-        address: String,
-    },
+    ShortRewardWeight { premium_rate: Decimal },
+    Balance { address: String },
+    TokenInfo {},
 }
 
 impl WasmMockQuerier {
     pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {
         match &request {
-            QueryRequest::Wasm(WasmQuery::Smart { msg, .. }) => match from_binary(msg) {
+            QueryRequest::Wasm(WasmQuery::Smart { msg, contract_addr }) => match from_binary(msg) {
                 // maybe querywrapper like custom query from smart contract
                 Ok(OracleQuery::Treasury(query_data)) => match query_data {
                     OracleTreasuryQuery::TaxRate {} => {
@@ -85,8 +82,25 @@ impl WasmMockQuerier {
                         SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
                     }
                 },
+                // query exchange rate
+                Ok(OracleQuery::Exchange(query_data)) => match query_data {
+                    OracleExchangeQuery::ExchangeRate {
+                        base_denom,
+                        quote_denom,
+                    } => {
+                        let res = ExchangeRateResponse {
+                            base_denom: base_denom.unwrap_or(ORAI_DENOM.to_string()),
+                            item: ExchangeRateItem {
+                                quote_denom,
+                                exchange_rate: self.oracle_price,
+                            },
+                        };
+                        SystemResult::Ok(ContractResult::Ok(to_binary(&res).unwrap()))
+                    }
+                    _ => panic!("DO NOT ENTER HERE"),
+                },
 
-                // try with FactoryQueryMsg
+                // try with MockQueryMsg
                 _ => match from_binary(msg).unwrap() {
                     MockQueryMsg::Pair { asset_infos } => {
                         SystemResult::Ok(ContractResult::from(to_binary(&PairInfo {
@@ -108,19 +122,20 @@ impl WasmMockQuerier {
                             total_share: Uint128::zero(),
                         })))
                     }
-                    MockQueryMsg::Price {
-                        base_asset: _,
-                        quote_asset: _,
-                    } => SystemResult::Ok(ContractResult::from(to_binary(&PriceResponse {
-                        rate: self.oracle_price,
-                        last_updated_base: 100,
-                        last_updated_quote: 100,
-                    }))),
                     MockQueryMsg::Balance { address: _ } => {
                         SystemResult::Ok(ContractResult::from(to_binary(&cw20::BalanceResponse {
                             balance: self.token_balance,
                         })))
                     }
+                    MockQueryMsg::TokenInfo {} => SystemResult::Ok(ContractResult::from(
+                        to_binary(&cw20::TokenInfoResponse {
+                            symbol: contract_addr.to_string(),
+                            // fake 1 million token
+                            total_supply: Uint128(1_000_000_000u128),
+                            decimals: 6,
+                            name: "Mock Token".to_string(),
+                        }),
+                    )),
                 },
             },
 
