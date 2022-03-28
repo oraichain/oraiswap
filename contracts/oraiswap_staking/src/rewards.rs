@@ -84,6 +84,7 @@ pub fn deposit_reward(
         // erf(pool_info.premium_rate.0)
         // 3.0f64
         let total_reward = *amount;
+        // short_reward came from sLP Tokens are minted and immediately staked when a short position is created
         let mut short_reward = total_reward * pool_info.short_reward_weight;
         let mut normal_reward = Asset::checked_sub(total_reward, short_reward).unwrap();
 
