@@ -18,10 +18,10 @@ fn test_deposit_reward() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -158,10 +158,10 @@ fn test_deposit_reward_when_no_bonding() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -277,10 +277,10 @@ fn test_before_share_changes() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -420,10 +420,10 @@ fn test_withdraw() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -506,10 +506,10 @@ fn withdraw_multiple_rewards() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -737,10 +737,10 @@ fn test_adjust_premium() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,

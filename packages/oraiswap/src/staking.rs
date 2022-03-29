@@ -9,11 +9,11 @@ use cw20::Cw20ReceiveMsg;
 pub struct InitMsg {
     // default is sender
     pub owner: Option<HumanAddr>,
-    pub oraix_token: HumanAddr,
+    pub reward_addr: HumanAddr,
     // this for minting short token
     pub minter: Option<HumanAddr>,
-    pub oracle_contract: HumanAddr,
-    pub oraiswap_factory: HumanAddr,
+    pub oracle_addr: HumanAddr,
+    pub factory_addr: HumanAddr,
     pub base_denom: Option<String>,
     // this for update short token reward weight
     pub premium_min_update_interval: Option<u64>,
@@ -120,10 +120,10 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: HumanAddr,
-    pub oraix_token: HumanAddr,
+    pub reward_addr: HumanAddr,
     pub minter: HumanAddr,
-    pub oracle_contract: HumanAddr,
-    pub oraiswap_factory: HumanAddr,
+    pub oracle_addr: HumanAddr,
+    pub factory_addr: HumanAddr,
     pub base_denom: String,
     pub premium_min_update_interval: u64,
 }

@@ -5,7 +5,7 @@
   "required": [
     "base_denom",
     "mint_contract",
-    "oraix_token",
+    "reward_addr",
     "oracle_contract",
     "owner",
     "premium_min_update_interval",
@@ -19,7 +19,7 @@
     "mint_contract": {
       "type": "string"
     },
-    "oraix_token": {
+    "reward_addr": {
       "type": "string"
     },
     "oracle_contract": {

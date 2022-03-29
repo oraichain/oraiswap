@@ -67,11 +67,11 @@ pub fn query_supply(querier: &QuerierWrapper, contract_addr: HumanAddr) -> StdRe
 
 pub fn query_pair_info(
     querier: &QuerierWrapper,
-    factory_contract: HumanAddr,
+    factory_addr: HumanAddr,
     asset_infos: &[AssetInfo; 2],
 ) -> StdResult<PairInfo> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: factory_contract,
+        contract_addr: factory_addr,
         msg: to_binary(&FactoryQueryMsg::Pair {
             asset_infos: asset_infos.clone(),
         })?,
@@ -80,21 +80,21 @@ pub fn query_pair_info(
 
 pub fn query_pair_config(
     querier: &QuerierWrapper,
-    factory_contract: HumanAddr,
+    factory_addr: HumanAddr,
 ) -> StdResult<ConfigResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: factory_contract,
+        contract_addr: factory_addr,
         msg: to_binary(&FactoryQueryMsg::Config {})?,
     }))
 }
 
 pub fn simulate(
     querier: &QuerierWrapper,
-    pair_contract: HumanAddr,
+    pair_addr: HumanAddr,
     offer_asset: &Asset,
 ) -> StdResult<SimulationResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: pair_contract,
+        contract_addr: pair_addr,
         msg: to_binary(&PairQueryMsg::Simulation {
             offer_asset: offer_asset.clone(),
         })?,
@@ -103,11 +103,11 @@ pub fn simulate(
 
 pub fn reverse_simulate(
     querier: &QuerierWrapper,
-    pair_contract: HumanAddr,
+    pair_addr: HumanAddr,
     ask_asset: &Asset,
 ) -> StdResult<ReverseSimulationResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: pair_contract,
+        contract_addr: pair_addr,
         msg: to_binary(&PairQueryMsg::ReverseSimulation {
             ask_asset: ask_asset.clone(),
         })?,

@@ -25,13 +25,13 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
             owner: deps
                 .api
                 .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
-            oraix_token: deps.api.canonical_address(&msg.oraix_token)?,
+            reward_addr: deps.api.canonical_address(&msg.reward_addr)?,
             // this is for minting short token
             minter: deps
                 .api
                 .canonical_address(&msg.minter.unwrap_or(info.sender))?,
-            oracle_contract: deps.api.canonical_address(&msg.oracle_contract)?,
-            oraiswap_factory: deps.api.canonical_address(&msg.oraiswap_factory)?,
+            oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
+            factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
             premium_min_update_interval: msg.premium_min_update_interval.unwrap_or(7600), // 2 hours
@@ -143,7 +143,7 @@ pub fn receive_cw20(
             let config: Config = read_config(deps.storage)?;
 
             // only reward token contract can execute this message
-            if config.oraix_token != deps.api.canonical_address(&info.sender)? {
+            if config.reward_addr != deps.api.canonical_address(&info.sender)? {
                 return Err(StdError::generic_err("unauthorized"));
             }
 
@@ -302,10 +302,10 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
-        oraix_token: deps.api.human_address(&state.oraix_token)?,
+        reward_addr: deps.api.human_address(&state.reward_addr)?,
         minter: deps.api.human_address(&state.minter)?,
-        oracle_contract: deps.api.human_address(&state.oracle_contract)?,
-        oraiswap_factory: deps.api.human_address(&state.oraiswap_factory)?,
+        oracle_addr: deps.api.human_address(&state.oracle_addr)?,
+        factory_addr: deps.api.human_address(&state.factory_addr)?,
         base_denom: state.base_denom,
         premium_min_update_interval: state.premium_min_update_interval,
     };

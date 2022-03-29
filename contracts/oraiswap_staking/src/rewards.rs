@@ -19,8 +19,8 @@ pub fn adjust_premium(
     asset_tokens: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let oracle_contract = deps.api.human_address(&config.oracle_contract)?;
-    let oraiswap_factory = deps.api.human_address(&config.oraiswap_factory)?;
+    let oracle_addr = deps.api.human_address(&config.oracle_addr)?;
+    let factory_addr = deps.api.human_address(&config.factory_addr)?;
 
     for asset_token in asset_tokens.iter() {
         let asset_token_raw = deps.api.canonical_address(&asset_token)?;
@@ -33,8 +33,8 @@ pub fn adjust_premium(
 
         let (premium_rate, no_price_feed) = compute_premium_rate(
             deps.as_ref(),
-            oracle_contract.clone(),
-            oraiswap_factory.clone(),
+            oracle_addr.clone(),
+            factory_addr.clone(),
             asset_token.to_owned(),
             config.base_denom.to_string(),
         )?;
@@ -138,7 +138,7 @@ pub fn withdraw_reward(
     let config: Config = read_config(deps.storage)?;
     Ok(HandleResponse {
         messages: vec![WasmMsg::Execute {
-            contract_addr: deps.api.human_address(&config.oraix_token)?,
+            contract_addr: deps.api.human_address(&config.reward_addr)?,
             msg: to_binary(&Cw20HandleMsg::Transfer {
                 recipient: info.sender,
                 amount,

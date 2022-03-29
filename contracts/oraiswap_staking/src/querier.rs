@@ -14,13 +14,13 @@ use oraiswap::{
 pub fn compute_premium_rate(
     deps: Deps,
     oracle_addr: HumanAddr,
-    factory_contract: HumanAddr,
+    factory_addr: HumanAddr,
     asset_token: HumanAddr,
     base_denom: String,
 ) -> StdResult<(Decimal, bool)> {
     let pair_info: PairInfo = query_pair_info(
         &deps.querier,
-        factory_contract,
+        factory_addr,
         &[
             AssetInfo::NativeToken {
                 denom: base_denom.clone(),

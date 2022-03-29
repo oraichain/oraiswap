@@ -161,7 +161,7 @@ pub fn auto_stake(
     slippage_tolerance: Option<Decimal>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let oraiswap_factory = deps.api.human_address(&config.oraiswap_factory)?;
+    let factory_addr = deps.api.human_address(&config.factory_addr)?;
 
     let mut native_asset_op: Option<Asset> = None;
     let mut token_info_op: Option<(HumanAddr, Uint128)> = None;
@@ -189,7 +189,7 @@ pub fn auto_stake(
 
     // query pair info to obtain pair contract address
     let asset_infos: [AssetInfo; 2] = [assets[0].info.clone(), assets[1].info.clone()];
-    let oraiswap_pair: PairInfo = query_pair_info(&deps.querier, oraiswap_factory, &asset_infos)?;
+    let oraiswap_pair: PairInfo = query_pair_info(&deps.querier, factory_addr, &asset_infos)?;
 
     // assert the token and lp token match with pool info
     let pool_info: PoolInfo =

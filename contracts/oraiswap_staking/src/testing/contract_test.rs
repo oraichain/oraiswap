@@ -10,10 +10,10 @@ fn proper_initialization() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -30,10 +30,10 @@ fn proper_initialization() {
     assert_eq!(
         ConfigResponse {
             owner: "owner".into(),
-            oraix_token: "reward".into(),
+            reward_addr: "reward".into(),
             minter: "mint".into(),
-            oracle_contract: "oracle".into(),
-            oraiswap_factory: "oraiswap_factory".into(),
+            oracle_addr: "oracle".into(),
+            factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),
             premium_min_update_interval: 3600,
         },
@@ -47,10 +47,10 @@ fn update_config() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
@@ -76,10 +76,10 @@ fn update_config() {
     assert_eq!(
         ConfigResponse {
             owner: "owner2".into(),
-            oraix_token: "reward".into(),
+            reward_addr: "reward".into(),
             minter: "mint".into(),
-            oracle_contract: "oracle".into(),
-            oraiswap_factory: "oraiswap_factory".into(),
+            oracle_addr: "oracle".into(),
+            factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),
             premium_min_update_interval: 7200,
         },
@@ -107,10 +107,10 @@ fn test_register() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        oraix_token: "reward".into(),
+        reward_addr: "reward".into(),
         minter: Some("mint".into()),
-        oracle_contract: "oracle".into(),
-        oraiswap_factory: "oraiswap_factory".into(),
+        oracle_addr: "oracle".into(),
+        factory_addr: "factory".into(),
         base_denom: None,
         premium_min_update_interval: Some(3600),
         short_reward_bound: None,
