@@ -89,7 +89,7 @@ pub fn increase_short_token(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    if deps.api.canonical_address(&info.sender)? != config.mint_contract {
+    if deps.api.canonical_address(&info.sender)? != config.minter {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -125,7 +125,7 @@ pub fn decrease_short_token(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    if deps.api.canonical_address(&info.sender)? != config.mint_contract {
+    if deps.api.canonical_address(&info.sender)? != config.minter {
         return Err(StdError::generic_err("unauthorized"));
     }
 

@@ -9,13 +9,13 @@ fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -31,7 +31,7 @@ fn proper_initialization() {
         ConfigResponse {
             owner: "owner".into(),
             oraix_token: "reward".into(),
-            mint_contract: "mint".into(),
+            minter: "mint".into(),
             oracle_contract: "oracle".into(),
             oraiswap_factory: "oraiswap_factory".into(),
             base_denom: ORAI_DENOM.to_string(),
@@ -46,13 +46,13 @@ fn update_config() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -77,7 +77,7 @@ fn update_config() {
         ConfigResponse {
             owner: "owner2".into(),
             oraix_token: "reward".into(),
-            mint_contract: "mint".into(),
+            minter: "mint".into(),
             oracle_contract: "oracle".into(),
             oraiswap_factory: "oraiswap_factory".into(),
             base_denom: ORAI_DENOM.to_string(),
@@ -106,13 +106,13 @@ fn test_register() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 

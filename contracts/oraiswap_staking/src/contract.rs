@@ -18,17 +18,23 @@ use oraiswap::staking::{
 
 use cw20::Cw20ReceiveMsg;
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     store_config(
         deps.storage,
         &Config {
-            owner: deps.api.canonical_address(&msg.owner)?,
+            owner: deps
+                .api
+                .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
             oraix_token: deps.api.canonical_address(&msg.oraix_token)?,
-            mint_contract: deps.api.canonical_address(&msg.mint_contract)?,
+            // this is for minting short token
+            minter: deps
+                .api
+                .canonical_address(&msg.minter.unwrap_or(info.sender))?,
             oracle_contract: deps.api.canonical_address(&msg.oracle_contract)?,
             oraiswap_factory: deps.api.canonical_address(&msg.oraiswap_factory)?,
+            // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
-            premium_min_update_interval: msg.premium_min_update_interval,
+            premium_min_update_interval: msg.premium_min_update_interval.unwrap_or(7600), // 2 hours
             // premium rate > 7% then reward_weight = 40%
             short_reward_bound: msg
                 .short_reward_bound
@@ -297,7 +303,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
         oraix_token: deps.api.human_address(&state.oraix_token)?,
-        mint_contract: deps.api.human_address(&state.mint_contract)?,
+        minter: deps.api.human_address(&state.minter)?,
         oracle_contract: deps.api.human_address(&state.oracle_contract)?,
         oraiswap_factory: deps.api.human_address(&state.oraiswap_factory)?,
         base_denom: state.base_denom,

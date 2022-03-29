@@ -17,13 +17,13 @@ fn test_deposit_reward() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -157,13 +157,13 @@ fn test_deposit_reward_when_no_bonding() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -276,13 +276,13 @@ fn test_before_share_changes() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -419,13 +419,13 @@ fn test_withdraw() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -505,13 +505,13 @@ fn withdraw_multiple_rewards() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
@@ -736,13 +736,13 @@ fn test_adjust_premium() {
         .with_oracle_price(Decimal::from_ratio(100u128, 1u128));
 
     let msg = InitMsg {
-        owner: "owner".into(),
+        owner: Some("owner".into()),
         oraix_token: "reward".into(),
-        mint_contract: "mint".into(),
+        minter: Some("mint".into()),
         oracle_contract: "oracle".into(),
         oraiswap_factory: "oraiswap_factory".into(),
         base_denom: None,
-        premium_min_update_interval: 3600,
+        premium_min_update_interval: Some(3600),
         short_reward_bound: None,
     };
 
