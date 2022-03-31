@@ -59,7 +59,9 @@ fn test_deposit_reward() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -330,7 +332,9 @@ fn test_before_share_changes() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -378,7 +382,9 @@ fn test_before_share_changes() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -477,7 +483,9 @@ fn test_withdraw() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -591,7 +599,9 @@ fn withdraw_multiple_rewards() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -603,7 +613,9 @@ fn withdraw_multiple_rewards() {
         sender: "addr".into(),
         amount: Uint128(1000u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset2".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset2".into(),
+            },
         })
         .ok(),
     });

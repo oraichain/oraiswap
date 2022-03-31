@@ -55,7 +55,9 @@ fn test_deprecate() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -243,7 +245,9 @@ fn test_deprecate() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -325,7 +329,9 @@ fn test_deprecate() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -389,7 +395,9 @@ fn test_deprecate() {
         sender: "newaddr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });

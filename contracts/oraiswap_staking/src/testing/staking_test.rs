@@ -42,7 +42,9 @@ fn test_bond_tokens() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -115,7 +117,9 @@ fn test_bond_tokens() {
         sender: "addr2".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -159,7 +163,9 @@ fn test_bond_tokens() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
@@ -206,7 +212,9 @@ fn test_unbond() {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         })
         .ok(),
     });
