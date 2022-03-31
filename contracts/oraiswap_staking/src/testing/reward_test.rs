@@ -83,7 +83,12 @@ fn test_deposit_reward() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -117,11 +122,11 @@ fn test_deposit_reward() {
     );
 
     // if premium_rate is over threshold, distribution weight should be 60:40
-    let asset_token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
-    let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_token_raw).unwrap();
+    let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
+    let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
         &mut deps.storage,
-        &asset_token_raw,
+        &asset_key,
         &PoolInfo {
             reward_index: Decimal::zero(),
             short_reward_index: Decimal::zero(),
@@ -208,7 +213,12 @@ fn test_deposit_reward_when_no_bonding() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -242,11 +252,11 @@ fn test_deposit_reward_when_no_bonding() {
     );
 
     // if premium_rate is over threshold, distribution weight should be 60:40
-    let asset_token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
-    let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_token_raw).unwrap();
+    let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
+    let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
         &mut deps.storage,
-        &asset_token_raw,
+        &asset_key,
         &PoolInfo {
             pending_reward: Uint128::zero(),
             short_pending_reward: Uint128::zero(),
@@ -356,7 +366,12 @@ fn test_before_share_changes() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -364,10 +379,10 @@ fn test_before_share_changes() {
     let info = mock_info("reward", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let asset_raw = deps.api.canonical_address(&"asset".into()).unwrap();
+    let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
     let addr_raw = deps.api.canonical_address(&"addr".into()).unwrap();
     let reward_bucket = rewards_read(&deps.storage, &addr_raw, false);
-    let reward_info: RewardInfo = reward_bucket.load(asset_raw.as_slice()).unwrap();
+    let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
     assert_eq!(
         RewardInfo {
             pending_reward: Uint128::zero(),
@@ -392,7 +407,7 @@ fn test_before_share_changes() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let reward_bucket = rewards_read(&deps.storage, &addr_raw, false);
-    let reward_info: RewardInfo = reward_bucket.load(asset_raw.as_slice()).unwrap();
+    let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
     assert_eq!(
         RewardInfo {
             pending_reward: Uint128(80u128),
@@ -407,7 +422,12 @@ fn test_before_share_changes() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -425,7 +445,7 @@ fn test_before_share_changes() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let reward_bucket = rewards_read(&deps.storage, &addr_raw, false);
-    let reward_info: RewardInfo = reward_bucket.load(asset_raw.as_slice()).unwrap();
+    let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
     assert_eq!(
         RewardInfo {
             pending_reward: Uint128(160u128),
@@ -498,7 +518,12 @@ fn test_withdraw() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -637,8 +662,18 @@ fn withdraw_multiple_rewards() {
         amount: Uint128(300u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
             rewards: vec![
-                ("asset".into(), Uint128(100u128)),
-                ("asset2".into(), Uint128(200u128)),
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: "asset".into(),
+                    },
+                    amount: Uint128(100u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: "asset2".into(),
+                    },
+                    amount: Uint128(200u128),
+                },
             ],
         })
         .ok(),

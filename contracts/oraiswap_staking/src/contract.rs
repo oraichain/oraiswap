@@ -146,8 +146,8 @@ pub fn receive_cw20(
             }
 
             let mut rewards_amount = Uint128::zero();
-            for (_, amount) in rewards.iter() {
-                rewards_amount += *amount;
+            for asset in rewards.iter() {
+                rewards_amount += asset.amount;
             }
 
             if rewards_amount != cw20_msg.amount {

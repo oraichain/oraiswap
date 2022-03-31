@@ -13,6 +13,7 @@ use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
 
 use cw20::Cw20HandleMsg;
 
+// for short token only, which is in HumanAddr format
 pub fn adjust_premium(
     deps: DepsMut,
     env: Env,
@@ -23,8 +24,8 @@ pub fn adjust_premium(
     let factory_addr = deps.api.human_address(&config.factory_addr)?;
 
     for asset_token in asset_tokens.iter() {
-        let asset_token_raw = deps.api.canonical_address(&asset_token)?;
-        let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_token_raw)?;
+        let asset_key = deps.api.canonical_address(&asset_token)?;
+        let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
         if env.block.time < pool_info.premium_updated_time + config.premium_min_update_interval {
             return Err(StdError::generic_err(
                 "cannot adjust premium before premium_min_update_interval passed",
@@ -53,7 +54,7 @@ pub fn adjust_premium(
 
         store_pool_info(
             deps.storage,
-            &asset_token_raw,
+            &asset_key,
             &PoolInfo {
                 premium_rate,
                 short_reward_weight,
@@ -73,17 +74,17 @@ pub fn adjust_premium(
 // deposit_reward must be from reward token contract
 pub fn deposit_reward(
     deps: DepsMut,
-    rewards: Vec<(HumanAddr, Uint128)>,
+    rewards: Vec<Asset>,
     rewards_amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    for (asset_token, amount) in rewards.iter() {
-        let asset_token_raw: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
-        let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_token_raw)?;
+    for asset in rewards.iter() {
+        let asset_key = asset.info.to_vec(deps.api)?;
+        let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
         // Decimal::from_ratio(1, 5).mul()
         // erf(pool_info.premium_rate.0)
         // 3.0f64
-        let total_reward = *amount;
+        let total_reward = asset.amount;
         // short_reward came from sLP Tokens are minted and immediately staked when a short position is created
         let mut short_reward = total_reward * pool_info.short_reward_weight;
         let mut normal_reward = Asset::checked_sub(total_reward, short_reward).unwrap();
@@ -108,7 +109,7 @@ pub fn deposit_reward(
             pool_info.short_pending_reward = Uint128::zero();
         }
 
-        store_pool_info(deps.storage, &asset_token_raw, &pool_info)?;
+        store_pool_info(deps.storage, &&asset_key, &pool_info)?;
     }
 
     Ok(HandleResponse {
@@ -282,15 +283,13 @@ fn _read_reward_infos(
         rewards_bucket
             .range(None, None, Order::Ascending)
             .map(|item| {
-                let (k, v) = item?;
-                let asset_token_raw = CanonicalAddr::from(k);
-                let mut reward_info = v;
+                let (asset_key, mut reward_info) = item?;
 
-                let pool_info = read_pool_info(storage, &asset_token_raw)?;
+                let pool_info = read_pool_info(storage, &asset_key)?;
                 let (pool_index, should_migrate) = if is_short {
                     (pool_info.short_reward_index, None)
                 } else if pool_info.migration_params.is_some()
-                    && !read_is_migrated(storage, &asset_token_raw, staker_addr)
+                    && !read_is_migrated(storage, &asset_key, staker_addr)
                 {
                     (
                         pool_info.migration_params.unwrap().index_snapshot,
@@ -304,7 +303,8 @@ fn _read_reward_infos(
 
                 Ok(RewardInfoResponseItem {
                     asset_info: AssetInfo::Token {
-                        contract_addr: api.human_address(&asset_token_raw)?,
+                        contract_addr: api
+                            .human_address(&CanonicalAddr::from(asset_key.as_slice()))?,
                     },
                     bond_amount: reward_info.bond_amount,
                     pending_reward: reward_info.pending_reward,

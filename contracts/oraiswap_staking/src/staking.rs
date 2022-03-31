@@ -83,15 +83,9 @@ pub fn increase_short_token(
     }
 
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_token_raw: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
+    let asset_key: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
 
-    _increase_bond_amount(
-        deps.storage,
-        &staker_addr_raw,
-        &asset_token_raw,
-        amount,
-        true,
-    )?;
+    _increase_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, true)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -119,16 +113,10 @@ pub fn decrease_short_token(
     }
 
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_token_raw: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
+    let asset_key: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
 
     // not used
-    let _ = _decrease_bond_amount(
-        deps.storage,
-        &staker_addr_raw,
-        &asset_token_raw,
-        amount,
-        true,
-    )?;
+    let _ = _decrease_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, true)?;
 
     Ok(HandleResponse {
         messages: vec![],
