@@ -351,22 +351,22 @@ pub fn migrate(
     _info: MessageInfo,
     msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    migrate_pool_infos(deps.storage)?;
+    // migrate_pool_infos(deps.storage)?;
 
-    // when the migration is executed, deprecate directly the MIR pool
-    let config = read_config(deps.storage)?;
-    let self_info = MessageInfo {
-        sender: deps.api.human_address(&config.owner)?,
-        sent_funds: vec![],
-    };
+    // // when the migration is executed, deprecate directly the MIR pool
+    // let config = read_config(deps.storage)?;
+    // let self_info = MessageInfo {
+    //     sender: deps.api.human_address(&config.owner)?,
+    //     sent_funds: vec![],
+    // };
 
-    // depricate old one
-    deprecate_staking_token(
-        deps,
-        self_info,
-        msg.asset_info_to_deprecate,
-        msg.new_staking_token,
-    )?;
+    // // depricate old one
+    // deprecate_staking_token(
+    //     deps,
+    //     self_info,
+    //     msg.asset_info_to_deprecate,
+    //     msg.new_staking_token,
+    // )?;
 
     Ok(MigrateResponse::default())
 }
