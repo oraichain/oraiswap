@@ -130,7 +130,7 @@ pub fn withdraw_reward(
 ) -> StdResult<HandleResponse> {
     let staker_addr = deps.api.canonical_address(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
-    // .map_or(Ok(None), |r| r.map(Some))?;
+
     let normal_reward = _withdraw_reward(deps.storage, &staker_addr, &asset_key, false)?;
     let short_reward = _withdraw_reward(deps.storage, &staker_addr, &asset_key, true)?;
 
@@ -302,14 +302,15 @@ fn _read_reward_infos(
                 before_share_change(pool_index, &mut reward_info)?;
 
                 // try convert to contract token, otherwise it is native token
-                let asset_info = api
+                let asset_info = match api
                     .human_address(&CanonicalAddr::from(asset_key.as_slice()))
-                    .map_or(
-                        AssetInfo::NativeToken {
-                            denom: String::from_utf8(asset_key.clone())?,
-                        },
-                        |contract_addr| AssetInfo::Token { contract_addr },
-                    );
+                    .ok()
+                {
+                    None => AssetInfo::NativeToken {
+                        denom: String::from_utf8(asset_key.clone())?,
+                    },
+                    Some(contract_addr) => AssetInfo::Token { contract_addr },
+                };
 
                 Ok(RewardInfoResponseItem {
                     asset_info,
