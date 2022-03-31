@@ -28,13 +28,4 @@ thiserror = { version = "1.0.21" }
 [dev-dependencies]
 cosmwasm-schema = "0.13.2"
 
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
+

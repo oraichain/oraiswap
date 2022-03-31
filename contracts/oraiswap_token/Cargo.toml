@@ -17,17 +17,6 @@ backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all init/handle/query exports
 library = []
 
-[profile.release]
-codegen-units = 1
-debug = false
-debug-assertions = false
-incremental = false
-lto = true
-opt-level = 3
-overflow-checks = true
-panic = 'abort'
-rpath = false
-
 [dependencies]
 cw0 = { version = "0.5.0" }
 cw2 = { version = "0.5.0" }

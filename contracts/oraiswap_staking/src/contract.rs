@@ -112,9 +112,10 @@ pub fn receive_cw20(
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<HandleResponse> {
     match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
-        Ok(Cw20HookMsg::Bond { asset_token }) => {
-            let pool_info: PoolInfo =
-                read_pool_info(deps.storage, &deps.api.canonical_address(&asset_token)?)?;
+        Ok(Cw20HookMsg::Bond { asset_info }) => {
+            // check permission
+            let asset_key = asset_info.to_vec(deps.api)?;
+            let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
             // only staking token contract can execute this message
             let token_raw = deps.api.canonical_address(&info.sender)?;
@@ -134,14 +135,7 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("unauthorized"));
             }
 
-            bond(
-                deps,
-                cw20_msg.sender,
-                AssetInfo::Token {
-                    contract_addr: asset_token,
-                },
-                cw20_msg.amount,
-            )
+            bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
         }
         Ok(Cw20HookMsg::DepositReward { rewards }) => {
             let config: Config = read_config(deps.storage)?;

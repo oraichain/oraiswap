@@ -92,7 +92,10 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    Bond { asset_token: HumanAddr },
+    // this call from LP token contract
+    Bond { asset_info: AssetInfo },
+    // reward tokens are ow20 only, and used by admin or factory contract to deposit newly minted ORAIX tokens, which
+    // will be used as rewards for the specified asset's staking pool.
     DepositReward { rewards: Vec<(HumanAddr, Uint128)> },
 }
 
