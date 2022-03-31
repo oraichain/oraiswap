@@ -307,7 +307,7 @@ fn _read_reward_infos(
                     .ok()
                 {
                     None => AssetInfo::NativeToken {
-                        denom: String::from_utf8(asset_key.clone())?,
+                        denom: String::from_utf8(asset_key)?,
                     },
                     Some(contract_addr) => AssetInfo::Token { contract_addr },
                 };
