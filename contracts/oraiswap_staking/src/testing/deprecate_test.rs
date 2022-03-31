@@ -3,7 +3,7 @@ use crate::state::{read_pool_info, store_pool_info, PoolInfo};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::AssetInfo;
+use oraiswap::asset::{Asset, AssetInfo};
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
@@ -37,11 +37,11 @@ fn test_deprecate() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
-    let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
+    let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
+    let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
         &mut deps.storage,
-        &token_raw,
+        &asset_key,
         &PoolInfo {
             premium_rate: Decimal::percent(2),
             short_reward_weight: Decimal::percent(20),
@@ -79,7 +79,12 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -166,7 +171,12 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });
@@ -344,7 +354,12 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![("asset".into(), Uint128(100u128))],
+            rewards: vec![Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
+                amount: Uint128(100u128),
+            }],
         })
         .ok(),
     });

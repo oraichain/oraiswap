@@ -96,7 +96,7 @@ pub enum Cw20HookMsg {
     Bond { asset_info: AssetInfo },
     // reward tokens are ow20 only, and used by admin or factory contract to deposit newly minted ORAIX tokens, which
     // will be used as rewards for the specified asset's staking pool.
-    DepositReward { rewards: Vec<(HumanAddr, Uint128)> },
+    DepositReward { rewards: Vec<Asset> },
 }
 
 /// We currently take no arguments for migrations
