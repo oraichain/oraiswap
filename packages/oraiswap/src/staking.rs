@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::Asset;
+use crate::asset::{Asset, AssetInfo};
 use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
 
@@ -34,11 +34,11 @@ pub enum HandleMsg {
         short_reward_bound: Option<(Decimal, Decimal)>,
     },
     RegisterAsset {
-        asset_token: HumanAddr,
+        asset_info: AssetInfo, // can be ow20 token or native token
         staking_token: HumanAddr,
     },
     DeprecateStakingToken {
-        asset_token: HumanAddr,
+        asset_info: AssetInfo,
         new_staking_token: HumanAddr,
     },
 
@@ -46,13 +46,13 @@ pub enum HandleMsg {
     /// User operations ///
     ////////////////////////
     Unbond {
-        asset_token: HumanAddr,
+        asset_info: AssetInfo,
         amount: Uint128,
     },
     /// Withdraw pending rewards
     Withdraw {
         // If the asset token is not given, then all rewards are withdrawn
-        asset_token: Option<HumanAddr>,
+        asset_info: Option<AssetInfo>,
     },
     /// Provides liquidity and automatically stakes the LP tokens
     AutoStake {
@@ -61,7 +61,7 @@ pub enum HandleMsg {
     },
     /// Hook to stake the minted LP tokens
     AutoStakeHook {
-        asset_token: HumanAddr,
+        asset_info: AssetInfo,
         staking_token: HumanAddr,
         staker_addr: HumanAddr,
         prev_staking_token_amount: Uint128,
@@ -71,14 +71,14 @@ pub enum HandleMsg {
     /// Permission-less operations ///
     //////////////////////////////////
     AdjustPremium {
-        asset_tokens: Vec<HumanAddr>,
+        asset_tokens: Vec<HumanAddr>, // only support ow20 token
     },
 
     ////////////////////////////////
     /// Mint contract operations ///
     ////////////////////////////////
     IncreaseShortToken {
-        asset_token: HumanAddr,
+        asset_token: HumanAddr, // short token and premium only support ow20 token, it is from limit order
         staker_addr: HumanAddr,
         amount: Uint128,
     },
@@ -99,7 +99,7 @@ pub enum Cw20HookMsg {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub asset_token_to_deprecate: HumanAddr,
+    pub asset_info_to_deprecate: AssetInfo,
     pub new_staking_token: HumanAddr,
 }
 
@@ -108,11 +108,11 @@ pub struct MigrateMsg {
 pub enum QueryMsg {
     Config {},
     PoolInfo {
-        asset_token: HumanAddr,
+        asset_info: AssetInfo,
     },
     RewardInfo {
         staker_addr: HumanAddr,
-        asset_token: Option<HumanAddr>,
+        asset_info: Option<AssetInfo>,
     },
 }
 
@@ -131,7 +131,7 @@ pub struct ConfigResponse {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfoResponse {
-    pub asset_token: HumanAddr,
+    pub asset_info: AssetInfo,
     pub staking_token: HumanAddr,
     pub total_bond_amount: Uint128,
     pub total_short_amount: Uint128,
@@ -155,7 +155,7 @@ pub struct RewardInfoResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfoResponseItem {
-    pub asset_token: HumanAddr,
+    pub asset_info: AssetInfo,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
     pub is_short: bool,

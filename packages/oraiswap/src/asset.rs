@@ -179,6 +179,15 @@ impl fmt::Display for AssetInfo {
 }
 
 impl AssetInfo {
+    pub fn to_vec(&self, api: &dyn Api) -> StdResult<Vec<u8>> {
+        match self {
+            AssetInfo::NativeToken { denom } => Ok(denom.as_bytes().to_vec()),
+            AssetInfo::Token { contract_addr } => api
+                .canonical_address(&contract_addr)
+                .map(|addr| addr.as_slice().to_vec()),
+        }
+    }
+
     pub fn to_raw(&self, api: &dyn Api) -> StdResult<AssetInfoRaw> {
         match self {
             AssetInfo::NativeToken { denom } => Ok(AssetInfoRaw::NativeToken {

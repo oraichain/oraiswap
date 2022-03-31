@@ -1,7 +1,7 @@
 use crate::contract::{handle, init, query};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{attr, from_binary, Decimal, StdError, Uint128};
-use oraiswap::asset::ORAI_DENOM;
+use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{ConfigResponse, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg};
 
 #[test]
@@ -122,7 +122,9 @@ fn test_register() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -140,7 +142,7 @@ fn test_register() {
         res.attributes,
         vec![
             attr("action", "register_asset"),
-            attr("asset_token", "asset"),
+            attr("asset_info", "asset"),
         ]
     );
 
@@ -148,7 +150,9 @@ fn test_register() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -156,7 +160,9 @@ fn test_register() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
             total_short_amount: Uint128::zero(),

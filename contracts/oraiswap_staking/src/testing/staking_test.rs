@@ -29,7 +29,9 @@ fn test_bond_tokens() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -51,7 +53,9 @@ fn test_bond_tokens() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: Some("asset".into()),
+            asset_info: Some(AssetInfo::Token {
+                contract_addr: "asset".into(),
+            }),
             staker_addr: "addr".into(),
         },
     )
@@ -62,7 +66,9 @@ fn test_bond_tokens() {
         RewardInfoResponse {
             staker_addr: "addr".into(),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into()
+                },
                 pending_reward: Uint128::zero(),
                 bond_amount: Uint128(100u128),
                 is_short: false,
@@ -75,7 +81,9 @@ fn test_bond_tokens() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -84,7 +92,9 @@ fn test_bond_tokens() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128(100u128),
             total_short_amount: Uint128::zero(),
@@ -116,7 +126,9 @@ fn test_bond_tokens() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -124,7 +136,9 @@ fn test_bond_tokens() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128(200u128),
             total_short_amount: Uint128::zero(),
@@ -178,7 +192,9 @@ fn test_unbond() {
 
     // register asset
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -199,7 +215,9 @@ fn test_unbond() {
 
     // unbond 150 tokens; failed
     let msg = HandleMsg::Unbond {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         amount: Uint128(150u128),
     };
 
@@ -214,7 +232,9 @@ fn test_unbond() {
 
     // normal unbond
     let msg = HandleMsg::Unbond {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         amount: Uint128(100u128),
     };
 
@@ -238,7 +258,9 @@ fn test_unbond() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -246,7 +268,9 @@ fn test_unbond() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
             total_short_amount: Uint128::zero(),
@@ -266,7 +290,7 @@ fn test_unbond() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -300,7 +324,9 @@ fn test_increase_short_token() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -322,6 +348,7 @@ fn test_increase_short_token() {
 
     let info = mock_info("mint", &[]);
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    // short token only allow smart contract
     assert_eq!(
         vec![
             attr("action", "increase_short_token"),
@@ -336,7 +363,9 @@ fn test_increase_short_token() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -345,7 +374,9 @@ fn test_increase_short_token() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
             total_short_amount: Uint128::from(100u128),
@@ -365,7 +396,7 @@ fn test_increase_short_token() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -376,7 +407,9 @@ fn test_increase_short_token() {
         RewardInfoResponse {
             staker_addr: "addr".into(),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into()
+                },
                 pending_reward: Uint128::zero(),
                 bond_amount: Uint128(100u128),
                 is_short: true,
@@ -405,7 +438,9 @@ fn test_decrease_short_token() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -441,7 +476,9 @@ fn test_decrease_short_token() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -450,7 +487,9 @@ fn test_decrease_short_token() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
             total_short_amount: Uint128::zero(),
@@ -470,7 +509,7 @@ fn test_decrease_short_token() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -519,7 +558,9 @@ fn test_auto_stake() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "lptoken".into(),
     };
 
@@ -667,7 +708,9 @@ fn test_auto_stake() {
             WasmMsg::Execute {
                 contract_addr: MOCK_CONTRACT_ADDR.into(),
                 msg: to_binary(&HandleMsg::AutoStakeHook {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     staking_token: "lptoken".into(),
                     staker_addr: "addr0000".into(),
                     prev_staking_token_amount: Uint128(0),
@@ -683,7 +726,9 @@ fn test_auto_stake() {
 
     // wrong asset
     let msg = HandleMsg::AutoStakeHook {
-        asset_token: "asset1".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset1".into(),
+        },
         staking_token: "lptoken".into(),
         staker_addr: "addr0000".into(),
         prev_staking_token_amount: Uint128(0),
@@ -693,7 +738,9 @@ fn test_auto_stake() {
 
     // valid msg
     let msg = HandleMsg::AutoStakeHook {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "lptoken".into(),
         staker_addr: "addr0000".into(),
         prev_staking_token_amount: Uint128(0),
@@ -712,7 +759,7 @@ fn test_auto_stake() {
         vec![
             attr("action", "bond"),
             attr("staker_addr", "addr0000"),
-            attr("asset_token", "asset"),
+            attr("asset_info", "asset"),
             attr("amount", "100"),
         ]
     );
@@ -721,7 +768,9 @@ fn test_auto_stake() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
         },
     )
     .unwrap();
@@ -729,7 +778,9 @@ fn test_auto_stake() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_token: "asset".into(),
+            asset_info: AssetInfo::Token {
+                contract_addr: "asset".into()
+            },
             staking_token: "lptoken".into(),
             total_bond_amount: Uint128(100u128),
             total_short_amount: Uint128::zero(),

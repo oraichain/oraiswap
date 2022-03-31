@@ -11,7 +11,7 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
-use oraiswap::asset::ORAI_DENOM;
+use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
@@ -65,18 +65,15 @@ pub fn handle(
             short_reward_bound,
         ),
         HandleMsg::RegisterAsset {
-            asset_token,
+            asset_info,
             staking_token,
-        } => register_asset(deps, info, asset_token, staking_token),
+        } => register_asset(deps, info, asset_info, staking_token),
         HandleMsg::DeprecateStakingToken {
-            asset_token,
+            asset_info,
             new_staking_token,
-        } => deprecate_staking_token(deps, info, asset_token, new_staking_token),
-        HandleMsg::Unbond {
-            asset_token,
-            amount,
-        } => unbond(deps, info.sender, asset_token, amount),
-        HandleMsg::Withdraw { asset_token } => withdraw_reward(deps, info, asset_token),
+        } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
+        HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
+        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, info, asset_info),
         HandleMsg::AdjustPremium { asset_tokens } => adjust_premium(deps, env, asset_tokens),
         HandleMsg::IncreaseShortToken {
             staker_addr,
@@ -93,7 +90,7 @@ pub fn handle(
             slippage_tolerance,
         } => auto_stake(deps, env, info, assets, slippage_tolerance),
         HandleMsg::AutoStakeHook {
-            asset_token,
+            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
@@ -101,7 +98,7 @@ pub fn handle(
             deps,
             env,
             info,
-            asset_token,
+            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
@@ -137,7 +134,14 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("unauthorized"));
             }
 
-            bond(deps, cw20_msg.sender, asset_token, cw20_msg.amount)
+            bond(
+                deps,
+                cw20_msg.sender,
+                AssetInfo::Token {
+                    contract_addr: asset_token,
+                },
+                cw20_msg.amount,
+            )
         }
         Ok(Cw20HookMsg::DepositReward { rewards }) => {
             let config: Config = read_config(deps.storage)?;
@@ -198,23 +202,24 @@ pub fn update_config(
 fn register_asset(
     deps: DepsMut,
     info: MessageInfo,
-    asset_token: HumanAddr,
+    asset_info: AssetInfo,
     staking_token: HumanAddr,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let asset_token_raw = deps.api.canonical_address(&asset_token)?;
 
     if config.owner != deps.api.canonical_address(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    if read_pool_info(deps.storage, &asset_token_raw).is_ok() {
+    // query asset_key from AssetInfo
+    let asset_key = asset_info.to_vec(deps.api)?;
+    if read_pool_info(deps.storage, &asset_key).is_ok() {
         return Err(StdError::generic_err("Asset was already registered"));
     }
 
     store_pool_info(
         deps.storage,
-        &asset_token_raw,
+        &asset_key,
         &PoolInfo {
             staking_token: deps.api.canonical_address(&staking_token)?,
             total_bond_amount: Uint128::zero(),
@@ -234,7 +239,7 @@ fn register_asset(
         messages: vec![],
         attributes: vec![
             attr("action", "register_asset"),
-            attr("asset_token", asset_token.as_str()),
+            attr("asset_info", asset_info),
         ],
         data: None,
     })
@@ -243,17 +248,17 @@ fn register_asset(
 fn deprecate_staking_token(
     deps: DepsMut,
     info: MessageInfo,
-    asset_token: HumanAddr,
+    asset_info: AssetInfo,
     new_staking_token: HumanAddr,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let asset_token_raw = deps.api.canonical_address(&asset_token)?;
 
     if config.owner != deps.api.canonical_address(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_token_raw)?;
+    let asset_key = asset_info.to_vec(deps.api)?;
+    let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
     if pool_info.migration_params.is_some() {
         return Err(StdError::generic_err(
@@ -270,13 +275,13 @@ fn deprecate_staking_token(
     });
     pool_info.staking_token = deps.api.canonical_address(&new_staking_token)?;
 
-    store_pool_info(deps.storage, &asset_token_raw, &pool_info)?;
+    store_pool_info(deps.storage, &asset_key, &pool_info)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("action", "depcrecate_staking_token"),
-            attr("asset_token", asset_token.to_string()),
+            attr("asset_info", asset_info),
             attr(
                 "deprecated_staking_token",
                 deprecated_token_addr.to_string(),
@@ -290,11 +295,11 @@ fn deprecate_staking_token(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::PoolInfo { asset_token } => to_binary(&query_pool_info(deps, asset_token)?),
+        QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
         QueryMsg::RewardInfo {
             staker_addr,
-            asset_token,
-        } => to_binary(&query_reward_info(deps, staker_addr, asset_token)?),
+            asset_info,
+        } => to_binary(&query_reward_info(deps, staker_addr, asset_info)?),
     }
 }
 
@@ -313,11 +318,11 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(resp)
 }
 
-pub fn query_pool_info(deps: Deps, asset_token: HumanAddr) -> StdResult<PoolInfoResponse> {
-    let asset_token_raw = deps.api.canonical_address(&asset_token)?;
-    let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_token_raw)?;
+pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoResponse> {
+    let asset_key = asset_info.to_vec(deps.api)?;
+    let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
-        asset_token,
+        asset_info,
         staking_token: deps.api.human_address(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
         total_short_amount: pool_info.total_short_amount,
@@ -359,7 +364,7 @@ pub fn migrate(
     deprecate_staking_token(
         deps,
         self_info,
-        msg.asset_token_to_deprecate,
+        msg.asset_info_to_deprecate,
         msg.new_staking_token,
     )?;
 

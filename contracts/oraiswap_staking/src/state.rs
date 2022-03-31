@@ -56,14 +56,14 @@ pub struct MigrationParams {
 
 pub fn store_pool_info(
     storage: &mut dyn Storage,
-    asset_token: &CanonicalAddr,
+    asset_key: &[u8],
     pool_info: &PoolInfo,
 ) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_POOL_INFO).save(asset_token.as_slice(), pool_info)
+    Bucket::new(storage, PREFIX_POOL_INFO).save(asset_key, pool_info)
 }
 
-pub fn read_pool_info(storage: &dyn Storage, asset_token: &CanonicalAddr) -> StdResult<PoolInfo> {
-    ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_token.as_slice())
+pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<PoolInfo> {
+    ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -102,19 +102,14 @@ pub fn rewards_read<'a>(
 
 pub fn store_is_migrated(
     storage: &mut dyn Storage,
-    asset_token: &CanonicalAddr,
+    asset_key: &[u8],
     staker: &CanonicalAddr,
 ) -> StdResult<()> {
-    Bucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()])
-        .save(asset_token.as_slice(), &true)
+    Bucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()]).save(asset_key, &true)
 }
 
-pub fn read_is_migrated(
-    storage: &dyn Storage,
-    asset_token: &CanonicalAddr,
-    staker: &CanonicalAddr,
-) -> bool {
+pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &CanonicalAddr) -> bool {
     ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()])
-        .load(asset_token.as_slice())
+        .load(asset_key)
         .unwrap_or(false)
 }

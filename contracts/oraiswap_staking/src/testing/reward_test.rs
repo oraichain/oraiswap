@@ -31,7 +31,9 @@ fn test_deposit_reward() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -92,7 +94,9 @@ fn test_deposit_reward() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -133,7 +137,9 @@ fn test_deposit_reward() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -171,7 +177,9 @@ fn test_deposit_reward_when_no_bonding() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -211,7 +219,9 @@ fn test_deposit_reward_when_no_bonding() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -252,7 +262,9 @@ fn test_deposit_reward_when_no_bonding() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -290,7 +302,9 @@ fn test_before_share_changes() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -396,7 +410,9 @@ fn test_before_share_changes() {
 
     // unbond
     let msg = HandleMsg::Unbond {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         amount: Uint128(100u128),
     };
     let info = mock_info("addr", &[]);
@@ -433,7 +449,9 @@ fn test_withdraw() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -480,7 +498,9 @@ fn test_withdraw() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::Withdraw {
-        asset_token: Some("asset".into()),
+        asset_info: Some(AssetInfo::Token {
+            contract_addr: "asset".into(),
+        }),
     };
     let info = mock_info("addr", &[]);
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -519,7 +539,9 @@ fn withdraw_multiple_rewards() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -527,7 +549,9 @@ fn withdraw_multiple_rewards() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset2".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset2".into(),
+        },
         staking_token: "staking2".into(),
     };
 
@@ -614,7 +638,7 @@ fn withdraw_multiple_rewards() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -626,21 +650,27 @@ fn withdraw_multiple_rewards() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128(80u128),
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset2".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset2".into()
+                    },
                     bond_amount: Uint128(1000u128),
                     pending_reward: Uint128(160u128),
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(50u128),
                     pending_reward: Uint128(20u128),
                     is_short: true,
@@ -651,7 +681,7 @@ fn withdraw_multiple_rewards() {
     );
 
     // withdraw all
-    let msg = HandleMsg::Withdraw { asset_token: None };
+    let msg = HandleMsg::Withdraw { asset_info: None };
     let info = mock_info("addr", &[]);
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
@@ -673,7 +703,7 @@ fn withdraw_multiple_rewards() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -685,21 +715,27 @@ fn withdraw_multiple_rewards() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128::zero(),
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset2".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset2".into()
+                    },
                     bond_amount: Uint128(1000u128),
                     pending_reward: Uint128::zero(),
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(50u128),
                     pending_reward: Uint128::zero(),
                     is_short: true,
@@ -750,7 +786,9 @@ fn test_adjust_premium() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -770,7 +808,9 @@ fn test_adjust_premium() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -815,7 +855,9 @@ fn test_adjust_premium() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -850,7 +892,9 @@ fn test_adjust_premium() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),

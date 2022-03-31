@@ -3,6 +3,7 @@ use crate::state::{read_pool_info, store_pool_info, PoolInfo};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use oraiswap::asset::AssetInfo;
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
@@ -27,7 +28,9 @@ fn test_deprecate() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         staking_token: "staking".into(),
     };
 
@@ -87,7 +90,9 @@ fn test_deprecate() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -111,7 +116,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -123,14 +128,18 @@ fn test_deprecate() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128(80u128),
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(200u128),
                     pending_reward: Uint128(20u128),
                     is_short: true,
@@ -142,7 +151,9 @@ fn test_deprecate() {
 
     // handle deprecate
     let msg = HandleMsg::DeprecateStakingToken {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         new_staking_token: "new_staking".into(),
     };
     let info = mock_info("owner", &[]);
@@ -166,7 +177,9 @@ fn test_deprecate() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
+                },
             },
         )
         .unwrap(),
@@ -192,7 +205,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -204,14 +217,18 @@ fn test_deprecate() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128(80u128), // did not change
                     is_short: false,
                     should_migrate: Some(true), // non-short pos should migrate
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(200u128),
                     pending_reward: Uint128(40u128), // more rewards here
                     is_short: true,
@@ -245,7 +262,9 @@ fn test_deprecate() {
 
     // unbond all the old tokens
     let msg = HandleMsg::Unbond {
-        asset_token: "asset".into(),
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
         amount: Uint128(100u128),
     };
     let info = mock_info("addr", &[]);
@@ -268,7 +287,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -280,14 +299,18 @@ fn test_deprecate() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128::zero(),
                     pending_reward: Uint128(80u128), // still the same
                     is_short: false,
                     should_migrate: None, // now its back to empty
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(200u128),
                     pending_reward: Uint128(40u128),
                     is_short: true,
@@ -328,7 +351,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "addr".into(),
         },
     )
@@ -340,14 +363,18 @@ fn test_deprecate() {
             staker_addr: "addr".into(),
             reward_infos: vec![
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128(240u128), // 80 * 3
                     is_short: false,
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
-                    asset_token: "asset".into(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: "asset".into()
+                    },
                     bond_amount: Uint128(200u128),
                     pending_reward: Uint128(60u128), // 40 + 20
                     is_short: true,
@@ -373,7 +400,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_token: None,
+            asset_info: None,
             staker_addr: "newaddr".into(),
         },
     )
@@ -384,7 +411,9 @@ fn test_deprecate() {
         RewardInfoResponse {
             staker_addr: "newaddr".into(),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_token: "asset".into(),
+                asset_info: AssetInfo::Token {
+                    contract_addr: "asset".into()
+                },
                 bond_amount: Uint128(100u128),
                 pending_reward: Uint128::zero(),
                 is_short: false,

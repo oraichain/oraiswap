@@ -17,25 +17,19 @@ use oraiswap::staking::HandleMsg;
 pub fn bond(
     deps: DepsMut,
     staker_addr: HumanAddr,
-    asset_token: HumanAddr,
+    asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_token_raw: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
-    _increase_bond_amount(
-        deps.storage,
-        &staker_addr_raw,
-        &asset_token_raw,
-        amount,
-        false,
-    )?;
+    let asset_key = asset_info.to_vec(deps.api)?;
+    _increase_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, false)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("action", "bond"),
             attr("staker_addr", staker_addr.as_str()),
-            attr("asset_token", asset_token.as_str()),
+            attr("asset_info", asset_info),
             attr("amount", amount.to_string()),
         ],
         data: None,
@@ -45,18 +39,13 @@ pub fn bond(
 pub fn unbond(
     deps: DepsMut,
     staker_addr: HumanAddr,
-    asset_token: HumanAddr,
+    asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_token_raw: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
-    let staking_token: CanonicalAddr = _decrease_bond_amount(
-        deps.storage,
-        &staker_addr_raw,
-        &asset_token_raw,
-        amount,
-        false,
-    )?;
+    let asset_key = asset_info.to_vec(deps.api)?;
+    let staking_token: CanonicalAddr =
+        _decrease_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, false)?;
     let staking_token_addr = deps.api.human_address(&staking_token)?;
 
     Ok(HandleResponse {
@@ -72,7 +61,7 @@ pub fn unbond(
         attributes: vec![
             attr("action", "unbond"),
             attr("staker_addr", staker_addr.as_str()),
-            attr("asset_token", asset_token.as_str()),
+            attr("asset_info", asset_info),
             attr("amount", amount.to_string()),
             attr("staking_token", staking_token_addr.as_str()),
         ],
@@ -264,7 +253,9 @@ pub fn auto_stake(
             WasmMsg::Execute {
                 contract_addr: env.contract.address,
                 msg: to_binary(&HandleMsg::AutoStakeHook {
-                    asset_token: token_addr.clone(),
+                    asset_info: AssetInfo::Token {
+                        contract_addr: token_addr.clone(),
+                    },
                     staking_token: oraiswap_pair.liquidity_token,
                     staker_addr: info.sender,
                     prev_staking_token_amount,
@@ -286,7 +277,7 @@ pub fn auto_stake_hook(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    asset_token: HumanAddr,
+    asset_info: AssetInfo,
     staking_token: HumanAddr,
     staker_addr: HumanAddr,
     prev_staking_token_amount: Uint128,
@@ -302,19 +293,19 @@ pub fn auto_stake_hook(
     let amount_to_stake =
         Asset::checked_sub(current_staking_token_amount, prev_staking_token_amount)?;
 
-    bond(deps, staker_addr, asset_token, amount_to_stake)
+    bond(deps, staker_addr, asset_info, amount_to_stake)
 }
 
 fn _increase_bond_amount(
     storage: &mut dyn Storage,
     staker_addr: &CanonicalAddr,
-    asset_token: &CanonicalAddr,
+    asset_key: &[u8],
     amount: Uint128,
     is_short: bool,
 ) -> StdResult<()> {
-    let mut pool_info: PoolInfo = read_pool_info(storage, asset_token)?;
+    let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
     let mut reward_info: RewardInfo = rewards_read(storage, staker_addr, is_short)
-        .load(asset_token.as_slice())
+        .load(asset_key)
         .unwrap_or_else(|_| RewardInfo {
             index: Decimal::zero(),
             bond_amount: Uint128::zero(),
@@ -322,14 +313,14 @@ fn _increase_bond_amount(
         });
 
     // check if the position should be migrated
-    let is_position_migrated = read_is_migrated(storage, asset_token, staker_addr);
+    let is_position_migrated = read_is_migrated(storage, asset_key, staker_addr);
     if !is_short && pool_info.migration_params.is_some() {
         // the pool has been migrated, if position is not migrated and has tokens bonded, return error
         if !reward_info.bond_amount.is_zero() && !is_position_migrated {
             return Err(StdError::generic_err("The LP token for this asset has been deprecated, withdraw all your deprecated tokens to migrate your position"));
         } else if !is_position_migrated {
             // if the position is not migrated, but bond amount is zero, it means it's a new position, so store it as migrated
-            store_is_migrated(storage, asset_token, staker_addr)?;
+            store_is_migrated(storage, asset_key, staker_addr)?;
         }
     }
 
@@ -351,8 +342,8 @@ fn _increase_bond_amount(
 
     reward_info.bond_amount += amount;
 
-    rewards_store(storage, staker_addr, is_short).save(asset_token.as_slice(), &reward_info)?;
-    store_pool_info(storage, asset_token, &pool_info)?;
+    rewards_store(storage, staker_addr, is_short).save(asset_key, &reward_info)?;
+    store_pool_info(storage, asset_key, &pool_info)?;
 
     Ok(())
 }
@@ -360,20 +351,20 @@ fn _increase_bond_amount(
 fn _decrease_bond_amount(
     storage: &mut dyn Storage,
     staker_addr: &CanonicalAddr,
-    asset_token: &CanonicalAddr,
+    asset_key: &[u8],
     amount: Uint128,
     is_short: bool,
 ) -> StdResult<CanonicalAddr> {
-    let mut pool_info: PoolInfo = read_pool_info(storage, asset_token)?;
+    let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
     let mut reward_info: RewardInfo =
-        rewards_read(storage, staker_addr, is_short).load(asset_token.as_slice())?;
+        rewards_read(storage, staker_addr, is_short).load(asset_key)?;
 
     if reward_info.bond_amount < amount {
         return Err(StdError::generic_err("Cannot unbond more than bond amount"));
     }
 
     // if the lp token was migrated, and the user did not close their position yet, cap the reward at the snapshot
-    let should_migrate = !read_is_migrated(storage, asset_token, staker_addr)
+    let should_migrate = !read_is_migrated(storage, asset_key, staker_addr)
         && !is_short
         && pool_info.migration_params.is_some();
     let (pool_index, staking_token) = if is_short {
@@ -406,17 +397,17 @@ fn _decrease_bond_amount(
     reward_info.bond_amount = Asset::checked_sub(reward_info.bond_amount, amount)?;
 
     if reward_info.bond_amount.is_zero() && should_migrate {
-        store_is_migrated(storage, asset_token, staker_addr)?;
+        store_is_migrated(storage, asset_key, staker_addr)?;
     }
 
     if reward_info.pending_reward.is_zero() && reward_info.bond_amount.is_zero() {
-        rewards_store(storage, staker_addr, is_short).remove(asset_token.as_slice());
+        rewards_store(storage, staker_addr, is_short).remove(asset_key);
     } else {
-        rewards_store(storage, staker_addr, is_short).save(asset_token.as_slice(), &reward_info)?;
+        rewards_store(storage, staker_addr, is_short).save(asset_key, &reward_info)?;
     }
 
     // Update pool info
-    store_pool_info(storage, asset_token, &pool_info)?;
+    store_pool_info(storage, asset_key, &pool_info)?;
 
     Ok(staking_token)
 }
