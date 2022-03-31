@@ -301,11 +301,18 @@ fn _read_reward_infos(
 
                 before_share_change(pool_index, &mut reward_info)?;
 
+                // try convert to contract token, otherwise it is native token
+                let asset_info = api
+                    .human_address(&CanonicalAddr::from(asset_key.as_slice()))
+                    .map_or(
+                        AssetInfo::NativeToken {
+                            denom: String::from_utf8(asset_key.clone())?,
+                        },
+                        |contract_addr| AssetInfo::Token { contract_addr },
+                    );
+
                 Ok(RewardInfoResponseItem {
-                    asset_info: AssetInfo::Token {
-                        contract_addr: api
-                            .human_address(&CanonicalAddr::from(asset_key.as_slice()))?,
-                    },
+                    asset_info,
                     bond_amount: reward_info.bond_amount,
                     pending_reward: reward_info.pending_reward,
                     is_short,
