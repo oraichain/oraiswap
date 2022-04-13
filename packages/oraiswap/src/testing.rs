@@ -104,13 +104,13 @@ fn test_asset_info() {
         denom: "uusd".to_string(),
     };
 
-    assert!(!token_info.equal(&native_token_info));
+    assert!(!token_info.eq(&native_token_info));
 
-    assert!(!token_info.equal(&AssetInfo::Token {
+    assert!(!token_info.eq(&AssetInfo::Token {
         contract_addr: "asset0001".into(),
     }));
 
-    assert!(token_info.equal(&AssetInfo::Token {
+    assert!(token_info.eq(&AssetInfo::Token {
         contract_addr: "asset0000".into(),
     }));
 
@@ -209,7 +209,7 @@ fn test_asset() {
     assert_eq!(
         token_asset
             .into_msg(
-                &orai_oracle,
+                Some(&orai_oracle),
                 &deps.as_ref().querier,
                 MOCK_CONTRACT_ADDR.into(),
                 "addr0000".into()
@@ -229,7 +229,7 @@ fn test_asset() {
     assert_eq!(
         native_token_asset
             .into_msg(
-                &orai_oracle,
+                Some(&orai_oracle),
                 &deps.as_ref().querier,
                 MOCK_CONTRACT_ADDR.into(),
                 "addr0000".into()

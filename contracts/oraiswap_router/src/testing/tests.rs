@@ -7,12 +7,14 @@ use crate::operations::assert_operations;
 use crate::testing::mock_querier::mock_dependencies;
 
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo, ATOM_DENOM, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::router::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
     SwapOperation,
 };
+
+use oraiswap::mock_querier::ATOM_DENOM;
 
 #[test]
 fn proper_initialization() {

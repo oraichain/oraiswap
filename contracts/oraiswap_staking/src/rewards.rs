@@ -1,15 +1,13 @@
 use crate::state::{
-    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_pool_info,
-    Config, PoolInfo, RewardInfo, CANONICAL_LENGTH,
+    read_is_migrated, read_pool_info, read_reward_weights, rewards_read, rewards_store,
+    store_pool_info, PoolInfo, RewardInfo, CANONICAL_LENGTH,
 };
 use cosmwasm_std::{
-    attr, coins, to_binary, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, MessageInfo, Order, StdResult, Storage, Uint128, WasmMsg,
+    attr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    MessageInfo, Order, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw};
+use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
 use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
-
-use cw20::Cw20HandleMsg;
 
 // deposit_reward must be from reward token contract
 pub fn deposit_reward(
@@ -57,55 +55,32 @@ pub fn withdraw_reward(
     let staker_addr = deps.api.canonical_address(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
-    let config: Config = read_config(deps.storage)?;
-    let total_amount = _withdraw_reward(deps.storage, &staker_addr, &asset_key)?;
-
-    // now calculate weight
-    let total_weight: u32 = config.reward_weights.iter().map(|(_, w)| w).sum();
-
-    let mut messages: Vec<CosmosMsg> = vec![];
-
-    for (asset_raw, weight) in config.reward_weights {
-        // ignore empty weight
-        if weight == 0 {
-            continue;
-        }
-        let amount = Uint128::from(total_amount.u128() * (weight as u128) / (total_weight as u128));
-        let message = match asset_raw {
-            AssetInfoRaw::NativeToken { denom } => BankMsg::Send {
-                from_address: env.contract.address.clone(),
-                to_address: info.sender.clone(),
-                amount: coins(amount.u128(), denom),
-            }
-            .into(),
-            AssetInfoRaw::Token { contract_addr } => WasmMsg::Execute {
-                contract_addr: deps.api.human_address(&contract_addr)?,
-                msg: to_binary(&Cw20HandleMsg::Transfer {
-                    recipient: info.sender.clone(),
-                    amount,
-                })?,
-                send: vec![],
-            }
-            .into(),
-        };
-        messages.push(message);
-    }
+    // get reward assets and convert into CosmMsg
+    let reward_assets = _get_reward_assets(deps.storage, &staker_addr, &asset_key)?;
+    let messages = reward_assets
+        .into_iter()
+        .map(|reward_asset| {
+            Ok(reward_asset.to_normal(deps.api)?.into_msg(
+                None,
+                &deps.querier,
+                env.contract.address.clone(),
+                info.sender.clone(),
+            )?)
+        })
+        .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
     Ok(HandleResponse {
         messages,
-        attributes: vec![
-            attr("action", "withdraw"),
-            attr("amount", total_amount.to_string()),
-        ],
+        attributes: vec![attr("action", "withdraw")],
         data: None,
     })
 }
 
-fn _withdraw_reward(
+fn _get_reward_assets(
     storage: &mut dyn Storage,
     staker_addr: &CanonicalAddr,
     asset_key: &Option<Vec<u8>>,
-) -> StdResult<Uint128> {
+) -> StdResult<Vec<AssetRaw>> {
     let rewards_bucket = rewards_read(storage, staker_addr);
 
     // single reward withdraw, using Vec to store reference variable in local function
@@ -122,7 +97,8 @@ fn _withdraw_reward(
             .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()?
     };
 
-    let mut amount: Uint128 = Uint128::zero();
+    let mut reward_assets: Vec<AssetRaw> = vec![];
+
     for reward_pair in reward_pairs {
         let (asset_key, mut reward_info) = reward_pair;
         let pool_info: PoolInfo = read_pool_info(storage, &asset_key)?;
@@ -139,7 +115,35 @@ fn _withdraw_reward(
 
         before_share_change(pool_index, &mut reward_info)?;
 
-        amount += reward_info.pending_reward;
+        let total_amount = reward_info.pending_reward;
+        // calculate and accumulate the reward amount
+        let reward_weights = read_reward_weights(storage, &asset_key)?;
+        // now calculate weight
+        let total_weight: u32 = reward_weights.iter().map(|rw| rw.weight).sum();
+
+        for rw in reward_weights {
+            // ignore empty weight
+            if rw.weight == 0 {
+                continue;
+            }
+            let amount =
+                Uint128::from(total_amount.u128() * (rw.weight as u128) / (total_weight as u128));
+
+            // update, first time push it, later update the amount
+            match reward_assets.iter_mut().find(|ra| ra.info.eq(&rw.info)) {
+                None => {
+                    reward_assets.push(AssetRaw {
+                        info: rw.info,
+                        amount,
+                    });
+                }
+                Some(reward_asset) => {
+                    reward_asset.amount += amount;
+                }
+            }
+        }
+
+        // reset pending_reward
         reward_info.pending_reward = Uint128::zero();
 
         // Update rewards info
@@ -150,7 +154,7 @@ fn _withdraw_reward(
         }
     }
 
-    Ok(amount)
+    Ok(reward_assets)
 }
 
 // withdraw reward to pending reward

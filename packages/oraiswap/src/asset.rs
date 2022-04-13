@@ -9,14 +9,13 @@ use crate::{
 };
 
 use cosmwasm_std::{
-    to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, HumanAddr, MessageInfo,
+    coin, to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, HumanAddr, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
 
 pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 pub const ORAI_DENOM: &str = "orai";
-pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {
@@ -97,8 +96,8 @@ impl Asset {
 
     /// create a CosmosMsg send message to receiver
     pub fn into_msg(
-        self,
-        oracle_contract: &OracleContract,
+        &self,
+        oracle_contract: Option<&OracleContract>,
         querier: &QuerierWrapper,
         sender: HumanAddr,
         recipient: HumanAddr,
@@ -107,18 +106,23 @@ impl Asset {
 
         match &self.info {
             AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: contract_addr.to_owned().into(),
-                msg: to_binary(&Cw20HandleMsg::Transfer {
-                    recipient: recipient.into(),
-                    amount,
-                })?,
+                contract_addr: contract_addr.to_owned(),
+                msg: to_binary(&Cw20HandleMsg::Transfer { recipient, amount })?,
                 send: vec![],
             })),
-            AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
-                from_address: sender.into(),
-                to_address: recipient.into(),
-                amount: vec![self.deduct_tax(oracle_contract, querier)?],
-            })),
+            AssetInfo::NativeToken { denom } => {
+                // if there is oracle contract then calculate tax deduction
+                let send_amount = if let Some(oracle_contract) = oracle_contract {
+                    self.deduct_tax(oracle_contract, querier)?
+                } else {
+                    coin(amount.u128(), denom)
+                };
+                Ok(CosmosMsg::Bank(BankMsg::Send {
+                    from_address: sender,
+                    to_address: recipient,
+                    amount: vec![send_amount],
+                }))
+            }
         }
     }
 
@@ -216,7 +220,7 @@ impl AssetInfo {
         }
     }
 
-    pub fn equal(&self, asset: &AssetInfo) -> bool {
+    pub fn eq(&self, asset: &AssetInfo) -> bool {
         match self {
             AssetInfo::Token { contract_addr, .. } => {
                 let self_contract_addr = contract_addr;
@@ -283,7 +287,7 @@ impl AssetInfoRaw {
         }
     }
 
-    pub fn equal(&self, asset: &AssetInfoRaw) -> bool {
+    pub fn eq(&self, asset: &AssetInfoRaw) -> bool {
         match self {
             AssetInfoRaw::Token { contract_addr, .. } => {
                 let self_contract_addr = contract_addr;

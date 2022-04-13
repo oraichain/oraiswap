@@ -2,7 +2,8 @@ use crate::migration::migrate_pool_infos;
 use crate::rewards::{deposit_reward, query_reward_info, withdraw_reward};
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_config, read_pool_info, store_config, store_pool_info, Config, MigrationParams, PoolInfo,
+    read_config, read_pool_info, read_reward_weights, store_config, store_pool_info,
+    store_reward_weights, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -11,7 +12,8 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
+    AssetInfoRawWeight, AssetInfoWeight, ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg,
+    MigrateMsg, PoolInfoResponse, QueryMsg,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -50,6 +52,10 @@ pub fn handle(
         HandleMsg::UpdateConfig { reward_addr, owner } => {
             update_config(deps, info, owner, reward_addr)
         }
+        HandleMsg::UpdateRewardWeights {
+            asset_info,
+            weights,
+        } => update_reward_weights(deps, info, asset_info, weights),
         HandleMsg::RegisterAsset {
             asset_info,
             staking_token,
@@ -163,6 +169,33 @@ pub fn update_config(
     })
 }
 
+fn update_reward_weights(
+    deps: DepsMut,
+    info: MessageInfo,
+    asset_info: AssetInfo,
+    reward_weights: Vec<AssetInfoWeight>,
+) -> StdResult<HandleResponse> {
+    let config: Config = read_config(deps.storage)?;
+
+    if deps.api.canonical_address(&info.sender)? != config.owner {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    // convert weights to raw_weights
+    let raw_weights = reward_weights
+        .into_iter()
+        .map(|w| Ok(w.to_raw(deps.api)?))
+        .collect::<StdResult<Vec<AssetInfoRawWeight>>>()?;
+
+    store_reward_weights(deps.storage, &asset_info.to_vec(deps.api)?, raw_weights)?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        attributes: vec![attr("action", "update_reward_weights")],
+        data: None,
+    })
+}
+
 fn register_asset(
     deps: DepsMut,
     info: MessageInfo,
@@ -254,6 +287,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
+        QueryMsg::RewardWeights { asset_info } => {
+            to_binary(&query_reward_weights(deps, asset_info)?)
+        }
         QueryMsg::RewardInfo {
             staker_addr,
             asset_info,
@@ -293,6 +329,17 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
             .migration_params
             .map(|params| params.index_snapshot),
     })
+}
+
+pub fn query_reward_weights(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<AssetInfoWeight>> {
+    let asset_key = asset_info.to_vec(deps.api)?;
+
+    let raw_weights = read_reward_weights(deps.storage, &asset_key)?;
+
+    raw_weights
+        .into_iter()
+        .map(|w| Ok(w.to_normal(deps.api)?))
+        .collect()
 }
 
 // migrate contract

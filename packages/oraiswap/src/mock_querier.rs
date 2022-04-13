@@ -10,6 +10,8 @@ use crate::factory::QueryMsg as FactoryQueryMsg;
 use crate::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
 
+pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
+
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.
 pub fn mock_dependencies(

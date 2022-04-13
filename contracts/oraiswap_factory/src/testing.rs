@@ -234,6 +234,7 @@ fn update_pair() {
     )
     .unwrap();
 
+    // should never change commission rate once deployed
     let pair_res: PairInfo = from_binary(&query_res).unwrap();
     assert_eq!(
         pair_res,
@@ -242,7 +243,7 @@ fn update_pair() {
             liquidity_token: "liquidity0000".into(),
             contract_addr: "pair0000".into(),
             asset_infos,
-            commission_rate: "1".into()
+            commission_rate: DEFAULT_COMMISSION_RATE.into()
         }
     );
 }
