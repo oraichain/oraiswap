@@ -29,6 +29,7 @@ pub enum HandleMsg {
     /// Owner operations ///
     ////////////////////////
     UpdateConfig {
+        reward_addr: Option<HumanAddr>,
         owner: Option<HumanAddr>,
         premium_min_update_interval: Option<u64>,
         short_reward_bound: Option<(Decimal, Decimal)>,

@@ -63,6 +63,7 @@ fn update_config() {
     let info = mock_info("owner", &[]);
     let msg = HandleMsg::UpdateConfig {
         owner: Some("owner2".into()),
+        reward_addr: None,
         premium_min_update_interval: Some(7200),
         short_reward_bound: None,
     };
@@ -89,6 +90,7 @@ fn update_config() {
     // unauthorized err
     let info = mock_info("owner", &[]);
     let msg = HandleMsg::UpdateConfig {
+        reward_addr: None,
         owner: None,
         premium_min_update_interval: Some(7200),
         short_reward_bound: None,

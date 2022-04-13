@@ -109,7 +109,7 @@ pub fn deposit_reward(
             pool_info.short_pending_reward = Uint128::zero();
         }
 
-        store_pool_info(deps.storage, &&asset_key, &pool_info)?;
+        store_pool_info(deps.storage, &asset_key, &pool_info)?;
     }
 
     Ok(HandleResponse {

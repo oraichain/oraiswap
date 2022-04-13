@@ -54,6 +54,7 @@ pub fn handle(
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
         HandleMsg::UpdateConfig {
+            reward_addr,
             owner,
             premium_min_update_interval,
             short_reward_bound,
@@ -61,6 +62,7 @@ pub fn handle(
             deps,
             info,
             owner,
+            reward_addr,
             premium_min_update_interval,
             short_reward_bound,
         ),
@@ -141,7 +143,7 @@ pub fn receive_cw20(
             let config: Config = read_config(deps.storage)?;
 
             // only reward token contract can execute this message
-            if config.reward_addr != deps.api.canonical_address(&info.sender)? {
+            if config.reward_addr != deps.api.canonical_address(&cw20_msg.sender)? {
                 return Err(StdError::generic_err("unauthorized"));
             }
 
@@ -164,6 +166,7 @@ pub fn update_config(
     deps: DepsMut,
     info: MessageInfo,
     owner: Option<HumanAddr>,
+    reward_addr: Option<HumanAddr>,
     premium_min_update_interval: Option<u64>,
     short_reward_bound: Option<(Decimal, Decimal)>,
 ) -> StdResult<HandleResponse> {
@@ -175,6 +178,10 @@ pub fn update_config(
 
     if let Some(owner) = owner {
         config.owner = deps.api.canonical_address(&owner)?;
+    }
+
+    if let Some(reward_addr) = reward_addr {
+        config.reward_addr = deps.api.canonical_address(&reward_addr)?;
     }
 
     if let Some(premium_min_update_interval) = premium_min_update_interval {
