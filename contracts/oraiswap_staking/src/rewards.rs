@@ -76,16 +76,10 @@ pub fn deposit_reward(
     deps: DepsMut,
     rewards: Vec<Asset>,
     rewards_amount: Uint128,
-    reward_addr: CanonicalAddr,
 ) -> StdResult<HandleResponse> {
     for asset in rewards.iter() {
         let asset_key = asset.info.to_vec(deps.api)?;
         let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
-        let index = pool_info
-            .reward_addresses
-            .iter()
-            .position(|&r| r == reward_addr)
-            .unwrap_or(0);
 
         // Decimal::from_ratio(1, 5).mul()
         // erf(pool_info.premium_rate.0)
@@ -95,25 +89,25 @@ pub fn deposit_reward(
         let mut short_reward = total_reward * pool_info.short_reward_weight;
         let mut normal_reward = Asset::checked_sub(total_reward, short_reward).unwrap();
 
-        if pool_info.total_bond_amount[index].is_zero() {
-            pool_info.pending_reward[index] += normal_reward;
+        if pool_info.total_bond_amount.is_zero() {
+            pool_info.pending_reward += normal_reward;
         } else {
-            normal_reward += pool_info.pending_reward[index];
+            normal_reward += pool_info.pending_reward;
             let normal_reward_per_bond =
-                Decimal::from_ratio(normal_reward, pool_info.total_bond_amount[index]);
-            pool_info.reward_index[index] = pool_info.reward_index[index] + normal_reward_per_bond;
-            pool_info.pending_reward[index] = Uint128::zero();
+                Decimal::from_ratio(normal_reward, pool_info.total_bond_amount);
+            pool_info.reward_index = pool_info.reward_index + normal_reward_per_bond;
+            pool_info.pending_reward = Uint128::zero();
         }
 
-        // if pool_info.total_short_amount.is_zero() {
-        // pool_info.short_pending_reward += short_reward;
-        // } else {
-        // short_reward += pool_info.short_pending_reward;
-        // let short_reward_per_bond =
-        //     Decimal::from_ratio(short_reward, pool_info.total_short_amount);
-        // pool_info.short_reward_index = pool_info.short_reward_index + short_reward_per_bond;
-        // pool_info.short_pending_reward = Uint128::zero();
-        // }
+        if pool_info.total_short_amount.is_zero() {
+            pool_info.short_pending_reward += short_reward;
+        } else {
+            short_reward += pool_info.short_pending_reward;
+            let short_reward_per_bond =
+                Decimal::from_ratio(short_reward, pool_info.total_short_amount);
+            pool_info.short_reward_index = pool_info.short_reward_index + short_reward_per_bond;
+            pool_info.short_pending_reward = Uint128::zero();
+        }
 
         store_pool_info(deps.storage, &&asset_key, &pool_info)?;
     }
@@ -138,9 +132,9 @@ pub fn withdraw_reward(
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
     let normal_reward = _withdraw_reward(deps.storage, &staker_addr, &asset_key, false)?;
-    // let short_reward = _withdraw_reward(deps.storage, &staker_addr, &asset_key, true)?;
+    let short_reward = _withdraw_reward(deps.storage, &staker_addr, &asset_key, true)?;
 
-    let amount = normal_reward;
+    let amount = normal_reward + short_reward;
     let config: Config = read_config(deps.storage)?;
     Ok(HandleResponse {
         messages: vec![WasmMsg::Execute {
