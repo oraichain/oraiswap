@@ -35,7 +35,6 @@ fn test_deposit_reward() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // store 3% premium rate
     let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
@@ -55,14 +54,10 @@ fn test_deposit_reward() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit 100 reward tokens
-    // premium is 0, so rewards distributed 80:20
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -99,7 +94,6 @@ fn test_deposit_reward() {
         }
     );
 
-    // if premium_rate is over threshold, distribution weight should be 60:40
     let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
@@ -164,20 +158,15 @@ fn test_deposit_reward_when_no_bonding() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // store 3% premium rate
     let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
 
     // factory deposit 100 reward tokens
-    // premium is 0, so rewards distributed 80:20
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -214,7 +203,6 @@ fn test_deposit_reward_when_no_bonding() {
         }
     );
 
-    // if premium_rate is over threshold, distribution weight should be 60:40
     let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
@@ -279,7 +267,6 @@ fn test_before_share_changes() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // store 3% premium rate
     let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
@@ -298,15 +285,10 @@ fn test_before_share_changes() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // factory deposit 100 reward tokens
-    // premium is 0, so rewards distributed 80:20
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -363,9 +345,6 @@ fn test_before_share_changes() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -426,7 +405,6 @@ fn test_withdraw() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // store 3% premium rate
     let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
@@ -445,15 +423,10 @@ fn test_withdraw() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // factory deposit 100 reward tokens
-    // premium_rate is zero; distribute weight => 80:20
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -525,12 +498,10 @@ fn withdraw_multiple_rewards() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // store 3% premium rate
     let token_raw = deps.api.canonical_address(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
 
-    // store 3% premium rate for asset2
     let token_raw = deps.api.canonical_address(&"asset2".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
@@ -568,9 +539,6 @@ fn withdraw_multiple_rewards() {
         sender: "factory".into(),
         amount: Uint128(300u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![
                 Asset {
                     info: AssetInfo::Token {

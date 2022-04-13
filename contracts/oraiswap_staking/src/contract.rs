@@ -9,7 +9,7 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
@@ -17,6 +17,8 @@ use oraiswap::staking::{
 use cw20::Cw20ReceiveMsg;
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+    // make sure it works
+
     store_config(
         deps.storage,
         &Config {
@@ -57,7 +59,7 @@ pub fn handle(
             new_staking_token,
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
         HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
-        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, info, asset_info),
+        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -110,10 +112,7 @@ pub fn receive_cw20(
 
             bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
         }
-        Ok(Cw20HookMsg::DepositReward {
-            asset_info,
-            rewards,
-        }) => {
+        Ok(Cw20HookMsg::DepositReward { rewards }) => {
             let config: Config = read_config(deps.storage)?;
 
             // only reward token contract can execute this message
@@ -130,11 +129,7 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("rewards amount miss matched"));
             }
 
-            let rewards_asset = Asset {
-                amount: rewards_amount,
-                info: asset_info,
-            };
-            deposit_reward(deps, rewards, rewards_asset)
+            deposit_reward(deps, rewards, rewards_amount)
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }

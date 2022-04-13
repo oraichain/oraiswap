@@ -1,12 +1,12 @@
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_pool_info,
-    Config, PoolInfo, RewardInfo,
+    Config, PoolInfo, RewardInfo, CANONICAL_LENGTH,
 };
 use cosmwasm_std::{
-    attr, to_binary, Api, CanonicalAddr, Decimal, Deps, DepsMut, HandleResponse, HumanAddr,
-    MessageInfo, Order, StdResult, Storage, Uint128, WasmMsg,
+    attr, coins, to_binary, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, MessageInfo, Order, StdResult, Storage, Uint128, WasmMsg,
 };
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw};
 use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
 
 use cw20::Cw20HandleMsg;
@@ -15,7 +15,7 @@ use cw20::Cw20HandleMsg;
 pub fn deposit_reward(
     deps: DepsMut,
     rewards: Vec<Asset>,
-    rewards_asset: Asset,
+    rewards_amount: Uint128,
 ) -> StdResult<HandleResponse> {
     for asset in rewards.iter() {
         let asset_key = asset.info.to_vec(deps.api)?;
@@ -42,7 +42,7 @@ pub fn deposit_reward(
         data: None,
         attributes: vec![
             attr("action", "deposit_reward"),
-            attr("rewards_amount", rewards_asset.amount.to_string()),
+            attr("rewards_amount", rewards_amount.to_string()),
         ],
     })
 }
@@ -50,28 +50,52 @@ pub fn deposit_reward(
 // withdraw all rewards or single reward depending on asset_token
 pub fn withdraw_reward(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<HandleResponse> {
     let staker_addr = deps.api.canonical_address(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
-    let amount = _withdraw_reward(deps.storage, &staker_addr, &asset_key)?;
-
     let config: Config = read_config(deps.storage)?;
-    Ok(HandleResponse {
-        messages: vec![WasmMsg::Execute {
-            contract_addr: deps.api.human_address(&config.reward_addr)?,
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: info.sender,
-                amount,
-            })?,
-            send: vec![],
+    let total_amount = _withdraw_reward(deps.storage, &staker_addr, &asset_key)?;
+
+    // now calculate weight
+    let total_weight: u32 = config.reward_weights.iter().map(|(_, w)| w).sum();
+
+    let mut messages: Vec<CosmosMsg> = vec![];
+
+    for (asset_raw, weight) in config.reward_weights {
+        // ignore empty weight
+        if weight == 0 {
+            continue;
         }
-        .into()],
+        let amount = Uint128::from(total_amount.u128() * (weight as u128) / (total_weight as u128));
+        let message = match asset_raw {
+            AssetInfoRaw::NativeToken { denom } => BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: info.sender.clone(),
+                amount: coins(amount.u128(), denom),
+            }
+            .into(),
+            AssetInfoRaw::Token { contract_addr } => WasmMsg::Execute {
+                contract_addr: deps.api.human_address(&contract_addr)?,
+                msg: to_binary(&Cw20HandleMsg::Transfer {
+                    recipient: info.sender.clone(),
+                    amount,
+                })?,
+                send: vec![],
+            }
+            .into(),
+        };
+        messages.push(message);
+    }
+
+    Ok(HandleResponse {
+        messages,
         attributes: vec![
             attr("action", "withdraw"),
-            attr("amount", amount.to_string()),
+            attr("amount", total_amount.to_string()),
         ],
         data: None,
     })
@@ -214,7 +238,8 @@ fn _read_reward_infos(
                 before_share_change(pool_index, &mut reward_info)?;
 
                 // try convert to contract token, otherwise it is native token
-                let asset_info = if asset_key.len() == 20 {
+
+                let asset_info = if asset_key.len() == CANONICAL_LENGTH {
                     AssetInfo::Token {
                         contract_addr: api.human_address(&asset_key.into())?,
                     }

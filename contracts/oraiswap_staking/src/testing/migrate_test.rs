@@ -20,12 +20,7 @@ fn test_pool_infos_migration() {
         total_bond_amount: Uint128::from(1u128),
         total_short_amount: Uint128::from(1u128),
         reward_index: Decimal::percent(1),
-        short_reward_index: Decimal::percent(1),
         pending_reward: Uint128::from(1u128),
-        short_pending_reward: Uint128::from(1u128),
-        premium_rate: Decimal::percent(1),
-        short_reward_weight: Decimal::percent(1),
-        premium_updated_time: 1,
     };
     let asset_2 = deps.api.canonical_address(&"asset2".into()).unwrap();
     let pool_info_2 = LegacyPoolInfo {
@@ -33,12 +28,7 @@ fn test_pool_infos_migration() {
         total_bond_amount: Uint128::from(2u128),
         total_short_amount: Uint128::from(2u128),
         reward_index: Decimal::percent(2),
-        short_reward_index: Decimal::percent(2),
         pending_reward: Uint128::from(2u128),
-        short_pending_reward: Uint128::from(2u128),
-        premium_rate: Decimal::percent(2),
-        short_reward_weight: Decimal::percent(2),
-        premium_updated_time: 2,
     };
 
     legacy_store.save(asset_1.as_slice(), &pool_info_1).unwrap();

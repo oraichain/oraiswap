@@ -59,9 +59,6 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -139,9 +136,6 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),
@@ -298,9 +292,6 @@ fn test_deprecate() {
         sender: "factory".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
-            asset_info: AssetInfo::Token {
-                contract_addr: "oraix".into(),
-            },
             rewards: vec![Asset {
                 info: AssetInfo::Token {
                     contract_addr: "asset".into(),

@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Decimal, HumanAddr, Uint128};
+use crate::asset::{Asset, AssetInfo, AssetInfoRaw};
+use cosmwasm_std::{Api, Decimal, HumanAddr, StdResult, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -36,6 +36,11 @@ pub enum HandleMsg {
         asset_info: AssetInfo,
         new_staking_token: HumanAddr,
     },
+    // update weights for an asset
+    UpdateRewardWeights {
+        asset_info: AssetInfo,
+        weights: Vec<AssetInfoWeight>,
+    },
 
     ////////////////////////
     /// User operations ///
@@ -67,15 +72,10 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     // this call from LP token contract
-    Bond {
-        asset_info: AssetInfo,
-    },
+    Bond { asset_info: AssetInfo },
     // reward tokens are ow20 only, and used by admin or factory contract to deposit newly minted ORAIX tokens, which
     // will be used as rewards for the specified asset's staking pool.
-    DepositReward {
-        asset_info: AssetInfo,
-        rewards: Vec<Asset>,
-    },
+    DepositReward { rewards: Vec<Asset> },
 }
 
 /// We currently take no arguments for migrations
@@ -90,6 +90,9 @@ pub struct MigrateMsg {
 pub enum QueryMsg {
     Config {},
     PoolInfo {
+        asset_info: AssetInfo,
+    },
+    RewardWeights {
         asset_info: AssetInfo,
     },
     RewardInfo {
@@ -107,6 +110,11 @@ pub struct ConfigResponse {
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RewardWeightsResponse {
+    weights: Vec<AssetInfoWeight>,
 }
 
 // We define a custom struct for each query response
@@ -136,4 +144,34 @@ pub struct RewardInfoResponseItem {
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AssetInfoRawWeight {
+    pub info: AssetInfoRaw,
+    pub weight: u32,
+}
+
+impl AssetInfoRawWeight {
+    pub fn to_normal(&self, api: &dyn Api) -> StdResult<AssetInfoWeight> {
+        Ok(AssetInfoWeight {
+            info: self.info.to_normal(api)?,
+            weight: self.weight,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AssetInfoWeight {
+    pub info: AssetInfo,
+    pub weight: u32,
+}
+
+impl AssetInfoWeight {
+    pub fn to_raw(&self, api: &dyn Api) -> StdResult<AssetInfoRawWeight> {
+        Ok(AssetInfoRawWeight {
+            info: self.info.to_raw(api)?,
+            weight: self.weight,
+        })
+    }
 }

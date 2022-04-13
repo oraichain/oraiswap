@@ -1,7 +1,8 @@
+use oraiswap::staking::AssetInfoRawWeight;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, StdError, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config";
@@ -10,6 +11,10 @@ pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
 static PREFIX_REWARD: &[u8] = b"reward";
 
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
+
+static PREFIX_REWARD_WEIGHTS: &[u8] = b"reward_weights";
+
+pub const CANONICAL_LENGTH: usize = 20;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
@@ -92,4 +97,26 @@ pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &Canoni
     ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()])
         .load(asset_key)
         .unwrap_or(false)
+}
+
+pub fn store_reward_weights(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    weights: Vec<AssetInfoRawWeight>,
+) -> StdResult<()> {
+    let mut weight_bucket: Bucket<Vec<AssetInfoRawWeight>> =
+        Bucket::new(storage, PREFIX_REWARD_WEIGHTS);
+    weight_bucket.save(asset_key, &weights)
+}
+
+pub fn read_reward_weights(
+    storage: &dyn Storage,
+    asset_key: &[u8],
+) -> StdResult<Vec<AssetInfoRawWeight>> {
+    let weight_bucket: ReadonlyBucket<Vec<AssetInfoRawWeight>> =
+        ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHTS);
+    match weight_bucket.load(asset_key) {
+        Ok(v) => Ok(v),
+        _ => Err(StdError::generic_err("No asset info weights stored")),
+    }
 }
