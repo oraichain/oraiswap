@@ -139,10 +139,17 @@ pub fn receive_cw20(
         }
         Ok(Cw20HookMsg::DepositReward { rewards }) => {
             let config: Config = read_config(deps.storage)?;
-
             // only reward token contract can execute this message
-            if config.reward_addr != deps.api.canonical_address(&info.sender)? {
-                return Err(StdError::generic_err("unauthorized"));
+            for asset in rewards.iter() {
+                let asset_key = asset.info.to_vec(deps.api)?;
+                let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+
+                if !pool_info
+                    .reward_addresses
+                    .contains(&deps.api.canonical_address(&info.sender)?)
+                {
+                    return Err(StdError::generic_err("unauthorized"));
+                }
             }
 
             let mut rewards_amount = Uint128::zero();
@@ -154,7 +161,12 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("rewards amount miss matched"));
             }
 
-            deposit_reward(deps, rewards, rewards_amount)
+            deposit_reward(
+                deps,
+                rewards,
+                rewards_amount,
+                deps.api.canonical_address(&info.sender)?,
+            )
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
