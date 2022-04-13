@@ -10,14 +10,10 @@ pub struct InitMsg {
     // default is sender
     pub owner: Option<HumanAddr>,
     pub reward_addr: HumanAddr,
-    // this for minting short token
     pub minter: Option<HumanAddr>,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: Option<String>,
-    // this for update short token reward weight
-    pub premium_min_update_interval: Option<u64>,
-    pub short_reward_bound: Option<(Decimal, Decimal)>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -31,8 +27,6 @@ pub enum HandleMsg {
     UpdateConfig {
         reward_addr: Option<HumanAddr>,
         owner: Option<HumanAddr>,
-        premium_min_update_interval: Option<u64>,
-        short_reward_bound: Option<(Decimal, Decimal)>,
     },
     RegisterAsset {
         asset_info: AssetInfo, // can be ow20 token or native token
@@ -67,37 +61,21 @@ pub enum HandleMsg {
         staker_addr: HumanAddr,
         prev_staking_token_amount: Uint128,
     },
-
-    //////////////////////////////////
-    /// Permission-less operations ///
-    //////////////////////////////////
-    AdjustPremium {
-        asset_tokens: Vec<HumanAddr>, // only support ow20 token
-    },
-
-    ////////////////////////////////
-    /// Mint contract operations ///
-    ////////////////////////////////
-    IncreaseShortToken {
-        asset_token: HumanAddr, // short token and premium only support ow20 token, it is from limit order
-        staker_addr: HumanAddr,
-        amount: Uint128,
-    },
-    DecreaseShortToken {
-        asset_token: HumanAddr,
-        staker_addr: HumanAddr,
-        amount: Uint128,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     // this call from LP token contract
-    Bond { asset_info: AssetInfo },
+    Bond {
+        asset_info: AssetInfo,
+    },
     // reward tokens are ow20 only, and used by admin or factory contract to deposit newly minted ORAIX tokens, which
     // will be used as rewards for the specified asset's staking pool.
-    DepositReward { rewards: Vec<Asset> },
+    DepositReward {
+        asset_info: AssetInfo,
+        rewards: Vec<Asset>,
+    },
 }
 
 /// We currently take no arguments for migrations
@@ -129,7 +107,6 @@ pub struct ConfigResponse {
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: String,
-    pub premium_min_update_interval: u64,
 }
 
 // We define a custom struct for each query response
@@ -138,14 +115,8 @@ pub struct PoolInfoResponse {
     pub asset_info: AssetInfo,
     pub staking_token: HumanAddr,
     pub total_bond_amount: Uint128,
-    pub total_short_amount: Uint128,
     pub reward_index: Decimal,
-    pub short_reward_index: Decimal,
     pub pending_reward: Uint128,
-    pub short_pending_reward: Uint128,
-    pub premium_rate: Decimal,
-    pub short_reward_weight: Decimal,
-    pub premium_updated_time: u64,
     pub migration_index_snapshot: Option<Decimal>,
     pub migration_deprecated_staking_token: Option<HumanAddr>,
 }
@@ -162,7 +133,6 @@ pub struct RewardInfoResponseItem {
     pub asset_info: AssetInfo,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
-    pub is_short: bool,
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,

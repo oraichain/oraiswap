@@ -15,8 +15,6 @@ fn proper_initialization() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -35,7 +33,6 @@ fn proper_initialization() {
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),
-            premium_min_update_interval: 3600,
         },
         config
     );
@@ -52,8 +49,6 @@ fn update_config() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -64,8 +59,6 @@ fn update_config() {
     let msg = HandleMsg::UpdateConfig {
         owner: Some("owner2".into()),
         reward_addr: None,
-        premium_min_update_interval: Some(7200),
-        short_reward_bound: None,
     };
 
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -82,7 +75,6 @@ fn update_config() {
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),
-            premium_min_update_interval: 7200,
         },
         config
     );
@@ -92,8 +84,6 @@ fn update_config() {
     let msg = HandleMsg::UpdateConfig {
         reward_addr: None,
         owner: None,
-        premium_min_update_interval: Some(7200),
-        short_reward_bound: None,
     };
 
     let res = handle(deps.as_mut(), mock_env(), info, msg);
@@ -114,8 +104,6 @@ fn test_register() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -167,14 +155,8 @@ fn test_register() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }

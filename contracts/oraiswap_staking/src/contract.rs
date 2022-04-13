@@ -1,8 +1,6 @@
 use crate::migration::migrate_pool_infos;
-use crate::rewards::{adjust_premium, deposit_reward, query_reward_info, withdraw_reward};
-use crate::staking::{
-    auto_stake, auto_stake_hook, bond, decrease_short_token, increase_short_token, unbond,
-};
+use crate::rewards::{deposit_reward, query_reward_info, withdraw_reward};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
     read_config, read_pool_info, store_config, store_pool_info, Config, MigrationParams, PoolInfo,
 };
@@ -11,7 +9,7 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
-use oraiswap::asset::{AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
@@ -26,7 +24,6 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
                 .api
                 .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
             reward_addr: deps.api.canonical_address(&msg.reward_addr)?,
-            // this is for minting short token
             minter: deps
                 .api
                 .canonical_address(&msg.minter.unwrap_or(info.sender))?,
@@ -34,11 +31,6 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
             factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
-            premium_min_update_interval: msg.premium_min_update_interval.unwrap_or(7600), // 2 hours
-            // premium rate > 7% then reward_weight = 40%
-            short_reward_bound: msg
-                .short_reward_bound
-                .unwrap_or((Decimal::percent(7), Decimal::percent(40))),
         },
     )?;
 
@@ -53,19 +45,9 @@ pub fn handle(
 ) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        HandleMsg::UpdateConfig {
-            reward_addr,
-            owner,
-            premium_min_update_interval,
-            short_reward_bound,
-        } => update_config(
-            deps,
-            info,
-            owner,
-            reward_addr,
-            premium_min_update_interval,
-            short_reward_bound,
-        ),
+        HandleMsg::UpdateConfig { reward_addr, owner } => {
+            update_config(deps, info, owner, reward_addr)
+        }
         HandleMsg::RegisterAsset {
             asset_info,
             staking_token,
@@ -76,17 +58,6 @@ pub fn handle(
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
         HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
         HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, info, asset_info),
-        HandleMsg::AdjustPremium { asset_tokens } => adjust_premium(deps, env, asset_tokens),
-        HandleMsg::IncreaseShortToken {
-            staker_addr,
-            asset_token,
-            amount,
-        } => increase_short_token(deps, info, staker_addr, asset_token, amount),
-        HandleMsg::DecreaseShortToken {
-            staker_addr,
-            asset_token,
-            amount,
-        } => decrease_short_token(deps, info, staker_addr, asset_token, amount),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -139,7 +110,10 @@ pub fn receive_cw20(
 
             bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
         }
-        Ok(Cw20HookMsg::DepositReward { rewards }) => {
+        Ok(Cw20HookMsg::DepositReward {
+            asset_info,
+            rewards,
+        }) => {
             let config: Config = read_config(deps.storage)?;
 
             // only reward token contract can execute this message
@@ -156,7 +130,11 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("rewards amount miss matched"));
             }
 
-            deposit_reward(deps, rewards, rewards_amount)
+            let rewards_asset = Asset {
+                amount: rewards_amount,
+                info: asset_info,
+            };
+            deposit_reward(deps, rewards, rewards_asset)
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
@@ -167,8 +145,6 @@ pub fn update_config(
     info: MessageInfo,
     owner: Option<HumanAddr>,
     reward_addr: Option<HumanAddr>,
-    premium_min_update_interval: Option<u64>,
-    short_reward_bound: Option<(Decimal, Decimal)>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -182,14 +158,6 @@ pub fn update_config(
 
     if let Some(reward_addr) = reward_addr {
         config.reward_addr = deps.api.canonical_address(&reward_addr)?;
-    }
-
-    if let Some(premium_min_update_interval) = premium_min_update_interval {
-        config.premium_min_update_interval = premium_min_update_interval;
-    }
-
-    if let Some(short_reward_bound) = short_reward_bound {
-        config.short_reward_bound = short_reward_bound;
     }
 
     store_config(deps.storage, &config)?;
@@ -224,14 +192,8 @@ fn register_asset(
         &PoolInfo {
             staking_token: deps.api.canonical_address(&staking_token)?,
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_params: None,
         },
     )?;
@@ -313,7 +275,6 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         oracle_addr: deps.api.human_address(&state.oracle_addr)?,
         factory_addr: deps.api.human_address(&state.factory_addr)?,
         base_denom: state.base_denom,
-        premium_min_update_interval: state.premium_min_update_interval,
     };
 
     Ok(resp)
@@ -326,14 +287,8 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
         asset_info,
         staking_token: deps.api.human_address(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
-        total_short_amount: pool_info.total_short_amount,
         reward_index: pool_info.reward_index,
-        short_reward_index: pool_info.short_reward_index,
         pending_reward: pool_info.pending_reward,
-        short_pending_reward: pool_info.short_pending_reward,
-        premium_rate: pool_info.premium_rate,
-        short_reward_weight: pool_info.short_reward_weight,
-        premium_updated_time: pool_info.premium_updated_time,
         migration_deprecated_staking_token: pool_info.migration_params.clone().map(|params| {
             deps.api
                 .human_address(&params.deprecated_staking_token)

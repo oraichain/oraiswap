@@ -21,8 +21,6 @@ fn test_bond_tokens() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -73,7 +71,6 @@ fn test_bond_tokens() {
                 },
                 pending_reward: Uint128::zero(),
                 bond_amount: Uint128(100u128),
-                is_short: false,
                 should_migrate: None,
             }],
         }
@@ -99,14 +96,8 @@ fn test_bond_tokens() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128(100u128),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
@@ -145,14 +136,8 @@ fn test_bond_tokens() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128(200u128),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
@@ -189,8 +174,6 @@ fn test_unbond() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -281,14 +264,8 @@ fn test_unbond() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
@@ -324,8 +301,6 @@ fn test_increase_short_token() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -340,32 +315,6 @@ fn test_increase_short_token() {
 
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    let msg = HandleMsg::IncreaseShortToken {
-        asset_token: "asset".into(),
-        staker_addr: "addr".into(),
-        amount: Uint128::from(100u128),
-    };
-
-    let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone());
-    match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
-        _ => panic!("DO NOT ENTER HERE"),
-    }
-
-    let info = mock_info("mint", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-    // short token only allow smart contract
-    assert_eq!(
-        vec![
-            attr("action", "increase_short_token"),
-            attr("staker_addr", "addr"),
-            attr("asset_token", "asset"),
-            attr("amount", "100"),
-        ],
-        res.attributes
-    );
 
     let data = query(
         deps.as_ref(),
@@ -387,14 +336,8 @@ fn test_increase_short_token() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::from(100u128),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
@@ -420,7 +363,6 @@ fn test_increase_short_token() {
                 },
                 pending_reward: Uint128::zero(),
                 bond_amount: Uint128(100u128),
-                is_short: true,
                 should_migrate: None,
             }],
         }
@@ -438,8 +380,6 @@ fn test_decrease_short_token() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -454,31 +394,6 @@ fn test_decrease_short_token() {
 
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    let msg = HandleMsg::IncreaseShortToken {
-        asset_token: "asset".into(),
-        staker_addr: "addr".into(),
-        amount: Uint128::from(100u128),
-    };
-
-    let info = mock_info("mint", &[]);
-    let _ = handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
-
-    let msg = HandleMsg::DecreaseShortToken {
-        asset_token: "asset".into(),
-        staker_addr: "addr".into(),
-        amount: Uint128::from(100u128),
-    };
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-    assert_eq!(
-        vec![
-            attr("action", "decrease_short_token"),
-            attr("staker_addr", "addr"),
-            attr("asset_token", "asset"),
-            attr("amount", "100"),
-        ],
-        res.attributes
-    );
 
     let data = query(
         deps.as_ref(),
@@ -500,14 +415,8 @@ fn test_decrease_short_token() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
@@ -558,8 +467,6 @@ fn test_auto_stake() {
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
         base_denom: None,
-        premium_min_update_interval: Some(3600),
-        short_reward_bound: None,
     };
 
     let info = mock_info("addr", &[]);
@@ -791,14 +698,8 @@ fn test_auto_stake() {
             },
             staking_token: "lptoken".into(),
             total_bond_amount: Uint128(100u128),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
         }
