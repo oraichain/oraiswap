@@ -5,7 +5,7 @@
   "required": [
     "base_denom",
     "mint_contract",
-    "reward_addr",
+    "rewarder",
     "oracle_contract",
     "owner",
     "premium_min_update_interval",
@@ -19,7 +19,7 @@
     "mint_contract": {
       "type": "string"
     },
-    "reward_addr": {
+    "rewarder": {
       "type": "string"
     },
     "oracle_contract": {

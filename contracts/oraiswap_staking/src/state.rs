@@ -7,19 +7,18 @@ use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config";
 pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
-
 static PREFIX_REWARD: &[u8] = b"reward";
-
+static PREFIX_STAKER: &[u8] = b"staker";
+static PREFIX_TOTAL_REWARD_AMOUNT: &[u8] = b"total_reward_amount"; // total_amount for each reward asset, use this to check balance when deposit
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
-
-static PREFIX_REWARD_WEIGHTS: &[u8] = b"reward_weights";
+static PREFIX_REWARD_WEIGHT: &[u8] = b"reward_weight";
 
 pub const CANONICAL_LENGTH: usize = 20;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
-    pub reward_addr: CanonicalAddr,
+    pub rewarder: CanonicalAddr,
     pub minter: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
@@ -61,6 +60,18 @@ pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Pool
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
+pub fn store_total_reward_amount(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    total_amount: &Uint128,
+) -> StdResult<()> {
+    Bucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).save(asset_key, total_amount)
+}
+
+pub fn read_total_reward_amount(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Uint128> {
+    ReadonlyBucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).load(asset_key)
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfo {
     pub index: Decimal,
@@ -85,6 +96,17 @@ pub fn rewards_read<'a>(
     ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
 }
 
+/// returns a bucket with all stakers belong by this owner (query it by owner)
+pub fn stakers_store<'a>(storage: &'a mut dyn Storage, asset_key: &[u8]) -> Bucket<'a, bool> {
+    Bucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
+}
+
+/// returns a bucket with all rewards owned by this owner (query it by owner)
+/// (read-only version for queries)
+pub fn stakers_read<'a>(storage: &'a dyn Storage, asset_key: &[u8]) -> ReadonlyBucket<'a, bool> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
+}
+
 pub fn store_is_migrated(
     storage: &mut dyn Storage,
     asset_key: &[u8],
@@ -105,7 +127,7 @@ pub fn store_reward_weights(
     weights: Vec<AssetInfoRawWeight>,
 ) -> StdResult<()> {
     let mut weight_bucket: Bucket<Vec<AssetInfoRawWeight>> =
-        Bucket::new(storage, PREFIX_REWARD_WEIGHTS);
+        Bucket::new(storage, PREFIX_REWARD_WEIGHT);
     weight_bucket.save(asset_key, &weights)
 }
 
@@ -114,9 +136,20 @@ pub fn read_reward_weights(
     asset_key: &[u8],
 ) -> StdResult<Vec<AssetInfoRawWeight>> {
     let weight_bucket: ReadonlyBucket<Vec<AssetInfoRawWeight>> =
-        ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHTS);
+        ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHT);
     match weight_bucket.load(asset_key) {
         Ok(v) => Ok(v),
         _ => Err(StdError::generic_err("No asset info weights stored")),
     }
+}
+
+// for query limit state
+
+// this will set the first key after the provided key, by appending a 1 byte
+pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
+    start_after.map(|id| {
+        let mut v = id.clone();
+        v.push(1);
+        v
+    })
 }

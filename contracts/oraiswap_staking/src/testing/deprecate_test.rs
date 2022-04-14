@@ -15,7 +15,7 @@ fn test_deprecate() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -53,10 +53,10 @@ fn test_deprecate() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // factory deposit 100 reward tokens
+    // owner of reward contract deposit 100 reward tokens
     // distribute weight => 80:20
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
+        sender: "reward".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::DepositReward {
             rewards: vec![Asset {
@@ -68,7 +68,7 @@ fn test_deprecate() {
         })
         .ok(),
     });
-    let info = mock_info("reward", &[]);
+    let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query pool and reward info

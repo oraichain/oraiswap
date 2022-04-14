@@ -10,7 +10,7 @@ fn proper_initialization() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -28,7 +28,7 @@ fn proper_initialization() {
     assert_eq!(
         ConfigResponse {
             owner: "owner".into(),
-            reward_addr: "reward".into(),
+            rewarder: "reward".into(),
             minter: "mint".into(),
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
@@ -44,7 +44,7 @@ fn update_config() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -58,7 +58,7 @@ fn update_config() {
     let info = mock_info("owner", &[]);
     let msg = HandleMsg::UpdateConfig {
         owner: Some("owner2".into()),
-        reward_addr: None,
+        rewarder: None,
     };
 
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -70,7 +70,7 @@ fn update_config() {
     assert_eq!(
         ConfigResponse {
             owner: "owner2".into(),
-            reward_addr: "reward".into(),
+            rewarder: "reward".into(),
             minter: "mint".into(),
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
@@ -82,7 +82,7 @@ fn update_config() {
     // unauthorized err
     let info = mock_info("owner", &[]);
     let msg = HandleMsg::UpdateConfig {
-        reward_addr: None,
+        rewarder: None,
         owner: None,
     };
 
@@ -99,7 +99,7 @@ fn test_register() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),

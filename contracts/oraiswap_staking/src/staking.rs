@@ -1,7 +1,7 @@
 use crate::rewards::before_share_change;
 use crate::state::{
-    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_is_migrated,
-    store_pool_info, Config, PoolInfo, RewardInfo,
+    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, stakers_store,
+    store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
     attr, to_binary, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
@@ -261,6 +261,12 @@ fn _increase_bond_amount(
     rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
     store_pool_info(storage, asset_key, &pool_info)?;
 
+    // mark this staker belong to the pool the first time
+    let mut stakers_bucket = stakers_store(storage, asset_key);
+    if stakers_bucket.may_load(staker_addr)?.is_none() {
+        stakers_bucket.save(staker_addr, &true)?;
+    }
+
     Ok(())
 }
 
@@ -308,6 +314,8 @@ fn _decrease_bond_amount(
 
     if reward_info.pending_reward.is_zero() && reward_info.bond_amount.is_zero() {
         rewards_store(storage, staker_addr).remove(asset_key);
+        // remove staker from the pool
+        stakers_store(storage, asset_key).remove(staker_addr);
     } else {
         rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
     }

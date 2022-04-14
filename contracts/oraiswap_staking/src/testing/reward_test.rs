@@ -15,7 +15,7 @@ fn test_deposit_reward() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -138,7 +138,7 @@ fn test_deposit_reward_when_no_bonding() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -247,7 +247,7 @@ fn test_before_share_changes() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -385,7 +385,7 @@ fn test_withdraw() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -468,7 +468,7 @@ fn withdraw_multiple_rewards() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),

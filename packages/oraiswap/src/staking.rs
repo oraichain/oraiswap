@@ -9,7 +9,7 @@ use cw20::Cw20ReceiveMsg;
 pub struct InitMsg {
     // default is sender
     pub owner: Option<HumanAddr>,
-    pub reward_addr: HumanAddr,
+    pub rewarder: HumanAddr,
     pub minter: Option<HumanAddr>,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
@@ -25,7 +25,7 @@ pub enum HandleMsg {
     /// Owner operations ///
     ////////////////////////
     UpdateConfig {
-        reward_addr: Option<HumanAddr>,
+        rewarder: Option<HumanAddr>,
         owner: Option<HumanAddr>,
     },
     RegisterAsset {
@@ -41,6 +41,11 @@ pub enum HandleMsg {
         asset_info: AssetInfo,
         weights: Vec<AssetInfoWeight>,
     },
+    // reward tokens are in amount proportionaly, and used by minter contract to update amounts after checking the balance, which
+    // will be used as rewards for the specified asset's staking pool.
+    DepositReward {
+        rewards: Vec<Asset>,
+    },
 
     ////////////////////////
     /// User operations ///
@@ -54,6 +59,12 @@ pub enum HandleMsg {
         // If the asset token is not given, then all rewards are withdrawn
         asset_info: Option<AssetInfo>,
     },
+    // Withdraw for others in this pool, such as when reward weights are changed for the pool
+    WithdrawOthers {
+        asset_info: Option<AssetInfo>,
+        staker_addrs: Vec<HumanAddr>,
+    },
+
     /// Provides liquidity and automatically stakes the LP tokens
     AutoStake {
         assets: [Asset; 2],
@@ -73,9 +84,6 @@ pub enum HandleMsg {
 pub enum Cw20HookMsg {
     // this call from LP token contract
     Bond { asset_info: AssetInfo },
-    // reward tokens are ow20 only, and used by admin or factory contract to deposit newly minted ORAIX tokens, which
-    // will be used as rewards for the specified asset's staking pool.
-    DepositReward { rewards: Vec<Asset> },
 }
 
 /// We currently take no arguments for migrations
@@ -99,13 +107,20 @@ pub enum QueryMsg {
         staker_addr: HumanAddr,
         asset_info: Option<AssetInfo>,
     },
+    // Query all staker belong to the pool
+    RewardInfos {
+        asset_info: AssetInfo,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+        order: Option<u8>,
+    },
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: HumanAddr,
-    pub reward_addr: HumanAddr,
+    pub rewarder: HumanAddr,
     pub minter: HumanAddr,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,

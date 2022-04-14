@@ -3,10 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::oracle::OracleContract;
-use crate::{
-    error::OverflowError,
-    querier::{query_balance, query_token_balance},
-};
+use crate::{error::OverflowError, querier::query_token_balance};
 
 use cosmwasm_std::{
     coin, to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, HumanAddr, MessageInfo,
@@ -215,7 +212,7 @@ impl AssetInfo {
                 query_token_balance(querier, contract_addr.to_owned().into(), pool_addr)
             }
             AssetInfo::NativeToken { denom, .. } => {
-                query_balance(querier, pool_addr, denom.to_string())
+                Ok(querier.query_balance(pool_addr, denom)?.amount)
             }
         }
     }

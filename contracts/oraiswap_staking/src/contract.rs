@@ -1,14 +1,18 @@
 use crate::migration::migrate_pool_infos;
-use crate::rewards::{deposit_reward, query_reward_info, withdraw_reward};
+use crate::rewards::{
+    deposit_reward, process_withdraw_reward, query_all_reward_infos, query_reward_info,
+    withdraw_reward, withdraw_reward_others,
+};
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_config, read_pool_info, read_reward_weights, store_config, store_pool_info,
+    read_config, read_pool_info, read_reward_weights, stakers_read, store_config, store_pool_info,
     store_reward_weights, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
+    attr, from_binary, to_binary, Binary, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, Order, StdError,
+    StdResult, Uint128,
 };
 use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
@@ -19,15 +23,13 @@ use oraiswap::staking::{
 use cw20::Cw20ReceiveMsg;
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
-    // make sure it works
-
     store_config(
         deps.storage,
         &Config {
             owner: deps
                 .api
                 .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
-            reward_addr: deps.api.canonical_address(&msg.reward_addr)?,
+            rewarder: deps.api.canonical_address(&msg.rewarder)?,
             minter: deps
                 .api
                 .canonical_address(&msg.minter.unwrap_or(info.sender))?,
@@ -49,13 +51,12 @@ pub fn handle(
 ) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        HandleMsg::UpdateConfig { reward_addr, owner } => {
-            update_config(deps, info, owner, reward_addr)
-        }
+        HandleMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
         HandleMsg::UpdateRewardWeights {
             asset_info,
             weights,
-        } => update_reward_weights(deps, info, asset_info, weights),
+        } => update_reward_weights(deps, env, info, asset_info, weights),
+        HandleMsg::DepositReward { rewards } => deposit_reward(deps, env, info, rewards),
         HandleMsg::RegisterAsset {
             asset_info,
             staking_token,
@@ -66,6 +67,10 @@ pub fn handle(
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
         HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
         HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
+        HandleMsg::WithdrawOthers {
+            asset_info,
+            staker_addrs,
+        } => withdraw_reward_others(deps, env, staker_addrs, asset_info),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -118,25 +123,6 @@ pub fn receive_cw20(
 
             bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
         }
-        Ok(Cw20HookMsg::DepositReward { rewards }) => {
-            let config: Config = read_config(deps.storage)?;
-
-            // only reward token contract can execute this message
-            if config.reward_addr != deps.api.canonical_address(&cw20_msg.sender)? {
-                return Err(StdError::generic_err("unauthorized"));
-            }
-
-            let mut rewards_amount = Uint128::zero();
-            for asset in rewards.iter() {
-                rewards_amount += asset.amount;
-            }
-
-            if rewards_amount != cw20_msg.amount {
-                return Err(StdError::generic_err("rewards amount miss matched"));
-            }
-
-            deposit_reward(deps, rewards, rewards_amount)
-        }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
 }
@@ -145,7 +131,7 @@ pub fn update_config(
     deps: DepsMut,
     info: MessageInfo,
     owner: Option<HumanAddr>,
-    reward_addr: Option<HumanAddr>,
+    rewarder: Option<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -157,8 +143,8 @@ pub fn update_config(
         config.owner = deps.api.canonical_address(&owner)?;
     }
 
-    if let Some(reward_addr) = reward_addr {
-        config.reward_addr = deps.api.canonical_address(&reward_addr)?;
+    if let Some(rewarder) = rewarder {
+        config.rewarder = deps.api.canonical_address(&rewarder)?;
     }
 
     store_config(deps.storage, &config)?;
@@ -169,8 +155,11 @@ pub fn update_config(
     })
 }
 
+// need to withdraw all rewards of the stakers belong to the pool
+// may need to call withdraw from backend side by querying all stakers with pagination in case out of gas
 fn update_reward_weights(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
     reward_weights: Vec<AssetInfoWeight>,
@@ -181,16 +170,53 @@ fn update_reward_weights(
         return Err(StdError::generic_err("unauthorized"));
     }
 
+    let asset_key = asset_info.to_vec(deps.api)?;
+
+    // withdraw all rewards for all stakers from this pool
+    let staker_addrs = stakers_read(deps.storage, &asset_key)
+        .range(None, None, Order::Ascending)
+        .map(|item| {
+            let (k, _) = item?;
+            Ok(CanonicalAddr::from(k))
+        })
+        .collect::<StdResult<Vec<CanonicalAddr>>>()?;
+
+    let mut messages: Vec<CosmosMsg> = vec![];
+
+    // withdraw reward for each staker
+    for staker_addr_raw in staker_addrs {
+        let reward_assets = process_withdraw_reward(
+            deps.storage,
+            deps.api,
+            staker_addr_raw.clone(),
+            Some(asset_key.clone()),
+        )?;
+
+        messages.extend(
+            reward_assets
+                .into_iter()
+                .map(|ra| {
+                    Ok(ra.into_msg(
+                        None,
+                        &deps.querier,
+                        env.contract.address.clone(),
+                        deps.api.human_address(&staker_addr_raw)?,
+                    )?)
+                })
+                .collect::<StdResult<Vec<CosmosMsg>>>()?,
+        );
+    }
+
     // convert weights to raw_weights
     let raw_weights = reward_weights
         .into_iter()
         .map(|w| Ok(w.to_raw(deps.api)?))
         .collect::<StdResult<Vec<AssetInfoRawWeight>>>()?;
 
-    store_reward_weights(deps.storage, &asset_info.to_vec(deps.api)?, raw_weights)?;
+    store_reward_weights(deps.storage, &asset_key, raw_weights)?;
 
     Ok(HandleResponse {
-        messages: vec![],
+        messages,
         attributes: vec![attr("action", "update_reward_weights")],
         data: None,
     })
@@ -294,6 +320,18 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             staker_addr,
             asset_info,
         } => to_binary(&query_reward_info(deps, staker_addr, asset_info)?),
+        QueryMsg::RewardInfos {
+            asset_info,
+            start_after,
+            limit,
+            order,
+        } => to_binary(&query_all_reward_infos(
+            deps,
+            asset_info,
+            start_after,
+            limit,
+            order,
+        )?),
     }
 }
 
@@ -301,7 +339,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
-        reward_addr: deps.api.human_address(&state.reward_addr)?,
+        rewarder: deps.api.human_address(&state.rewarder)?,
         minter: deps.api.human_address(&state.minter)?,
         oracle_addr: deps.api.human_address(&state.oracle_addr)?,
         factory_addr: deps.api.human_address(&state.factory_addr)?,

@@ -16,7 +16,7 @@ fn test_bond_tokens() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -169,7 +169,7 @@ fn test_unbond() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -296,7 +296,7 @@ fn test_increase_short_token() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -375,7 +375,7 @@ fn test_decrease_short_token() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -462,7 +462,7 @@ fn test_auto_stake() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        reward_addr: "reward".into(),
+        rewarder: "reward".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
