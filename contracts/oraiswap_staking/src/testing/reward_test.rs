@@ -15,7 +15,7 @@ fn test_deposit_reward() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -54,20 +54,15 @@ fn test_deposit_reward() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit 100 reward tokens
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
@@ -138,7 +133,7 @@ fn test_deposit_reward_when_no_bonding() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -163,20 +158,15 @@ fn test_deposit_reward_when_no_bonding() {
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
 
     // factory deposit 100 reward tokens
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
@@ -247,7 +237,7 @@ fn test_before_share_changes() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -285,21 +275,16 @@ fn test_before_share_changes() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
 
-    let info = mock_info("reward", &[]);
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
@@ -341,20 +326,15 @@ fn test_before_share_changes() {
     );
 
     // factory deposit 100 reward tokens; = 0.8 + 0.4 = 1.2 is reward_index
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond
@@ -385,7 +365,7 @@ fn test_withdraw() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -423,20 +403,15 @@ fn test_withdraw() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::Withdraw {
@@ -450,7 +425,7 @@ fn test_withdraw() {
     assert_eq!(
         res.messages,
         vec![WasmMsg::Execute {
-            contract_addr: "reward".into(),
+            contract_addr: "rewarder".into(),
             msg: to_binary(&Cw20HandleMsg::Transfer {
                 recipient: "addr".into(),
                 amount: Uint128(80u128),
@@ -468,7 +443,7 @@ fn withdraw_multiple_rewards() {
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -535,28 +510,23 @@ fn withdraw_multiple_rewards() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit asset
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(300u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![
-                Asset {
-                    info: AssetInfo::Token {
-                        contract_addr: "asset".into(),
-                    },
-                    amount: Uint128(100u128),
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset".into(),
                 },
-                Asset {
-                    info: AssetInfo::Token {
-                        contract_addr: "asset2".into(),
-                    },
-                    amount: Uint128(200u128),
+                amount: Uint128(100u128),
+            },
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: "asset2".into(),
                 },
-            ],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+                amount: Uint128(200u128),
+            },
+        ],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let data = query(
@@ -602,7 +572,7 @@ fn withdraw_multiple_rewards() {
     assert_eq!(
         res.messages,
         vec![WasmMsg::Execute {
-            contract_addr: "reward".into(),
+            contract_addr: "rewarder".into(),
             msg: to_binary(&Cw20HandleMsg::Transfer {
                 recipient: "addr".into(),
                 amount: Uint128(260u128),

@@ -34,7 +34,10 @@ pub fn deposit_reward(
         let asset_key = asset.info.to_vec(deps.api)?;
 
         // get reward_weights from this pool:
-        let reward_weights = read_reward_weights(deps.storage, &asset_key)?;
+        let reward_weights = read_reward_weights(deps.storage, &asset_key).map_err(|_err| {
+            StdError::generic_err(format!("No reward weights for '{}' stored", asset.info))
+        })?;
+
         let total_weight: u32 = reward_weights.iter().map(|rw| rw.weight).sum();
 
         // check total_amount of each asset

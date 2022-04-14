@@ -1,21 +1,25 @@
 use crate::contract::{handle, init, query};
 use crate::state::{read_pool_info, store_pool_info};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
+use cosmwasm_std::{coin, from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::mock_querier::ATOM_DENOM;
 use oraiswap::staking::{
-    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem,
+    AssetInfoWeight, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg,
+    RewardInfoResponse, RewardInfoResponseItem,
 };
 
 #[test]
 fn test_deprecate() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -39,6 +43,30 @@ fn test_deprecate() {
     let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(&mut deps.storage, &asset_key, &pool_info).unwrap();
 
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+
     // bond 100 tokens
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
@@ -55,20 +83,15 @@ fn test_deprecate() {
 
     // owner of reward contract deposit 100 reward tokens
     // distribute weight => 80:20
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "reward".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("owner", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query pool and reward info
@@ -132,20 +155,15 @@ fn test_deprecate() {
     handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // deposit more rewards
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query again
@@ -288,20 +306,15 @@ fn test_deprecate() {
 
     // deposit new rewards
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "factory".into(),
-        amount: Uint128(100u128),
-        msg: to_binary(&Cw20HookMsg::DepositReward {
-            rewards: vec![Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
-                },
-                amount: Uint128(100u128),
-            }],
-        })
-        .ok(),
-    });
-    let info = mock_info("reward", &[]);
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // expect to have 80 * 3 rewards
