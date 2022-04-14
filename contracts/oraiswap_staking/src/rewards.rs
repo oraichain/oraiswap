@@ -1,7 +1,7 @@
 use crate::state::{
-    calc_range_start, read_config, read_is_migrated, read_pool_info, read_reward_weights,
-    read_total_reward_amount, rewards_read, rewards_store, stakers_read, store_pool_info,
-    store_total_reward_amount, PoolInfo, RewardInfo, CANONICAL_LENGTH,
+    read_config, read_is_migrated, read_pool_info, read_reward_weights, read_total_reward_amount,
+    rewards_read, rewards_store, stakers_read, store_pool_info, store_total_reward_amount,
+    PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
     attr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
@@ -327,7 +327,7 @@ pub fn query_all_reward_infos(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
 
     let (start, end, order_by) = match order {
-        Some(1) => (calc_range_start(start_after), None, Order::Ascending),
+        Some(1) => (start_after, None, Order::Ascending),
         _ => (None, start_after, Order::Descending),
     };
 
@@ -410,15 +410,14 @@ fn _read_reward_infos(
 
                 before_share_change(pool_index, &mut reward_info)?;
 
-                // try convert to contract token, otherwise it is native token
-
-                let asset_info = if asset_key.len() == CANONICAL_LENGTH {
-                    AssetInfo::Token {
-                        contract_addr: api.human_address(&asset_key.into())?,
-                    }
-                } else {
+                // try convert to AssetInfo based on reward info
+                let asset_info = if reward_info.native_token {
                     AssetInfo::NativeToken {
                         denom: String::from_utf8(asset_key)?,
+                    }
+                } else {
+                    AssetInfo::Token {
+                        contract_addr: api.human_address(&asset_key.into())?,
                     }
                 };
 

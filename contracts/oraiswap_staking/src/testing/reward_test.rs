@@ -1,17 +1,22 @@
 use crate::contract::{handle, init, query};
 use crate::state::{read_pool_info, rewards_read, store_pool_info, PoolInfo, RewardInfo};
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_binary, to_binary, Api, Decimal, Uint128, WasmMsg};
+use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::{coin, coins, from_binary, to_binary, Api, BankMsg, Decimal, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::mock_querier::mock_dependencies;
+use oraiswap::mock_querier::ATOM_DENOM;
 use oraiswap::staking::{
-    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem,
+    AssetInfoWeight, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg,
+    RewardInfoResponse, RewardInfoResponseItem,
 };
 
 #[test]
 fn test_deposit_reward() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
@@ -24,6 +29,30 @@ fn test_deposit_reward() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -84,7 +113,7 @@ fn test_deposit_reward() {
         res_cmp,
         PoolInfoResponse {
             total_bond_amount: Uint128(100u128),
-            reward_index: Decimal::from_ratio(80u128, 100u128),
+            reward_index: Decimal::from_ratio(100u128, 100u128),
             ..res
         }
     );
@@ -121,7 +150,7 @@ fn test_deposit_reward() {
         res_cmp,
         PoolInfoResponse {
             total_bond_amount: Uint128(100u128),
-            reward_index: Decimal::from_ratio(60u128, 100u128),
+            reward_index: Decimal::from_ratio(100u128, 100u128),
             ..res
         }
     );
@@ -129,7 +158,10 @@ fn test_deposit_reward() {
 
 #[test]
 fn test_deposit_reward_when_no_bonding() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
@@ -142,6 +174,30 @@ fn test_deposit_reward_when_no_bonding() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -188,7 +244,7 @@ fn test_deposit_reward_when_no_bonding() {
         res_cmp,
         PoolInfoResponse {
             reward_index: Decimal::zero(),
-            pending_reward: Uint128(80u128),
+            pending_reward: Uint128(100u128),
             ..res
         }
     );
@@ -225,7 +281,7 @@ fn test_deposit_reward_when_no_bonding() {
         res_cmp,
         PoolInfoResponse {
             reward_index: Decimal::zero(),
-            pending_reward: Uint128(60u128),
+            pending_reward: Uint128(100u128),
             ..res
         }
     );
@@ -233,7 +289,10 @@ fn test_deposit_reward_when_no_bonding() {
 
 #[test]
 fn test_before_share_changes() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
@@ -246,6 +305,30 @@ fn test_before_share_changes() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -296,6 +379,7 @@ fn test_before_share_changes() {
             pending_reward: Uint128::zero(),
             bond_amount: Uint128(100u128),
             index: Decimal::zero(),
+            native_token: false,
         },
         reward_info
     );
@@ -318,9 +402,10 @@ fn test_before_share_changes() {
     let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
     assert_eq!(
         RewardInfo {
-            pending_reward: Uint128(80u128),
+            pending_reward: Uint128(100u128),
             bond_amount: Uint128(200u128),
-            index: Decimal::from_ratio(80u128, 100u128),
+            index: Decimal::from_ratio(100u128, 100u128),
+            native_token: false,
         },
         reward_info
     );
@@ -351,9 +436,10 @@ fn test_before_share_changes() {
     let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
     assert_eq!(
         RewardInfo {
-            pending_reward: Uint128(160u128),
+            pending_reward: Uint128(200u128),
             bond_amount: Uint128(100u128),
-            index: Decimal::from_ratio(120u128, 100u128),
+            index: Decimal::from_ratio(150u128, 100u128),
+            native_token: false,
         },
         reward_info
     );
@@ -361,7 +447,19 @@ fn test_before_share_changes() {
 
 #[test]
 fn test_withdraw() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
+
+    // update other contract token balance
+    deps.querier.with_token_balances(&[(
+        &"reward".to_string(),
+        &[(
+            &MOCK_CONTRACT_ADDR.to_string(),
+            &Uint128::from(10000000000u128),
+        )],
+    )]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
@@ -374,6 +472,36 @@ fn test_withdraw() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::Token {
+                    contract_addr: "reward".into(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -424,22 +552,48 @@ fn test_withdraw() {
 
     assert_eq!(
         res.messages,
-        vec![WasmMsg::Execute {
-            contract_addr: "rewarder".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: "addr".into(),
-                amount: Uint128(80u128),
-            })
-            .unwrap(),
-            send: vec![],
-        }
-        .into()]
+        vec![
+            BankMsg::Send {
+                from_address: MOCK_CONTRACT_ADDR.into(),
+                to_address: "addr".into(),
+                amount: coins(20u128, ORAI_DENOM.to_string())
+            }
+            .into(),
+            BankMsg::Send {
+                from_address: MOCK_CONTRACT_ADDR.into(),
+                to_address: "addr".into(),
+                amount: coins(40u128, ATOM_DENOM.to_string())
+            }
+            .into(),
+            WasmMsg::Execute {
+                contract_addr: "reward".into(),
+                msg: to_binary(&Cw20HandleMsg::Transfer {
+                    recipient: "addr".into(),
+                    amount: Uint128(40u128),
+                })
+                .unwrap(),
+                send: vec![],
+            }
+            .into()
+        ]
     );
 }
 
 #[test]
 fn withdraw_multiple_rewards() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
+
+    // update other contract token balance
+    deps.querier.with_token_balances(&[(
+        &"reward".to_string(),
+        &[(
+            &MOCK_CONTRACT_ADDR.to_string(),
+            &Uint128::from(10000000000u128),
+        )],
+    )]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
@@ -452,6 +606,64 @@ fn withdraw_multiple_rewards() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // set reward weights for asset
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::Token {
+                    contract_addr: "reward".into(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    let msg = HandleMsg::UpdateRewardWeights {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset2".into(),
+        },
+        weights: vec![
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                weight: 100,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                weight: 200,
+            },
+            AssetInfoWeight {
+                info: AssetInfo::Token {
+                    contract_addr: "reward".into(),
+                },
+                weight: 200,
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -549,7 +761,7 @@ fn withdraw_multiple_rewards() {
                         contract_addr: "asset".into()
                     },
                     bond_amount: Uint128(100u128),
-                    pending_reward: Uint128(80u128),
+                    pending_reward: Uint128(100u128),
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
@@ -557,7 +769,7 @@ fn withdraw_multiple_rewards() {
                         contract_addr: "asset2".into()
                     },
                     bond_amount: Uint128(1000u128),
-                    pending_reward: Uint128(160u128),
+                    pending_reward: Uint128(200u128),
                     should_migrate: None,
                 },
             ],
@@ -571,16 +783,30 @@ fn withdraw_multiple_rewards() {
 
     assert_eq!(
         res.messages,
-        vec![WasmMsg::Execute {
-            contract_addr: "rewarder".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: "addr".into(),
-                amount: Uint128(260u128),
-            })
-            .unwrap(),
-            send: vec![],
-        }
-        .into()]
+        vec![
+            BankMsg::Send {
+                from_address: MOCK_CONTRACT_ADDR.into(),
+                to_address: "addr".into(),
+                amount: coins(60u128, ORAI_DENOM.to_string())
+            }
+            .into(),
+            BankMsg::Send {
+                from_address: MOCK_CONTRACT_ADDR.into(),
+                to_address: "addr".into(),
+                amount: coins(120u128, ATOM_DENOM.to_string())
+            }
+            .into(),
+            WasmMsg::Execute {
+                contract_addr: "reward".into(),
+                msg: to_binary(&Cw20HandleMsg::Transfer {
+                    recipient: "addr".into(),
+                    amount: Uint128(120u128),
+                })
+                .unwrap(),
+                send: vec![],
+            }
+            .into()
+        ]
     );
 
     let data = query(

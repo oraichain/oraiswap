@@ -113,7 +113,7 @@ fn test_deprecate() {
         res_cmp,
         PoolInfoResponse {
             total_bond_amount: Uint128(100u128),
-            reward_index: Decimal::from_ratio(80u128, 100u128),
+            reward_index: Decimal::from_ratio(100u128, 100u128),
             migration_index_snapshot: None,
             migration_deprecated_staking_token: None,
             ..res
@@ -124,6 +124,9 @@ fn test_deprecate() {
         mock_env(),
         QueryMsg::RewardInfo {
             asset_info: None,
+            // asset_info: Some(AssetInfo::Token {
+            //     contract_addr: "asset".into(),
+            // }),
             staker_addr: "addr".into(),
         },
     )
@@ -135,10 +138,10 @@ fn test_deprecate() {
             staker_addr: "addr".into(),
             reward_infos: vec![RewardInfoResponseItem {
                 asset_info: AssetInfo::Token {
-                    contract_addr: "asset".into()
+                    contract_addr: "asset".into(),
                 },
                 bond_amount: Uint128(100u128),
-                pending_reward: Uint128(80u128),
+                pending_reward: Uint128(100u128),
                 should_migrate: None,
             }],
         }
@@ -186,10 +189,10 @@ fn test_deprecate() {
         PoolInfoResponse {
             staking_token: "new_staking".into(),
             total_bond_amount: Uint128::zero(), // reset
-            reward_index: Decimal::from_ratio(80u128, 100u128), // stays the same
-            migration_index_snapshot: Some(Decimal::from_ratio(80u128, 100u128)),
+            reward_index: Decimal::from_ratio(100u128, 100u128), // stays the same
+            migration_index_snapshot: Some(Decimal::from_ratio(100u128, 100u128)),
             migration_deprecated_staking_token: Some("staking".into()),
-            pending_reward: Uint128(80u128), // new reward waiting here
+            pending_reward: Uint128(100u128), // new reward waiting here
             ..res
         }
     );
@@ -212,8 +215,8 @@ fn test_deprecate() {
                     contract_addr: "asset".into()
                 },
                 bond_amount: Uint128(100u128),
-                pending_reward: Uint128(80u128), // did not change
-                should_migrate: Some(true),      // non-short pos should migrate
+                pending_reward: Uint128(100u128), // did not change
+                should_migrate: Some(true),       // non-short pos should migrate
             }],
         }
     );
@@ -284,8 +287,8 @@ fn test_deprecate() {
                     contract_addr: "asset".into()
                 },
                 bond_amount: Uint128::zero(),
-                pending_reward: Uint128(80u128), // still the same
-                should_migrate: None,            // now its back to empty
+                pending_reward: Uint128(100u128), // still the same
+                should_migrate: None,             // now its back to empty
             },],
         }
     );
@@ -338,7 +341,7 @@ fn test_deprecate() {
                     contract_addr: "asset".into()
                 },
                 bond_amount: Uint128(100u128),
-                pending_reward: Uint128(240u128), // 80 * 3
+                pending_reward: Uint128(300u128), // 100 * 3
                 should_migrate: None,
             },],
         }

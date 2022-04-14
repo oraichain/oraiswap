@@ -13,8 +13,6 @@ static PREFIX_TOTAL_REWARD_AMOUNT: &[u8] = b"total_reward_amount"; // total_amou
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
 static PREFIX_REWARD_WEIGHT: &[u8] = b"reward_weight";
 
-pub const CANONICAL_LENGTH: usize = 20;
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
@@ -74,6 +72,7 @@ pub fn read_total_reward_amount(storage: &dyn Storage, asset_key: &[u8]) -> StdR
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfo {
+    pub native_token: bool,
     pub index: Decimal,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
@@ -138,15 +137,4 @@ pub fn read_reward_weights(
     let weight_bucket: ReadonlyBucket<Vec<AssetInfoRawWeight>> =
         ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHT);
     weight_bucket.load(asset_key)
-}
-
-// for query limit state
-
-// this will set the first key after the provided key, by appending a 1 byte
-pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
-    start_after.map(|id| {
-        let mut v = id.clone();
-        v.push(1);
-        v
-    })
 }

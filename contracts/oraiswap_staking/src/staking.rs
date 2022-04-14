@@ -4,7 +4,7 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
+    attr, to_binary, Api, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
@@ -21,8 +21,13 @@ pub fn bond(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key = asset_info.to_vec(deps.api)?;
-    _increase_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount)?;
+    _increase_bond_amount(
+        deps.storage,
+        deps.api,
+        &staker_addr_raw,
+        &asset_info,
+        amount,
+    )?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -43,9 +48,13 @@ pub fn unbond(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let staking_token: CanonicalAddr =
-        _decrease_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount)?;
+    let staking_token: CanonicalAddr = _decrease_bond_amount(
+        deps.storage,
+        deps.api,
+        &staker_addr_raw,
+        &asset_info,
+        amount,
+    )?;
     let staking_token_addr = deps.api.human_address(&staking_token)?;
 
     Ok(HandleResponse {
@@ -225,14 +234,17 @@ pub fn auto_stake_hook(
 
 fn _increase_bond_amount(
     storage: &mut dyn Storage,
+    api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_key: &[u8],
+    asset_info: &AssetInfo,
     amount: Uint128,
 ) -> StdResult<()> {
+    let asset_key = &asset_info.to_vec(api)?;
     let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
     let mut reward_info: RewardInfo = rewards_read(storage, staker_addr)
         .load(asset_key)
         .unwrap_or_else(|_| RewardInfo {
+            native_token: asset_info.is_native_token(),
             index: Decimal::zero(),
             bond_amount: Uint128::zero(),
             pending_reward: Uint128::zero(),
@@ -272,10 +284,12 @@ fn _increase_bond_amount(
 
 fn _decrease_bond_amount(
     storage: &mut dyn Storage,
+    api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_key: &[u8],
+    asset_info: &AssetInfo,
     amount: Uint128,
 ) -> StdResult<CanonicalAddr> {
+    let asset_key = &asset_info.to_vec(api)?;
     let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
     let mut reward_info: RewardInfo = rewards_read(storage, staker_addr).load(asset_key)?;
 
