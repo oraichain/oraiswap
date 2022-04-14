@@ -12,7 +12,7 @@ use cw20::Cw20HandleMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::HandleMsg as PairHandleMsg;
-use oraiswap::querier::{query_balance, query_pair_config, query_pair_info, query_token_balance};
+use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
 use oraiswap::router::{HandleMsg, SwapOperation};
 
 /// Execute swap operation
@@ -46,7 +46,9 @@ pub fn handle_swap_operation(
 
             let amount = match offer_asset_info.clone() {
                 AssetInfo::NativeToken { denom } => {
-                    query_balance(&deps.querier, env.contract.address, denom)?
+                    deps.querier
+                        .query_balance(env.contract.address, &denom)?
+                        .amount
                 }
                 AssetInfo::Token { contract_addr } => {
                     query_token_balance(&deps.querier, contract_addr.into(), env.contract.address)?

@@ -3,35 +3,9 @@ use crate::factory::{ConfigResponse, QueryMsg as FactoryQueryMsg};
 use crate::pair::{QueryMsg as PairQueryMsg, ReverseSimulationResponse, SimulationResponse};
 
 use cosmwasm_std::{
-    to_binary, AllBalanceResponse, BalanceResponse, BankQuery, Coin, HumanAddr, QuerierWrapper,
-    QueryRequest, StdResult, Uint128, WasmQuery,
+    to_binary, HumanAddr, QuerierWrapper, QueryRequest, StdResult, Uint128, WasmQuery,
 };
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
-
-pub fn query_balance(
-    querier: &QuerierWrapper,
-    account_addr: HumanAddr,
-    denom: String,
-) -> StdResult<Uint128> {
-    // load price form the oracle
-    let balance: BalanceResponse = querier.query(&QueryRequest::Bank(BankQuery::Balance {
-        address: account_addr,
-        denom,
-    }))?;
-    Ok(balance.amount.amount)
-}
-
-pub fn query_all_balances(
-    querier: &QuerierWrapper,
-    account_addr: HumanAddr,
-) -> StdResult<Vec<Coin>> {
-    // load price form the oracle
-    let all_balances: AllBalanceResponse =
-        querier.query(&QueryRequest::Bank(BankQuery::AllBalances {
-            address: account_addr,
-        }))?;
-    Ok(all_balances.amount)
-}
 
 pub fn query_token_balance(
     querier: &QuerierWrapper,

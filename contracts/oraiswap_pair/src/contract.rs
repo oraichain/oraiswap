@@ -230,12 +230,12 @@ pub fn provide_liquidity(
     let deposits: [Uint128; 2] = [
         assets
             .iter()
-            .find(|a| a.info.equal(&pools[0].info))
+            .find(|a| a.info.eq(&pools[0].info))
             .map(|a| a.amount)
             .expect("Wrong asset info is given"),
         assets
             .iter()
-            .find(|a| a.info.equal(&pools[1].info))
+            .find(|a| a.info.eq(&pools[1].info))
             .map(|a| a.amount)
             .expect("Wrong asset info is given"),
     ];
@@ -341,13 +341,13 @@ pub fn withdraw_liquidity(
     Ok(HandleResponse {
         messages: vec![
             refund_assets[0].clone().into_msg(
-                &oracle_contract,
+                Some(&oracle_contract),
                 &deps.querier,
                 env.contract.address.clone(),
                 sender.clone(),
             )?,
             refund_assets[1].clone().into_msg(
-                &oracle_contract,
+                Some(&oracle_contract),
                 &deps.querier,
                 env.contract.address,
                 sender.clone(),
@@ -397,13 +397,13 @@ pub fn swap(
 
     // If the asset balance is already increased
     // To calculated properly we should subtract user deposit from the pool
-    if offer_asset.info.equal(&pools[0].info) {
+    if offer_asset.info.eq(&pools[0].info) {
         offer_pool = Asset {
             amount: Asset::checked_sub(pools[0].amount, offer_asset.amount)?,
             info: pools[0].info.clone(),
         };
         ask_pool = pools[1].clone();
-    } else if offer_asset.info.equal(&pools[1].info) {
+    } else if offer_asset.info.eq(&pools[1].info) {
         offer_pool = Asset {
             amount: Asset::checked_sub(pools[1].amount, offer_asset.amount)?,
             info: pools[1].info.clone(),
@@ -446,7 +446,7 @@ pub fn swap(
     let mut messages: Vec<CosmosMsg> = vec![];
     if !return_amount.is_zero() {
         messages.push(return_asset.into_msg(
-            &oracle_contract,
+            Some(&oracle_contract),
             &deps.querier,
             env.contract.address,
             receiver.clone(),
@@ -521,10 +521,10 @@ pub fn query_simulation(
 
     let offer_pool: Asset;
     let ask_pool: Asset;
-    if offer_asset.info.equal(&pools[0].info) {
+    if offer_asset.info.eq(&pools[0].info) {
         offer_pool = pools[0].clone();
         ask_pool = pools[1].clone();
-    } else if offer_asset.info.equal(&pools[1].info) {
+    } else if offer_asset.info.eq(&pools[1].info) {
         offer_pool = pools[1].clone();
         ask_pool = pools[0].clone();
     } else {
@@ -557,10 +557,10 @@ pub fn query_reverse_simulation(
 
     let offer_pool: Asset;
     let ask_pool: Asset;
-    if ask_asset.info.equal(&pools[0].info) {
+    if ask_asset.info.eq(&pools[0].info) {
         ask_pool = pools[0].clone();
         offer_pool = pools[1].clone();
-    } else if ask_asset.info.equal(&pools[1].info) {
+    } else if ask_asset.info.eq(&pools[1].info) {
         ask_pool = pools[1].clone();
         offer_pool = pools[0].clone();
     } else {

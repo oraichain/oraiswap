@@ -1,3 +1,4 @@
+use oraiswap::staking::AssetInfoRawWeight;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -6,23 +7,20 @@ use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config";
 pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
-
 static PREFIX_REWARD: &[u8] = b"reward";
-static PREFIX_SHORT_REWARD: &[u8] = b"short_reward";
-
+static PREFIX_STAKER: &[u8] = b"staker";
+static PREFIX_TOTAL_REWARD_AMOUNT: &[u8] = b"total_reward_amount"; // total_amount for each reward asset, use this to check balance when deposit
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
+static PREFIX_REWARD_WEIGHT: &[u8] = b"reward_weight";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
-    pub reward_addr: CanonicalAddr,
+    pub rewarder: CanonicalAddr,
     pub minter: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,
-    pub premium_min_update_interval: u64,
-    // > premium_rate => < reward_weight
-    pub short_reward_bound: (Decimal, Decimal),
 }
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
@@ -37,14 +35,8 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<Config> {
 pub struct PoolInfo {
     pub staking_token: CanonicalAddr,
     pub pending_reward: Uint128, // not distributed amount due to zero bonding
-    pub short_pending_reward: Uint128, // not distributed amount due to zero bonding
     pub total_bond_amount: Uint128,
-    pub total_short_amount: Uint128,
     pub reward_index: Decimal,
-    pub short_reward_index: Decimal,
-    pub premium_rate: Decimal,
-    pub short_reward_weight: Decimal,
-    pub premium_updated_time: u64,
     pub migration_params: Option<MigrationParams>,
 }
 
@@ -66,8 +58,21 @@ pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Pool
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
+pub fn store_total_reward_amount(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    total_amount: &Uint128,
+) -> StdResult<()> {
+    Bucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).save(asset_key, total_amount)
+}
+
+pub fn read_total_reward_amount(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Uint128> {
+    ReadonlyBucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).load(asset_key)
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfo {
+    pub native_token: bool,
     pub index: Decimal,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
@@ -77,13 +82,8 @@ pub struct RewardInfo {
 pub fn rewards_store<'a>(
     storage: &'a mut dyn Storage,
     owner: &CanonicalAddr,
-    is_short: bool,
 ) -> Bucket<'a, RewardInfo> {
-    if is_short {
-        Bucket::multilevel(storage, &[PREFIX_SHORT_REWARD, owner.as_slice()])
-    } else {
-        Bucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
-    }
+    Bucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
 }
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)
@@ -91,13 +91,19 @@ pub fn rewards_store<'a>(
 pub fn rewards_read<'a>(
     storage: &'a dyn Storage,
     owner: &CanonicalAddr,
-    is_short: bool,
 ) -> ReadonlyBucket<'a, RewardInfo> {
-    if is_short {
-        ReadonlyBucket::multilevel(storage, &[PREFIX_SHORT_REWARD, owner.as_slice()])
-    } else {
-        ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
-    }
+    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
+}
+
+/// returns a bucket with all stakers belong by this owner (query it by owner)
+pub fn stakers_store<'a>(storage: &'a mut dyn Storage, asset_key: &[u8]) -> Bucket<'a, bool> {
+    Bucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
+}
+
+/// returns a bucket with all rewards owned by this owner (query it by owner)
+/// (read-only version for queries)
+pub fn stakers_read<'a>(storage: &'a dyn Storage, asset_key: &[u8]) -> ReadonlyBucket<'a, bool> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
 }
 
 pub fn store_is_migrated(
@@ -112,4 +118,23 @@ pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &Canoni
     ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()])
         .load(asset_key)
         .unwrap_or(false)
+}
+
+pub fn store_reward_weights(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    weights: Vec<AssetInfoRawWeight>,
+) -> StdResult<()> {
+    let mut weight_bucket: Bucket<Vec<AssetInfoRawWeight>> =
+        Bucket::new(storage, PREFIX_REWARD_WEIGHT);
+    weight_bucket.save(asset_key, &weights)
+}
+
+pub fn read_reward_weights(
+    storage: &dyn Storage,
+    asset_key: &[u8],
+) -> StdResult<Vec<AssetInfoRawWeight>> {
+    let weight_bucket: ReadonlyBucket<Vec<AssetInfoRawWeight>> =
+        ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHT);
+    weight_bucket.load(asset_key)
 }

@@ -1,9 +1,7 @@
 use crate::asset::{Asset, AssetInfo, PairInfo};
-use crate::mock_querier::mock_dependencies;
+use crate::mock_querier::{mock_dependencies, query_all_balances, query_balance};
 use crate::oracle::OracleContract;
-use crate::querier::{
-    query_all_balances, query_balance, query_pair_info, query_supply, query_token_balance,
-};
+use crate::querier::{query_pair_info, query_supply, query_token_balance};
 
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 use cosmwasm_std::{to_binary, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
@@ -104,13 +102,13 @@ fn test_asset_info() {
         denom: "uusd".to_string(),
     };
 
-    assert!(!token_info.equal(&native_token_info));
+    assert!(!token_info.eq(&native_token_info));
 
-    assert!(!token_info.equal(&AssetInfo::Token {
+    assert!(!token_info.eq(&AssetInfo::Token {
         contract_addr: "asset0001".into(),
     }));
 
-    assert!(token_info.equal(&AssetInfo::Token {
+    assert!(token_info.eq(&AssetInfo::Token {
         contract_addr: "asset0000".into(),
     }));
 
@@ -209,7 +207,7 @@ fn test_asset() {
     assert_eq!(
         token_asset
             .into_msg(
-                &orai_oracle,
+                Some(&orai_oracle),
                 &deps.as_ref().querier,
                 MOCK_CONTRACT_ADDR.into(),
                 "addr0000".into()
@@ -229,7 +227,7 @@ fn test_asset() {
     assert_eq!(
         native_token_asset
             .into_msg(
-                &orai_oracle,
+                Some(&orai_oracle),
                 &deps.as_ref().querier,
                 MOCK_CONTRACT_ADDR.into(),
                 "addr0000".into()

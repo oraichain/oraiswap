@@ -5,7 +5,6 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::to_length_prefixed;
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw, ORAI_DENOM};
-use oraiswap::pair::DEFAULT_COMMISSION_RATE;
 use std::collections::HashMap;
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
@@ -72,6 +71,7 @@ impl WasmMockQuerier {
         match &request {
             QueryRequest::Wasm(WasmQuery::Raw { contract_addr, key }) => {
                 let key: &[u8] = key.as_slice();
+
                 let prefix_pair_info = to_length_prefixed(b"pair_info");
                 if key.eq(&prefix_pair_info) {
                     let pair_info: PairInfo =
@@ -86,8 +86,8 @@ impl WasmMockQuerier {
                         };
 
                     let api: MockApi = MockApi::default();
-                    SystemResult::Ok(ContractResult::from(to_binary(&PairInfoRaw {
-                        oracle_addr: api.canonical_address(&"oracle0000".into()).unwrap(),
+                    let pair_info_raw = PairInfoRaw {
+                        oracle_addr: api.canonical_address(&pair_info.oracle_addr).unwrap(),
                         contract_addr: api.canonical_address(&pair_info.contract_addr).unwrap(),
                         liquidity_token: api.canonical_address(&pair_info.liquidity_token).unwrap(),
                         asset_infos: [
@@ -98,8 +98,9 @@ impl WasmMockQuerier {
                                 denom: ORAI_DENOM.to_string(),
                             },
                         ],
-                        commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
-                    })))
+                        commission_rate: pair_info.commission_rate,
+                    };
+                    SystemResult::Ok(ContractResult::from(to_binary(&pair_info_raw)))
                 } else {
                     panic!("DO NOT ENTER HERE")
                 }

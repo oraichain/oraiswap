@@ -1,19 +1,23 @@
 use crate::migration::migrate_pool_infos;
-use crate::rewards::{adjust_premium, deposit_reward, query_reward_info, withdraw_reward};
-use crate::staking::{
-    auto_stake, auto_stake_hook, bond, decrease_short_token, increase_short_token, unbond,
+use crate::rewards::{
+    deposit_reward, process_withdraw_reward, query_all_reward_infos, query_reward_info,
+    withdraw_reward, withdraw_reward_others,
 };
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_config, read_pool_info, store_config, store_pool_info, Config, MigrationParams, PoolInfo,
+    read_config, read_pool_info, read_reward_weights, stakers_read, store_config, store_pool_info,
+    store_reward_weights, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
+    attr, from_binary, to_binary, Binary, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, Order, StdError,
+    StdResult, Uint128,
 };
 use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
+    AssetInfoRawWeight, AssetInfoWeight, ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg,
+    MigrateMsg, PoolInfoResponse, QueryMsg,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -25,8 +29,7 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
             owner: deps
                 .api
                 .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
-            reward_addr: deps.api.canonical_address(&msg.reward_addr)?,
-            // this is for minting short token
+            rewarder: deps.api.canonical_address(&msg.rewarder)?,
             minter: deps
                 .api
                 .canonical_address(&msg.minter.unwrap_or(info.sender))?,
@@ -34,11 +37,6 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
             factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
-            premium_min_update_interval: msg.premium_min_update_interval.unwrap_or(7600), // 2 hours
-            // premium rate > 7% then reward_weight = 40%
-            short_reward_bound: msg
-                .short_reward_bound
-                .unwrap_or((Decimal::percent(7), Decimal::percent(40))),
         },
     )?;
 
@@ -53,17 +51,12 @@ pub fn handle(
 ) -> StdResult<HandleResponse> {
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        HandleMsg::UpdateConfig {
-            owner,
-            premium_min_update_interval,
-            short_reward_bound,
-        } => update_config(
-            deps,
-            info,
-            owner,
-            premium_min_update_interval,
-            short_reward_bound,
-        ),
+        HandleMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
+        HandleMsg::UpdateRewardWeights {
+            asset_info,
+            weights,
+        } => update_reward_weights(deps, env, info, asset_info, weights),
+        HandleMsg::DepositReward { rewards } => deposit_reward(deps, env, info, rewards),
         HandleMsg::RegisterAsset {
             asset_info,
             staking_token,
@@ -73,18 +66,11 @@ pub fn handle(
             new_staking_token,
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
         HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
-        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, info, asset_info),
-        HandleMsg::AdjustPremium { asset_tokens } => adjust_premium(deps, env, asset_tokens),
-        HandleMsg::IncreaseShortToken {
-            staker_addr,
-            asset_token,
-            amount,
-        } => increase_short_token(deps, info, staker_addr, asset_token, amount),
-        HandleMsg::DecreaseShortToken {
-            staker_addr,
-            asset_token,
-            amount,
-        } => decrease_short_token(deps, info, staker_addr, asset_token, amount),
+        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
+        HandleMsg::WithdrawOthers {
+            asset_info,
+            staker_addrs,
+        } => withdraw_reward_others(deps, env, staker_addrs, asset_info),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -137,25 +123,6 @@ pub fn receive_cw20(
 
             bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
         }
-        Ok(Cw20HookMsg::DepositReward { rewards }) => {
-            let config: Config = read_config(deps.storage)?;
-
-            // only reward token contract can execute this message
-            if config.reward_addr != deps.api.canonical_address(&info.sender)? {
-                return Err(StdError::generic_err("unauthorized"));
-            }
-
-            let mut rewards_amount = Uint128::zero();
-            for asset in rewards.iter() {
-                rewards_amount += asset.amount;
-            }
-
-            if rewards_amount != cw20_msg.amount {
-                return Err(StdError::generic_err("rewards amount miss matched"));
-            }
-
-            deposit_reward(deps, rewards, rewards_amount)
-        }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
 }
@@ -164,8 +131,7 @@ pub fn update_config(
     deps: DepsMut,
     info: MessageInfo,
     owner: Option<HumanAddr>,
-    premium_min_update_interval: Option<u64>,
-    short_reward_bound: Option<(Decimal, Decimal)>,
+    rewarder: Option<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -177,18 +143,81 @@ pub fn update_config(
         config.owner = deps.api.canonical_address(&owner)?;
     }
 
-    if let Some(premium_min_update_interval) = premium_min_update_interval {
-        config.premium_min_update_interval = premium_min_update_interval;
-    }
-
-    if let Some(short_reward_bound) = short_reward_bound {
-        config.short_reward_bound = short_reward_bound;
+    if let Some(rewarder) = rewarder {
+        config.rewarder = deps.api.canonical_address(&rewarder)?;
     }
 
     store_config(deps.storage, &config)?;
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![attr("action", "update_config")],
+        data: None,
+    })
+}
+
+// need to withdraw all rewards of the stakers belong to the pool
+// may need to call withdraw from backend side by querying all stakers with pagination in case out of gas
+fn update_reward_weights(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    asset_info: AssetInfo,
+    reward_weights: Vec<AssetInfoWeight>,
+) -> StdResult<HandleResponse> {
+    let config: Config = read_config(deps.storage)?;
+
+    if deps.api.canonical_address(&info.sender)? != config.owner {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    let asset_key = asset_info.to_vec(deps.api)?;
+
+    // withdraw all rewards for all stakers from this pool
+    let staker_addrs = stakers_read(deps.storage, &asset_key)
+        .range(None, None, Order::Ascending)
+        .map(|item| {
+            let (k, _) = item?;
+            Ok(CanonicalAddr::from(k))
+        })
+        .collect::<StdResult<Vec<CanonicalAddr>>>()?;
+
+    let mut messages: Vec<CosmosMsg> = vec![];
+
+    // withdraw reward for each staker
+    for staker_addr_raw in staker_addrs {
+        let reward_assets = process_withdraw_reward(
+            deps.storage,
+            deps.api,
+            staker_addr_raw.clone(),
+            Some(asset_key.clone()),
+        )?;
+
+        messages.extend(
+            reward_assets
+                .into_iter()
+                .map(|ra| {
+                    Ok(ra.into_msg(
+                        None,
+                        &deps.querier,
+                        env.contract.address.clone(),
+                        deps.api.human_address(&staker_addr_raw)?,
+                    )?)
+                })
+                .collect::<StdResult<Vec<CosmosMsg>>>()?,
+        );
+    }
+
+    // convert weights to raw_weights
+    let raw_weights = reward_weights
+        .into_iter()
+        .map(|w| Ok(w.to_raw(deps.api)?))
+        .collect::<StdResult<Vec<AssetInfoRawWeight>>>()?;
+
+    store_reward_weights(deps.storage, &asset_key, raw_weights)?;
+
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![attr("action", "update_reward_weights")],
         data: None,
     })
 }
@@ -217,14 +246,8 @@ fn register_asset(
         &PoolInfo {
             staking_token: deps.api.canonical_address(&staking_token)?,
             total_bond_amount: Uint128::zero(),
-            total_short_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
-            short_reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
-            short_pending_reward: Uint128::zero(),
-            premium_rate: Decimal::zero(),
-            short_reward_weight: Decimal::zero(),
-            premium_updated_time: 0,
             migration_params: None,
         },
     )?;
@@ -290,10 +313,25 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
+        QueryMsg::RewardWeights { asset_info } => {
+            to_binary(&query_reward_weights(deps, asset_info)?)
+        }
         QueryMsg::RewardInfo {
             staker_addr,
             asset_info,
         } => to_binary(&query_reward_info(deps, staker_addr, asset_info)?),
+        QueryMsg::RewardInfos {
+            asset_info,
+            start_after,
+            limit,
+            order,
+        } => to_binary(&query_all_reward_infos(
+            deps,
+            asset_info,
+            start_after,
+            limit,
+            order,
+        )?),
     }
 }
 
@@ -301,12 +339,11 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
-        reward_addr: deps.api.human_address(&state.reward_addr)?,
+        rewarder: deps.api.human_address(&state.rewarder)?,
         minter: deps.api.human_address(&state.minter)?,
         oracle_addr: deps.api.human_address(&state.oracle_addr)?,
         factory_addr: deps.api.human_address(&state.factory_addr)?,
         base_denom: state.base_denom,
-        premium_min_update_interval: state.premium_min_update_interval,
     };
 
     Ok(resp)
@@ -319,14 +356,8 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
         asset_info,
         staking_token: deps.api.human_address(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
-        total_short_amount: pool_info.total_short_amount,
         reward_index: pool_info.reward_index,
-        short_reward_index: pool_info.short_reward_index,
         pending_reward: pool_info.pending_reward,
-        short_pending_reward: pool_info.short_pending_reward,
-        premium_rate: pool_info.premium_rate,
-        short_reward_weight: pool_info.short_reward_weight,
-        premium_updated_time: pool_info.premium_updated_time,
         migration_deprecated_staking_token: pool_info.migration_params.clone().map(|params| {
             deps.api
                 .human_address(&params.deprecated_staking_token)
@@ -336,6 +367,17 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
             .migration_params
             .map(|params| params.index_snapshot),
     })
+}
+
+pub fn query_reward_weights(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<AssetInfoWeight>> {
+    let asset_key = asset_info.to_vec(deps.api)?;
+
+    let raw_weights = read_reward_weights(deps.storage, &asset_key)?;
+
+    raw_weights
+        .into_iter()
+        .map(|w| Ok(w.to_normal(deps.api)?))
+        .collect()
 }
 
 // migrate contract
