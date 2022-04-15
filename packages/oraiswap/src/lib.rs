@@ -1,4 +1,5 @@
 pub mod asset;
+pub mod distributor;
 pub mod error;
 pub mod factory;
 pub mod hook;
