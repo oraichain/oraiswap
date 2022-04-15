@@ -138,3 +138,20 @@ pub fn read_reward_weights(
         ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHT);
     weight_bucket.load(asset_key)
 }
+
+// upper bound key by 1, for Order::Ascending
+pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
+    start_after.map(|input| {
+        let mut copy = input.clone();
+        // zero out all trailing 255, increment first that is not such
+        for i in (0..input.len()).rev() {
+            if copy[i] == 255 {
+                copy[i] = 0;
+            } else {
+                copy[i] += 1;
+                break;
+            }
+        }
+        copy
+    })
+}

@@ -112,7 +112,8 @@ pub enum QueryMsg {
         asset_info: AssetInfo,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
-        order: Option<u8>,
+        // so can convert or throw error
+        order: Option<i32>,
     },
 }
 

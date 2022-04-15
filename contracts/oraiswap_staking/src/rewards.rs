@@ -1,7 +1,9 @@
+use std::convert::TryFrom;
+
 use crate::state::{
-    read_config, read_is_migrated, read_pool_info, read_reward_weights, read_total_reward_amount,
-    rewards_read, rewards_store, stakers_read, store_pool_info, store_total_reward_amount,
-    PoolInfo, RewardInfo,
+    calc_range_start, read_config, read_is_migrated, read_pool_info, read_reward_weights,
+    read_total_reward_amount, rewards_read, rewards_store, stakers_read, store_pool_info,
+    store_total_reward_amount, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
     attr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
@@ -317,8 +319,10 @@ pub fn query_all_reward_infos(
     asset_info: AssetInfo,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
-    order: Option<u8>,
+    order: Option<i32>,
 ) -> StdResult<Vec<RewardInfoResponse>> {
+    // default is Ascending
+    let order_by = Order::try_from(order.unwrap_or(1))?;
     let asset_key = asset_info.to_vec(deps.api)?;
     let start_after = start_after
         .map_or(None, |a| deps.api.canonical_address(&a).ok())
@@ -326,9 +330,9 @@ pub fn query_all_reward_infos(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
 
-    let (start, end, order_by) = match order {
-        Some(1) => (start_after, None, Order::Ascending),
-        _ => (None, start_after, Order::Descending),
+    let (start, end) = match order_by {
+        Order::Ascending => (calc_range_start(start_after), None),
+        Order::Descending => (None, start_after),
     };
 
     let info_responses = stakers_read(deps.storage, &asset_key)
