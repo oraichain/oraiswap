@@ -182,10 +182,6 @@ impl WasmMockQuerier {
         self.pool_assets = pool_assets;
     }
 
-    pub fn with_oracle_price(&mut self, oracle_price: Decimal) {
-        self.oracle_price = oracle_price;
-    }
-
     pub fn with_token_balance(&mut self, token_balance: Uint128) {
         self.token_balance = token_balance;
     }

@@ -1,7 +1,8 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_binary, from_slice, to_binary, Coin, ContractResult, Decimal, Empty, OwnedDeps, Querier,
-    QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    from_binary, from_slice, to_binary, AllBalanceResponse, BalanceResponse, BankQuery, Coin,
+    ContractResult, Decimal, Empty, HumanAddr, OwnedDeps, Querier, QuerierResult, QuerierWrapper,
+    QueryRequest, StdResult, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use std::collections::HashMap;
 
@@ -9,6 +10,33 @@ use crate::asset::PairInfo;
 use crate::factory::QueryMsg as FactoryQueryMsg;
 use crate::oracle::{OracleQuery, OracleTreasuryQuery, TaxCapResponse, TaxRateResponse};
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
+
+pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
+
+pub fn query_balance(
+    querier: &QuerierWrapper,
+    account_addr: HumanAddr,
+    denom: String,
+) -> StdResult<Uint128> {
+    // load price form the oracle
+    let balance: BalanceResponse = querier.query(&QueryRequest::Bank(BankQuery::Balance {
+        address: account_addr,
+        denom,
+    }))?;
+    Ok(balance.amount.amount)
+}
+
+pub fn query_all_balances(
+    querier: &QuerierWrapper,
+    account_addr: HumanAddr,
+) -> StdResult<Vec<Coin>> {
+    // load price form the oracle
+    let all_balances: AllBalanceResponse =
+        querier.query(&QueryRequest::Bank(BankQuery::AllBalances {
+            address: account_addr,
+        }))?;
+    Ok(all_balances.amount)
+}
 
 /// mock_dependencies is a drop-in replacement for cosmwasm_std::testing::mock_dependencies
 /// this uses our CustomQuerier.

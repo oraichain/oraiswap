@@ -1,10 +1,10 @@
 use crate::rewards::before_share_change;
 use crate::state::{
-    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, store_is_migrated,
-    store_pool_info, Config, PoolInfo, RewardInfo,
+    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, stakers_store,
+    store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
+    attr, to_binary, Api, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
@@ -21,8 +21,13 @@ pub fn bond(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key = asset_info.to_vec(deps.api)?;
-    _increase_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, false)?;
+    _increase_bond_amount(
+        deps.storage,
+        deps.api,
+        &staker_addr_raw,
+        &asset_info,
+        amount,
+    )?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -43,9 +48,13 @@ pub fn unbond(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let staking_token: CanonicalAddr =
-        _decrease_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, false)?;
+    let staking_token: CanonicalAddr = _decrease_bond_amount(
+        deps.storage,
+        deps.api,
+        &staker_addr_raw,
+        &asset_info,
+        amount,
+    )?;
     let staking_token_addr = deps.api.human_address(&staking_token)?;
 
     Ok(HandleResponse {
@@ -66,67 +75,6 @@ pub fn unbond(
             attr("staking_token", staking_token_addr.as_str()),
         ],
         data: None,
-    })
-}
-
-// only mint contract can execute the operation
-pub fn increase_short_token(
-    deps: DepsMut,
-    info: MessageInfo,
-    staker_addr: HumanAddr,
-    asset_token: HumanAddr,
-    amount: Uint128,
-) -> StdResult<HandleResponse> {
-    let config: Config = read_config(deps.storage)?;
-    if deps.api.canonical_address(&info.sender)? != config.minter {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
-
-    _increase_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, true)?;
-
-    Ok(HandleResponse {
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "increase_short_token"),
-            attr("staker_addr", staker_addr.as_str()),
-            attr("asset_token", asset_token.as_str()),
-            attr("amount", amount.to_string()),
-        ],
-    })
-}
-
-// only mint contract can execute the operation
-pub fn decrease_short_token(
-    deps: DepsMut,
-    info: MessageInfo,
-    staker_addr: HumanAddr,
-    asset_token: HumanAddr,
-    amount: Uint128,
-) -> StdResult<HandleResponse> {
-    let config: Config = read_config(deps.storage)?;
-    if deps.api.canonical_address(&info.sender)? != config.minter {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let asset_key: CanonicalAddr = deps.api.canonical_address(&asset_token)?;
-
-    // not used
-    let _ = _decrease_bond_amount(deps.storage, &staker_addr_raw, &asset_key, amount, true)?;
-
-    Ok(HandleResponse {
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "decrease_short_token"),
-            attr("staker_addr", staker_addr.as_str()),
-            attr("asset_token", asset_token.as_str()),
-            attr("amount", amount.to_string()),
-        ],
     })
 }
 
@@ -286,15 +234,17 @@ pub fn auto_stake_hook(
 
 fn _increase_bond_amount(
     storage: &mut dyn Storage,
+    api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_key: &[u8],
+    asset_info: &AssetInfo,
     amount: Uint128,
-    is_short: bool,
 ) -> StdResult<()> {
+    let asset_key = &asset_info.to_vec(api)?;
     let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
-    let mut reward_info: RewardInfo = rewards_read(storage, staker_addr, is_short)
+    let mut reward_info: RewardInfo = rewards_read(storage, staker_addr)
         .load(asset_key)
         .unwrap_or_else(|_| RewardInfo {
+            native_token: asset_info.is_native_token(),
             index: Decimal::zero(),
             bond_amount: Uint128::zero(),
             pending_reward: Uint128::zero(),
@@ -302,7 +252,7 @@ fn _increase_bond_amount(
 
     // check if the position should be migrated
     let is_position_migrated = read_is_migrated(storage, asset_key, staker_addr);
-    if !is_short && pool_info.migration_params.is_some() {
+    if pool_info.migration_params.is_some() {
         // the pool has been migrated, if position is not migrated and has tokens bonded, return error
         if !reward_info.bond_amount.is_zero() && !is_position_migrated {
             return Err(StdError::generic_err("The LP token for this asset has been deprecated, withdraw all your deprecated tokens to migrate your position"));
@@ -312,55 +262,45 @@ fn _increase_bond_amount(
         }
     }
 
-    let pool_index = if is_short {
-        pool_info.short_reward_index
-    } else {
-        pool_info.reward_index
-    };
-
     // Withdraw reward to pending reward; before changing share
-    before_share_change(pool_index, &mut reward_info)?;
+    before_share_change(pool_info.reward_index, &mut reward_info)?;
 
-    // Increase total short or bond amount
-    if is_short {
-        pool_info.total_short_amount += amount;
-    } else {
-        pool_info.total_bond_amount += amount;
-    }
+    // Increase total bond amount
+    pool_info.total_bond_amount += amount;
 
     reward_info.bond_amount += amount;
 
-    rewards_store(storage, staker_addr, is_short).save(asset_key, &reward_info)?;
+    rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
     store_pool_info(storage, asset_key, &pool_info)?;
+
+    // mark this staker belong to the pool the first time
+    let mut stakers_bucket = stakers_store(storage, asset_key);
+    if stakers_bucket.may_load(staker_addr)?.is_none() {
+        stakers_bucket.save(staker_addr, &true)?;
+    }
 
     Ok(())
 }
 
 fn _decrease_bond_amount(
     storage: &mut dyn Storage,
+    api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_key: &[u8],
+    asset_info: &AssetInfo,
     amount: Uint128,
-    is_short: bool,
 ) -> StdResult<CanonicalAddr> {
+    let asset_key = &asset_info.to_vec(api)?;
     let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
-    let mut reward_info: RewardInfo =
-        rewards_read(storage, staker_addr, is_short).load(asset_key)?;
+    let mut reward_info: RewardInfo = rewards_read(storage, staker_addr).load(asset_key)?;
 
     if reward_info.bond_amount < amount {
         return Err(StdError::generic_err("Cannot unbond more than bond amount"));
     }
 
     // if the lp token was migrated, and the user did not close their position yet, cap the reward at the snapshot
-    let should_migrate = !read_is_migrated(storage, asset_key, staker_addr)
-        && !is_short
-        && pool_info.migration_params.is_some();
-    let (pool_index, staking_token) = if is_short {
-        (
-            pool_info.short_reward_index,
-            pool_info.staking_token.clone(),
-        ) // actually not used later
-    } else if should_migrate {
+    let should_migrate =
+        !read_is_migrated(storage, asset_key, staker_addr) && pool_info.migration_params.is_some();
+    let (pool_index, staking_token) = if should_migrate {
         let migraton_params = pool_info.migration_params.clone().unwrap();
         (
             migraton_params.index_snapshot,
@@ -373,10 +313,8 @@ fn _decrease_bond_amount(
     // Distribute reward to pending reward; before changing share
     before_share_change(pool_index, &mut reward_info)?;
 
-    // Decrease total short or bond amount
-    if is_short {
-        pool_info.total_short_amount = Asset::checked_sub(pool_info.total_short_amount, amount)?;
-    } else if !should_migrate {
+    // Decrease total bond amount
+    if !should_migrate {
         // if it should migrate, we dont need to decrease from the current total bond amount
         pool_info.total_bond_amount = Asset::checked_sub(pool_info.total_bond_amount, amount)?;
     }
@@ -389,9 +327,11 @@ fn _decrease_bond_amount(
     }
 
     if reward_info.pending_reward.is_zero() && reward_info.bond_amount.is_zero() {
-        rewards_store(storage, staker_addr, is_short).remove(asset_key);
+        rewards_store(storage, staker_addr).remove(asset_key);
+        // remove staker from the pool
+        stakers_store(storage, asset_key).remove(staker_addr);
     } else {
-        rewards_store(storage, staker_addr, is_short).save(asset_key, &reward_info)?;
+        rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
     }
 
     // Update pool info
