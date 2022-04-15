@@ -144,7 +144,7 @@ pub fn distribute(deps: DepsMut, env: Env) -> StdResult<HandleResponse> {
 
     Ok(HandleResponse {
         messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: staking_contract.clone(),
+            contract_addr: staking_contract,
             msg: to_binary(&StakingHandleMsg::DepositReward { rewards })?,
             send: vec![],
         })],

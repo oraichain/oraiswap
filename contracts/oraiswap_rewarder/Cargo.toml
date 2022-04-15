@@ -3,7 +3,7 @@ name = "oraiswap-rewarder"
 version = "0.0.0"
 authors = ["Terraform Labs, PTE.","Oraichain Labs"]
 edition = "2018"
-description = "A Oraiswap factory contract - auto pair contract generator and also directory for all pairs"
+description = "A Oraiswap rewarder contract - auto distribute reward to oraiswap_staking contract"
 license = "MIT"
 
 exclude = [
@@ -26,11 +26,10 @@ backtraces = ["cosmwasm-std/backtraces"]
 cw20 = { version = "0.5.0" } 
 oraiswap = { path = "../../packages/oraiswap", default-features = false }
 cosmwasm-std = { version = "0.13.2" }
-cosmwasm-storage = "0.13.2"
+cosmwasm-storage = { version = "0.13.2", default-features = false, features = ["iterator"]  }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
 
 [dev-dependencies]
 cosmwasm-schema = "0.13.2"
-cosmwasm-storage = { version = "0.13.2", features = ["iterator"] }
