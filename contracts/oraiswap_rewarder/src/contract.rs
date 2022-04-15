@@ -168,6 +168,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
         staking_contract: deps.api.human_address(&state.staking_contract)?,
+        distribution_interval: state.distribution_interval,
     };
 
     Ok(resp)

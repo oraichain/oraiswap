@@ -43,6 +43,7 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub owner: HumanAddr,
     pub staking_contract: HumanAddr,
+    pub distribution_interval: u64,
 }
 
 // We define a custom struct for each query response
