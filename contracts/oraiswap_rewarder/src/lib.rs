@@ -1,5 +1,4 @@
 pub mod contract;
-pub mod math;
 pub mod state;
 
 #[cfg(all(target_arch = "wasm32", not(feature = "library")))]

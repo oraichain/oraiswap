@@ -1,18 +1,19 @@
+use oraiswap::asset::Asset;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint128};
-use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket, Singleton};
+use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
+use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
+pub static PREFIX_REWARD_PER_SEC: &[u8] = b"reward_per_sec";
 static KEY_CONFIG: &[u8] = b"config";
 static KEY_LAST_DISTRIBUTED: &[u8] = b"last_distributed";
-pub static PREFIX_REWARD_PER_SEC: &[u8] = b"reward_per_sec";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
     pub staking_contract: CanonicalAddr,
-    pub genesis_time: u64,
+    pub distribution_interval: u64,
 }
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
@@ -24,8 +25,7 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<Config> {
 }
 
 pub fn store_last_distributed(storage: &mut dyn Storage, last_distributed: u64) -> StdResult<()> {
-    let mut store: Singleton<u64> = singleton(storage, KEY_LAST_DISTRIBUTED);
-    store.save(&last_distributed)
+    singleton(storage, KEY_LAST_DISTRIBUTED).save(&last_distributed)
 }
 
 pub fn read_last_distributed(storage: &dyn Storage) -> StdResult<u64> {
@@ -35,11 +35,11 @@ pub fn read_last_distributed(storage: &dyn Storage) -> StdResult<u64> {
 pub fn store_pool_reward_per_sec(
     storage: &mut dyn Storage,
     asset_key: &[u8],
-    reward_per_sec: &u128,
+    reward: &Asset,
 ) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_REWARD_PER_SEC).save(asset_key, reward_per_sec)
+    Bucket::new(storage, PREFIX_REWARD_PER_SEC).save(asset_key, reward)
 }
 
-pub fn read_pool_reward_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<u128> {
+pub fn read_pool_reward_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Asset> {
     ReadonlyBucket::new(storage, PREFIX_REWARD_PER_SEC).load(asset_key)
 }

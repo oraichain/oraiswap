@@ -187,20 +187,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oraiswap-distributor"
-version = "0.0.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw-storage-plus",
- "cw20",
- "oraiswap",
- "schemars",
- "serde",
-]
-
-[[package]]
 name = "oraiswap-factory"
 version = "0.0.0"
 dependencies = [
@@ -229,6 +215,19 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "oraiswap-rewarder"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "oraiswap",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
