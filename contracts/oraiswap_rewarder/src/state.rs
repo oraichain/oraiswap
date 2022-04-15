@@ -12,10 +12,7 @@ pub static PREFIX_REWARD_PER_SEC: &[u8] = b"reward_per_sec";
 pub struct Config {
     pub owner: CanonicalAddr,
     pub staking_contract: CanonicalAddr,
-    pub token_code_id: u64, // used to create asset token
-    pub base_denom: String,
     pub genesis_time: u64,
-    pub distribution_schedule: Vec<(u64, u64, Uint128)>, // [[start_time, end_time, distribution_amount], [], ...]
 }
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {

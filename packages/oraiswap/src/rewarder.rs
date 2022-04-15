@@ -7,10 +7,7 @@ use crate::asset::AssetInfo;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
-    pub token_code_id: u64,
-    pub base_denom: String,
     pub staking_contract: HumanAddr,
-    pub distribution_schedule: Vec<(u64, u64, Uint128)>, // [[start_time, end_time, distribution_amount], [], ...]
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -21,8 +18,7 @@ pub enum HandleMsg {
     ///////////////////
     UpdateConfig {
         owner: Option<HumanAddr>,
-        token_code_id: Option<u64>,
-        distribution_schedule: Option<Vec<(u64, u64, Uint128)>>, // [[start_time, end_time, distribution_amount], [], ...]
+        staking_contract: Option<HumanAddr>,
     },
 
     UpdateRewardPerSec {
@@ -31,7 +27,7 @@ pub enum HandleMsg {
     },
 
     Distribute {
-        asset_info: AssetInfo,
+        asset_infos: Vec<AssetInfo>,
     },
 }
 
@@ -50,10 +46,8 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: HumanAddr,
-    pub token_code_id: u64,
-    pub base_denom: String,
     pub genesis_time: u64,
-    pub distribution_schedule: Vec<(u64, u64, Uint128)>,
+    pub staking_contract: HumanAddr,
 }
 
 // We define a custom struct for each query response
