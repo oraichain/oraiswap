@@ -218,6 +218,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraiswap-rewarder"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "oraiswap",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "oraiswap-router"
 version = "0.0.0"
 dependencies = [

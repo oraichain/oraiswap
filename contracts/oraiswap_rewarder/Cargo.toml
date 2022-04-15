@@ -1,0 +1,36 @@
+[package]
+name = "oraiswap-rewarder"
+version = "0.0.0"
+authors = ["Terraform Labs, PTE.","Oraichain Labs"]
+edition = "2018"
+description = "A Oraiswap factory contract - auto pair contract generator and also directory for all pairs"
+license = "MIT"
+
+exclude = [
+  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+  "contract.wasm",
+  "hash.txt",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+
+[dependencies]
+cw20 = { version = "0.5.0" } 
+oraiswap = { path = "../../packages/oraiswap", default-features = false }
+cosmwasm-std = { version = "0.13.2" }
+cosmwasm-storage = "0.13.2"
+schemars = "0.7"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+
+
+[dev-dependencies]
+cosmwasm-schema = "0.13.2"
+cosmwasm-storage = { version = "0.13.2", features = ["iterator"] }
