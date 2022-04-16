@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
-pub static KEY_CONFIG: &[u8] = b"config";
-pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
-static PREFIX_REWARD: &[u8] = b"reward";
+pub static KEY_CONFIG: &[u8] = b"config_v2";
+pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
+pub static PREFIX_REWARD: &[u8] = b"reward_v2";
 static PREFIX_STAKER: &[u8] = b"staker";
 static PREFIX_TOTAL_REWARD_AMOUNT: &[u8] = b"total_reward_amount"; // total_amount for each reward asset, use this to check balance when deposit
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";

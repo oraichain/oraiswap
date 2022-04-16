@@ -1,4 +1,4 @@
-use crate::migration::migrate_pool_infos;
+use crate::migration::{migrate_config, migrate_pool_infos, migrate_rewards_store};
 use crate::rewards::{
     deposit_reward, process_withdraw_reward, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
@@ -388,21 +388,23 @@ pub fn migrate(
     msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
     migrate_pool_infos(deps.storage)?;
+    migrate_config(deps.storage)?;
+    migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
 
     // when the migration is executed, deprecate directly the MIR pool
-    let config = read_config(deps.storage)?;
-    let self_info = MessageInfo {
-        sender: deps.api.human_address(&config.owner)?,
-        sent_funds: vec![],
-    };
+    // let config = read_config(deps.storage)?;
+    // let self_info = MessageInfo {
+    //     sender: deps.api.human_address(&config.owner)?,
+    //     sent_funds: vec![],
+    // };
 
     // depricate old one
-    deprecate_staking_token(
-        deps,
-        self_info,
-        msg.asset_info_to_deprecate,
-        msg.new_staking_token,
-    )?;
+    // deprecate_staking_token(
+    //     deps,
+    //     self_info,
+    //     msg.asset_info_to_deprecate,
+    //     msg.new_staking_token,
+    // )?;
 
     Ok(MigrateResponse::default())
 }

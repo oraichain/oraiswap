@@ -89,8 +89,9 @@ pub enum Cw20HookMsg {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub asset_info_to_deprecate: AssetInfo,
-    pub new_staking_token: HumanAddr,
+    pub staker_addrs: Vec<HumanAddr>,
+    // pub asset_info_to_deprecate: AssetInfo,
+    // pub new_staking_token: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
