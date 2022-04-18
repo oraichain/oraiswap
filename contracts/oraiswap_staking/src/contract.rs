@@ -70,7 +70,7 @@ pub fn handle(
         HandleMsg::WithdrawOthers {
             asset_info,
             staker_addrs,
-        } => withdraw_reward_others(deps, env, staker_addrs, asset_info),
+        } => withdraw_reward_others(deps, env, info, staker_addrs, asset_info),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,

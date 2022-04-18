@@ -139,9 +139,17 @@ pub fn withdraw_reward(
 pub fn withdraw_reward_others(
     deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     staker_addrs: Vec<HumanAddr>,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<HandleResponse> {
+    let config = read_config(deps.storage)?;
+
+    // only admin can execute this message
+    if config.owner != deps.api.canonical_address(&info.sender)? {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
     let mut messages: Vec<CosmosMsg> = vec![];
 
