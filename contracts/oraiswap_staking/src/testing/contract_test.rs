@@ -4,11 +4,10 @@ use cosmwasm_std::{
     attr, coin, from_binary, to_binary, Decimal, HumanAddr, Order, StdError, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
-use oraiswap::asset::{AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_querier::mock_dependencies;
 use oraiswap::staking::{
-    AssetInfoWeight, ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg,
-    RewardInfoResponse,
+    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
 };
 
 #[test]
@@ -186,17 +185,17 @@ fn test_query_staker_pagination() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
+    // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![AssetInfoWeight {
+        assets: vec![Asset {
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
-            weight: 100,
+            amount: 100u128.into(),
         }],
     };
     let info = mock_info("owner", &[]);

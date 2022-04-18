@@ -6,8 +6,8 @@ use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_querier::{mock_dependencies, ATOM_DENOM};
 use oraiswap::staking::{
-    AssetInfoWeight, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg,
-    RewardInfoResponse, RewardInfoResponseItem,
+    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    RewardInfoResponseItem,
 };
 
 #[test]
@@ -29,24 +29,23 @@ fn test_deposit_reward() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -174,24 +173,23 @@ fn test_deposit_reward_when_no_bonding() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -305,24 +303,23 @@ fn test_before_share_changes() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -472,30 +469,29 @@ fn test_withdraw() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::Token {
                     contract_addr: "reward".into(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -606,58 +602,57 @@ fn withdraw_multiple_rewards() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::Token {
                     contract_addr: "reward".into(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset2".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::Token {
                     contract_addr: "reward".into(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -847,7 +842,7 @@ fn withdraw_multiple_rewards() {
 }
 
 #[test]
-fn test_update_reward_weights() {
+fn test_update_rewards_per_sec() {
     let mut deps = mock_dependencies(&[
         coin(10000000000u128, ORAI_DENOM),
         coin(20000000000u128, ATOM_DENOM),
@@ -865,24 +860,23 @@ fn test_update_reward_weights() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // set reward weights for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };
@@ -929,27 +923,27 @@ fn test_update_reward_weights() {
     let info = mock_info("rewarder", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
-    // change reward weights for the pool
+    // change rewards per second for the pool
     let _res = handle(
         deps.as_mut(),
         mock_env(),
         mock_info("owner", &[]),
-        HandleMsg::UpdateRewardWeights {
+        HandleMsg::UpdateRewardsPerSec {
             asset_info: AssetInfo::Token {
                 contract_addr: "asset".into(),
             },
-            weights: vec![
-                AssetInfoWeight {
+            assets: vec![
+                Asset {
                     info: AssetInfo::NativeToken {
                         denom: ORAI_DENOM.to_string(),
                     },
-                    weight: 100,
+                    amount: 100u128.into(),
                 },
-                AssetInfoWeight {
+                Asset {
                     info: AssetInfo::NativeToken {
                         denom: ATOM_DENOM.to_string(),
                     },
-                    weight: 100,
+                    amount: 100u128.into(),
                 },
             ],
         },

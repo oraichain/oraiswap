@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::state::{
-    calc_range_start, read_config, read_is_migrated, read_pool_info, read_reward_weights,
+    calc_range_start, read_config, read_is_migrated, read_pool_info, read_rewards_per_sec,
     read_total_reward_amount, rewards_read, rewards_store, stakers_read, store_pool_info,
     store_total_reward_amount, PoolInfo, RewardInfo,
 };
@@ -35,21 +35,21 @@ pub fn deposit_reward(
     for asset in rewards.iter() {
         let asset_key = asset.info.to_vec(deps.api)?;
 
-        // get reward_weights from this pool:
-        let reward_weights = read_reward_weights(deps.storage, &asset_key).map_err(|_err| {
-            StdError::generic_err(format!("No reward weights for '{}' stored", asset.info))
+        // get rewards_per_sec from this pool:
+        let rewards_per_sec = read_rewards_per_sec(deps.storage, &asset_key).map_err(|_err| {
+            StdError::generic_err(format!("No rewards per second for '{}' stored", asset.info))
         })?;
 
-        let total_weight: u32 = reward_weights.iter().map(|rw| rw.weight).sum();
+        let total_amount: Uint128 = rewards_per_sec.iter().map(|rw| rw.amount).sum();
 
         // check total_amount of each asset
-        for rw in reward_weights {
+        for rw in rewards_per_sec {
             // ignore empty weight
-            if rw.weight == 0 {
+            if rw.amount.is_zero() {
                 continue;
             }
             let plus_amount =
-                Uint128::from(asset.amount.u128() * (rw.weight as u128) / (total_weight as u128));
+                Uint128::from(asset.amount.u128() * rw.amount.u128() / (total_amount.u128()));
 
             // update new total_reward_amount
             let reward_asset_key = rw.info.as_bytes();
@@ -252,19 +252,19 @@ fn _process_reward_assets(
 
         before_share_change(pool_index, &mut reward_info)?;
 
-        let total_amount = reward_info.pending_reward;
+        let total_pending_amount = reward_info.pending_reward;
         // calculate and accumulate the reward amount
-        let reward_weights = read_reward_weights(storage, &asset_key)?;
+        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
         // now calculate weight
-        let total_weight: u32 = reward_weights.iter().map(|rw| rw.weight).sum();
+        let total_amount: Uint128 = rewards_per_sec.iter().map(|rw| rw.amount).sum();
 
-        for rw in reward_weights {
+        for rw in rewards_per_sec {
             // ignore empty weight
-            if rw.weight == 0 {
+            if rw.amount.is_zero() {
                 continue;
             }
             let amount =
-                Uint128::from(total_amount.u128() * (rw.weight as u128) / (total_weight as u128));
+                Uint128::from(total_pending_amount.u128() * rw.amount.u128() / total_amount.u128());
 
             // update, first time push it, later update the amount
             match reward_assets.iter_mut().find(|ra| ra.info.eq(&rw.info)) {
