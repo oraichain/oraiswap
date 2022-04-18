@@ -1,12 +1,16 @@
 use crate::migration::{
-    migrate_config, migrate_pool_infos, migrate_rewards_store, LegacyConfig, LegacyPoolInfo,
-    LegacyRewardInfo, LEGACY_KEY_CONFIG, LEGACY_PREFIX_REWARD,
+    migrate_config, migrate_pool_infos, migrate_rewards_store, migrate_total_reward_amount,
+    LegacyConfig, LegacyPoolInfo, LegacyRewardInfo, LEGACY_KEY_CONFIG, LEGACY_PREFIX_REWARD,
 };
-use crate::state::{read_config, read_pool_info, rewards_read, Config, RewardInfo};
+use crate::state::{
+    read_config, read_pool_info, read_total_reward_amount, rewards_read, Config, RewardInfo,
+};
 use crate::state::{PoolInfo, PREFIX_POOL_INFO};
 use cosmwasm_std::{testing::mock_dependencies, Api};
 use cosmwasm_std::{CanonicalAddr, Decimal, Storage, Uint128};
 use cosmwasm_storage::{singleton, Bucket};
+use oraiswap::asset::AssetInfo;
+use oraiswap::staking::AmountInfo;
 
 pub fn pool_infos_old_store(storage: &mut dyn Storage) -> Bucket<LegacyPoolInfo> {
     Bucket::new(storage, PREFIX_POOL_INFO)
@@ -182,5 +186,31 @@ fn test_migration() {
             pending_reward: Uint128::from(500u64),
             native_token: false,
         }
+    );
+
+    // try migrate total reward amount
+    migrate_total_reward_amount(
+        &mut deps.storage,
+        &mut deps.api,
+        vec![AmountInfo {
+            asset_info: AssetInfo::NativeToken {
+                denom: "orai".into(),
+            },
+            amount: Uint128::from(1u64),
+        }],
     )
+    .unwrap();
+
+    let total_reward_amount = read_total_reward_amount(
+        &mut deps.storage,
+        AssetInfo::NativeToken {
+            denom: "orai".into(),
+        }
+        .to_raw(&deps.api)
+        .unwrap()
+        .as_bytes(),
+    )
+    .unwrap();
+
+    assert_eq!(total_reward_amount, Uint128::from(1u64));
 }

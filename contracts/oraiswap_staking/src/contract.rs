@@ -1,9 +1,11 @@
-use crate::migration::{migrate_config, migrate_pool_infos, migrate_rewards_store};
+use crate::migration::{
+    migrate_config, migrate_pool_infos, migrate_rewards_store, migrate_total_reward_amount,
+};
 use crate::rewards::{
     deposit_reward, process_withdraw_reward, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
     read_config, read_pool_info, read_reward_weights, stakers_read, store_config, store_pool_info,
     store_reward_weights, Config, MigrationParams, PoolInfo,
@@ -89,6 +91,10 @@ pub fn handle(
             staker_addr,
             prev_staking_token_amount,
         ),
+        HandleMsg::UpdateListStakers {
+            asset_info,
+            stakers,
+        } => update_list_stakers(deps, env, info, asset_info, stakers),
     }
 }
 
@@ -390,6 +396,7 @@ pub fn migrate(
     migrate_pool_infos(deps.storage)?;
     migrate_config(deps.storage)?;
     migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool
     // let config = read_config(deps.storage)?;

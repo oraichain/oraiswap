@@ -1,10 +1,12 @@
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, HumanAddr, Order, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
+use oraiswap::{asset::AssetInfo, staking::AmountInfo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::state::{
-    rewards_store, Config, MigrationParams, PoolInfo, RewardInfo, KEY_CONFIG, PREFIX_POOL_INFO,
+    rewards_store, store_total_reward_amount, Config, MigrationParams, PoolInfo, RewardInfo,
+    KEY_CONFIG, PREFIX_POOL_INFO,
 };
 
 pub static LEGACY_KEY_CONFIG: &[u8] = b"config";
@@ -136,5 +138,17 @@ pub fn migrate_rewards_store(
         }
     }
 
+    Ok(())
+}
+
+pub fn migrate_total_reward_amount(
+    store: &mut dyn Storage,
+    api: &dyn Api,
+    amount_infos: Vec<AmountInfo>,
+) -> StdResult<()> {
+    for amount_info in amount_infos {
+        let asset_info_raw = amount_info.asset_info.to_raw(api)?;
+        store_total_reward_amount(store, asset_info_raw.as_bytes(), &amount_info.amount)?;
+    }
     Ok(())
 }
