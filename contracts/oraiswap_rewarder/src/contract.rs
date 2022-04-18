@@ -52,6 +52,7 @@ pub fn handle(
 
         HandleMsg::Distribute {} => distribute(deps, env),
         HandleMsg::UpdateRewardPerSec { reward } => update_reward_per_sec(deps, info, reward),
+        HandleMsg::UpdateRewardsPerSec { rewards } => update_rewards_per_sec(deps, info, rewards),
     }
 }
 
@@ -87,6 +88,7 @@ pub fn update_config(
         data: None,
     })
 }
+
 pub fn update_reward_per_sec(
     deps: DepsMut,
     info: MessageInfo,
@@ -103,6 +105,28 @@ pub fn update_reward_per_sec(
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![attr("action", "update_reward_per_sec")],
+        data: None,
+    })
+}
+
+pub fn update_rewards_per_sec(
+    deps: DepsMut,
+    info: MessageInfo,
+    rewards: Vec<Asset>,
+) -> StdResult<HandleResponse> {
+    let config: Config = read_config(deps.storage)?;
+    if config.owner != deps.api.canonical_address(&info.sender)? {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    for reward in rewards {
+        let asset_key = reward.info.to_vec(deps.api)?;
+        store_pool_reward_per_sec(deps.storage, &asset_key, &reward)?;
+    }
+
+    Ok(HandleResponse {
+        messages: vec![],
+        attributes: vec![attr("action", "update_rewards_per_sec")],
         data: None,
     })
 }

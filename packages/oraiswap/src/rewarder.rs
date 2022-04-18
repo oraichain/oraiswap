@@ -27,6 +27,11 @@ pub enum HandleMsg {
         reward: Asset,
     },
 
+    // multiple update
+    UpdateRewardsPerSec {
+        rewards: Vec<Asset>,
+    },
+
     Distribute {},
 }
 
