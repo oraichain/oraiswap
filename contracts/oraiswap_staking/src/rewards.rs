@@ -189,7 +189,7 @@ pub fn process_withdraw_reward(
     asset_key: Option<Vec<u8>>,
 ) -> StdResult<Vec<Asset>> {
     // get reward assets and convert into CosmMsg
-    let reward_raw_assets = _get_reward_assets(storage, &staker_addr, &asset_key)?;
+    let reward_raw_assets = _process_reward_assets(storage, &staker_addr, &asset_key)?;
     let mut reward_assets: Vec<Asset> = vec![];
     for reward_raw_asset in reward_raw_assets {
         let reward_asset = reward_raw_asset.to_normal(api)?;
@@ -213,7 +213,7 @@ pub fn process_withdraw_reward(
     Ok(reward_assets)
 }
 
-fn _get_reward_assets(
+fn _process_reward_assets(
     storage: &mut dyn Storage,
     staker_addr: &CanonicalAddr,
     asset_key: &Option<Vec<u8>>,
