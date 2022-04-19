@@ -1,6 +1,6 @@
 use crate::migration::migrate_pool_infos;
 use crate::rewards::{
-    deposit_reward, process_withdraw_reward, query_all_reward_infos, query_reward_info,
+    deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
@@ -55,7 +55,7 @@ pub fn handle(
         HandleMsg::UpdateRewardsPerSec { asset_info, assets } => {
             update_rewards_per_sec(deps, env, info, asset_info, assets)
         }
-        HandleMsg::DepositReward { rewards } => deposit_reward(deps, env, info, rewards),
+        HandleMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
         HandleMsg::RegisterAsset {
             asset_info,
             staking_token,
@@ -184,11 +184,11 @@ fn update_rewards_per_sec(
 
     // withdraw reward for each staker
     for staker_addr_raw in staker_addrs {
-        let reward_assets = process_withdraw_reward(
+        let reward_assets = process_reward_assets(
             deps.storage,
             deps.api,
-            staker_addr_raw.clone(),
-            Some(asset_key.clone()),
+            &staker_addr_raw,
+            &Some(asset_key.clone()),
         )?;
 
         messages.extend(
