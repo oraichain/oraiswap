@@ -17,6 +17,7 @@ use cosmwasm_std::{
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
+    RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -367,15 +368,20 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
     })
 }
 
-pub fn query_rewards_per_sec(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<Asset>> {
+pub fn query_rewards_per_sec(
+    deps: Deps,
+    asset_info: AssetInfo,
+) -> StdResult<RewardsPerSecResponse> {
     let asset_key = asset_info.to_vec(deps.api)?;
 
     let raw_assets = read_rewards_per_sec(deps.storage, &asset_key)?;
 
-    raw_assets
+    let assets = raw_assets
         .into_iter()
         .map(|w| Ok(w.to_normal(deps.api)?))
-        .collect()
+        .collect::<StdResult<Vec<Asset>>>()?;
+
+    Ok(RewardsPerSecResponse { assets })
 }
 
 // migrate contract
