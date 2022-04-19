@@ -1,9 +1,9 @@
-use crate::migration::migrate_pool_infos;
+use crate::migration::{migrate_config, migrate_pool_infos, migrate_rewards_store};
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
     read_config, read_pool_info, read_rewards_per_sec, stakers_read, store_config, store_pool_info,
     store_rewards_per_sec, Config, MigrationParams, PoolInfo,
@@ -88,6 +88,10 @@ pub fn handle(
             staker_addr,
             prev_staking_token_amount,
         ),
+        HandleMsg::UpdateListStakers {
+            asset_info,
+            stakers,
+        } => update_list_stakers(deps, env, info, asset_info, stakers),
     }
 }
 
@@ -391,22 +395,25 @@ pub fn migrate(
     _info: MessageInfo,
     msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    migrate_pool_infos(deps.storage)?;
+    // migrate_pool_infos(deps.storage)?;
+    // migrate_config(deps.storage)?;
+    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool
-    let config = read_config(deps.storage)?;
-    let self_info = MessageInfo {
-        sender: deps.api.human_address(&config.owner)?,
-        sent_funds: vec![],
-    };
+    // let config = read_config(deps.storage)?;
+    // let self_info = MessageInfo {
+    //     sender: deps.api.human_address(&config.owner)?,
+    //     sent_funds: vec![],
+    // };
 
     // depricate old one
-    deprecate_staking_token(
-        deps,
-        self_info,
-        msg.asset_info_to_deprecate,
-        msg.new_staking_token,
-    )?;
+    // deprecate_staking_token(
+    //     deps,
+    //     self_info,
+    //     msg.asset_info_to_deprecate,
+    //     msg.new_staking_token,
+    // )?;
 
     Ok(MigrateResponse::default())
 }

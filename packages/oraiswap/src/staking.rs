@@ -77,6 +77,10 @@ pub enum HandleMsg {
         staker_addr: HumanAddr,
         prev_staking_token_amount: Uint128,
     },
+    UpdateListStakers {
+        asset_info: AssetInfo,
+        stakers: Vec<HumanAddr>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -89,8 +93,17 @@ pub enum Cw20HookMsg {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub asset_info_to_deprecate: AssetInfo,
-    pub new_staking_token: HumanAddr,
+    pub staker_addrs: Vec<HumanAddr>,
+    pub amount_infos: Vec<AmountInfo>,
+    // pub new_staking_token: HumanAddr,
+}
+
+/// We currently take no arguments for migrations
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AmountInfo {
+    pub asset_info: AssetInfo,
+    pub amount: Uint128,
+    // pub new_staking_token: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

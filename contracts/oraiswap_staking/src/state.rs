@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
-pub static KEY_CONFIG: &[u8] = b"config";
-pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
-static PREFIX_REWARD: &[u8] = b"reward";
+pub static KEY_CONFIG: &[u8] = b"config_v2";
+pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
+pub static PREFIX_REWARD: &[u8] = b"reward_v2";
 static PREFIX_STAKER: &[u8] = b"staker";
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
 static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
