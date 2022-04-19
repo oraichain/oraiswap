@@ -191,10 +191,10 @@ fn _read_pool_reward_per_sec(
     staking_contract: HumanAddr,
     asset_info: AssetInfo,
 ) -> StdResult<Uint128> {
-    let res: RewardsPerSecResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+    let res: Vec<Asset> = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: staking_contract,
         msg: to_binary(&StakingQueryMsg::RewardsPerSec { asset_info })?,
     }))?;
 
-    Ok(res.assets.iter().map(|a| a.amount).sum())
+    Ok(res.iter().map(|a| a.amount).sum())
 }
