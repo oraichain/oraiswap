@@ -191,26 +191,26 @@ fn update_reward_weights(
 
     // withdraw reward for each staker
     for staker_addr_raw in staker_addrs {
-        let reward_assets = process_withdraw_reward(
+        if let Ok(reward_assets) = process_withdraw_reward(
             deps.storage,
             deps.api,
             staker_addr_raw.clone(),
             Some(asset_key.clone()),
-        )?;
-
-        messages.extend(
-            reward_assets
-                .into_iter()
-                .map(|ra| {
-                    Ok(ra.into_msg(
-                        None,
-                        &deps.querier,
-                        env.contract.address.clone(),
-                        deps.api.human_address(&staker_addr_raw)?,
-                    )?)
-                })
-                .collect::<StdResult<Vec<CosmosMsg>>>()?,
-        );
+        ) {
+            messages.extend(
+                reward_assets
+                    .into_iter()
+                    .map(|ra| {
+                        Ok(ra.into_msg(
+                            None,
+                            &deps.querier,
+                            env.contract.address.clone(),
+                            deps.api.human_address(&staker_addr_raw)?,
+                        )?)
+                    })
+                    .collect::<StdResult<Vec<CosmosMsg>>>()?,
+            );
+        }
     }
 
     // convert weights to raw_weights
@@ -393,10 +393,10 @@ pub fn migrate(
     _info: MessageInfo,
     msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    migrate_pool_infos(deps.storage)?;
-    migrate_config(deps.storage)?;
-    migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
-    migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
+    // migrate_pool_infos(deps.storage)?;
+    // migrate_config(deps.storage)?;
+    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool
     // let config = read_config(deps.storage)?;

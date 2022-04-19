@@ -185,8 +185,7 @@ pub fn process_withdraw_reward(
         let reward_asset = reward_raw_asset.to_normal(api)?;
         // each reward amount we need to update total_reward_amount
         let reward_asset_key = reward_raw_asset.info.as_bytes();
-        let total_reward_amount =
-            read_total_reward_amount(storage, &reward_asset_key).unwrap_or(Uint128::zero());
+        let total_reward_amount = read_total_reward_amount(storage, &reward_asset_key)?;
 
         // each time call withdraw reward, must check the balance is enough, so if total_reward_amount < reward_asset.amount
         // an error will be thrown
