@@ -7,8 +7,8 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
-    read_config, read_pool_info, read_reward_weights, stakers_read, store_config, store_pool_info,
-    store_reward_weights, Config, MigrationParams, PoolInfo,
+    read_config, read_pool_info, read_rewards_per_sec, stakers_read, store_config, store_pool_info,
+    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -16,10 +16,9 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, Order, StdError,
     StdResult, Uint128,
 };
-use oraiswap::asset::{AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    AssetInfoRawWeight, AssetInfoWeight, ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg,
-    MigrateMsg, PoolInfoResponse, QueryMsg,
+    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -54,10 +53,9 @@ pub fn handle(
     match msg {
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
         HandleMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
-        HandleMsg::UpdateRewardWeights {
-            asset_info,
-            weights,
-        } => update_reward_weights(deps, env, info, asset_info, weights),
+        HandleMsg::UpdateRewardsPerSec { asset_info, assets } => {
+            update_rewards_per_sec(deps, env, info, asset_info, assets)
+        }
         HandleMsg::DepositReward { rewards } => deposit_reward(deps, env, info, rewards),
         HandleMsg::RegisterAsset {
             asset_info,
@@ -72,7 +70,7 @@ pub fn handle(
         HandleMsg::WithdrawOthers {
             asset_info,
             staker_addrs,
-        } => withdraw_reward_others(deps, env, staker_addrs, asset_info),
+        } => withdraw_reward_others(deps, env, info, staker_addrs, asset_info),
         HandleMsg::AutoStake {
             assets,
             slippage_tolerance,
@@ -163,12 +161,12 @@ pub fn update_config(
 
 // need to withdraw all rewards of the stakers belong to the pool
 // may need to call withdraw from backend side by querying all stakers with pagination in case out of gas
-fn update_reward_weights(
+fn update_rewards_per_sec(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
-    reward_weights: Vec<AssetInfoWeight>,
+    assets: Vec<Asset>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
@@ -213,17 +211,17 @@ fn update_reward_weights(
         }
     }
 
-    // convert weights to raw_weights
-    let raw_weights = reward_weights
+    // convert assets to raw_assets
+    let raw_assets = assets
         .into_iter()
         .map(|w| Ok(w.to_raw(deps.api)?))
-        .collect::<StdResult<Vec<AssetInfoRawWeight>>>()?;
+        .collect::<StdResult<Vec<AssetRaw>>>()?;
 
-    store_reward_weights(deps.storage, &asset_key, raw_weights)?;
+    store_rewards_per_sec(deps.storage, &asset_key, raw_assets)?;
 
     Ok(HandleResponse {
         messages,
-        attributes: vec![attr("action", "update_reward_weights")],
+        attributes: vec![attr("action", "update_rewards_per_sec")],
         data: None,
     })
 }
@@ -319,8 +317,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
-        QueryMsg::RewardWeights { asset_info } => {
-            to_binary(&query_reward_weights(deps, asset_info)?)
+        QueryMsg::RewardsPerSec { asset_info } => {
+            to_binary(&query_rewards_per_sec(deps, asset_info)?)
         }
         QueryMsg::RewardInfo {
             staker_addr,
@@ -375,12 +373,12 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
     })
 }
 
-pub fn query_reward_weights(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<AssetInfoWeight>> {
+pub fn query_rewards_per_sec(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<Asset>> {
     let asset_key = asset_info.to_vec(deps.api)?;
 
-    let raw_weights = read_reward_weights(deps.storage, &asset_key)?;
+    let raw_assets = read_rewards_per_sec(deps.storage, &asset_key)?;
 
-    raw_weights
+    raw_assets
         .into_iter()
         .map(|w| Ok(w.to_normal(deps.api)?))
         .collect()
