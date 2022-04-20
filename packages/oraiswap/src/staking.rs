@@ -94,7 +94,7 @@ pub enum Cw20HookMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
     pub staker_addrs: Vec<HumanAddr>,
-    pub amount_infos: Vec<AmountInfo>,
+    // pub amount_infos: Vec<AmountInfo>,
     // pub new_staking_token: HumanAddr,
 }
 
