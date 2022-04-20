@@ -135,7 +135,6 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub owner: HumanAddr,
     pub rewarder: HumanAddr,
-    pub minter: HumanAddr,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: String,

@@ -16,7 +16,6 @@ static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 pub struct Config {
     pub owner: CanonicalAddr,
     pub rewarder: CanonicalAddr,
-    pub minter: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,

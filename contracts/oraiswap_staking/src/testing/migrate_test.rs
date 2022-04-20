@@ -131,10 +131,6 @@ fn test_migration() {
                 .api
                 .canonical_address(&"orai1lus0f0rhx8s03gdllx2n6vhkmf0536dv57wfge".into())
                 .unwrap(),
-            minter: deps
-                .api
-                .canonical_address(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
-                .unwrap(),
             oracle_addr: deps
                 .api
                 .canonical_address(&"orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m".into())

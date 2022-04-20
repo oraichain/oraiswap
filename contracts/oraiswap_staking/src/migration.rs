@@ -83,7 +83,6 @@ pub fn migrate_config(store: &mut dyn Storage) -> StdResult<()> {
     let new_config = Config {
         owner: config.owner,
         rewarder: config.reward_addr,
-        minter: config.minter,
         oracle_addr: config.oracle_addr,
         factory_addr: config.factory_addr,
         base_denom: config.base_denom,

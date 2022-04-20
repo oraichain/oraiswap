@@ -30,9 +30,6 @@ pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdRes
                 .api
                 .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
             rewarder: deps.api.canonical_address(&msg.rewarder)?,
-            minter: deps
-                .api
-                .canonical_address(&msg.minter.unwrap_or(info.sender))?,
             oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
             factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
@@ -343,7 +340,6 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
         rewarder: deps.api.human_address(&state.rewarder)?,
-        minter: deps.api.human_address(&state.minter)?,
         oracle_addr: deps.api.human_address(&state.oracle_addr)?,
         factory_addr: deps.api.human_address(&state.factory_addr)?,
         base_denom: state.base_denom,
