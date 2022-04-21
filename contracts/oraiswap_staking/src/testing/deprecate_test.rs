@@ -6,8 +6,8 @@ use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_querier::ATOM_DENOM;
 use oraiswap::staking::{
-    AssetInfoWeight, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg,
-    RewardInfoResponse, RewardInfoResponseItem,
+    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    RewardInfoResponseItem,
 };
 
 #[test]
@@ -43,24 +43,24 @@ fn test_deprecate() {
     let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(&mut deps.storage, &asset_key, &pool_info).unwrap();
 
-    // set reward weights for asset
+    // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardWeights {
+    let msg = HandleMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
-        weights: vec![
-            AssetInfoWeight {
+        assets: vec![
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                weight: 100,
+                amount: 100u128.into(),
             },
-            AssetInfoWeight {
+            Asset {
                 info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                weight: 200,
+                amount: 200u128.into(),
             },
         ],
     };

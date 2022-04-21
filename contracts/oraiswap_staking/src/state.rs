@@ -1,23 +1,21 @@
-use oraiswap::staking::AssetInfoRawWeight;
+use oraiswap::asset::AssetRaw;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
-pub static KEY_CONFIG: &[u8] = b"config";
-pub static PREFIX_POOL_INFO: &[u8] = b"pool_info";
-static PREFIX_REWARD: &[u8] = b"reward";
+pub static KEY_CONFIG: &[u8] = b"config_v2";
+pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
+pub static PREFIX_REWARD: &[u8] = b"reward_v2";
 static PREFIX_STAKER: &[u8] = b"staker";
-static PREFIX_TOTAL_REWARD_AMOUNT: &[u8] = b"total_reward_amount"; // total_amount for each reward asset, use this to check balance when deposit
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
-static PREFIX_REWARD_WEIGHT: &[u8] = b"reward_weight";
+static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: CanonicalAddr,
     pub rewarder: CanonicalAddr,
-    pub minter: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,
@@ -56,18 +54,6 @@ pub fn store_pool_info(
 
 pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<PoolInfo> {
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
-}
-
-pub fn store_total_reward_amount(
-    storage: &mut dyn Storage,
-    asset_key: &[u8],
-    total_amount: &Uint128,
-) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).save(asset_key, total_amount)
-}
-
-pub fn read_total_reward_amount(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Uint128> {
-    ReadonlyBucket::new(storage, PREFIX_TOTAL_REWARD_AMOUNT).load(asset_key)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -120,21 +106,33 @@ pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &Canoni
         .unwrap_or(false)
 }
 
-pub fn store_reward_weights(
+pub fn store_rewards_per_sec(
     storage: &mut dyn Storage,
     asset_key: &[u8],
-    weights: Vec<AssetInfoRawWeight>,
+    assets: Vec<AssetRaw>,
 ) -> StdResult<()> {
-    let mut weight_bucket: Bucket<Vec<AssetInfoRawWeight>> =
-        Bucket::new(storage, PREFIX_REWARD_WEIGHT);
-    weight_bucket.save(asset_key, &weights)
+    let mut weight_bucket: Bucket<Vec<AssetRaw>> = Bucket::new(storage, PREFIX_REWARDS_PER_SEC);
+    weight_bucket.save(asset_key, &assets)
 }
 
-pub fn read_reward_weights(
-    storage: &dyn Storage,
-    asset_key: &[u8],
-) -> StdResult<Vec<AssetInfoRawWeight>> {
-    let weight_bucket: ReadonlyBucket<Vec<AssetInfoRawWeight>> =
-        ReadonlyBucket::new(storage, PREFIX_REWARD_WEIGHT);
+pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Vec<AssetRaw>> {
+    let weight_bucket: ReadonlyBucket<Vec<AssetRaw>> =
+        ReadonlyBucket::new(storage, PREFIX_REWARDS_PER_SEC);
     weight_bucket.load(asset_key)
+}
+
+// upper bound key by 1, for Order::Ascending
+pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
+    start_after.map(|mut input| {
+        // zero out all trailing 255, increment first that is not such
+        for i in (0..input.len()).rev() {
+            if input[i] == 255 {
+                input[i] = 0;
+            } else {
+                input[i] += 1;
+                break;
+            }
+        }
+        input
+    })
 }

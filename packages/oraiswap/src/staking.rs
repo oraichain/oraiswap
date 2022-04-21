@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::{Asset, AssetInfo, AssetInfoRaw};
-use cosmwasm_std::{Api, Decimal, HumanAddr, StdResult, Uint128};
+use crate::asset::{Asset, AssetInfo};
+use cosmwasm_std::{Decimal, HumanAddr, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -36,10 +36,10 @@ pub enum HandleMsg {
         asset_info: AssetInfo,
         new_staking_token: HumanAddr,
     },
-    // update weights for an asset
-    UpdateRewardWeights {
+    // update rewards per second for an asset
+    UpdateRewardsPerSec {
         asset_info: AssetInfo,
-        weights: Vec<AssetInfoWeight>,
+        assets: Vec<Asset>,
     },
     // reward tokens are in amount proportionaly, and used by minter contract to update amounts after checking the balance, which
     // will be used as rewards for the specified asset's staking pool.
@@ -59,7 +59,7 @@ pub enum HandleMsg {
         // If the asset token is not given, then all rewards are withdrawn
         asset_info: Option<AssetInfo>,
     },
-    // Withdraw for others in this pool, such as when reward weights are changed for the pool
+    // Withdraw for others in this pool, such as when rewards per second are changed for the pool
     WithdrawOthers {
         asset_info: Option<AssetInfo>,
         staker_addrs: Vec<HumanAddr>,
@@ -77,6 +77,10 @@ pub enum HandleMsg {
         staker_addr: HumanAddr,
         prev_staking_token_amount: Uint128,
     },
+    UpdateListStakers {
+        asset_info: AssetInfo,
+        stakers: Vec<HumanAddr>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -89,8 +93,17 @@ pub enum Cw20HookMsg {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub asset_info_to_deprecate: AssetInfo,
-    pub new_staking_token: HumanAddr,
+    pub staker_addrs: Vec<HumanAddr>,
+    pub amount_infos: Vec<AmountInfo>,
+    // pub new_staking_token: HumanAddr,
+}
+
+/// We currently take no arguments for migrations
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AmountInfo {
+    pub asset_info: AssetInfo,
+    pub amount: Uint128,
+    // pub new_staking_token: HumanAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -100,7 +113,7 @@ pub enum QueryMsg {
     PoolInfo {
         asset_info: AssetInfo,
     },
-    RewardWeights {
+    RewardsPerSec {
         asset_info: AssetInfo,
     },
     RewardInfo {
@@ -112,7 +125,8 @@ pub enum QueryMsg {
         asset_info: AssetInfo,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
-        order: Option<u8>,
+        // so can convert or throw error
+        order: Option<i32>,
     },
 }
 
@@ -121,15 +135,14 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub owner: HumanAddr,
     pub rewarder: HumanAddr,
-    pub minter: HumanAddr,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct RewardWeightsResponse {
-    weights: Vec<AssetInfoWeight>,
+pub struct RewardsPerSecResponse {
+    pub assets: Vec<Asset>,
 }
 
 // We define a custom struct for each query response
@@ -159,34 +172,4 @@ pub struct RewardInfoResponseItem {
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct AssetInfoRawWeight {
-    pub info: AssetInfoRaw,
-    pub weight: u32,
-}
-
-impl AssetInfoRawWeight {
-    pub fn to_normal(&self, api: &dyn Api) -> StdResult<AssetInfoWeight> {
-        Ok(AssetInfoWeight {
-            info: self.info.to_normal(api)?,
-            weight: self.weight,
-        })
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct AssetInfoWeight {
-    pub info: AssetInfo,
-    pub weight: u32,
-}
-
-impl AssetInfoWeight {
-    pub fn to_raw(&self, api: &dyn Api) -> StdResult<AssetInfoRawWeight> {
-        Ok(AssetInfoRawWeight {
-            info: self.info.to_raw(api)?,
-            weight: self.weight,
-        })
-    }
 }

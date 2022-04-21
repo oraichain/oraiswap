@@ -78,6 +78,31 @@ pub fn unbond(
     })
 }
 
+pub fn update_list_stakers(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    asset_info: AssetInfo,
+    stakers: Vec<HumanAddr>,
+) -> StdResult<HandleResponse> {
+    let config: Config = read_config(deps.storage)?;
+
+    if deps.api.canonical_address(&info.sender)? != config.owner {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+    let asset_info_raw = asset_info.to_raw(deps.api)?;
+    for staker in stakers {
+        stakers_store(deps.storage, asset_info_raw.as_bytes())
+            .save(deps.api.canonical_address(&staker)?.as_slice(), &true)?;
+    }
+
+    Ok(HandleResponse {
+        messages: vec![],
+        attributes: vec![attr("action", "update_list_stakers")],
+        data: None,
+    })
+}
+
 pub fn auto_stake(
     deps: DepsMut,
     env: Env,
