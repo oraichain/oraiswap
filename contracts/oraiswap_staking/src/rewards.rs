@@ -192,6 +192,9 @@ pub fn process_reward_assets(
             }
             let amount =
                 Uint128::from(total_pending_amount.u128() * rw.amount.u128() / total_amount.u128());
+            if amount.is_zero() {
+                continue;
+            }
 
             // update, first time push it, later update the amount
             let rw_info = rw.info.to_normal(api)?;

@@ -395,9 +395,9 @@ pub fn migrate(
     _info: MessageInfo,
     msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    migrate_pool_infos(deps.storage)?;
-    migrate_config(deps.storage)?;
-    migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    // migrate_pool_infos(deps.storage)?;
+    // migrate_config(deps.storage)?;
+    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
     // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool
