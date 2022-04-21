@@ -185,26 +185,26 @@ fn update_rewards_per_sec(
 
     // withdraw reward for each staker
     for staker_addr_raw in staker_addrs {
-        let reward_assets = process_reward_assets(
+        if let Ok(reward_assets) = process_reward_assets(
             deps.storage,
             deps.api,
             &staker_addr_raw,
             &Some(asset_key.clone()),
-        )?;
-
-        messages.extend(
-            reward_assets
-                .into_iter()
-                .map(|ra| {
-                    Ok(ra.into_msg(
-                        None,
-                        &deps.querier,
-                        env.contract.address.clone(),
-                        deps.api.human_address(&staker_addr_raw)?,
-                    )?)
-                })
-                .collect::<StdResult<Vec<CosmosMsg>>>()?,
-        );
+        ) {
+            messages.extend(
+                reward_assets
+                    .into_iter()
+                    .map(|ra| {
+                        Ok(ra.into_msg(
+                            None,
+                            &deps.querier,
+                            env.contract.address.clone(),
+                            deps.api.human_address(&staker_addr_raw)?,
+                        )?)
+                    })
+                    .collect::<StdResult<Vec<CosmosMsg>>>()?,
+            );
+        }
     }
 
     // convert assets to raw_assets

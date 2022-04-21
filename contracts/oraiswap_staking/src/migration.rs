@@ -126,8 +126,10 @@ pub fn migrate_rewards_store(
 
         for reward_pair in reward_pairs {
             let (asset_key, reward_info) = reward_pair;
+            let native_token = if asset_key.len() == 20 { false } else { true };
+            // try convert to contract token, otherwise it is native token
             let new_reward_info = RewardInfo {
-                native_token: false,
+                native_token,
                 index: reward_info.index,
                 bond_amount: reward_info.bond_amount,
                 pending_reward: reward_info.pending_reward,
