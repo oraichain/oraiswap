@@ -326,11 +326,16 @@ fn _read_reward_infos(
             };
 
             before_share_change(pool_index, &mut reward_info)?;
+            let pending_withdraw_amount: Uint128 = reward_info
+                .pending_withdraw
+                .into_iter()
+                .map(|pw| pw.amount)
+                .sum();
 
             vec![RewardInfoResponseItem {
                 asset_info: asset_info.to_owned(),
                 bond_amount: reward_info.bond_amount,
-                pending_reward: reward_info.pending_reward,
+                pending_reward: reward_info.pending_reward + pending_withdraw_amount,
 
                 should_migrate,
             }]
