@@ -212,6 +212,9 @@ pub fn process_reward_assets(
 
             // if withdraw, then return reward_assets to create MsgSend, otherwise update pending_withdraw
             if do_withdraw {
+                for rw in pending_withdraw_assets {
+                    update_reward_assets_amount(&mut reward_assets, rw.clone(), rw.amount);
+                }
                 reward_info.pending_withdraw = vec![];
             } else {
                 reward_info.pending_withdraw = pending_withdraw_assets;
