@@ -8,7 +8,7 @@ use cosmwasm_std::{
     attr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, Order, StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
 use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -73,12 +73,12 @@ pub fn withdraw_reward(
     let staker_addr = deps.api.canonical_address(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
-    let reward_assets = process_reward_assets(deps.storage, deps.api, &staker_addr, &asset_key)?;
+    let reward_assets = process_reward_assets(deps.storage, &staker_addr, &asset_key, true)?;
 
     let messages = reward_assets
         .into_iter()
         .map(|ra| {
-            Ok(ra.into_msg(
+            Ok(ra.to_normal(deps.api)?.into_msg(
                 None,
                 &deps.querier,
                 env.contract.address.clone(),
@@ -96,7 +96,7 @@ pub fn withdraw_reward(
 
 pub fn withdraw_reward_others(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     staker_addrs: Vec<HumanAddr>,
     asset_info: Option<AssetInfo>,
@@ -109,42 +109,42 @@ pub fn withdraw_reward_others(
     }
 
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
-    let mut messages: Vec<CosmosMsg> = vec![];
+    // let mut messages: Vec<CosmosMsg> = vec![];
 
     // withdraw reward for each staker
     for staker_addr in staker_addrs {
         let staker_addr_raw = deps.api.canonical_address(&staker_addr)?;
-        let reward_assets =
-            process_reward_assets(deps.storage, deps.api, &staker_addr_raw, &asset_key.clone())?;
-
-        messages.extend(
-            reward_assets
-                .into_iter()
-                .map(|ra| {
-                    Ok(ra.into_msg(
-                        None,
-                        &deps.querier,
-                        env.contract.address.clone(),
-                        staker_addr.clone(),
-                    )?)
-                })
-                .collect::<StdResult<Vec<CosmosMsg>>>()?,
-        );
+        process_reward_assets(deps.storage, &staker_addr_raw, &asset_key.clone(), false)?;
     }
 
     Ok(HandleResponse {
-        messages,
+        messages: vec![],
         attributes: vec![attr("action", "withdraw_reward_others")],
         data: None,
     })
 }
 
+fn update_reward_assets_amount(reward_assets: &mut Vec<AssetRaw>, rw: AssetRaw, amount: Uint128) {
+    match reward_assets.iter_mut().find(|ra| ra.info.eq(&rw.info)) {
+        None => {
+            reward_assets.push(AssetRaw {
+                info: rw.info,
+                amount,
+            });
+        }
+        Some(reward_asset) => {
+            reward_asset.amount += amount;
+        }
+    }
+}
+
+// this function will return total asset to reward, then later can be updated as pending_withdraw, or send to client
 pub fn process_reward_assets(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     staker_addr: &CanonicalAddr,
     asset_key: &Option<Vec<u8>>,
-) -> StdResult<Vec<Asset>> {
+    do_withdraw: bool,
+) -> StdResult<Vec<AssetRaw>> {
     let rewards_bucket = rewards_read(storage, staker_addr);
 
     // single reward withdraw, using Vec to store reference variable in local function
@@ -161,7 +161,8 @@ pub fn process_reward_assets(
             .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()?
     };
 
-    let mut reward_assets: Vec<Asset> = vec![];
+    // only has value when do_withdraw
+    let mut reward_assets: Vec<AssetRaw> = vec![];
 
     for reward_pair in reward_pairs {
         let (asset_key, mut reward_info) = reward_pair;
@@ -179,40 +180,46 @@ pub fn process_reward_assets(
 
         before_share_change(pool_index, &mut reward_info)?;
 
-        let total_pending_amount = reward_info.pending_reward;
-        // calculate and accumulate the reward amount
-        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
-        // now calculate weight
-        let total_amount: Uint128 = rewards_per_sec.iter().map(|rw| rw.amount).sum();
+        // reward assets for a pool
+        let mut pending_withdraw_assets: Vec<AssetRaw> = reward_info.pending_withdraw.clone();
 
-        for rw in rewards_per_sec {
-            // ignore empty weight
-            if rw.amount.is_zero() {
-                continue;
+        if !reward_info.pending_reward.is_zero() {
+            // calculate and accumulate the reward amount
+            let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
+            // now calculate weight
+            let total_amount: Uint128 = rewards_per_sec.iter().map(|rw| rw.amount).sum();
+
+            for rw in rewards_per_sec {
+                // ignore empty weight
+                if rw.amount.is_zero() {
+                    continue;
+                }
+                let amount = Uint128::from(
+                    reward_info.pending_reward.u128() * rw.amount.u128() / total_amount.u128(),
+                );
+
+                // update, first time push it, later update the amount
+
+                if do_withdraw {
+                    update_reward_assets_amount(&mut reward_assets, rw, amount);
+                } else {
+                    update_reward_assets_amount(&mut pending_withdraw_assets, rw, amount);
+                }
             }
-            let amount =
-                Uint128::from(total_pending_amount.u128() * rw.amount.u128() / total_amount.u128());
 
-            // update, first time push it, later update the amount
-            let rw_info = rw.info.to_normal(api)?;
-            match reward_assets.iter_mut().find(|ra| ra.info.eq(&rw_info)) {
-                None => {
-                    reward_assets.push(Asset {
-                        info: rw_info,
-                        amount,
-                    });
-                }
-                Some(reward_asset) => {
-                    reward_asset.amount += amount;
-                }
+            // reset pending_reward
+            reward_info.pending_reward = Uint128::zero();
+
+            // if withdraw, then return reward_assets to create MsgSend, otherwise update pending_withdraw
+            if do_withdraw {
+                reward_info.pending_withdraw = vec![];
+            } else {
+                reward_info.pending_withdraw = pending_withdraw_assets;
             }
         }
 
-        // reset pending_reward
-        reward_info.pending_reward = Uint128::zero();
-
-        // Update rewards info
-        if reward_info.bond_amount.is_zero() {
+        // Update rewards info, if empty bond_amount and withdraw then remove
+        if reward_info.bond_amount.is_zero() && do_withdraw {
             rewards_store(storage, staker_addr).remove(&asset_key);
         } else {
             rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;

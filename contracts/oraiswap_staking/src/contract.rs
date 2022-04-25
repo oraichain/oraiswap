@@ -1,4 +1,4 @@
-use crate::migration::{migrate_config, migrate_pool_infos, migrate_rewards_store};
+use crate::migration::migrate_rewards_store;
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
@@ -10,7 +10,7 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    attr, from_binary, to_binary, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
     HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, Order, StdError,
     StdResult, Uint128,
 };
@@ -50,7 +50,7 @@ pub fn handle(
         HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
         HandleMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
         HandleMsg::UpdateRewardsPerSec { asset_info, assets } => {
-            update_rewards_per_sec(deps, env, info, asset_info, assets)
+            update_rewards_per_sec(deps, info, asset_info, assets)
         }
         HandleMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
         HandleMsg::RegisterAsset {
@@ -159,7 +159,6 @@ pub fn update_config(
 // may need to call withdraw from backend side by querying all stakers with pagination in case out of gas
 fn update_rewards_per_sec(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
     assets: Vec<Asset>,
@@ -181,30 +180,16 @@ fn update_rewards_per_sec(
         })
         .collect::<StdResult<Vec<CanonicalAddr>>>()?;
 
-    let mut messages: Vec<CosmosMsg> = vec![];
+    // let mut messages: Vec<CosmosMsg> = vec![];
 
     // withdraw reward for each staker
     for staker_addr_raw in staker_addrs {
-        let reward_assets = process_reward_assets(
+        process_reward_assets(
             deps.storage,
-            deps.api,
             &staker_addr_raw,
             &Some(asset_key.clone()),
+            false,
         )?;
-
-        messages.extend(
-            reward_assets
-                .into_iter()
-                .map(|ra| {
-                    Ok(ra.into_msg(
-                        None,
-                        &deps.querier,
-                        env.contract.address.clone(),
-                        deps.api.human_address(&staker_addr_raw)?,
-                    )?)
-                })
-                .collect::<StdResult<Vec<CosmosMsg>>>()?,
-        );
     }
 
     // convert assets to raw_assets
@@ -216,7 +201,7 @@ fn update_rewards_per_sec(
     store_rewards_per_sec(deps.storage, &asset_key, raw_assets)?;
 
     Ok(HandleResponse {
-        messages,
+        messages: vec![],
         attributes: vec![attr("action", "update_rewards_per_sec")],
         data: None,
     })
@@ -393,7 +378,7 @@ pub fn migrate(
 ) -> StdResult<MigrateResponse> {
     // migrate_pool_infos(deps.storage)?;
     // migrate_config(deps.storage)?;
-    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
     // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool

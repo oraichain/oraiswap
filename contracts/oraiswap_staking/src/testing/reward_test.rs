@@ -376,6 +376,7 @@ fn test_before_share_changes() {
             bond_amount: Uint128(100u128),
             index: Decimal::zero(),
             native_token: false,
+            pending_withdraw: vec![],
         },
         reward_info
     );
@@ -402,6 +403,7 @@ fn test_before_share_changes() {
             bond_amount: Uint128(200u128),
             index: Decimal::from_ratio(100u128, 100u128),
             native_token: false,
+            pending_withdraw: vec![],
         },
         reward_info
     );
@@ -436,6 +438,7 @@ fn test_before_share_changes() {
             bond_amount: Uint128(100u128),
             index: Decimal::from_ratio(150u128, 100u128),
             native_token: false,
+            pending_withdraw: vec![],
         },
         reward_info
     );

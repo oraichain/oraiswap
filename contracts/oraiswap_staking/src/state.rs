@@ -62,6 +62,8 @@ pub struct RewardInfo {
     pub index: Decimal,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    // this is updated by the owner of this contract, when changing the reward_per_sec
+    pub pending_withdraw: Vec<AssetRaw>,
 }
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)
