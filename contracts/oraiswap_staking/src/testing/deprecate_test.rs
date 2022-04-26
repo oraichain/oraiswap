@@ -142,6 +142,7 @@ fn test_deprecate() {
                 },
                 bond_amount: Uint128(100u128),
                 pending_reward: Uint128(100u128),
+                pending_withdraw: vec![],
                 should_migrate: None,
             }],
         }
@@ -216,7 +217,8 @@ fn test_deprecate() {
                 },
                 bond_amount: Uint128(100u128),
                 pending_reward: Uint128(100u128), // did not change
-                should_migrate: Some(true),       // non-short pos should migrate
+                pending_withdraw: vec![],
+                should_migrate: Some(true), // non-short pos should migrate
             }],
         }
     );
@@ -288,7 +290,8 @@ fn test_deprecate() {
                 },
                 bond_amount: Uint128::zero(),
                 pending_reward: Uint128(100u128), // still the same
-                should_migrate: None,             // now its back to empty
+                pending_withdraw: vec![],
+                should_migrate: None, // now its back to empty
             },],
         }
     );
@@ -342,6 +345,7 @@ fn test_deprecate() {
                 },
                 bond_amount: Uint128(100u128),
                 pending_reward: Uint128(300u128), // 100 * 3
+                pending_withdraw: vec![],
                 should_migrate: None,
             },],
         }
@@ -381,6 +385,7 @@ fn test_deprecate() {
                 },
                 bond_amount: Uint128(100u128),
                 pending_reward: Uint128::zero(),
+                pending_withdraw: vec![],
                 should_migrate: None,
             },],
         }

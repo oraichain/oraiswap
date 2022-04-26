@@ -70,6 +70,7 @@ fn test_bond_tokens() {
                     contract_addr: "asset".into()
                 },
                 pending_reward: Uint128::zero(),
+                pending_withdraw: vec![],
                 bond_amount: Uint128(100u128),
                 should_migrate: None,
             }],

@@ -169,6 +169,7 @@ pub struct RewardInfoResponseItem {
     pub asset_info: AssetInfo,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    pub pending_withdraw: Vec<Asset>,
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,

@@ -29,7 +29,6 @@ pub fn deposit_reward(
 
     let mut rewards_amount = Uint128::zero();
 
-    // for each asset, make sure we have enough balance according to weight, so we need to store total amount of each token and verify it
     for asset in rewards.iter() {
         let asset_key = asset.info.to_vec(deps.api)?;
 
@@ -191,9 +190,8 @@ pub fn process_reward_assets(
                 if rw.amount.is_zero() {
                     continue;
                 }
-                let amount = Uint128::from(
-                    reward_info.pending_reward.u128() * rw.amount.u128() / total_amount.u128(),
-                );
+                let amount =
+                    reward_info.pending_reward * Decimal::from_ratio(rw.amount, total_amount);
 
                 // update pending_withdraw, first time push it, later update the amount
                 update_reward_assets_amount(&mut reward_info.pending_withdraw, rw, amount);
@@ -320,17 +318,17 @@ fn _read_reward_infos_response(
 
             before_share_change(pool_index, &mut reward_info)?;
 
-            let pending_withdraw_amount: Uint128 = reward_info
+            let pending_withdraw = reward_info
                 .pending_withdraw
-                .iter() // no copy item
-                .map(|pw| pw.amount)
-                .sum();
+                .into_iter()
+                .map(|pw| Ok(pw.to_normal(api)?))
+                .collect::<StdResult<Vec<Asset>>>()?;
 
             Ok(RewardInfoResponseItem {
                 asset_info: asset_info.to_owned(),
                 bond_amount: reward_info.bond_amount,
-                pending_reward: reward_info.pending_reward + pending_withdraw_amount,
-
+                pending_reward: reward_info.pending_reward,
+                pending_withdraw,
                 should_migrate,
             })
         })

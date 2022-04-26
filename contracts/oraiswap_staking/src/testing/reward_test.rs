@@ -759,6 +759,7 @@ fn withdraw_multiple_rewards() {
                     },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128(100u128),
+                    pending_withdraw: vec![],
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
@@ -767,6 +768,7 @@ fn withdraw_multiple_rewards() {
                     },
                     bond_amount: Uint128(1000u128),
                     pending_reward: Uint128(200u128),
+                    pending_withdraw: vec![],
                     should_migrate: None,
                 },
             ],
@@ -827,7 +829,7 @@ fn withdraw_multiple_rewards() {
                     },
                     bond_amount: Uint128(100u128),
                     pending_reward: Uint128::zero(),
-
+                    pending_withdraw: vec![],
                     should_migrate: None,
                 },
                 RewardInfoResponseItem {
@@ -836,7 +838,7 @@ fn withdraw_multiple_rewards() {
                     },
                     bond_amount: Uint128(1000u128),
                     pending_reward: Uint128::zero(),
-
+                    pending_withdraw: vec![],
                     should_migrate: None,
                 },
             ],
@@ -985,8 +987,21 @@ fn test_update_rewards_per_sec() {
                     contract_addr: "asset".into()
                 },
                 bond_amount: Uint128(300u128),
-                pending_reward: Uint128(399u128),
-
+                pending_reward: Uint128(99u128),
+                pending_withdraw: vec![
+                    Asset {
+                        info: AssetInfo::NativeToken {
+                            denom: ORAI_DENOM.to_string()
+                        },
+                        amount: Uint128(99)
+                    },
+                    Asset {
+                        info: AssetInfo::NativeToken {
+                            denom: ATOM_DENOM.to_string()
+                        },
+                        amount: Uint128(199)
+                    }
+                ],
                 should_migrate: None,
             },],
         }
