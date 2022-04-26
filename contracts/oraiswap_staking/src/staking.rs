@@ -44,11 +44,11 @@ pub fn bond(
 pub fn unbond(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    staker_addr: HumanAddr,
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&info.sender)?;
+    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
     let (staking_token, reward_assets) = _decrease_bond_amount(
         deps.storage,
         deps.api,
@@ -60,7 +60,7 @@ pub fn unbond(
     let mut messages = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.clone(),
         msg: to_binary(&Cw20HandleMsg::Transfer {
-            recipient: info.sender.clone(),
+            recipient: staker_addr.clone(),
             amount,
         })?,
         send: vec![],
@@ -76,7 +76,7 @@ pub fn unbond(
                     None,
                     &deps.querier,
                     env.contract.address.clone(),
-                    info.sender.clone(),
+                    staker_addr.clone(),
                 )?)
             })
             .collect::<StdResult<Vec<CosmosMsg>>>()?,
@@ -86,7 +86,7 @@ pub fn unbond(
         messages,
         attributes: vec![
             attr("action", "unbond"),
-            attr("staker_addr", info.sender.as_str()),
+            attr("staker_addr", staker_addr.as_str()),
             attr("asset_info", asset_info),
             attr("amount", amount.to_string()),
             attr("staking_token", staking_token_addr.as_str()),
