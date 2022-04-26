@@ -4,8 +4,8 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, Api, CanonicalAddr, Coin, Decimal, DepsMut, Env, HandleResponse, HumanAddr,
-    MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, to_binary, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, HandleResponse,
+    HumanAddr, MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20HandleMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
@@ -43,12 +43,13 @@ pub fn bond(
 
 pub fn unbond(
     deps: DepsMut,
-    staker_addr: HumanAddr,
+    env: Env,
+    info: MessageInfo,
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
-    let staking_token: CanonicalAddr = _decrease_bond_amount(
+    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&info.sender)?;
+    let (staking_token, reward_assets) = _decrease_bond_amount(
         deps.storage,
         deps.api,
         &staker_addr_raw,
@@ -56,20 +57,36 @@ pub fn unbond(
         amount,
     )?;
     let staking_token_addr = deps.api.human_address(&staking_token)?;
+    let mut messages = vec![WasmMsg::Execute {
+        contract_addr: staking_token_addr.clone(),
+        msg: to_binary(&Cw20HandleMsg::Transfer {
+            recipient: info.sender.clone(),
+            amount,
+        })?,
+        send: vec![],
+    }
+    .into()];
+
+    // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
+    messages.extend(
+        reward_assets
+            .into_iter()
+            .map(|ra| {
+                Ok(ra.into_msg(
+                    None,
+                    &deps.querier,
+                    env.contract.address.clone(),
+                    info.sender.clone(),
+                )?)
+            })
+            .collect::<StdResult<Vec<CosmosMsg>>>()?,
+    );
 
     Ok(HandleResponse {
-        messages: vec![WasmMsg::Execute {
-            contract_addr: staking_token_addr.clone(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: staker_addr.clone(),
-                amount,
-            })?,
-            send: vec![],
-        }
-        .into()],
+        messages,
         attributes: vec![
             attr("action", "unbond"),
-            attr("staker_addr", staker_addr.as_str()),
+            attr("staker_addr", info.sender.as_str()),
             attr("asset_info", asset_info),
             attr("amount", amount.to_string()),
             attr("staking_token", staking_token_addr.as_str()),
@@ -314,11 +331,11 @@ fn _decrease_bond_amount(
     staker_addr: &CanonicalAddr,
     asset_info: &AssetInfo,
     amount: Uint128,
-) -> StdResult<CanonicalAddr> {
+) -> StdResult<(CanonicalAddr, Vec<Asset>)> {
     let asset_key = &asset_info.to_vec(api)?;
     let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
     let mut reward_info: RewardInfo = rewards_read(storage, staker_addr).load(asset_key)?;
-
+    let mut reward_assets = vec![];
     if reward_info.bond_amount < amount {
         return Err(StdError::generic_err("Cannot unbond more than bond amount"));
     }
@@ -353,6 +370,13 @@ fn _decrease_bond_amount(
     }
 
     if reward_info.pending_reward.is_zero() && reward_info.bond_amount.is_zero() {
+        // if pending_withdraw is not empty, then return reward_assets to withdraw money
+        reward_assets = reward_info
+            .pending_withdraw
+            .into_iter()
+            .map(|ra| Ok(ra.to_normal(api)?))
+            .collect::<StdResult<Vec<Asset>>>()?;
+
         rewards_store(storage, staker_addr).remove(asset_key);
         // remove staker from the pool
         stakers_store(storage, asset_key).remove(staker_addr);
@@ -363,5 +387,5 @@ fn _decrease_bond_amount(
     // Update pool info
     store_pool_info(storage, asset_key, &pool_info)?;
 
-    Ok(staking_token)
+    Ok((staking_token, reward_assets))
 }

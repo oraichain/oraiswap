@@ -61,7 +61,7 @@ pub fn handle(
             asset_info,
             new_staking_token,
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
-        HandleMsg::Unbond { asset_info, amount } => unbond(deps, info.sender, asset_info, amount),
+        HandleMsg::Unbond { asset_info, amount } => unbond(deps, env, info, asset_info, amount),
         HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
         HandleMsg::WithdrawOthers {
             asset_info,
