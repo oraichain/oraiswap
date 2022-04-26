@@ -1,9 +1,13 @@
 use crate::contract::{handle, init, query};
 use crate::testing::mock_querier::mock_dependencies_with_querier;
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{attr, from_binary, to_binary, Coin, Decimal, StdError, Uint128, WasmMsg};
+use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::{
+    attr, coin, from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128,
+    WasmMsg,
+};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::mock_querier::{mock_dependencies, ATOM_DENOM};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
@@ -166,11 +170,14 @@ fn test_bond_tokens() {
 
 #[test]
 fn test_unbond() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: "rewarder".into(),
         minter: Some("mint".into()),
         oracle_addr: "oracle".into(),
         factory_addr: "factory".into(),
@@ -179,6 +186,29 @@ fn test_unbond() {
 
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardsPerSec {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        assets: vec![
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                amount: 200u128.into(),
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // register asset
     let msg = HandleMsg::RegisterAsset {
@@ -203,6 +233,40 @@ fn test_unbond() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(300u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+    // will also add to the index the pending rewards from before the migration
+    let msg = HandleMsg::UpdateRewardsPerSec {
+        asset_info: AssetInfo::Token {
+            contract_addr: "asset".into(),
+        },
+        assets: vec![
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond 150 tokens; failed
@@ -234,16 +298,30 @@ fn test_unbond() {
     let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
-        vec![WasmMsg::Execute {
-            contract_addr: "staking".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: "addr".into(),
-                amount: Uint128(100u128),
+        vec![
+            WasmMsg::Execute {
+                contract_addr: "staking".into(),
+                msg: to_binary(&Cw20HandleMsg::Transfer {
+                    recipient: "addr".into(),
+                    amount: Uint128(100u128),
+                })
+                .unwrap(),
+                send: vec![],
+            }
+            .into(),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: "cosmos2contract".into(),
+                to_address: "addr".into(),
+                amount: vec![coin(99u128, ORAI_DENOM)],
             })
-            .unwrap(),
-            send: vec![],
-        }
-        .into()]
+            .into(),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: "cosmos2contract".into(),
+                to_address: "addr".into(),
+                amount: vec![coin(199u128, ATOM_DENOM)],
+            })
+            .into()
+        ]
     );
 
     let data = query(
@@ -265,7 +343,7 @@ fn test_unbond() {
             },
             staking_token: "staking".into(),
             total_bond_amount: Uint128::zero(),
-            reward_index: Decimal::zero(),
+            reward_index: Decimal::from_ratio(300u128, 100u128),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,
             migration_index_snapshot: None,
