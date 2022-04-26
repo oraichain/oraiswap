@@ -69,6 +69,7 @@ fn test_migration() {
                 index: Decimal::one(),
                 bond_amount: Uint128::from(1000u64),
                 pending_reward: Uint128::from(500u64),
+                native_token: false,
             },
         )
         .unwrap();

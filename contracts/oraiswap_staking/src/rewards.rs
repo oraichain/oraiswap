@@ -180,9 +180,6 @@ pub fn process_reward_assets(
 
         before_share_change(pool_index, &mut reward_info)?;
 
-        // reward assets for a pool
-        let mut pending_withdraw_assets: Vec<AssetRaw> = reward_info.pending_withdraw.clone();
-
         if !reward_info.pending_reward.is_zero() {
             // calculate and accumulate the reward amount
             let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
@@ -198,27 +195,20 @@ pub fn process_reward_assets(
                     reward_info.pending_reward.u128() * rw.amount.u128() / total_amount.u128(),
                 );
 
-                // update, first time push it, later update the amount
-
-                if do_withdraw {
-                    update_reward_assets_amount(&mut reward_assets, rw, amount);
-                } else {
-                    update_reward_assets_amount(&mut pending_withdraw_assets, rw, amount);
-                }
+                // update pending_withdraw, first time push it, later update the amount
+                update_reward_assets_amount(&mut reward_info.pending_withdraw, rw, amount);
             }
 
             // reset pending_reward
             reward_info.pending_reward = Uint128::zero();
+        }
 
-            // if withdraw, then return reward_assets to create MsgSend, otherwise update pending_withdraw
-            if do_withdraw {
-                for rw in pending_withdraw_assets {
-                    update_reward_assets_amount(&mut reward_assets, rw.clone(), rw.amount);
-                }
-                reward_info.pending_withdraw = vec![];
-            } else {
-                reward_info.pending_withdraw = pending_withdraw_assets;
+        // if withdraw, then update reward_assets to create MsgSend
+        if do_withdraw {
+            for rw in reward_info.pending_withdraw {
+                update_reward_assets_amount(&mut reward_assets, rw.clone(), rw.amount);
             }
+            reward_info.pending_withdraw = vec![];
         }
 
         // Update rewards info, if empty bond_amount and withdraw then remove

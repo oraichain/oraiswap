@@ -26,6 +26,7 @@ pub struct LegacyRewardInfo {
     pub index: Decimal,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    pub native_token: bool,
 }
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)
@@ -54,7 +55,7 @@ pub fn migrate_rewards_store(
 
         for reward_pair in reward_pairs {
             let (asset_key, reward_info) = reward_pair;
-            let native_token = if asset_key.len() == 20 { false } else { true };
+            let native_token = reward_info.native_token;
             // try convert to contract token, otherwise it is native token
             let new_reward_info = RewardInfo {
                 native_token,
