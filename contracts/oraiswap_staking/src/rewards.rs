@@ -242,7 +242,7 @@ pub fn query_reward_info(
     let staker_addr_raw = deps.api.canonical_address(&staker_addr)?;
 
     let reward_infos: Vec<RewardInfoResponseItem> =
-        _read_reward_infos(deps.api, deps.storage, &staker_addr_raw, &asset_info)?;
+        _read_reward_infos_response(deps.api, deps.storage, &staker_addr_raw, &asset_info)?;
 
     Ok(RewardInfoResponse {
         staker_addr,
@@ -277,7 +277,7 @@ pub fn query_all_reward_infos(
         .map(|item| {
             let (k, _) = item?;
             let staker_addr_raw = CanonicalAddr::from(k);
-            let reward_infos: Vec<RewardInfoResponseItem> = _read_reward_infos(
+            let reward_infos: Vec<RewardInfoResponseItem> = _read_reward_infos_response(
                 deps.api,
                 deps.storage,
                 &staker_addr_raw,
@@ -294,17 +294,17 @@ pub fn query_all_reward_infos(
     Ok(info_responses)
 }
 
-fn _read_reward_infos(
+fn _read_reward_infos_response(
     api: &dyn Api,
     storage: &dyn Storage,
     staker_addr: &CanonicalAddr,
     asset_info: &Option<AssetInfo>,
 ) -> StdResult<Vec<RewardInfoResponseItem>> {
-    let rewards_bucket = rewards_read(storage, staker_addr);
-    let reward_infos: Vec<RewardInfoResponseItem> = if let Some(asset_info) = asset_info {
-        let asset_key = asset_info.to_vec(api)?;
-
-        if let Some(mut reward_info) = rewards_bucket.may_load(&asset_key)? {
+    let results = _read_reward_infos(api, storage, staker_addr, asset_info)?;
+    let reward_infos: Vec<RewardInfoResponseItem> = results
+        .into_iter()
+        .map(|(asset_info, mut reward_info)| {
+            let asset_key = asset_info.to_vec(api)?;
             let pool_info = read_pool_info(storage, &asset_key)?;
 
             let (pool_index, should_migrate) = if pool_info.migration_params.is_some()
@@ -319,19 +319,38 @@ fn _read_reward_infos(
             };
 
             before_share_change(pool_index, &mut reward_info)?;
+
             let pending_withdraw_amount: Uint128 = reward_info
                 .pending_withdraw
-                .into_iter()
+                .iter() // no copy item
                 .map(|pw| pw.amount)
                 .sum();
 
-            vec![RewardInfoResponseItem {
+            Ok(RewardInfoResponseItem {
                 asset_info: asset_info.to_owned(),
                 bond_amount: reward_info.bond_amount,
                 pending_reward: reward_info.pending_reward + pending_withdraw_amount,
 
                 should_migrate,
-            }]
+            })
+        })
+        .collect::<StdResult<Vec<RewardInfoResponseItem>>>()?;
+
+    Ok(reward_infos)
+}
+
+fn _read_reward_infos(
+    api: &dyn Api,
+    storage: &dyn Storage,
+    staker_addr: &CanonicalAddr,
+    asset_info: &Option<AssetInfo>,
+) -> StdResult<Vec<(AssetInfo, RewardInfo)>> {
+    let rewards_bucket = rewards_read(storage, staker_addr);
+    let results: Vec<(AssetInfo, RewardInfo)> = if let Some(asset_info) = asset_info {
+        let asset_key = asset_info.to_vec(api)?;
+
+        if let Some(reward_info) = rewards_bucket.may_load(&asset_key)? {
+            vec![(asset_info.clone(), reward_info)]
         } else {
             vec![]
         }
@@ -339,21 +358,7 @@ fn _read_reward_infos(
         rewards_bucket
             .range(None, None, Order::Ascending)
             .map(|item| {
-                let (asset_key, mut reward_info) = item?;
-
-                let pool_info = read_pool_info(storage, &asset_key)?;
-                let (pool_index, should_migrate) = if pool_info.migration_params.is_some()
-                    && !read_is_migrated(storage, &asset_key, staker_addr)
-                {
-                    (
-                        pool_info.migration_params.unwrap().index_snapshot,
-                        Some(true),
-                    )
-                } else {
-                    (pool_info.reward_index, None)
-                };
-
-                before_share_change(pool_index, &mut reward_info)?;
+                let (asset_key, reward_info) = item?;
 
                 // try convert to AssetInfo based on reward info
                 let asset_info = if reward_info.native_token {
@@ -366,15 +371,10 @@ fn _read_reward_infos(
                     }
                 };
 
-                Ok(RewardInfoResponseItem {
-                    asset_info,
-                    bond_amount: reward_info.bond_amount,
-                    pending_reward: reward_info.pending_reward,
-                    should_migrate,
-                })
+                Ok((asset_info, reward_info))
             })
-            .collect::<StdResult<Vec<RewardInfoResponseItem>>>()?
+            .collect::<StdResult<Vec<(AssetInfo, RewardInfo)>>>()?
     };
 
-    Ok(reward_infos)
+    Ok(results)
 }

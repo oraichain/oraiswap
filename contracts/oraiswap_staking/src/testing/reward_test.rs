@@ -903,7 +903,7 @@ fn test_update_rewards_per_sec() {
     // bond 100 tokens
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
-        amount: Uint128(100u128),
+        amount: Uint128(300u128),
         msg: to_binary(&Cw20HookMsg::Bond {
             asset_info: AssetInfo::Token {
                 contract_addr: "asset".into(),
@@ -914,13 +914,13 @@ fn test_update_rewards_per_sec() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // factory deposit 100 reward tokens
+    // factory deposit 300 reward tokens
     let msg = HandleMsg::DepositReward {
         rewards: vec![Asset {
             info: AssetInfo::Token {
                 contract_addr: "asset".into(),
             },
-            amount: Uint128(100u128),
+            amount: Uint128(300u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -940,18 +940,30 @@ fn test_update_rewards_per_sec() {
                     info: AssetInfo::NativeToken {
                         denom: ORAI_DENOM.to_string(),
                     },
-                    amount: 100u128.into(),
+                    amount: 33u128.into(),
                 },
                 Asset {
                     info: AssetInfo::NativeToken {
                         denom: ATOM_DENOM.to_string(),
                     },
-                    amount: 100u128.into(),
+                    amount: 67u128.into(),
                 },
             ],
         },
     )
     .unwrap();
+
+    // factory deposit 100 reward tokens
+    let msg = HandleMsg::DepositReward {
+        rewards: vec![Asset {
+            info: AssetInfo::Token {
+                contract_addr: "asset".into(),
+            },
+            amount: Uint128(100u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
+    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check reward info, pending reward should be zero because of withdrawal
     let data = query(
@@ -972,8 +984,8 @@ fn test_update_rewards_per_sec() {
                 asset_info: AssetInfo::Token {
                     contract_addr: "asset".into()
                 },
-                bond_amount: Uint128(100u128),
-                pending_reward: Uint128::zero(),
+                bond_amount: Uint128(300u128),
+                pending_reward: Uint128(399u128),
 
                 should_migrate: None,
             },],
