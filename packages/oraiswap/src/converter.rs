@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{HumanAddr, Uint128};
 
-use crate::asset::AssetInfo;
-use cw20::Cw20ReceiveMsg;
+use crate::asset::{Asset, AssetInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {}
@@ -17,7 +16,9 @@ pub enum HandleMsg {
     UpdateConfig {
         owner: HumanAddr,
     },
-    Receive(Cw20ReceiveMsg),
+    Convert {
+        asset: Asset,
+    },
     UpdateConvertInfoMsg {
         from: AssetInfo,
         to_token: AssetInfo,

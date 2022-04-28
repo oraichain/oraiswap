@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, StdError, StdResult, Uint128,
+    MessageInfo, StdError, StdResult,
 };
 
 use crate::state::{
@@ -12,8 +12,6 @@ use oraiswap::converter::ConvertInfoResponse;
 use oraiswap::converter::{ConfigResponse, HandleMsg, QueryMsg};
 
 use oraiswap::asset::{Asset, AssetInfo};
-
-use cw20::Cw20ReceiveMsg;
 
 pub fn init(deps: DepsMut, info: MessageInfo) -> StdResult<InitResponse> {
     store_config(
@@ -39,7 +37,7 @@ pub fn handle(
             to_token,
             from_to_ratio,
         } => update_convert_info(deps, info, from, to_token, from_to_ratio),
-        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        HandleMsg::Convert { asset } => convert(deps, env, info, asset),
     }
 }
 
@@ -93,27 +91,26 @@ pub fn update_convert_info(
     })
 }
 
-pub fn receive_cw20(
+pub fn convert(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    cw20_msg: Cw20ReceiveMsg,
+    asset: Asset,
 ) -> StdResult<HandleResponse> {
-    let asset_info = AssetInfo::Token {
-        contract_addr: info.sender,
-    };
-    let asset_key = &asset_info.to_vec(deps.api)?;
+    asset.assert_sent_native_token_balance(&info)?;
+
+    let asset_key = &asset.info.to_vec(deps.api)?;
     let convert_info = read_convert_info(deps.storage, asset_key)?;
 
     let message = (Asset {
         info: convert_info.to_token,
-        amount: (cw20_msg.amount.u128() * convert_info.from_to_ratio).into(),
+        amount: (asset.amount.u128() * convert_info.from_to_ratio).into(),
     })
     .into_msg(
         None,
         &deps.querier,
         env.contract.address.clone(),
-        cw20_msg.sender,
+        info.sender,
     )?;
     Ok(HandleResponse {
         messages: vec![message],
