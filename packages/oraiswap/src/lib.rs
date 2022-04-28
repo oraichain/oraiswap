@@ -9,6 +9,7 @@ pub mod rewarder;
 pub mod router;
 pub mod staking;
 pub mod token;
+pub mod converter;
 
 mod math;
 pub use crate::math::{Decimal256, Uint256};

@@ -187,6 +187,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraiswap-converter"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "oraiswap",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "oraiswap-factory"
 version = "0.0.0"
 dependencies = [
