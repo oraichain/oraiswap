@@ -107,7 +107,7 @@ pub fn update_pair(
 
     let token_ratio = TokenRatio {
         info: to.info,
-        ratio: Decimal::from_ratio(to.decimals, from.decimals),
+        ratio: Decimal::from_ratio(10u128.pow(to.decimals.into()), 10u128.pow(from.decimals.into())),
     };
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
