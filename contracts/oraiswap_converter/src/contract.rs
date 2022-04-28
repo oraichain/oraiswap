@@ -1,19 +1,19 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, StdError, StdResult,
+    attr, from_binary, to_binary, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse,
+    HumanAddr, InitResponse, MessageInfo, StdError, StdResult,
 };
+use cw20::Cw20ReceiveMsg;
 
-use crate::state::{
-    read_config, read_convert_info, store_config, store_convert_info, Config, ConvertInfo,
+use crate::state::{read_config, read_token_ratio, store_config, store_token_ratio, Config};
+
+use oraiswap::converter::{
+    ConfigResponse, ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo,
+    TokenRatio,
 };
-
-use oraiswap::converter::ConvertInfoResponse;
-
-use oraiswap::converter::{ConfigResponse, HandleMsg, QueryMsg};
 
 use oraiswap::asset::{Asset, AssetInfo};
 
-pub fn init(deps: DepsMut, info: MessageInfo) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, _msg: InitMsg) -> StdResult<InitResponse> {
     store_config(
         deps.storage,
         &Config {
@@ -31,13 +31,10 @@ pub fn handle(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
+        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         HandleMsg::UpdateConfig { owner } => update_config(deps, info, owner),
-        HandleMsg::UpdateConvertInfoMsg {
-            from,
-            to_token,
-            from_to_ratio,
-        } => update_convert_info(deps, info, from, to_token, from_to_ratio),
-        HandleMsg::Convert { asset } => convert(deps, env, info, asset),
+        HandleMsg::UpdatePair { from, to } => update_pair(deps, info, from, to),
+        HandleMsg::Convert {} => convert(deps, env, info),
     }
 }
 
@@ -47,6 +44,7 @@ pub fn update_config(
     owner: HumanAddr,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
+
     if config.owner != deps.api.canonical_address(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
@@ -62,27 +60,57 @@ pub fn update_config(
     })
 }
 
-pub fn update_convert_info(
+pub fn receive_cw20(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> StdResult<HandleResponse> {
+    match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
+        Ok(Cw20HookMsg::Convert {}) => {
+            // check permission
+            let token_raw = deps.api.canonical_address(&info.sender)?;
+            let token_ratio = read_token_ratio(deps.storage, token_raw.as_slice())?;
+            let message = Asset {
+                info: token_ratio.info,
+                amount: cw20_msg.amount * token_ratio.ratio,
+            }
+            .into_msg(
+                None,
+                &deps.querier,
+                env.contract.address.clone(),
+                cw20_msg.sender,
+            )?;
+
+            Ok(HandleResponse {
+                messages: vec![message],
+                attributes: vec![attr("action", "convert_token")],
+                data: None,
+            })
+        }
+        Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
+    }
+}
+
+pub fn update_pair(
     deps: DepsMut,
     info: MessageInfo,
-    from: AssetInfo,
-    to_token: AssetInfo,
-    from_to_ratio: u128,
+    from: TokenInfo,
+    to: TokenInfo,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
     if config.owner != deps.api.canonical_address(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = &from.to_vec(deps.api)?;
-    store_convert_info(
-        deps.storage,
-        asset_key,
-        &ConvertInfo {
-            to_token,
-            from_to_ratio,
-        },
-    )?;
+    let asset_key = from.info.to_vec(deps.api)?;
+
+    let token_ratio = TokenRatio {
+        info: to.info,
+        ratio: Decimal::from_ratio(to.decimals, from.decimals),
+    };
+
+    store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -91,29 +119,30 @@ pub fn update_convert_info(
     })
 }
 
-pub fn convert(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    asset: Asset,
-) -> StdResult<HandleResponse> {
-    asset.assert_sent_native_token_balance(&info)?;
+pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleResponse> {
+    let mut messages: Vec<CosmosMsg> = vec![];
 
-    let asset_key = &asset.info.to_vec(deps.api)?;
-    let convert_info = read_convert_info(deps.storage, asset_key)?;
+    for native_coin in info.sent_funds {
+        let asset_key = native_coin.denom.as_bytes();
+        let amount = native_coin.amount;
+        let token_ratio = read_token_ratio(deps.storage, asset_key)?;
 
-    let message = (Asset {
-        info: convert_info.to_token,
-        amount: (asset.amount.u128() * convert_info.from_to_ratio).into(),
-    })
-    .into_msg(
-        None,
-        &deps.querier,
-        env.contract.address.clone(),
-        info.sender,
-    )?;
+        let message = Asset {
+            info: token_ratio.info,
+            amount: amount * token_ratio.ratio,
+        }
+        .into_msg(
+            None,
+            &deps.querier,
+            env.contract.address.clone(),
+            info.sender.clone(),
+        )?;
+
+        messages.push(message);
+    }
+
     Ok(HandleResponse {
-        messages: vec![message],
+        messages,
         attributes: vec![attr("action", "convert_token")],
         data: None,
     })
@@ -137,9 +166,6 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 pub fn query_convert_info(deps: Deps, asset_info: AssetInfo) -> StdResult<ConvertInfoResponse> {
     let asset_key = asset_info.to_vec(deps.api)?;
-    let convert_info = read_convert_info(deps.storage, &asset_key)?;
-    Ok(ConvertInfoResponse {
-        to_token: convert_info.to_token,
-        from_to_ratio: convert_info.from_to_ratio,
-    })
+    let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
+    Ok(ConvertInfoResponse { token_ratio })
 }
