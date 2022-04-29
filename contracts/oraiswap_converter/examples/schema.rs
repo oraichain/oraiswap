@@ -2,7 +2,7 @@ use std::env::current_dir;
 use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
-use oraiswap::rewarder::{ConfigResponse, DistributionInfoResponse, HandleMsg, InitMsg, QueryMsg};
+use oraiswap::converter::{ConfigResponse, ConvertInfoResponse, HandleMsg, InitMsg, QueryMsg};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -14,5 +14,5 @@ fn main() {
     export_schema(&schema_for!(HandleMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(ConfigResponse), &out_dir);
-    export_schema(&schema_for!(DistributionInfoResponse), &out_dir);
+    export_schema(&schema_for!(ConvertInfoResponse), &out_dir);
 }
