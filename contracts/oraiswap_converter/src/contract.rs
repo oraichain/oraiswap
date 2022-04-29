@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, StdError, StdResult,
+    attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdError, StdResult,
 };
 use cw20::Cw20ReceiveMsg;
 
@@ -71,9 +71,10 @@ pub fn receive_cw20(
             // check permission
             let token_raw = deps.api.canonical_address(&info.sender)?;
             let token_ratio = read_token_ratio(deps.storage, token_raw.as_slice())?;
+            let amount = cw20_msg.amount * token_ratio.ratio;
             let message = Asset {
                 info: token_ratio.info,
-                amount: cw20_msg.amount * token_ratio.ratio,
+                amount: amount.clone(),
             }
             .into_msg(
                 None,
@@ -84,7 +85,11 @@ pub fn receive_cw20(
 
             Ok(HandleResponse {
                 messages: vec![message],
-                attributes: vec![attr("action", "convert_token")],
+                attributes: vec![
+                    attr("action", "convert_token"),
+                    attr("from_amount", cw20_msg.amount),
+                    attr("to_amount", amount),
+                ],
                 data: None,
             })
         }
@@ -107,7 +112,10 @@ pub fn update_pair(
 
     let token_ratio = TokenRatio {
         info: to.info,
-        ratio: Decimal::from_ratio(10u128.pow(to.decimals.into()), 10u128.pow(from.decimals.into())),
+        ratio: Decimal::from_ratio(
+            10u128.pow(to.decimals.into()),
+            10u128.pow(from.decimals.into()),
+        ),
     };
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
@@ -121,15 +129,24 @@ pub fn update_pair(
 
 pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleResponse> {
     let mut messages: Vec<CosmosMsg> = vec![];
+    let mut attributes: Vec<Attribute> = vec![];
+    attributes.push(attr("action", "convert_token"));
 
     for native_coin in info.sent_funds {
         let asset_key = native_coin.denom.as_bytes();
         let amount = native_coin.amount;
+        attributes.extend(vec![
+            attr("denom", native_coin.denom.clone()),
+            attr("from_amount", amount.clone()),
+        ]);
         let token_ratio = read_token_ratio(deps.storage, asset_key)?;
+        let to_amount = amount * token_ratio.ratio;
+
+        attributes.push(attr("to_amount", to_amount));
 
         let message = Asset {
             info: token_ratio.info,
-            amount: amount * token_ratio.ratio,
+            amount: to_amount.clone(),
         }
         .into_msg(
             None,
@@ -143,7 +160,7 @@ pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleRe
 
     Ok(HandleResponse {
         messages,
-        attributes: vec![attr("action", "convert_token")],
+        attributes,
         data: None,
     })
 }
