@@ -20,6 +20,7 @@ pub struct TokenRatio {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {}
+pub struct MigrateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +37,9 @@ pub enum HandleMsg {
     UpdatePair {
         from: TokenInfo,
         to: TokenInfo,
+    },
+    UnregisterPair {
+        from: TokenInfo,
     },
 }
 
