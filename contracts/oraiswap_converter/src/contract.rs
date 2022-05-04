@@ -1,16 +1,17 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdError, StdResult, MigrateResponse,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult,
 };
 use cw20::Cw20ReceiveMsg;
 
 use crate::state::{
-    read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_store, Config,
+    read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_remove,
+    token_ratio_store, Config,
 };
 
 use oraiswap::converter::{
-    ConfigResponse, ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo,
-    TokenRatio, MigrateMsg,
+    ConfigResponse, ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, QueryMsg,
+    TokenInfo, TokenRatio,
 };
 
 use oraiswap::asset::{Asset, AssetInfo};
@@ -142,7 +143,8 @@ pub fn unregister_pair(
 
     let asset_key = from.info.to_vec(deps.api)?;
 
-    token_ratio_store(deps.storage).remove(&asset_key);
+    // token_ratio_store(deps.storage).remove(&asset_key);
+    token_ratio_remove(deps.storage, &asset_key);
 
     Ok(HandleResponse {
         messages: vec![],
