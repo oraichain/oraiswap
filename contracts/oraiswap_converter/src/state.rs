@@ -34,9 +34,9 @@ pub fn read_token_ratio(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<To
     ReadonlyBucket::new(storage, KEY_TOKEN_RATIO).load(asset_key)
 }
 
-pub fn token_ratio_store<'a>(storage: &'a mut dyn Storage) -> Bucket<'a, TokenRatio> {
-    Bucket::new(storage, KEY_TOKEN_RATIO)
-}
+// pub fn token_ratio_store<'a>(storage: &'a mut dyn Storage) -> Bucket<'a, TokenRatio> {
+//     Bucket::new(storage, KEY_TOKEN_RATIO)
+// }
 
 pub fn token_ratio_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8]) {
     Bucket::<'a, TokenRatio>::new(storage, KEY_TOKEN_RATIO).remove(asset_key)
