@@ -1,8 +1,10 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
     HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult,
+    Uint128,
 };
 use cw20::Cw20ReceiveMsg;
+use oraiswap::{Decimal256, Uint256};
 
 use crate::state::{
     read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_remove, Config,
@@ -13,7 +15,7 @@ use oraiswap::converter::{
     TokenInfo, TokenRatio,
 };
 
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo, DECIMAL_FRACTION};
 
 pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, _msg: InitMsg) -> StdResult<InitResponse> {
     store_config(
@@ -38,6 +40,7 @@ pub fn handle(
         HandleMsg::UpdatePair { from, to } => update_pair(deps, info, from, to),
         HandleMsg::UnregisterPair { from } => unregister_pair(deps, info, from),
         HandleMsg::Convert {} => convert(deps, env, info),
+        HandleMsg::ConvertReverse { from_asset } => convert_reverse(deps, env, info, from_asset),
     }
 }
 
@@ -61,6 +64,19 @@ pub fn update_config(
         attributes: vec![attr("action", "update_config")],
         data: None,
     })
+}
+
+fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
+    let _nominator = Uint256::from(nominator);
+    let _denominator = Decimal256::from(denominator);
+
+    let result: Uint128 = (_nominator
+        * Decimal256::from_ratio(
+            Uint256::from(DECIMAL_FRACTION),
+            Uint256::from(DECIMAL_FRACTION) * _denominator,
+        ))
+    .into();
+    result
 }
 
 pub fn receive_cw20(
@@ -95,6 +111,41 @@ pub fn receive_cw20(
                 ],
                 data: None,
             })
+        }
+        Ok(Cw20HookMsg::ConvertReverse { from }) => {
+            let asset_key = from.to_vec(deps.api)?;
+            let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
+
+            if let AssetInfo::Token { contract_addr } = token_ratio.info {
+                if contract_addr != info.sender {
+                    return Err(StdError::generic_err("invalid cw20 hook message"));
+                }
+
+                let amount = div_ratio_decimal(cw20_msg.amount.clone(), token_ratio.ratio.clone());
+
+                let message = Asset {
+                    info: from,
+                    amount: amount.clone(),
+                }
+                .into_msg(
+                    None,
+                    &deps.querier,
+                    env.contract.address.clone(),
+                    cw20_msg.sender,
+                )?;
+
+                Ok(HandleResponse {
+                    messages: vec![message],
+                    attributes: vec![
+                        attr("action", "convert_token_reverse"),
+                        attr("from_amount", cw20_msg.amount),
+                        attr("to_amount", amount),
+                    ],
+                    data: None,
+                })
+            } else {
+                return Err(StdError::generic_err("invalid cw20 hook message"));
+            }
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
@@ -187,6 +238,49 @@ pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleRe
         attributes,
         data: None,
     })
+}
+
+pub fn convert_reverse(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    from_asset: AssetInfo,
+) -> StdResult<HandleResponse> {
+    let asset_key = from_asset.to_vec(deps.api)?;
+    let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
+
+    if let AssetInfo::NativeToken { denom } = token_ratio.info {
+        //check sent_funds includes To token
+        let native_coin = info.sent_funds.iter().find(|a| a.denom.eq(&denom));
+        if native_coin.is_none() {
+            return Err(StdError::generic_err("invalid cw20 hook message"));
+        }
+        let native_coin = native_coin.unwrap();
+        let amount = div_ratio_decimal(native_coin.amount.clone(), token_ratio.ratio.clone());
+        let message = Asset {
+            info: from_asset,
+            amount: amount.clone(),
+        }
+        .into_msg(
+            None,
+            &deps.querier,
+            env.contract.address.clone(),
+            info.sender.clone(),
+        )?;
+
+        Ok(HandleResponse {
+            messages: vec![message],
+            attributes: vec![
+                attr("action", "convert_token_reverse"),
+                attr("denom", native_coin.denom.clone()),
+                attr("from_amount", native_coin.amount.clone()),
+                attr("to_amount", amount),
+            ],
+            data: None,
+        })
+    } else {
+        return Err(StdError::generic_err("invalid cw20 hook message"));
+    }
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

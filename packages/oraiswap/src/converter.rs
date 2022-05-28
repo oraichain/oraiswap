@@ -42,6 +42,9 @@ pub enum HandleMsg {
     UnregisterPair {
         from: TokenInfo,
     },
+    ConvertReverse {
+        from_asset: AssetInfo,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -54,8 +57,8 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    // this call from LP token contract
     Convert {},
+    ConvertReverse { from: AssetInfo },
 }
 
 // We define a custom struct for each query response
