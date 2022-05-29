@@ -3,8 +3,8 @@ use std::ops::{Div, Mul};
 use cosmwasm_std::{
     attr, coin, from_binary,
     testing::{mock_env, mock_info},
-    to_binary, Binary, CosmosMsg, CustomQuery, Decimal, Empty, HumanAddr, QueryRequest, StdError,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, BankMsg, Binary, CosmosMsg, CustomQuery, Decimal, Empty, HumanAddr, QueryRequest,
+    StdError, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::{
@@ -272,17 +272,34 @@ fn test_withdraw_tokens() {
 
     //test proper withdraw tokens
     let msg = HandleMsg::WithdrawTokens {
-        asset_infos: vec![AssetInfo::NativeToken {
-            denom: ORAI_DENOM.into(),
-        },
-        AssetInfo::NativeToken {
-            denom: ATOM_DENOM.into(),
-        }],
+        asset_infos: vec![
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.into(),
+            },
+            AssetInfo::NativeToken {
+                denom: ATOM_DENOM.into(),
+            },
+        ],
     };
 
     let info = mock_info("addr", &[]);
     let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
+    assert_eq!(
+        res.messages,
+        vec![
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: mock_env().contract.address,
+                to_address: info.sender.clone(),
+                amount: vec![coin(10000000000u128, ORAI_DENOM),],
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: mock_env().contract.address,
+                to_address: info.sender,
+                amount: vec![coin(20000000000u128, ATOM_DENOM),],
+            })
+        ]
+    );
     assert_eq!(
         res.attributes,
         vec![
@@ -294,12 +311,14 @@ fn test_withdraw_tokens() {
 
     //test unauthorized withdraw tokens
     let msg = HandleMsg::WithdrawTokens {
-        asset_infos: vec![AssetInfo::NativeToken {
-            denom: ORAI_DENOM.into(),
-        },
-        AssetInfo::NativeToken {
-            denom: ATOM_DENOM.into(),
-        }],
+        asset_infos: vec![
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.into(),
+            },
+            AssetInfo::NativeToken {
+                denom: ATOM_DENOM.into(),
+            },
+        ],
     };
 
     let info = mock_info("addr1", &[]);
