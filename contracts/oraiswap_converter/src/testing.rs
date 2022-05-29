@@ -8,7 +8,7 @@ use cosmwasm_std::{
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::{
-    asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
+    asset::{Asset, AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
     converter::{
         ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo, TokenRatio,
     },
@@ -248,5 +248,65 @@ fn test_remove_pair() {
     match res {
         Err(StdError::NotFound { kind }) => assert_eq!(kind, "oraiswap::converter::TokenRatio"),
         _ => panic!("Must return not found"),
+    };
+}
+
+#[test]
+fn test_withdraw_tokens() {
+    let mut deps = mock_dependencies(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
+
+    let msg = InitMsg {};
+    let info = mock_info(
+        "addr",
+        &[
+            coin(10000000000u128, ORAI_DENOM),
+            coin(20000000000u128, ATOM_DENOM),
+        ],
+    );
+
+    // we can just call .unwrap() to assert this was a success
+    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    //test proper withdraw tokens
+    let msg = HandleMsg::WithdrawTokens {
+        asset_infos: vec![AssetInfo::NativeToken {
+            denom: ORAI_DENOM.into(),
+        },
+        AssetInfo::NativeToken {
+            denom: ATOM_DENOM.into(),
+        }],
+    };
+
+    let info = mock_info("addr", &[]);
+    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("action", "withdraw_tokens"),
+            attr("amount", 10000000000u128.to_string()),
+            attr("amount", 20000000000u128.to_string())
+        ]
+    );
+
+    //test unauthorized withdraw tokens
+    let msg = HandleMsg::WithdrawTokens {
+        asset_infos: vec![AssetInfo::NativeToken {
+            denom: ORAI_DENOM.into(),
+        },
+        AssetInfo::NativeToken {
+            denom: ATOM_DENOM.into(),
+        }],
+    };
+
+    let info = mock_info("addr1", &[]);
+    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone());
+
+    match res {
+        Err(StdError::GenericErr { msg }) => assert_eq!(msg, "unauthorized"),
+        _ => panic!("Must return unauthorized"),
     };
 }

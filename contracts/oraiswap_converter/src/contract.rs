@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult,
-    Uint128,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError,
+    StdResult, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
 use oraiswap::{Decimal256, Uint256};
@@ -41,6 +41,7 @@ pub fn handle(
         HandleMsg::UnregisterPair { from } => unregister_pair(deps, info, from),
         HandleMsg::Convert {} => convert(deps, env, info),
         HandleMsg::ConvertReverse { from_asset } => convert_reverse(deps, env, info, from_asset),
+        HandleMsg::WithdrawTokens { asset_infos } => withdraw_tokens(deps, env, info, asset_infos),
     }
 }
 
@@ -303,6 +304,43 @@ pub fn query_convert_info(deps: Deps, asset_info: AssetInfo) -> StdResult<Conver
     let asset_key = asset_info.to_vec(deps.api)?;
     let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
     Ok(ConvertInfoResponse { token_ratio })
+}
+
+pub fn withdraw_tokens(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    asset_infos: Vec<AssetInfo>,
+) -> StdResult<HandleResponse> {
+    let config = read_config(deps.storage)?;
+    let owner = deps.api.human_address(&config.owner)?;
+    if owner != info.sender {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut attributes: Vec<Attribute> = vec![attr("action", "withdraw_tokens")];
+
+    for asset in asset_infos {
+        let balance = asset.query_pool(&deps.querier, env.contract.address.clone())?;
+        let message = Asset {
+            info: asset,
+            amount: balance.clone(),
+        }
+        .into_msg(
+            None,
+            &deps.querier,
+            env.contract.address.clone(),
+            owner.clone(),
+        )?;
+        messages.push(message);
+        attributes.extend(vec![attr("amount", balance.to_string())])
+    }
+
+    Ok(HandleResponse {
+        messages,
+        attributes,
+        data: None,
+    })
 }
 
 pub fn migrate(

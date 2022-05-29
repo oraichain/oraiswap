@@ -45,6 +45,9 @@ pub enum HandleMsg {
     ConvertReverse {
         from_asset: AssetInfo,
     },
+    WithdrawTokens {
+        asset_infos: Vec<AssetInfo>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
