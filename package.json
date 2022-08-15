@@ -4,6 +4,6 @@
     "build": "bash build_release.sh"
   },
   "dependencies": {
-    "json-schema-to-typescript": "^10.1.5"
+    "@cosmwasm/ts-codegen": "^0.11.1"
   }
 }

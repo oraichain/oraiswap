@@ -114,7 +114,7 @@ pub fn update_pair(
 
     Ok(HandleResponse {
         messages: vec![],
-        attributes: vec![attr("action", "update_convert_info")],
+        attributes: vec![attr("action", "update_pair")],
         data: None,
     })
 }
