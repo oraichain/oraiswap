@@ -20,6 +20,8 @@ pub struct TokenRatio {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -37,6 +39,15 @@ pub enum HandleMsg {
         from: TokenInfo,
         to: TokenInfo,
     },
+    UnregisterPair {
+        from: TokenInfo,
+    },
+    ConvertReverse {
+        from_asset: AssetInfo,
+    },
+    WithdrawTokens {
+        asset_infos: Vec<AssetInfo>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -49,8 +60,8 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    // this call from LP token contract
     Convert {},
+    ConvertReverse { from: AssetInfo },
 }
 
 // We define a custom struct for each query response

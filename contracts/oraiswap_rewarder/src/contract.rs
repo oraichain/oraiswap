@@ -101,8 +101,8 @@ pub fn distribute(
     for asset_info in asset_infos {
         let asset_key = asset_info.to_vec(deps.api)?;
         // default is init time
-        let last_distributed =
-            read_last_distributed(deps.storage, &asset_key).unwrap_or(config.init_time);
+        let last_distributed = read_last_distributed(deps.storage, &asset_key)
+            .unwrap_or(now - config.distribution_interval - 1);
 
         let last_time_elapsed = now - last_distributed;
         if last_time_elapsed < config.distribution_interval {
