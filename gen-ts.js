@@ -55,6 +55,7 @@ if (package) {
   }
   const tsFolder = path.join(artifactsFolder, "ts");
   const baseName = path.basename(package);
-  const name = baseName.replace(/^.|_./g, (m) => m[0].toUpperCase());
+  const name = baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase());
+
   genTS(name, schemaFolder, tsFolder);
 }
