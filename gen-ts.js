@@ -26,7 +26,7 @@ const genTS = async (name, dir, outPath) => {
         enabled: true,
       },
       reactQuery: {
-        enabled: true,
+        enabled: process.argv.includes("--react-query"),
         optionalClient: true,
         version: "v4",
         mutations: true,
@@ -56,6 +56,6 @@ if (package) {
   const tsFolder = path.join(artifactsFolder, "ts");
   const baseName = path.basename(package);
   const name = baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase());
-
+  fs.rmSync(tsFolder, { recursive: true, force: true });
   genTS(name, schemaFolder, tsFolder);
 }
