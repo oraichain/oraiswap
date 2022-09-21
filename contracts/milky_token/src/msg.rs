@@ -1,10 +1,9 @@
+use oraiswap::hook::InitHook;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{HumanAddr, StdError, StdResult, Uint128};
 use cw20::{Cw20CoinHuman, MinterResponse};
-
-use crate::hook::InitHook;
 
 /// TokenContract InitMsg
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -17,6 +16,7 @@ pub struct InitMsg {
 
     /// call after work
     pub init_hook: Option<InitHook>,
+    pub tax_receiver: HumanAddr,
 }
 
 // this is InitMsg
