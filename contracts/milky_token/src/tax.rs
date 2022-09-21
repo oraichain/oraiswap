@@ -7,10 +7,14 @@ pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 
 pub fn compute_tax(amount: Uint128) -> StdResult<Uint128> {
     // get oracle params from oracle contract
-    Ok(amount.multiply_ratio(
+    let new_amount = amount.multiply_ratio(
         DECIMAL_FRACTION,
         DECIMAL_FRACTION * Decimal::from_ratio(TAX_RATE, 100u128) + DECIMAL_FRACTION,
-    ))
+    );
+    if new_amount.is_zero() {
+        return Ok(amount);
+    }
+    Ok(new_amount)
 }
 
 pub fn handle_tax(storage: &mut dyn Storage, amount: Uint128) -> StdResult<Uint128> {
@@ -76,6 +80,20 @@ mod tests {
 
         let info = mock_info(minter.clone(), &[]);
         let env = mock_env();
+
+        // case amount is too small, then we dont charge tax
+        let msg = HandleMsg::Transfer {
+            recipient: receiver.clone(),
+            amount: Uint128(1u128),
+        };
+        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // tax receiver address should receive 5 CASH because of tax
+        let balance = query_balance(deps.as_ref(), tax_receiver.clone())
+            .unwrap()
+            .balance;
+        assert_eq!(balance, Uint128(0u128));
+
         let msg = HandleMsg::Transfer {
             recipient: receiver.clone(),
             amount: Uint128(100u128),
