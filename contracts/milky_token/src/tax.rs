@@ -1,16 +1,25 @@
-use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, StdError, StdResult, Storage, Uint128};
 use cw20_base::state::balances;
+use oraiswap::error::OverflowError;
 
 use crate::state::TAX_RATE;
 
-pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
+pub fn checked_sub(left: Uint128, right: Uint128) -> StdResult<Uint128> {
+    left.0.checked_sub(right.0).map(Uint128).ok_or_else(|| {
+        StdError::generic_err(
+            OverflowError {
+                operation: oraiswap::error::OverflowOperation::Sub,
+                operand1: left.to_string(),
+                operand2: right.to_string(),
+            }
+            .to_string(),
+        )
+    })
+}
 
 pub fn compute_tax(amount: Uint128) -> StdResult<Uint128> {
     // get oracle params from oracle contract
-    let new_amount = amount.multiply_ratio(
-        DECIMAL_FRACTION,
-        DECIMAL_FRACTION * Decimal::from_ratio(TAX_RATE, 100u128) + DECIMAL_FRACTION,
-    );
+    let new_amount = checked_sub(amount, amount.multiply_ratio(TAX_RATE, Uint128(100u128)))?;
     if new_amount.is_zero() {
         return Ok(amount);
     }
@@ -38,12 +47,11 @@ mod tests {
 
     use crate::{
         contract::{handle, init},
-        mock_querier::mock_dependencies,
         msg::InitMsg,
         tax::compute_tax,
     };
     use cosmwasm_std::{
-        testing::{mock_env, mock_info},
+        testing::{mock_dependencies, mock_env, mock_info},
         HumanAddr, Uint128,
     };
     use cw20::{Cw20CoinHuman, MinterResponse};
@@ -51,9 +59,9 @@ mod tests {
 
     #[test]
     fn test_compute_tax() {
-        let amount = Uint128(100u128);
+        let amount = Uint128(1000u128);
         let new_amount = compute_tax(amount).unwrap();
-        assert_eq!(new_amount, Uint128(95u128));
+        assert_eq!(new_amount, Uint128(950u128));
     }
 
     #[test]
@@ -62,7 +70,8 @@ mod tests {
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("minter");
         let tax_receiver = HumanAddr::from("tax_receiver");
-        let receiver = HumanAddr::from("receiver");
+        let random_contract = HumanAddr::from("random_contract");
+        let router_contract = HumanAddr::from("router_contract");
         let limit = Uint128(511223344);
         let init_msg = InitMsg {
             name: "Cash Token".to_string(),
@@ -78,6 +87,7 @@ mod tests {
             }),
             init_hook: None,
             tax_receiver: tax_receiver.clone(),
+            router_contract: HumanAddr::from("router_contract"),
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
@@ -86,40 +96,55 @@ mod tests {
         let info = mock_info(minter.clone(), &[]);
         let env = mock_env();
 
-        // init some amount to smart contract swap, it must have access to balance by user approvals
-        let msg = HandleMsg::Transfer {
-            recipient: tax_receiver.clone(),
-            amount: Uint128(1000u128),
-        };
-        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        // // init some amount to smart contract swap, it must have access to balance by user approvals
+        // let msg = HandleMsg::Transfer {
+        //     recipient: tax_receiver.clone(),
+        //     amount: Uint128(1000u128),
+        // };
+        // handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // case amount is too small, then we dont charge tax
-        let msg = HandleMsg::Transfer {
-            recipient: receiver.clone(),
+        let msg = HandleMsg::Send {
+            contract: router_contract.clone(),
             amount: Uint128(1u128),
+            msg: None,
         };
         handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         let balance = query_balance(deps.as_ref(), tax_receiver.clone())
             .unwrap()
             .balance;
-        assert_eq!(balance, Uint128(1000u128));
+        assert_eq!(balance, Uint128(0u128));
 
-        let msg = HandleMsg::Transfer {
-            recipient: receiver.clone(),
-            amount: Uint128(100u128),
+        let msg = HandleMsg::Send {
+            contract: router_contract.clone(),
+            amount: Uint128(1000u128),
+            msg: None,
         };
         handle(
             deps.as_mut(),
-            env,
-            mock_info(tax_receiver.clone(), &[]),
+            env.clone(),
+            mock_info(minter.clone(), &[]),
             msg,
         )
         .unwrap();
 
-        // tax receiver address should receive 5 CASH because of tax
+        // tax receiver address should receive 50 CASH because of tax
+        let balance = query_balance(deps.as_ref(), tax_receiver.clone())
+            .unwrap()
+            .balance;
+        assert_eq!(balance, Uint128(50u128));
+
+        // when send to other contract => tax doesnt increase
+        let msg = HandleMsg::Send {
+            contract: random_contract.clone(),
+            amount: Uint128(1000u128),
+            msg: None,
+        };
+        handle(deps.as_mut(), env, mock_info(minter.clone(), &[]), msg).unwrap();
+
+        // still the same amount
         let balance = query_balance(deps.as_ref(), tax_receiver).unwrap().balance;
-        // 1000 - 95 + 5 = 910
-        assert_eq!(balance, Uint128(910u128));
+        assert_eq!(balance, Uint128(50u128));
     }
 }

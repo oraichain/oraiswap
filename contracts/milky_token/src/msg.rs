@@ -17,6 +17,7 @@ pub struct InitMsg {
     /// call after work
     pub init_hook: Option<InitHook>,
     pub tax_receiver: HumanAddr,
+    pub router_contract: HumanAddr,
 }
 
 // this is InitMsg

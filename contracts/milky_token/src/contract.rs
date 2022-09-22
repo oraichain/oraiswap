@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo,
-    MigrateResponse, QueryRequest, StdError, StdResult, WasmMsg, WasmQuery,
+    Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, MigrateResponse,
+    StdError, StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -15,7 +15,7 @@ use cw20_base::{
 
 use crate::{
     msg::InitMsg,
-    state::{tax_receiver, tax_receiver_read},
+    state::{router_contract, router_contract_read, tax_receiver, tax_receiver_read},
     tax::handle_tax,
 };
 
@@ -53,7 +53,7 @@ pub fn init(
 
     // init tax receiver
     tax_receiver(deps.storage).save(&deps.api.canonical_address(&msg.tax_receiver)?)?;
-
+    router_contract(deps.storage).save(&deps.api.canonical_address(&msg.router_contract)?)?;
     // store token info
     let data = TokenInfo {
         name: msg.name,
@@ -88,26 +88,25 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     let msg_after_tax: HandleMsg = match msg {
-        HandleMsg::Transfer { recipient, amount } => {
-            // check is pair_contract
-            let is_pair_contract = deps
-                .querier
-                .query::<oraiswap::asset::PairInfo>(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: info.sender.clone(),
-                    msg: to_binary(&oraiswap::pair::QueryMsg::Pair {})?,
-                }))
-                .is_ok();
+        HandleMsg::Send {
+            amount,
+            msg,
+            contract,
+        } => {
+            let tax_receiver = tax_receiver_read(deps.storage).load()?;
+            let router_contract = router_contract_read(deps.storage).load()?;
 
-            let new_amount = if is_pair_contract {
-                let tax_receiver = tax_receiver_read(deps.storage).load()?;
+            // if call from this contract & send token to router contract, then caller is trying to sell / swap this token to another token => apply tax
+            let new_amount = if deps.api.canonical_address(&contract)?.eq(&router_contract) {
                 handle_tax(deps.storage, tax_receiver, amount)?
             } else {
                 amount
             };
 
-            HandleMsg::Transfer {
-                recipient,
+            HandleMsg::Send {
+                msg,
                 amount: new_amount,
+                contract,
             }
         }
         _ => msg,
