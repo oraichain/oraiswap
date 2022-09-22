@@ -38,11 +38,12 @@ mod tests {
 
     use crate::{
         contract::{handle, init},
+        mock_querier::mock_dependencies,
         msg::InitMsg,
         tax::compute_tax,
     };
     use cosmwasm_std::{
-        testing::{mock_dependencies, mock_env, mock_info},
+        testing::{mock_env, mock_info},
         HumanAddr, Uint128,
     };
     use cw20::{Cw20CoinHuman, MinterResponse};
