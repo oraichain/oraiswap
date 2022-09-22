@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, MigrateResponse,
-    StdError, StdResult, WasmMsg,
+    to_binary, Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo,
+    MigrateResponse, QueryRequest, StdError, StdResult, WasmMsg, WasmQuery,
 };
 
 use cw2::set_contract_version;
@@ -89,9 +89,17 @@ pub fn handle(
 ) -> Result<HandleResponse, ContractError> {
     let msg_after_tax: HandleMsg = match msg {
         HandleMsg::Transfer { recipient, amount } => {
-            let tax_receiver = tax_receiver_read(deps.storage).load()?;
+            // check is pair_contract
+            let is_pair_contract = deps
+                .querier
+                .query::<oraiswap::asset::PairInfo>(&QueryRequest::Wasm(WasmQuery::Smart {
+                    contract_addr: info.sender.clone(),
+                    msg: to_binary(&oraiswap::pair::QueryMsg::Pair {})?,
+                }))
+                .is_ok();
 
-            let new_amount = if deps.api.canonical_address(&info.sender)?.eq(&tax_receiver) {
+            let new_amount = if is_pair_contract {
+                let tax_receiver = tax_receiver_read(deps.storage).load()?;
                 handle_tax(deps.storage, tax_receiver, amount)?
             } else {
                 amount
