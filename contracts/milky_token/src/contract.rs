@@ -13,7 +13,11 @@ use cw20_base::{
     ContractError,
 };
 
-use crate::{msg::InitMsg, state::tax_receiver, tax::handle_tax};
+use crate::{
+    msg::InitMsg,
+    state::{tax_receiver, tax_receiver_read},
+    tax::handle_tax,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -85,92 +89,20 @@ pub fn handle(
 ) -> Result<HandleResponse, ContractError> {
     let msg_after_tax: HandleMsg = match msg {
         HandleMsg::Transfer { recipient, amount } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
+            let tax_receiver = tax_receiver_read(deps.storage).load()?;
+
+            let new_amount = if deps.api.canonical_address(&info.sender)?.eq(&tax_receiver) {
+                handle_tax(deps.storage, tax_receiver, amount)?
+            } else {
+                amount
+            };
+
             HandleMsg::Transfer {
                 recipient,
                 amount: new_amount,
             }
         }
-        HandleMsg::Burn { amount } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::Burn { amount: new_amount }
-        }
-        HandleMsg::Send {
-            contract,
-            amount,
-            msg,
-        } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::Send {
-                contract,
-                amount: new_amount,
-                msg,
-            }
-        }
-        HandleMsg::Mint { recipient, amount } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::Mint {
-                recipient,
-                amount: new_amount,
-            }
-        }
-        HandleMsg::IncreaseAllowance {
-            spender,
-            amount,
-            expires,
-        } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::IncreaseAllowance {
-                spender,
-                amount: new_amount,
-                expires,
-            }
-        }
-        HandleMsg::DecreaseAllowance {
-            spender,
-            amount,
-            expires,
-        } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::DecreaseAllowance {
-                spender,
-                amount: new_amount,
-                expires,
-            }
-        }
-        HandleMsg::TransferFrom {
-            owner,
-            recipient,
-            amount,
-        } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::TransferFrom {
-                owner,
-                recipient,
-                amount: new_amount,
-            }
-        }
-        HandleMsg::BurnFrom { owner, amount } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::BurnFrom {
-                owner,
-                amount: new_amount,
-            }
-        }
-        HandleMsg::SendFrom {
-            owner,
-            contract,
-            amount,
-            msg,
-        } => {
-            let new_amount = handle_tax(deps.storage, amount)?;
-            HandleMsg::SendFrom {
-                owner,
-                contract,
-                amount: new_amount,
-                msg,
-            }
-        }
+        _ => msg,
     };
 
     cw20_handle(deps, env, info, msg_after_tax)

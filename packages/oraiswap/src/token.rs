@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, StdError, StdResult, Uint128};
+use cosmwasm_std::{StdError, StdResult, Uint128};
 use cw20::{Cw20CoinHuman, MinterResponse};
 
 use crate::hook::InitHook;

@@ -1,7 +1,7 @@
-use cosmwasm_std::{Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cw20_base::state::balances;
 
-use crate::state::{tax_receiver_read, TAX_RATE};
+use crate::state::TAX_RATE;
 
 pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 
@@ -17,11 +17,15 @@ pub fn compute_tax(amount: Uint128) -> StdResult<Uint128> {
     Ok(new_amount)
 }
 
-pub fn handle_tax(storage: &mut dyn Storage, amount: Uint128) -> StdResult<Uint128> {
+pub fn handle_tax(
+    storage: &mut dyn Storage,
+    tax_receiver: CanonicalAddr,
+    amount: Uint128,
+) -> StdResult<Uint128> {
     // get new amount after deduct tax
     let new_amount = compute_tax(amount)?;
-    let tax_receiver = tax_receiver_read(storage).load()?;
     let mut accounts = balances(storage);
+
     // increment tax amount to receiver wallet
     accounts.update(&tax_receiver, |balance: Option<Uint128>| -> StdResult<_> {
         balance.unwrap_or_default() + amount - new_amount
@@ -81,6 +85,13 @@ mod tests {
         let info = mock_info(minter.clone(), &[]);
         let env = mock_env();
 
+        // init some amount to smart contract swap, it must have access to balance by user approvals
+        let msg = HandleMsg::Transfer {
+            recipient: tax_receiver.clone(),
+            amount: Uint128(1000u128),
+        };
+        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
         // case amount is too small, then we dont charge tax
         let msg = HandleMsg::Transfer {
             recipient: receiver.clone(),
@@ -88,20 +99,26 @@ mod tests {
         };
         handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
-        // tax receiver address should receive 5 CASH because of tax
         let balance = query_balance(deps.as_ref(), tax_receiver.clone())
             .unwrap()
             .balance;
-        assert_eq!(balance, Uint128(0u128));
+        assert_eq!(balance, Uint128(1000u128));
 
         let msg = HandleMsg::Transfer {
             recipient: receiver.clone(),
             amount: Uint128(100u128),
         };
-        handle(deps.as_mut(), env, info, msg).unwrap();
+        handle(
+            deps.as_mut(),
+            env,
+            mock_info(tax_receiver.clone(), &[]),
+            msg,
+        )
+        .unwrap();
 
         // tax receiver address should receive 5 CASH because of tax
         let balance = query_balance(deps.as_ref(), tax_receiver).unwrap().balance;
-        assert_eq!(balance, Uint128(5u128));
+        // 1000 - 95 + 5 = 910
+        assert_eq!(balance, Uint128(910u128));
     }
 }
