@@ -217,11 +217,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn migrate(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: MigrateMsg,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    cw20_migrate(deps, env, info, msg)
+    // cw20_migrate(deps, env, info, msg)
+    // once we have "migrated", set the new version and return success
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(MigrateResponse::default())
 }
 
 #[cfg(test)]
