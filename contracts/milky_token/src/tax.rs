@@ -49,11 +49,12 @@ mod tests {
     use crate::msg::HandleMsg;
     use crate::{
         contract::{handle, init},
+        mock_querier::mock_dependencies,
         msg::InitMsg,
         tax::compute_tax,
     };
     use cosmwasm_std::{
-        testing::{mock_dependencies, mock_env, mock_info},
+        testing::{mock_env, mock_info},
         HumanAddr, Uint128,
     };
     use cw20::{Cw20CoinHuman, MinterResponse};
@@ -117,7 +118,7 @@ mod tests {
         let balance = query_balance(deps.as_ref(), tax_receiver.clone())
             .unwrap()
             .balance;
-        assert_eq!(balance, Uint128(0u128));
+        assert_eq!(balance, Uint128(1000u128));
 
         let msg = HandleMsg::Send {
             contract: router_contract.clone(),
