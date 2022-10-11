@@ -7,7 +7,8 @@ use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllowanceResponse, BalanceResponse,
     TokenInfoResponse,
 };
-use cw20_base::msg::{HandleMsg, InitMsg, QueryMsg};
+use cw20_base::msg::{MigrateMsg, QueryMsg};
+use milky_token::msg::{HandleMsg, InitMsg};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -17,6 +18,7 @@ fn main() {
 
     export_schema(&schema_for!(InitMsg), &out_dir);
     export_schema(&schema_for!(HandleMsg), &out_dir);
+    export_schema(&schema_for!(MigrateMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(AllowanceResponse), &out_dir);
     export_schema(&schema_for!(BalanceResponse), &out_dir);

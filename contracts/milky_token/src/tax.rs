@@ -45,6 +45,8 @@ pub fn handle_tax(
 #[cfg(test)]
 mod tests {
 
+    use crate::contract::new_query_token_info;
+    use crate::msg::HandleMsg;
     use crate::{
         contract::{handle, init},
         msg::InitMsg,
@@ -55,7 +57,8 @@ mod tests {
         HumanAddr, Uint128,
     };
     use cw20::{Cw20CoinHuman, MinterResponse};
-    use cw20_base::{contract::query_balance, msg::HandleMsg};
+    use cw20_base::contract::query_balance;
+    use cw20_base::ContractError;
 
     #[test]
     fn test_compute_tax() {
@@ -146,5 +149,63 @@ mod tests {
         // still the same amount
         let balance = query_balance(deps.as_ref(), tax_receiver).unwrap().balance;
         assert_eq!(balance, Uint128(50u128));
+    }
+
+    #[test]
+    fn test_change_tax_info() {
+        let mut deps = mock_dependencies(&[]);
+        let amount = Uint128(11223344);
+        let minter = HumanAddr::from("minter");
+        let tax_receiver = HumanAddr::from("tax_receiver");
+        let limit = Uint128(511223344);
+        let init_msg = InitMsg {
+            name: "Cash Token".to_string(),
+            symbol: "CASH".to_string(),
+            decimals: 9,
+            initial_balances: vec![Cw20CoinHuman {
+                address: minter.clone(),
+                amount,
+            }],
+            mint: Some(MinterResponse {
+                minter: minter.clone(),
+                cap: Some(limit),
+            }),
+            init_hook: None,
+            tax_receiver: tax_receiver.clone(),
+            router_contract: HumanAddr::from("router_contract"),
+        };
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
+
+        let info = mock_info(minter.clone(), &[]);
+        let env = mock_env();
+
+        let msg = HandleMsg::ChangeTaxInfo {
+            new_tax_receiver: Some(HumanAddr("foobar".to_string())),
+            new_router_contract: Some(HumanAddr("new_router".to_string())),
+        };
+
+        // unauthorized case
+
+        let res = handle(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(HumanAddr::from("hacker"), &[]),
+            msg.clone(),
+        );
+        match res.unwrap_err() {
+            ContractError::Unauthorized { .. } => {}
+            e => panic!("expected unauthorized error, got {}", e),
+        }
+
+        // valid case
+
+        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // query new tax receiver & new router contract
+        let result = new_query_token_info(deps.as_ref()).unwrap();
+        assert_eq!(result.router_contract, HumanAddr::from("new_router"));
+        assert_eq!(result.tax_receiver, HumanAddr::from("foobar"))
     }
 }

@@ -1,7 +1,7 @@
 use cosmwasm_std::{CanonicalAddr, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
-const TAX_RECEIVER_KEY: &[u8] = b"tax_receiver";
+const TAX_RECEIVER_KEY: &[u8] = b"tax_receiver_key";
 const ROUTER_CONTRACT_KEY: &[u8] = b"router_contract_key";
 
 pub const TAX_RATE: Uint128 = Uint128(5u128);
