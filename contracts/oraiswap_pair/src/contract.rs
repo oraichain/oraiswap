@@ -420,7 +420,7 @@ pub fn swap(
         ask_pool.amount,
         offer_amount,
         commission_rate,
-    );
+    )?;
 
     // check max spread limit if exist
     assert_max_spread(
@@ -537,7 +537,7 @@ pub fn query_simulation(
         ask_pool.amount,
         offer_asset.amount,
         commission_rate,
-    );
+    )?;
 
     Ok(SimulationResponse {
         return_amount,

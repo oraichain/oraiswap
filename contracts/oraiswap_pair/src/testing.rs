@@ -1284,7 +1284,24 @@ fn test_compute_swap_with_huge_pool_variance() {
             Uint128::from(1u128),
             Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap()
         )
+        .unwrap()
         .0,
         Uint128::zero()
     );
+}
+
+#[test]
+fn test_compute_swap_with_empty_pool() {
+    let offer_pool = Uint128::from(0u128);
+    let ask_pool = Uint128::from(10u128);
+
+    let res = compute_swap(
+        offer_pool,
+        ask_pool,
+        Uint128::from(1u128),
+        Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap(),
+    )
+    .unwrap_err();
+
+    assert_eq!(res, ContractError::OfferPoolIsZero {});
 }

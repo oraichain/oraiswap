@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     asset::{Asset, AssetInfo},
+    error::ContractError,
     hook::InitHook,
     Decimal256, Uint256,
 };
@@ -104,7 +105,11 @@ pub fn compute_swap(
     ask_pool: Uint128,
     offer_amount: Uint128,
     commission_rate: Decimal256,
-) -> (Uint128, Uint128, Uint128) {
+) -> Result<(Uint128, Uint128, Uint128), ContractError> {
+    if offer_pool.is_zero() {
+        return Err(ContractError::OfferPoolIsZero {});
+    }
+
     // convert to uint256
     let offer_pool: Uint256 = offer_pool.into();
     let ask_pool: Uint256 = ask_pool.into();
@@ -124,9 +129,9 @@ pub fn compute_swap(
 
     // commission will be absorbed to pool
     let return_amount: Uint256 = return_amount - commission_amount;
-    (
+    Ok((
         return_amount.into(),
         spread_amount.into(),
         commission_amount.into(),
-    )
+    ))
 }

@@ -72,6 +72,9 @@ pub enum ContractError {
     #[error("Too small offer amount")]
     TooSmallOfferAmount {},
 
+    #[error("Offer pool is zero")]
+    OfferPoolIsZero {},
+
     #[error("Pair already exists")]
     PairExisted {},
 
