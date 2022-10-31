@@ -16,7 +16,6 @@ static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 pub struct Config {
     pub owner: CanonicalAddr,
     pub rewarder: CanonicalAddr,
-    pub minter: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,
@@ -63,6 +62,8 @@ pub struct RewardInfo {
     pub index: Decimal,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    // this is updated by the owner of this contract, when changing the reward_per_sec
+    pub pending_withdraw: Vec<AssetRaw>,
 }
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)

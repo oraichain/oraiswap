@@ -1,14 +1,9 @@
-use crate::migration::{
-    migrate_config, migrate_pool_infos, migrate_rewards_store, LegacyConfig, LegacyPoolInfo,
-    LegacyRewardInfo, LEGACY_KEY_CONFIG, LEGACY_PREFIX_REWARD,
-};
-use crate::state::{read_config, read_pool_info, rewards_read, Config, RewardInfo};
-use crate::state::{PoolInfo, PREFIX_POOL_INFO};
+use crate::migration::{migrate_rewards_store, LegacyPoolInfo, LegacyRewardInfo};
+use crate::state::PREFIX_POOL_INFO;
+use crate::state::{rewards_read, RewardInfo, PREFIX_REWARD};
 use cosmwasm_std::{testing::mock_dependencies, Api};
 use cosmwasm_std::{CanonicalAddr, Decimal, Storage, Uint128};
-use cosmwasm_storage::{singleton, Bucket};
-use oraiswap::asset::AssetInfo;
-use oraiswap::staking::AmountInfo;
+use cosmwasm_storage::Bucket;
 
 pub fn pool_infos_old_store(storage: &mut dyn Storage) -> Bucket<LegacyPoolInfo> {
     Bucket::new(storage, PREFIX_POOL_INFO)
@@ -19,7 +14,7 @@ pub fn rewards_store<'a>(
     storage: &'a mut dyn Storage,
     owner: &CanonicalAddr,
 ) -> Bucket<'a, LegacyRewardInfo> {
-    Bucket::multilevel(storage, &[LEGACY_PREFIX_REWARD, owner.as_slice()])
+    Bucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
 }
 
 #[test]
@@ -60,93 +55,6 @@ fn test_migration() {
     legacy_store.save(asset_1.as_slice(), &pool_info_1).unwrap();
     legacy_store.save(asset_2.as_slice(), &pool_info_2).unwrap();
 
-    migrate_pool_infos(deps.as_mut().storage).unwrap();
-
-    let new_pool_info_1: PoolInfo = read_pool_info(deps.as_mut().storage, &asset_1).unwrap();
-    let new_pool_info_2: PoolInfo = read_pool_info(deps.as_mut().storage, &asset_2).unwrap();
-
-    assert_eq!(
-        new_pool_info_1,
-        PoolInfo {
-            staking_token: deps.api.canonical_address(&"staking1".into()).unwrap(),
-            total_bond_amount: Uint128::from(1u128),
-            reward_index: Decimal::percent(1),
-            pending_reward: Uint128::from(1u128),
-            migration_params: None,
-        }
-    );
-    assert_eq!(
-        new_pool_info_2,
-        PoolInfo {
-            staking_token: deps.api.canonical_address(&"staking2".into()).unwrap(),
-            total_bond_amount: Uint128::from(2u128),
-            reward_index: Decimal::percent(2),
-            pending_reward: Uint128::from(2u128),
-            migration_params: None,
-        }
-    );
-
-    // migrate config
-    let legacy_config = LegacyConfig {
-        owner: deps
-            .api
-            .canonical_address(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
-            .unwrap(),
-        reward_addr: deps
-            .api
-            .canonical_address(&"orai1lus0f0rhx8s03gdllx2n6vhkmf0536dv57wfge".into())
-            .unwrap(),
-        minter: deps
-            .api
-            .canonical_address(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
-            .unwrap(),
-        oracle_addr: deps
-            .api
-            .canonical_address(&"orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m".into())
-            .unwrap(),
-        factory_addr: deps
-            .api
-            .canonical_address(&"orai1hemdkz4xx9kukgrunxu3yw0nvpyxf34v82d2c8".into())
-            .unwrap(),
-        base_denom: "orai".into(),
-        premium_min_update_interval: 7600u64,
-        short_reward_bound: (Decimal::one(), Decimal::one()),
-    };
-    singleton(&mut deps.storage, LEGACY_KEY_CONFIG)
-        .save(&legacy_config)
-        .unwrap();
-
-    migrate_config(&mut deps.storage).unwrap();
-
-    let new_config = read_config(&mut deps.storage).unwrap();
-
-    assert_eq!(
-        new_config,
-        Config {
-            owner: deps
-                .api
-                .canonical_address(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
-                .unwrap(),
-            rewarder: deps
-                .api
-                .canonical_address(&"orai1lus0f0rhx8s03gdllx2n6vhkmf0536dv57wfge".into())
-                .unwrap(),
-            minter: deps
-                .api
-                .canonical_address(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
-                .unwrap(),
-            oracle_addr: deps
-                .api
-                .canonical_address(&"orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m".into())
-                .unwrap(),
-            factory_addr: deps
-                .api
-                .canonical_address(&"orai1hemdkz4xx9kukgrunxu3yw0nvpyxf34v82d2c8".into())
-                .unwrap(),
-            base_denom: "orai".into(),
-        }
-    );
-
     // update reward store
     let staker_addr = deps
         .api
@@ -161,6 +69,7 @@ fn test_migration() {
                 index: Decimal::one(),
                 bond_amount: Uint128::from(1000u64),
                 pending_reward: Uint128::from(500u64),
+                native_token: false,
             },
         )
         .unwrap();
@@ -183,32 +92,7 @@ fn test_migration() {
             bond_amount: Uint128::from(1000u64),
             pending_reward: Uint128::from(500u64),
             native_token: false,
+            pending_withdraw: vec![],
         }
     );
-
-    // // try migrate total reward amount
-    // migrate_total_reward_amount(
-    //     &mut deps.storage,
-    //     &mut deps.api,
-    //     vec![AmountInfo {
-    //         asset_info: AssetInfo::NativeToken {
-    //             denom: "orai".into(),
-    //         },
-    //         amount: Uint128::from(1u64),
-    //     }],
-    // )
-    // .unwrap();
-
-    // let total_reward_amount = read_total_reward_amount(
-    //     &mut deps.storage,
-    //     AssetInfo::NativeToken {
-    //         denom: "orai".into(),
-    //     }
-    //     .to_raw(&deps.api)
-    //     .unwrap()
-    //     .as_bytes(),
-    // )
-    // .unwrap();
-
-    // assert_eq!(total_reward_amount, Uint128::from(1u64));
 }

@@ -7,7 +7,8 @@ use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllowanceResponse, BalanceResponse,
     TokenInfoResponse,
 };
-use cw20_base::msg::{HandleMsg, InitMsg, QueryMsg};
+use cw20_base::msg::{InitMsg, QueryMsg};
+use oraiswap_token::msg::HandleMsg;
 
 fn main() {
     let mut out_dir = current_dir().unwrap();

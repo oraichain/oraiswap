@@ -35,7 +35,6 @@ fn proper_initialization() {
         ConfigResponse {
             owner: "owner".into(),
             rewarder: "reward".into(),
-            minter: "mint".into(),
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),
@@ -77,7 +76,6 @@ fn update_config() {
         ConfigResponse {
             owner: "owner2".into(),
             rewarder: "reward".into(),
-            minter: "mint".into(),
             oracle_addr: "oracle".into(),
             factory_addr: "factory".into(),
             base_denom: ORAI_DENOM.to_string(),

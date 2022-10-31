@@ -135,7 +135,6 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub owner: HumanAddr,
     pub rewarder: HumanAddr,
-    pub minter: HumanAddr,
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
     pub base_denom: String,
@@ -170,6 +169,7 @@ pub struct RewardInfoResponseItem {
     pub asset_info: AssetInfo,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    pub pending_withdraw: Vec<Asset>,
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,
