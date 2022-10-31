@@ -1,5 +1,5 @@
 [package]
-name = "oraiswap_oracle"
+name = "oraiswap-oracle"
 version = "0.1.0"
 authors = ["tupt <tubackkhoa@gmail.com>"]
 edition = "2018"
@@ -30,3 +30,5 @@ thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.13.2" }
+cw20 = { version = "0.5.0" }
+cw-multi-test = { version = "0.5.0" }

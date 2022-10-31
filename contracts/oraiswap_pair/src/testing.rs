@@ -20,7 +20,7 @@ use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
 use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
-use oraiswap::mock_querier::ATOM_DENOM;
+use oraiswap::mock_app::ATOM_DENOM;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
     compute_swap, Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse,

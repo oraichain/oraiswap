@@ -7,7 +7,7 @@ use cosmwasm_std::{
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_querier::{mock_dependencies, ATOM_DENOM};
+use oraiswap::mock_app::{mock_dependencies, ATOM_DENOM};
 use oraiswap::pair::HandleMsg as PairHandleMsg;
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,

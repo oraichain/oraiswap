@@ -157,6 +157,7 @@ pub fn handle_register_pair(
     let pair_key = pair_key(&raw_infos);
 
     let mut pair_info = PAIRS.load(deps.storage, &pair_key)?;
+
     // make sure creator can update their pairs
     if pair_info.contract_addr != CanonicalAddr::default() {
         return Err(ContractError::PairRegistered {});

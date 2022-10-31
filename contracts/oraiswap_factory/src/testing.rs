@@ -1,13 +1,46 @@
 use crate::contract::{handle, init, query};
-use crate::mock_querier::mock_dependencies;
 
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{attr, from_binary, to_binary, WasmMsg};
+use cw_multi_test::{Contract, ContractWrapper};
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::error::ContractError;
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
 use oraiswap::hook::InitHook;
+use oraiswap::mock_app::MockApp;
 use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
+
+fn contract_token() -> Box<dyn Contract> {
+    let contract = ContractWrapper::new(
+        oraiswap_token::contract::handle,
+        oraiswap_token::contract::init,
+        oraiswap_token::contract::query,
+    );
+    Box::new(contract)
+}
+
+fn contract_pair() -> Box<dyn Contract> {
+    let contract = ContractWrapper::new(
+        oraiswap_pair::contract::handle,
+        oraiswap_pair::contract::init,
+        oraiswap_pair::contract::query,
+    );
+    Box::new(contract)
+}
+
+fn contract_oracle() -> Box<dyn Contract> {
+    let contract = ContractWrapper::new(
+        oraiswap_oracle::contract::handle,
+        oraiswap_oracle::contract::init,
+        oraiswap_oracle::contract::query,
+    );
+    Box::new(contract)
+}
+
+fn contract_factory() -> Box<dyn Contract> {
+    let contract = ContractWrapper::new(handle, init, query);
+    Box::new(contract)
+}
 
 #[test]
 fn proper_initialization() {
@@ -168,74 +201,29 @@ fn create_pair() {
 
 #[test]
 fn update_pair() {
-    let mut deps = mock_dependencies(&[]);
+    let mut app = MockApp::new();
+    app.set_cw20_contract(contract_token());
+    app.set_oracle_contract(contract_oracle());
 
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        pair_code_id: 321u64,
-        token_code_id: 123u64,
-        commission_rate: None,
-    };
+    app.set_factory_and_pair_contract(contract_factory(), contract_pair());
 
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
+    let contract_addr1 = app.create_token("assetA");
+    let contract_addr2 = app.create_token("assetB");
 
     let asset_infos = [
         AssetInfo::Token {
-            contract_addr: "asset0000".into(),
+            contract_addr: contract_addr1,
         },
         AssetInfo::Token {
-            contract_addr: "asset0001".into(),
+            contract_addr: contract_addr2,
         },
     ];
 
-    let msg = HandleMsg::CreatePair {
-        asset_infos: asset_infos.clone(),
-    };
-
     // create pair
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    let _res = handle(deps.as_mut(), env, info, msg).unwrap();
-
-    // register oraiswap pair querier, it is like deploy smart contract, let's assume pair0000 has liquidity_token address liquidity0000
-    deps.querier.with_oraiswap_pairs(&[(
-        &"pair0000".to_string(),
-        &PairInfo {
-            oracle_addr: "oracle0000".into(),
-            asset_infos: asset_infos.clone(),
-            contract_addr: "pair0000".into(),
-            liquidity_token: "liquidity0000".into(),
-            commission_rate: "1".into(),
-        },
-    )]);
-
-    // later update pair with newly created address
-    let update_msg = HandleMsg::Register {
-        asset_infos: asset_infos.clone(),
-    };
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("pair0000", &[]),
-        update_msg,
-    )
-    .unwrap();
-
-    let query_res = query(
-        deps.as_ref(),
-        mock_env(),
-        QueryMsg::Pair {
-            asset_infos: asset_infos.clone(),
-        },
-    )
-    .unwrap();
+    app.set_pair(asset_infos.clone());
 
     // should never change commission rate once deployed
-    let pair_res: PairInfo = from_binary(&query_res).unwrap();
+    let pair_res = app.query_pair(asset_infos.clone()).unwrap();
     assert_eq!(
         pair_res,
         PairInfo {

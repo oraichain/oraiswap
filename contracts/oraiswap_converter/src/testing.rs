@@ -12,7 +12,7 @@ use oraiswap::{
     converter::{
         ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo, TokenRatio,
     },
-    mock_querier::{mock_dependencies, ATOM_DENOM},
+    mock_app::{mock_dependencies, ATOM_DENOM},
     Decimal256, Uint256,
 };
 

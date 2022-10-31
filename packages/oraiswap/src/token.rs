@@ -32,6 +32,7 @@ impl InitMsg {
                 "Name is not in the expected format (3-50 UTF-8 bytes)",
             ));
         }
+
         if !is_valid_symbol(&self.symbol) {
             return Err(StdError::generic_err(
                 "Ticker symbol is not in expected format [a-zA-Z\\-]{3,12}",

@@ -24,8 +24,10 @@ schemars = "0.7"
 bigint = "4"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
+cw-multi-test = { version = "0.5.0" }
+# using cw20-base contract as library
+cw20-base = { version = "0.5.0", features = ["library"] }
 
 [dev-dependencies]
 cosmwasm-schema = "0.13.2"
-
 

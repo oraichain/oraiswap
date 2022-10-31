@@ -14,7 +14,7 @@ use oraiswap::router::{
     SwapOperation,
 };
 
-use oraiswap::mock_querier::ATOM_DENOM;
+use oraiswap::mock_app::ATOM_DENOM;
 
 #[test]
 fn proper_initialization() {
