@@ -1,33 +1,13 @@
-use std::str::FromStr;
-
-use crate::contract::{
-    assert_max_spread,
-    handle,
-    init,
-    query, //reply,
-    query_pair_info,
-    query_pool,
-    query_reverse_simulation,
-    query_simulation,
-};
+use crate::contract::{handle, init, query_pair_info};
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{
-    attr, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
-};
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
-use cw_multi_test::{Contract, ContractWrapper};
+use cosmwasm_std::{attr, to_binary, Coin, Decimal, StdError, Uint128, WasmMsg};
+use cw20::{Cw20ReceiveMsg, MinterResponse};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
-use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::mock_app::{MockApp, ATOM_DENOM};
-use oraiswap::oracle::OracleContract;
-use oraiswap::pair::{
-    compute_swap, Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse,
-    SimulationResponse, DEFAULT_COMMISSION_RATE,
-};
+use oraiswap::pair::{Cw20HookMsg, HandleMsg, InitMsg};
 use oraiswap::token::InitMsg as TokenInitMsg;
-use oraiswap::Decimal256;
 
 #[test]
 fn proper_initialization() {
@@ -403,16 +383,10 @@ fn withdraw_liquidity() {
 
     app.set_token_contract(oraiswap_token::testutils::contract());
 
-    app.set_token_balances(&[
-        (
-            &"liquidity".to_string(),
-            &[(&"addr0000".to_string(), &Uint128::from(1000u128))],
-        ),
-        (
-            &"asset".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
-        ),
-    ]);
+    app.set_token_balances(&[(
+        &"liquidity".to_string(),
+        &[(&"addr0000".to_string(), &Uint128::from(1000u128))],
+    )]);
 
     let liquidity_addr = app.get_token_addr("liquidity").unwrap();
 
@@ -443,7 +417,7 @@ fn withdraw_liquidity() {
         liquidity_addr.clone(),
         &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
             spender: pair_addr.clone(),
-            amount: Uint128::from(100u128),
+            amount: Uint128::from(1000u128),
             expires: None,
         },
         &[],
@@ -482,30 +456,36 @@ fn withdraw_liquidity() {
         )
         .unwrap();
 
-    app.set_balance(
-        pair_addr.clone(),
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000u128),
-        }],
-    );
-
     // withdraw liquidity
     let msg = HandleMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".into(),
         msg: to_binary(&Cw20HookMsg::WithdrawLiquidity {}).ok(),
-        amount: Uint128::from(10u128),
+        amount: Uint128::from(100u128),
     });
 
     let pair_info: PairInfo = app
         .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})
         .unwrap();
+    let liquidity_denom = app
+        .register_token(pair_info.liquidity_token.clone())
+        .unwrap();
+
+    app.set_token_balances(&[(
+        &"liquidity".to_string(),
+        &[(&pair_addr.to_string(), &Uint128::from(1000u128))],
+    )]);
+
+    app.set_token_balances_from(
+        pair_addr.clone(),
+        &[(
+            &liquidity_denom,
+            &[(&pair_addr.to_string(), &Uint128::from(1000u128))],
+        )],
+    );
 
     let res = app
         .execute(pair_info.liquidity_token, pair_addr.clone(), &msg, &[])
         .unwrap();
-
-    println!("{:?}", res);
 
     let log_withdrawn_share = res.attributes.get(2).expect("no log");
     let log_refund_assets = res.attributes.get(3).expect("no log");
@@ -516,6 +496,9 @@ fn withdraw_liquidity() {
     );
     assert_eq!(
         log_refund_assets,
-        &attr("refund_assets", format!("100{}, 100asset0000", ORAI_DENOM))
+        &attr(
+            "refund_assets",
+            format!("18{}, 99{}", ORAI_DENOM, liquidity_addr)
+        )
     );
 }

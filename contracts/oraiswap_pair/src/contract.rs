@@ -327,6 +327,7 @@ pub fn withdraw_liquidity(
     if share_ratio.is_zero() {
         return Err(ContractError::InvalidZeroRatio {});
     }
+
     let refund_assets: Vec<Asset> = pools
         .iter()
         .map(|a| Asset {

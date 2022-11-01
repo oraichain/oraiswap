@@ -82,24 +82,17 @@ impl MockApp {
         msg: &T,
         send_funds: &[Coin],
     ) -> Result<Response, String> {
-        // simulate bank transfer when run sent_funds
-        let balance: Vec<Coin> = send_funds
-            .into_iter()
-            .map(|fund| {
-                let current_amount = self
-                    .query_balance(contract_addr.clone(), fund.denom.clone())
-                    .unwrap_or_default();
+        // simulate bank transfer when run sent_funds by updating the balance
+        let mut balance = self.query_all_balances(contract_addr.clone()).unwrap();
+        for fund in send_funds {
+            if let Some(current_fund) = balance.iter_mut().find(|v| v.denom.eq(&fund.denom)) {
+                current_fund.amount += fund.amount;
+            } else {
+                balance.push(fund.clone());
+            }
+        }
 
-                Coin {
-                    denom: fund.denom.clone(),
-                    amount: fund.amount + current_amount,
-                }
-            })
-            .collect();
-
-        self.app
-            .set_bank_balance(contract_addr.clone(), balance)
-            .unwrap();
+        self.set_balance(contract_addr.clone(), &balance);
 
         let response = self
             .app
@@ -289,6 +282,30 @@ impl MockApp {
         Ok(all_balances.amount)
     }
 
+    pub fn register_token(&mut self, contract_addr: HumanAddr) -> StdResult<String> {
+        let res: cw20::TokenInfoResponse =
+            self.query(contract_addr.clone(), &cw20::Cw20QueryMsg::TokenInfo {})?;
+        self.token_map.insert(res.symbol.clone(), contract_addr);
+        Ok(res.symbol)
+    }
+
+    pub fn query_token_balances(&self, account_addr: HumanAddr) -> StdResult<Vec<Coin>> {
+        let mut balances = vec![];
+        for (denom, contract_addr) in self.token_map.iter() {
+            let res: cw20::BalanceResponse = self.query(
+                contract_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: account_addr.clone(),
+                },
+            )?;
+            balances.push(Coin {
+                denom: denom.clone(),
+                amount: res.balance,
+            });
+        }
+        Ok(balances)
+    }
+
     pub fn set_balance(&mut self, addr: HumanAddr, balance: &[Coin]) {
         // init balance for client
         self.app.set_bank_balance(addr, balance.to_vec()).unwrap();
@@ -326,8 +343,11 @@ impl MockApp {
         addr
     }
 
-    // configure the mint whitelist mock querier
-    pub fn set_token_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
+    pub fn set_token_balances_from(
+        &mut self,
+        sender: HumanAddr,
+        balances: &[(&String, &[(&String, &Uint128)])],
+    ) {
         for (token, balances) in balances.iter() {
             let contract_addr = match self.token_map.get(*token) {
                 None => {
@@ -342,7 +362,7 @@ impl MockApp {
             for (recipient, &amount) in balances.iter() {
                 if !amount.is_zero() {
                     self.execute(
-                        APP_OWNER.into(),
+                        sender.clone(),
                         contract_addr.clone(),
                         &cw20_base::msg::HandleMsg::Mint {
                             recipient: HumanAddr(recipient.to_string()),
@@ -354,5 +374,10 @@ impl MockApp {
                 }
             }
         }
+    }
+
+    // configure the mint whitelist mock querier
+    pub fn set_token_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
+        self.set_token_balances_from(APP_OWNER.into(), balances)
     }
 }
