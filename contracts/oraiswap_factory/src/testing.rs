@@ -162,6 +162,7 @@ fn create_pair() {
 
     let msg = HandleMsg::CreatePair {
         asset_infos: asset_infos.clone(),
+        auto_register: true,
     };
 
     let env = mock_env();
@@ -227,9 +228,9 @@ fn update_pair() {
     assert_eq!(
         pair_res,
         PairInfo {
-            oracle_addr: "oracle0000".into(),
-            liquidity_token: "liquidity0000".into(),
-            contract_addr: "pair0000".into(),
+            oracle_addr: app.oracle_addr,
+            liquidity_token: "Contract #5".into(),
+            contract_addr: "Contract #4".into(),
             asset_infos,
             commission_rate: DEFAULT_COMMISSION_RATE.into()
         }

@@ -40,7 +40,10 @@ pub fn handle(
             token_code_id,
             pair_code_id,
         } => handle_update_config(deps, env, info, owner, token_code_id, pair_code_id),
-        HandleMsg::CreatePair { asset_infos } => handle_create_pair(deps, env, info, asset_infos),
+        HandleMsg::CreatePair {
+            asset_infos,
+            auto_register,
+        } => handle_create_pair(deps, env, info, asset_infos, auto_register),
         HandleMsg::Register { asset_infos } => handle_register_pair(deps, env, info, asset_infos),
     }
 }
@@ -88,6 +91,7 @@ pub fn handle_create_pair(
     env: Env,
     _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
+    auto_register: bool,
 ) -> Result<HandleResponse, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
@@ -114,6 +118,17 @@ pub fn handle_create_pair(
         },
     )?;
 
+    let init_hook = if auto_register {
+        Some(InitHook {
+            contract_addr: env.contract.address,
+            msg: to_binary(&HandleMsg::Register {
+                asset_infos: asset_infos.clone(),
+            })?,
+        })
+    } else {
+        None
+    };
+
     Ok(HandleResponse {
         // instantiate pair with hook to call register after work
         messages: vec![WasmMsg::Instantiate {
@@ -125,12 +140,7 @@ pub fn handle_create_pair(
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
                 commission_rate: Some(config.commission_rate),
-                init_hook: Some(InitHook {
-                    contract_addr: env.contract.address,
-                    msg: to_binary(&HandleMsg::Register {
-                        asset_infos: asset_infos.clone(),
-                    })?,
-                }),
+                init_hook,
             })?,
         }
         .into()],
@@ -164,17 +174,19 @@ pub fn handle_register_pair(
     }
 
     // the contract must follow the standard interface
-    let liquidity_token = query_liquidity_token(deps.as_ref(), info.sender.clone())?;
-
+    pair_info.liquidity_token = query_liquidity_token(deps.querier, info.sender.clone())?;
     pair_info.contract_addr = deps.api.canonical_address(&info.sender)?;
-    pair_info.liquidity_token = deps.api.canonical_address(&liquidity_token)?;
+
     PAIRS.save(deps.storage, &pair_key, &pair_info)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("pair_contract_address", info.sender.to_string()),
-            attr("liquidity_token_address", liquidity_token.as_str()),
+            attr(
+                "liquidity_token_address",
+                deps.api.human_address(&pair_info.liquidity_token)?.as_str(),
+            ),
         ],
         data: None,
     })
