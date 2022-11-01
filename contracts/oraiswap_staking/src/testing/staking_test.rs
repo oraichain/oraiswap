@@ -1,14 +1,12 @@
 use crate::contract::{handle, init, query};
-use crate::testing::mock_querier::mock_dependencies_with_querier;
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{
     attr, coin, from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128,
     WasmMsg,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_app::ATOM_DENOM;
-use oraiswap::pair::HandleMsg as PairHandleMsg;
+use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
+use oraiswap::mock_app::{MockApp, ATOM_DENOM};
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
@@ -371,106 +369,207 @@ fn test_unbond() {
 
 #[test]
 fn test_auto_stake() {
-    let mut deps = mock_dependencies_with_querier(&[]);
-    deps.querier.with_pair_info("pair".into());
-    deps.querier.with_pool_assets([
-        Asset {
-            info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            amount: Uint128::from(100u128),
-        },
-        Asset {
-            info: AssetInfo::Token {
-                contract_addr: "asset".into(),
-            },
-            amount: Uint128::from(1u128),
-        },
+    let mut app = MockApp::new();
+
+    app.set_oracle_contract(oraiswap_oracle::testutils::contract());
+
+    app.set_token_contract(oraiswap_token::testutils::contract());
+
+    app.set_factory_and_pair_contract(
+        oraiswap_factory::testutils::contract(),
+        oraiswap_pair::testutils::contract(),
+    );
+
+    app.set_balance("addr".into(), &[coin(10000000000u128, ORAI_DENOM)]);
+
+    let asset_addr = app.create_token("asset");
+    let reward_addr = app.create_token("reward");
+    // update other contract token balance
+    app.set_token_balances(&[
+        (
+            &"reward".to_string(),
+            &[(&"addr".to_string(), &Uint128::from(10000000000u128))],
+        ),
+        (
+            &"asset".to_string(),
+            &[(&"addr".to_string(), &Uint128::from(10000000000u128))],
+        ),
     ]);
+
+    let asset_infos = [
+        AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfo::Token {
+            contract_addr: asset_addr.clone(),
+        },
+    ];
+
+    // create pair
+    let pair_addr = app.set_pair(asset_infos.clone()).unwrap();
+
+    let pair_info: PairInfo = app
+        .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})
+        .unwrap();
+
+    // set allowance
+    app.execute(
+        "addr".into(),
+        asset_addr.clone(),
+        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+            spender: pair_addr.clone(),
+            amount: Uint128::from(100u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // provide liquidity
+    // successfully provide liquidity for the exist pool
+    let msg = oraiswap::pair::HandleMsg::ProvideLiquidity {
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(100u128),
+            },
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: asset_addr.clone(),
+                },
+                amount: Uint128::from(100u128),
+            },
+        ],
+        slippage_tolerance: None,
+        receiver: None,
+    };
+
+    let _res = app
+        .execute(
+            "addr".into(),
+            pair_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            }],
+        )
+        .unwrap();
+
+    let code_id = app.upload(crate::testutils::contract());
 
     let msg = InitMsg {
         owner: Some("owner".into()),
-        rewarder: "reward".into(),
+        rewarder: reward_addr.clone(),
         minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+        oracle_addr: app.oracle_addr.clone(),
+        factory_addr: app.factory_addr.clone(),
         base_denom: None,
     };
 
-    let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let staking_addr = app
+        .instantiate(code_id, "addr".into(), &msg, &[], "staking")
+        .unwrap();
+
+    // set allowance
+    app.execute(
+        "addr".into(),
+        asset_addr.clone(),
+        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+            spender: staking_addr.clone(),
+            amount: Uint128::from(100u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
 
     let msg = HandleMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: asset_addr.clone(),
         },
-        staking_token: "lptoken".into(),
+        staking_token: pair_info.liquidity_token.clone(),
     };
 
-    let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = app
+        .execute("owner".into(), staking_addr.clone(), &msg, &[])
+        .unwrap();
 
     // no token asset
     let msg = HandleMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128(100u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128(100u128),
             },
         ],
         slippage_tolerance: None,
     };
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128(100u128),
-        }],
+
+    let res = app
+        .execute(
+            "addr".into(),
+            staking_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128(100u128),
+            }],
+        )
+        .unwrap_err();
+    assert_eq!(
+        res,
+        StdError::generic_err("Missing token asset").to_string()
     );
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert_eq!(res, StdError::generic_err("Missing token asset"));
 
     // no native asset
     let msg = HandleMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(1u128),
             },
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(1u128),
             },
         ],
         slippage_tolerance: None,
     };
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert_eq!(res, StdError::generic_err("Missing native asset"));
+
+    let res = app
+        .execute("addr".into(), staking_addr.clone(), &msg, &[])
+        .unwrap_err();
+    assert_eq!(
+        res,
+        StdError::generic_err("Missing native asset").to_string()
+    );
 
     let msg = HandleMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
                 amount: Uint128(100u128),
             },
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128(1u128),
             },
@@ -479,153 +578,106 @@ fn test_auto_stake() {
     };
 
     // attempt with no coins
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+    let res = app
+        .execute("addr".into(), staking_addr.clone(), &msg, &[])
+        .unwrap_err();
     assert_eq!(
         res,
         StdError::generic_err(
             "Native token balance mismatch between the argument and the transferred"
         )
+        .to_string()
     );
 
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128(100u128),
-        }],
-    );
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-    assert_eq!(
-        res.messages,
-        vec![
-            WasmMsg::Execute {
-                contract_addr: "asset".into(),
-                msg: to_binary(&Cw20HandleMsg::TransferFrom {
-                    owner: "addr0000".into(),
-                    recipient: MOCK_CONTRACT_ADDR.into(),
-                    amount: Uint128(1u128),
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: "asset".into(),
-                msg: to_binary(&Cw20HandleMsg::IncreaseAllowance {
-                    spender: "pair".into(),
-                    amount: Uint128(1),
-                    expires: None,
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: "pair".into(),
-                msg: to_binary(&PairHandleMsg::ProvideLiquidity {
-                    assets: [
-                        Asset {
-                            info: AssetInfo::NativeToken {
-                                denom: "uusd".to_string()
-                            },
-                            amount: Uint128(99u128),
-                        },
-                        Asset {
-                            info: AssetInfo::Token {
-                                contract_addr: "asset".into()
-                            },
-                            amount: Uint128(1u128),
-                        },
-                    ],
-                    slippage_tolerance: None,
-                    receiver: None,
-                })
-                .unwrap(),
-                send: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128(99u128), // 1% tax
-                }],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.into(),
-                msg: to_binary(&HandleMsg::AutoStakeHook {
-                    asset_info: AssetInfo::Token {
-                        contract_addr: "asset".into()
-                    },
-                    staking_token: "lptoken".into(),
-                    staker_addr: "addr0000".into(),
-                    prev_staking_token_amount: Uint128(0),
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into()
-        ]
-    );
+    let _res = app
+        .execute(
+            "addr".into(),
+            staking_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128(100u128),
+            }],
+        )
+        .unwrap();
 
-    deps.querier.with_token_balance(Uint128(100u128)); // recive 100 lptoken
+    // recive 100 lptoken
+    // app.execute(
+    //     pair_addr.clone(),
+    //     pair_info.liquidity_token.clone(),
+    //     &cw20::Cw20HandleMsg::Mint {
+    //         recipient: "addr".into(),
+    //         amount: Uint128::from(100u128),
+    //     },
+    //     &[],
+    // )
+    // .unwrap();
 
     // wrong asset
     let msg = HandleMsg::AutoStakeHook {
         asset_info: AssetInfo::Token {
             contract_addr: "asset1".into(),
         },
-        staking_token: "lptoken".into(),
-        staker_addr: "addr0000".into(),
+        staking_token: pair_info.liquidity_token.clone(),
+        staker_addr: "addr".into(),
         prev_staking_token_amount: Uint128(0),
     };
-    let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err(); // pool not found error
+    let res = app
+        .execute(staking_addr.clone(), staking_addr.clone(), &msg, &[])
+        .unwrap_err();
+    // pool not found error
+    assert_eq!(res.contains("PoolInfo not found"), true);
 
     // valid msg
     let msg = HandleMsg::AutoStakeHook {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: asset_addr.clone(),
         },
-        staking_token: "lptoken".into(),
-        staker_addr: "addr0000".into(),
+        staking_token: pair_info.liquidity_token.clone(),
+        staker_addr: "addr".into(),
         prev_staking_token_amount: Uint128(0),
     };
 
     // unauthorized attempt
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
-    assert_eq!(res, StdError::generic_err("unauthorized"));
+    let res = app
+        .execute("addr".into(), staking_addr.clone(), &msg, &[])
+        .unwrap_err();
+    assert_eq!(res, StdError::generic_err("unauthorized").to_string());
 
     // successfull attempt
-    let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    let res = app
+        .execute(staking_addr.clone(), staking_addr.clone(), &msg, &[])
+        .unwrap();
     assert_eq!(
         res.attributes,
         vec![
             attr("action", "bond"),
-            attr("staker_addr", "addr0000"),
-            attr("asset_info", "asset"),
-            attr("amount", "100"),
+            attr("staker_addr", "addr"),
+            attr("asset_info", asset_addr.as_str()),
+            attr("amount", "1"),
         ]
     );
 
-    let data = query(
-        deps.as_ref(),
-        mock_env(),
-        QueryMsg::PoolInfo {
-            asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+    let pool_info: PoolInfoResponse = app
+        .query(
+            staking_addr.clone(),
+            &QueryMsg::PoolInfo {
+                asset_info: AssetInfo::Token {
+                    contract_addr: asset_addr.clone(),
+                },
             },
-        },
-    )
-    .unwrap();
-    let pool_info: PoolInfoResponse = from_binary(&data).unwrap();
+        )
+        .unwrap();
+
     assert_eq!(
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: asset_addr.clone()
             },
-            staking_token: "lptoken".into(),
-            total_bond_amount: Uint128(100u128),
+            staking_token: pair_info.liquidity_token.clone(),
+            total_bond_amount: Uint128(1u128),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,

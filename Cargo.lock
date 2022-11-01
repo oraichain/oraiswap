@@ -307,8 +307,13 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw-multi-test",
  "cw20",
  "oraiswap",
+ "oraiswap-factory",
+ "oraiswap-oracle",
+ "oraiswap-pair",
+ "oraiswap-token",
  "schemars",
  "serde",
 ]
