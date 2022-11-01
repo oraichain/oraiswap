@@ -3,6 +3,7 @@ use cosmwasm_std::{
     AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Binary, Coin, Decimal, HumanAddr,
     QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -22,7 +23,7 @@ pub struct Response {
 
 pub struct MockApp {
     app: App,
-    pub cw20_id: u64,
+    pub token_id: u64,
     pub token_map: HashMap<String, HumanAddr>, // map token name to address
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
@@ -40,7 +41,7 @@ impl MockApp {
 
         MockApp {
             app,
-            cw20_id: 0,
+            token_id: 0,
             factory_addr: HumanAddr::default(),
             token_map: HashMap::new(),
             oracle_addr: HumanAddr::default(),
@@ -48,7 +49,7 @@ impl MockApp {
     }
 
     pub fn set_token_contract(&mut self, code: Box<dyn Contract>) {
-        self.cw20_id = self.upload(code);
+        self.token_id = self.upload(code);
     }
 
     pub fn upload(&mut self, code: Box<dyn Contract>) -> u64 {
@@ -68,6 +69,8 @@ impl MockApp {
         let contract_addr = self
             .app
             .instantiate_contract(code_id, sender, init_msg, send_funds, label)?;
+        // simulate bank transfer when run sent_funds
+        self.set_balance(contract_addr.clone(), send_funds);
         self.app.update_block(next_block);
         Ok(contract_addr)
     }
@@ -80,16 +83,41 @@ impl MockApp {
         send_funds: &[Coin],
     ) -> Result<Response, String> {
         // simulate bank transfer when run sent_funds
-        self.set_balance(contract_addr.clone(), send_funds);
+        let balance: Vec<Coin> = send_funds
+            .into_iter()
+            .map(|fund| {
+                let current_amount = self
+                    .query_balance(contract_addr.clone(), fund.denom.clone())
+                    .unwrap_or_default();
+
+                Coin {
+                    denom: fund.denom.clone(),
+                    amount: fund.amount + current_amount,
+                }
+            })
+            .collect();
+
+        self.app
+            .set_bank_balance(contract_addr.clone(), balance)
+            .unwrap();
 
         let response = self
             .app
             .execute_contract(sender, contract_addr, msg, send_funds)?;
+
         self.app.update_block(next_block);
         Ok(Response {
             attributes: response.attributes,
             data: response.data,
         })
+    }
+
+    pub fn query<T: DeserializeOwned, U: Serialize>(
+        &self,
+        contract_addr: HumanAddr,
+        msg: &U,
+    ) -> StdResult<T> {
+        self.app.wrap().query_wasm_smart(contract_addr, msg)
     }
 
     pub fn set_oracle_contract(&mut self, code: Box<dyn Contract>) {
@@ -125,7 +153,7 @@ impl MockApp {
                 APP_OWNER.into(),
                 &crate::factory::InitMsg {
                     pair_code_id,
-                    token_code_id: self.cw20_id,
+                    token_code_id: self.token_id,
                     oracle_addr: self.oracle_addr.clone(),
                     commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
                 },
@@ -278,7 +306,7 @@ impl MockApp {
     pub fn create_token(&mut self, token: &str) -> HumanAddr {
         let addr = self
             .instantiate(
-                self.cw20_id,
+                self.token_id,
                 APP_OWNER.into(),
                 &cw20_base::msg::InitMsg {
                     name: token.to_string(),

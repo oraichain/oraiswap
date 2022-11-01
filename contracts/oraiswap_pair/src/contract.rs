@@ -337,28 +337,30 @@ pub fn withdraw_liquidity(
 
     let oracle_contract = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
 
+    let messages = vec![
+        refund_assets[0].clone().into_msg(
+            Some(&oracle_contract),
+            &deps.querier,
+            env.contract.address.clone(),
+            sender.clone(),
+        )?,
+        refund_assets[1].clone().into_msg(
+            Some(&oracle_contract),
+            &deps.querier,
+            env.contract.address,
+            sender.clone(),
+        )?,
+        // burn liquidity token
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: deps.api.human_address(&pair_info.liquidity_token)?,
+            msg: to_binary(&Cw20HandleMsg::Burn { amount })?,
+            send: vec![],
+        }),
+    ];
+
     // update pool info
     Ok(HandleResponse {
-        messages: vec![
-            refund_assets[0].clone().into_msg(
-                Some(&oracle_contract),
-                &deps.querier,
-                env.contract.address.clone(),
-                sender.clone(),
-            )?,
-            refund_assets[1].clone().into_msg(
-                Some(&oracle_contract),
-                &deps.querier,
-                env.contract.address,
-                sender.clone(),
-            )?,
-            // burn liquidity token
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: deps.api.human_address(&pair_info.liquidity_token)?,
-                msg: to_binary(&Cw20HandleMsg::Burn { amount })?,
-                send: vec![],
-            }),
-        ],
+        messages,
         attributes: vec![
             attr("action", "withdraw_liquidity"),
             attr("sender", sender.as_str()),

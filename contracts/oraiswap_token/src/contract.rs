@@ -5,10 +5,15 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 use cw20_base::{
-    contract::{
-        create_accounts, handle as cw20_handle, migrate as cw20_migrate, query as cw20_query,
+    allowances::{
+        handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
+        handle_transfer_from,
     },
-    msg::{HandleMsg as OriginalHandleMsg, MigrateMsg, QueryMsg},
+    contract::{
+        create_accounts, handle_burn, handle_mint, handle_send, handle_transfer,
+        migrate as cw20_migrate, query as cw20_query,
+    },
+    msg::{MigrateMsg, QueryMsg},
     state::{token_info, token_info_read, MinterData, TokenInfo},
     ContractError,
 };
@@ -84,99 +89,38 @@ pub fn handle(
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::ChangeMinter { new_minter } => handle_change_minter(deps, env, info, new_minter),
-        HandleMsg::Mint { recipient, amount } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::Mint { recipient, amount },
-        ),
-        HandleMsg::Burn { amount } => {
-            cw20_handle(deps, env, info, OriginalHandleMsg::Burn { amount })
-        }
-        HandleMsg::BurnFrom { owner, amount } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::BurnFrom { owner, amount },
-        ),
+        HandleMsg::Mint { recipient, amount } => handle_mint(deps, env, info, recipient, amount),
+        HandleMsg::Burn { amount } => handle_burn(deps, env, info, amount),
+        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, info, owner, amount),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::DecreaseAllowance {
-                spender,
-                amount,
-                expires,
-            },
-        ),
+        } => handle_decrease_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::IncreaseAllowance {
-                spender,
-                amount,
-                expires,
-            },
-        ),
+        } => handle_increase_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::Send {
-                contract,
-                amount,
-                msg,
-            },
-        ),
+        } => handle_send(deps, env, info, contract, amount, msg),
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::SendFrom {
-                owner,
-                contract,
-                amount,
-                msg,
-            },
-        ),
-        HandleMsg::Transfer { recipient, amount } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::Transfer { recipient, amount },
-        ),
+        } => handle_send_from(deps, env, info, owner, contract, amount, msg),
+        HandleMsg::Transfer { recipient, amount } => {
+            handle_transfer(deps, env, info, recipient, amount)
+        }
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => cw20_handle(
-            deps,
-            env,
-            info,
-            OriginalHandleMsg::TransferFrom {
-                owner,
-                recipient,
-                amount,
-            },
-        ),
+        } => handle_transfer_from(deps, env, info, owner, recipient, amount),
     }
 }
 
