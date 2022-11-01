@@ -75,6 +75,8 @@ fn tax_cap_notfound() {
 fn test_asset() {
     let mut app = MockApp::new();
 
+    app.set_token_contract(oraiswap_token::testutils::contract());
+
     app.set_balance(
         MOCK_CONTRACT_ADDR.into(),
         &[Coin {
@@ -115,7 +117,7 @@ fn test_asset() {
         },
     };
 
-    let orai_oracle = OracleContract(app.oracle_addr.as_ref().cloned().unwrap());
+    let orai_oracle = OracleContract(app.oracle_addr.clone());
 
     assert_eq!(
         token_asset

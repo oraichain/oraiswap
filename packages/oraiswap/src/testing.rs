@@ -21,7 +21,7 @@ fn contract_cw20() -> Box<dyn Contract> {
 fn token_balance_querier() {
     let mut app = MockApp::new();
 
-    app.set_cw20_contract(contract_cw20());
+    app.set_token_contract(contract_cw20());
 
     app.set_token_balances(&[(
         &"AIRI".to_string(),
@@ -93,7 +93,7 @@ fn all_balances_querier() {
 #[test]
 fn supply_querier() {
     let mut app = MockApp::new();
-    app.set_cw20_contract(contract_cw20());
+    app.set_token_contract(contract_cw20());
     app.set_token_balances(&[(
         &"LPA".to_string(),
         &[
@@ -113,7 +113,7 @@ fn supply_querier() {
 #[test]
 fn test_asset_info() {
     let mut app = MockApp::new();
-    app.set_cw20_contract(contract_cw20());
+    app.set_token_contract(contract_cw20());
     app.set_balance(
         MOCK_CONTRACT_ADDR.into(),
         &[Coin {

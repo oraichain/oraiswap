@@ -20,3 +20,19 @@ pub mod mock_app;
 
 #[cfg(test)]
 mod testing;
+
+#[macro_export]
+macro_rules! create_entry_points_testing {
+    ($contract:ident) => {
+        use cw_multi_test::{Contract, ContractWrapper};
+
+        pub fn contract() -> Box<dyn Contract> {
+            let contract = ContractWrapper::new(
+                crate::contract::handle,
+                crate::contract::init,
+                crate::contract::query,
+            );
+            Box::new(contract)
+        }
+    };
+}

@@ -10,33 +10,6 @@ use oraiswap::hook::InitHook;
 use oraiswap::mock_app::MockApp;
 use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
 
-fn contract_token() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(
-        oraiswap_token::contract::handle,
-        oraiswap_token::contract::init,
-        oraiswap_token::contract::query,
-    );
-    Box::new(contract)
-}
-
-fn contract_pair() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(
-        oraiswap_pair::contract::handle,
-        oraiswap_pair::contract::init,
-        oraiswap_pair::contract::query,
-    );
-    Box::new(contract)
-}
-
-fn contract_oracle() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(
-        oraiswap_oracle::contract::handle,
-        oraiswap_oracle::contract::init,
-        oraiswap_oracle::contract::query,
-    );
-    Box::new(contract)
-}
-
 fn contract_factory() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(handle, init, query);
     Box::new(contract)
@@ -203,10 +176,10 @@ fn create_pair() {
 #[test]
 fn update_pair() {
     let mut app = MockApp::new();
-    app.set_cw20_contract(contract_token());
-    app.set_oracle_contract(contract_oracle());
+    app.set_token_contract(oraiswap_token::testutils::contract());
+    app.set_oracle_contract(oraiswap_oracle::testutils::contract());
 
-    app.set_factory_and_pair_contract(contract_factory(), contract_pair());
+    app.set_factory_and_pair_contract(contract_factory(), oraiswap_pair::testutils::contract());
 
     let contract_addr1 = app.create_token("assetA");
     let contract_addr2 = app.create_token("assetB");

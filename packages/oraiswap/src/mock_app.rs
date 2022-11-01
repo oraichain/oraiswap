@@ -22,7 +22,7 @@ pub struct Response {
 
 pub struct MockApp {
     app: App,
-    cw20_id: u64,
+    pub cw20_id: u64,
     pub token_map: HashMap<String, HumanAddr>, // map token name to address
     pub oracle_addr: HumanAddr,
     pub factory_addr: HumanAddr,
@@ -47,15 +47,20 @@ impl MockApp {
         }
     }
 
-    pub fn set_cw20_contract(&mut self, code: Box<dyn Contract>) {
-        self.cw20_id = self.app.store_code(code);
-        self.app.update_block(next_block);
+    pub fn set_token_contract(&mut self, code: Box<dyn Contract>) {
+        self.cw20_id = self.upload(code);
     }
 
-    pub fn instantiate<T: Serialize, V: Into<HumanAddr>>(
+    pub fn upload(&mut self, code: Box<dyn Contract>) -> u64 {
+        let code_id = self.app.store_code(code);
+        self.app.update_block(next_block);
+        code_id
+    }
+
+    pub fn instantiate<T: Serialize>(
         &mut self,
         code_id: u64,
-        sender: V,
+        sender: HumanAddr,
         init_msg: &T,
         send_funds: &[Coin],
         label: &str,
@@ -67,13 +72,16 @@ impl MockApp {
         Ok(contract_addr)
     }
 
-    pub fn execute<T: Serialize, V: Into<HumanAddr>>(
+    pub fn execute<T: Serialize>(
         &mut self,
-        sender: V,
-        contract_addr: V,
+        sender: HumanAddr,
+        contract_addr: HumanAddr,
         msg: &T,
         send_funds: &[Coin],
     ) -> Result<Response, String> {
+        // simulate bank transfer when run sent_funds
+        self.set_balance(contract_addr.clone(), send_funds);
+
         let response = self
             .app
             .execute_contract(sender, contract_addr, msg, send_funds)?;
@@ -85,11 +93,11 @@ impl MockApp {
     }
 
     pub fn set_oracle_contract(&mut self, code: Box<dyn Contract>) {
-        let code_id = self.app.store_code(code);
-        let contract_addr = self
+        let code_id = self.upload(code);
+        self.oracle_addr = self
             .instantiate(
                 code_id,
-                APP_OWNER,
+                APP_OWNER.into(),
                 &crate::oracle::InitMsg {
                     name: None,
                     version: None,
@@ -101,8 +109,6 @@ impl MockApp {
                 "oracle",
             )
             .unwrap();
-
-        self.oracle_addr = contract_addr;
     }
 
     pub fn set_factory_and_pair_contract(
@@ -110,13 +116,13 @@ impl MockApp {
         factory_code: Box<dyn Contract>,
         pair_code: Box<dyn Contract>,
     ) {
-        let factory_id = self.app.store_code(factory_code);
-        let pair_code_id = self.app.store_code(pair_code);
+        let factory_id = self.upload(factory_code);
+        let pair_code_id = self.upload(pair_code);
 
-        let factory_addr = self
+        self.factory_addr = self
             .instantiate(
                 factory_id,
-                APP_OWNER,
+                APP_OWNER.into(),
                 &crate::factory::InitMsg {
                     pair_code_id,
                     token_code_id: self.cw20_id,
@@ -127,8 +133,6 @@ impl MockApp {
                 "factory",
             )
             .unwrap();
-
-        self.factory_addr = factory_addr;
     }
 
     // configure the oraiswap pair
@@ -156,7 +160,7 @@ impl MockApp {
             let pair_addr = self
                 .instantiate(
                     pair_code_id,
-                    APP_OWNER,
+                    APP_OWNER.into(),
                     &crate::pair::InitMsg {
                         asset_infos: asset_infos.clone(),
                         token_code_id,
@@ -207,8 +211,8 @@ impl MockApp {
         if !self.oracle_addr.is_empty() {
             // update rate
             self.execute(
-                APP_OWNER,
-                &self.oracle_addr.clone(),
+                APP_OWNER.into(),
+                self.oracle_addr.clone(),
                 &crate::oracle::OracleMsg::Treasury(
                     crate::oracle::OracleTreasuryMsg::UpdateTaxRate { rate },
                 ),
@@ -219,8 +223,8 @@ impl MockApp {
             // update caps
             for (denom, &cap) in caps.iter() {
                 self.execute(
-                    APP_OWNER,
-                    &self.oracle_addr.clone(),
+                    APP_OWNER.into(),
+                    self.oracle_addr.clone(),
                     &crate::oracle::OracleMsg::Treasury(
                         crate::oracle::OracleTreasuryMsg::UpdateTaxCap {
                             denom: denom.to_string(),
@@ -275,7 +279,7 @@ impl MockApp {
         let addr = self
             .instantiate(
                 self.cw20_id,
-                APP_OWNER,
+                APP_OWNER.into(),
                 &cw20_base::msg::InitMsg {
                     name: token.to_string(),
                     symbol: token.to_string(),
@@ -308,16 +312,18 @@ impl MockApp {
 
             // mint for each recipient
             for (recipient, &amount) in balances.iter() {
-                self.execute(
-                    APP_OWNER,
-                    &contract_addr,
-                    &cw20_base::msg::HandleMsg::Mint {
-                        recipient: HumanAddr(recipient.to_string()),
-                        amount,
-                    },
-                    &[],
-                )
-                .unwrap();
+                if !amount.is_zero() {
+                    self.execute(
+                        APP_OWNER.into(),
+                        contract_addr.clone(),
+                        &cw20_base::msg::HandleMsg::Mint {
+                            recipient: HumanAddr(recipient.to_string()),
+                            amount,
+                        },
+                        &[],
+                    )
+                    .unwrap();
+                }
             }
         }
     }
