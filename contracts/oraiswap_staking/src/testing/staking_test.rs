@@ -601,18 +601,6 @@ fn test_auto_stake() {
         )
         .unwrap();
 
-    // recive 100 lptoken
-    // app.execute(
-    //     pair_addr.clone(),
-    //     pair_info.liquidity_token.clone(),
-    //     &cw20::Cw20HandleMsg::Mint {
-    //         recipient: "addr".into(),
-    //         amount: Uint128::from(100u128),
-    //     },
-    //     &[],
-    // )
-    // .unwrap();
-
     // wrong asset
     let msg = HandleMsg::AutoStakeHook {
         asset_info: AssetInfo::Token {
