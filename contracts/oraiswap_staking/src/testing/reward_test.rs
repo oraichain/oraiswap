@@ -1,10 +1,10 @@
 use crate::contract::{handle, init, query};
 use crate::state::{read_pool_info, rewards_read, store_pool_info, PoolInfo, RewardInfo};
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{coin, coins, from_binary, to_binary, Api, BankMsg, Decimal, Uint128, WasmMsg};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_app::{mock_dependencies, ATOM_DENOM};
+use oraiswap::mock_app::ATOM_DENOM;
 use oraiswap::staking::{
     Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
@@ -1131,7 +1131,6 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let info = mock_info("staking", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-
     let data = query(
         deps.as_ref(),
         mock_env(),
@@ -1141,7 +1140,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();    
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {

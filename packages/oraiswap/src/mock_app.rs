@@ -163,7 +163,7 @@ impl MockApp {
         }
     }
 
-    pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) {
+    pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<HumanAddr> {
         if !self.factory_addr.is_empty() {
             let crate::factory::ConfigResponse {
                 token_code_id,
@@ -207,13 +207,17 @@ impl MockApp {
 
             // then register
             self.execute(
-                pair_addr,
+                pair_addr.clone(),
                 self.factory_addr.clone(),
                 &crate::factory::HandleMsg::Register { asset_infos },
                 &[],
             )
             .unwrap();
+
+            return Some(pair_addr);
         }
+
+        None
     }
 
     pub fn query_pair(&self, asset_infos: [AssetInfo; 2]) -> StdResult<PairInfo> {
@@ -339,7 +343,7 @@ impl MockApp {
                 "cw20",
             )
             .unwrap();
-
+        self.token_map.insert(token.to_string(), addr.clone());
         addr
     }
 
@@ -350,11 +354,7 @@ impl MockApp {
     ) {
         for (token, balances) in balances.iter() {
             let contract_addr = match self.token_map.get(*token) {
-                None => {
-                    let addr = self.create_token(&token);
-                    self.token_map.insert(token.to_string(), addr.clone());
-                    addr
-                }
+                None => self.create_token(&token),
                 Some(addr) => addr.clone(),
             };
 

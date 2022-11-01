@@ -1,18 +1,15 @@
-use std::ops::{Div, Mul};
+use std::ops::Mul;
 
 use cosmwasm_std::{
-    attr, coin, from_binary,
-    testing::{mock_env, mock_info},
-    to_binary, BankMsg, Binary, CosmosMsg, CustomQuery, Decimal, Empty, HumanAddr, QueryRequest,
-    StdError, Uint128, WasmMsg, WasmQuery,
+    attr, coin,
+    testing::{mock_dependencies, mock_env, mock_info},
+    to_binary, BankMsg, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
 };
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 use oraiswap::{
-    asset::{Asset, AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
-    converter::{
-        ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo, TokenRatio,
-    },
-    mock_app::{mock_dependencies, ATOM_DENOM},
+    asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
+    converter::{Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo},
+    mock_app::ATOM_DENOM,
     Decimal256, Uint256,
 };
 
@@ -40,7 +37,7 @@ fn test_convert_reverse() {
 
     // we can just call .unwrap() to assert this was a success
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
-    let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
+    let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
     //pair1
     let msg = HandleMsg::UpdatePair {
@@ -195,7 +192,7 @@ fn test_remove_pair() {
 
     // we can just call .unwrap() to assert this was a success
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
-    let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
+    let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
     let msg = HandleMsg::UpdatePair {
         from: TokenInfo {
@@ -212,9 +209,9 @@ fn test_remove_pair() {
         },
     };
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+    let _res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
 
-    let res = query(
+    let _res = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::ConvertInfo {
@@ -234,7 +231,7 @@ fn test_remove_pair() {
         },
     };
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+    let _res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
     let res = query(
         deps.as_ref(),
         mock_env(),

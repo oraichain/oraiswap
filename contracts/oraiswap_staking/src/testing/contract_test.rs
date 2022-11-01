@@ -1,11 +1,10 @@
 use crate::contract::{handle, init, query};
-use cosmwasm_std::testing::{mock_env, mock_info};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{
     attr, coin, from_binary, to_binary, Decimal, HumanAddr, Order, StdError, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_app::mock_dependencies;
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
 };

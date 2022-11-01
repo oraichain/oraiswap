@@ -1,6 +1,5 @@
 use crate::contract::{init, query_config};
-use cosmwasm_std::testing::{mock_env, mock_info};
-use oraiswap::mock_app::mock_dependencies;
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use oraiswap::rewarder::{ConfigResponse, InitMsg};
 
 #[test]

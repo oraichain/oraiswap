@@ -1,86 +1,9 @@
-use crate::contract::{handle, init, query_pair_info};
-
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{attr, to_binary, Coin, Decimal, StdError, Uint128, WasmMsg};
-use cw20::{Cw20ReceiveMsg, MinterResponse};
+use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+use cosmwasm_std::{attr, to_binary, Coin, Decimal, StdError, Uint128};
+use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
-use oraiswap::hook::InitHook;
 use oraiswap::mock_app::{MockApp, ATOM_DENOM};
 use oraiswap::pair::{Cw20HookMsg, HandleMsg, InitMsg};
-use oraiswap::token::InitMsg as TokenInitMsg;
-
-#[test]
-fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-
-    // we can just call .unwrap() to assert this was a success
-    let res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
-    assert_eq!(
-        res.messages,
-        vec![WasmMsg::Instantiate {
-            code_id: 10u64,
-            msg: to_binary(&TokenInitMsg {
-                name: "oraiswap liquidity token".to_string(),
-                symbol: "uLP".to_string(),
-                decimals: 6,
-                initial_balances: vec![],
-                mint: Some(MinterResponse {
-                    minter: MOCK_CONTRACT_ADDR.into(),
-                    cap: None,
-                }),
-                init_hook: Some(InitHook {
-                    msg: to_binary(&HandleMsg::PostInitialize {}).unwrap(),
-                    contract_addr: MOCK_CONTRACT_ADDR.into(),
-                }),
-            })
-            .unwrap(),
-            send: vec![],
-            label: None,
-        }
-        .into(),]
-    );
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    // it worked, let's query the state
-    let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
-    assert_eq!("liquidity0000", pair_info.liquidity_token.as_str());
-    assert_eq!(
-        pair_info.asset_infos,
-        [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into()
-            }
-        ]
-    );
-}
 
 #[test]
 fn provide_liquidity_both_native() {

@@ -227,6 +227,7 @@ pub fn provide_liquidity(
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
     let mut pools: [Asset; 2] =
         pair_info.query_pools(&deps.querier, deps.api, env.contract.address.clone())?;
+
     let deposits: [Uint128; 2] = [
         assets
             .iter()

@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError,
-    StdResult, Uint128,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult,
+    Uint128,
 };
 use cw20::Cw20ReceiveMsg;
 use oraiswap::{Decimal256, Uint256};
@@ -344,10 +344,10 @@ pub fn withdraw_tokens(
 }
 
 pub fn migrate(
-    deps: DepsMut,
+    _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: MigrateMsg,
+    _msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
     Ok(MigrateResponse::default())
 }
