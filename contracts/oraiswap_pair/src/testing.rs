@@ -440,7 +440,8 @@ fn withdraw_liquidity() {
             },
         ],
         slippage_tolerance: None,
-        receiver: None,
+        // we send lq token to pair and later call it directly to test
+        receiver: Some(pair_addr.clone()),
     };
 
     // only accept 100, then 50 share will be generated with 100 * (100 / 200)
@@ -466,22 +467,6 @@ fn withdraw_liquidity() {
     let pair_info: PairInfo = app
         .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})
         .unwrap();
-    let liquidity_denom = app
-        .register_token(pair_info.liquidity_token.clone())
-        .unwrap();
-
-    app.set_token_balances(&[(
-        &"liquidity".to_string(),
-        &[(&pair_addr.to_string(), &Uint128::from(1000u128))],
-    )]);
-
-    app.set_token_balances_from(
-        pair_addr.clone(),
-        &[(
-            &liquidity_denom,
-            &[(&pair_addr.to_string(), &Uint128::from(1000u128))],
-        )],
-    );
 
     let res = app
         .execute(pair_info.liquidity_token, pair_addr.clone(), &msg, &[])
@@ -498,7 +483,7 @@ fn withdraw_liquidity() {
         log_refund_assets,
         &attr(
             "refund_assets",
-            format!("18{}, 99{}", ORAI_DENOM, liquidity_addr)
+            format!("200{}, 100{}", ORAI_DENOM, liquidity_addr)
         )
     );
 }
