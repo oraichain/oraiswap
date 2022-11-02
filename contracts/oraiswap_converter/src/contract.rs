@@ -1,13 +1,14 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
-use oraiswap::{Decimal256, Uint256};
 
 use crate::state::{
     read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_remove, Config,
 };
+
+use oraiswap::{Decimal256, Uint256};
 
 use oraiswap::converter::{
     ConfigResponse, ConvertInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
@@ -16,28 +17,25 @@ use oraiswap::converter::{
 
 use oraiswap::asset::{Asset, AssetInfo, DECIMAL_FRACTION};
 
-pub fn init(
+#[entry_point]
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     _msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     store_config(
         deps.storage,
         &Config {
-            owner: deps.api.addr_canonicalize(&info.sender)?,
+            owner: deps.api.addr_canonicalize(info.sender.as_str())?,
         },
     )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> StdResult<HandleResponse> {
+#[entry_point]
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateConfig { owner } => update_config(deps, info, owner),
@@ -49,47 +47,42 @@ pub fn handle(
     }
 }
 
-pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult<HandleResponse> {
+pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    config.owner = deps.api.addr_canonicalize(&owner)?;
+    config.owner = deps.api.addr_canonicalize(owner.as_str())?;
 
     store_config(deps.storage, &config)?;
 
-    Ok(HandleResponse {
-        messages: vec![],
-        attributes: vec![attr("action", "update_config")],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![attr("action", "update_config")]))
 }
 
 fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
-    let _nominator = Uint256::from(nominator);
-    let _denominator = Decimal256::from(denominator);
+    let nominator = Uint256::from(nominator);
+    let denominator = Decimal256::from(denominator);
 
-    let result: Uint128 = (_nominator
+    (nominator
         * Decimal256::from_ratio(
             Uint256::from(DECIMAL_FRACTION),
-            Uint256::from(DECIMAL_FRACTION) * _denominator,
+            Uint256::from(DECIMAL_FRACTION) * denominator,
         ))
-    .into();
-    result
+    .into()
 }
 
 pub fn receive_cw20(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse> {
-    match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
+) -> StdResult<Response> {
+    match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Convert {}) => {
             // check permission
-            let token_raw = deps.api.addr_canonicalize(&info.sender)?;
+            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
             let token_ratio = read_token_ratio(deps.storage, token_raw.as_slice())?;
             let amount = cw20_msg.amount * token_ratio.ratio;
             let message = Asset {
@@ -99,19 +92,14 @@ pub fn receive_cw20(
             .into_msg(
                 None,
                 &deps.querier,
-                env.contract.address.clone(),
-                cw20_msg.sender,
+                deps.api.addr_validate(cw20_msg.sender.as_str())?,
             )?;
 
-            Ok(HandleResponse {
-                messages: vec![message],
-                attributes: vec![
-                    attr("action", "convert_token"),
-                    attr("from_amount", cw20_msg.amount),
-                    attr("to_amount", amount),
-                ],
-                data: None,
-            })
+            Ok(Response::new().add_message(message).add_attributes(vec![
+                attr("action", "convert_token"),
+                attr("from_amount", cw20_msg.amount),
+                attr("to_amount", amount),
+            ]))
         }
         Ok(Cw20HookMsg::ConvertReverse { from }) => {
             let asset_key = from.to_vec(deps.api)?;
@@ -131,19 +119,14 @@ pub fn receive_cw20(
                 .into_msg(
                     None,
                     &deps.querier,
-                    env.contract.address.clone(),
-                    cw20_msg.sender,
+                    deps.api.addr_validate(cw20_msg.sender.as_str())?,
                 )?;
 
-                Ok(HandleResponse {
-                    messages: vec![message],
-                    attributes: vec![
-                        attr("action", "convert_token_reverse"),
-                        attr("from_amount", cw20_msg.amount),
-                        attr("to_amount", amount),
-                    ],
-                    data: None,
-                })
+                Ok(Response::new().add_message(message).add_attributes(vec![
+                    attr("action", "convert_token_reverse"),
+                    attr("from_amount", cw20_msg.amount),
+                    attr("to_amount", amount),
+                ]))
             } else {
                 return Err(StdError::generic_err("invalid cw20 hook message"));
             }
@@ -157,9 +140,9 @@ pub fn update_pair(
     info: MessageInfo,
     from: TokenInfo,
     to: TokenInfo,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -175,20 +158,12 @@ pub fn update_pair(
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
 
-    Ok(HandleResponse {
-        messages: vec![],
-        attributes: vec![attr("action", "update_pair")],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![attr("action", "update_pair")]))
 }
 
-pub fn unregister_pair(
-    deps: DepsMut,
-    info: MessageInfo,
-    from: TokenInfo,
-) -> StdResult<HandleResponse> {
+pub fn unregister_pair(deps: DepsMut, info: MessageInfo, from: TokenInfo) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -196,19 +171,15 @@ pub fn unregister_pair(
 
     token_ratio_remove(deps.storage, &asset_key);
 
-    Ok(HandleResponse {
-        messages: vec![],
-        attributes: vec![attr("action", "unregister_convert_info")],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![attr("action", "unregister_convert_info")]))
 }
 
-pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleResponse> {
+pub fn convert(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Response> {
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut attributes: Vec<Attribute> = vec![];
     attributes.push(attr("action", "convert_token"));
 
-    for native_coin in info.sent_funds {
+    for native_coin in info.funds {
         let asset_key = native_coin.denom.as_bytes();
         let amount = native_coin.amount;
         attributes.extend(vec![
@@ -224,35 +195,28 @@ pub fn convert(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<HandleRe
             info: token_ratio.info,
             amount: to_amount.clone(),
         }
-        .into_msg(
-            None,
-            &deps.querier,
-            env.contract.address.clone(),
-            info.sender.clone(),
-        )?;
+        .into_msg(None, &deps.querier, info.sender.clone())?;
 
         messages.push(message);
     }
 
-    Ok(HandleResponse {
-        messages,
-        attributes,
-        data: None,
-    })
+    Ok(Response::new()
+        .add_messages(messages)
+        .add_attributes(attributes))
 }
 
 pub fn convert_reverse(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     from_asset: AssetInfo,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let asset_key = from_asset.to_vec(deps.api)?;
     let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
 
     if let AssetInfo::NativeToken { denom } = token_ratio.info {
-        //check sent_funds includes To token
-        let native_coin = info.sent_funds.iter().find(|a| a.denom.eq(&denom));
+        //check funds includes To token
+        let native_coin = info.funds.iter().find(|a| a.denom.eq(&denom));
         if native_coin.is_none() {
             return Err(StdError::generic_err("invalid cw20 hook message"));
         }
@@ -262,28 +226,20 @@ pub fn convert_reverse(
             info: from_asset,
             amount: amount.clone(),
         }
-        .into_msg(
-            None,
-            &deps.querier,
-            env.contract.address.clone(),
-            info.sender.clone(),
-        )?;
+        .into_msg(None, &deps.querier, info.sender.clone())?;
 
-        Ok(HandleResponse {
-            messages: vec![message],
-            attributes: vec![
-                attr("action", "convert_token_reverse"),
-                attr("denom", native_coin.denom.clone()),
-                attr("from_amount", native_coin.amount.clone()),
-                attr("to_amount", amount),
-            ],
-            data: None,
-        })
+        Ok(Response::new().add_message(message).add_attributes(vec![
+            attr("action", "convert_token_reverse"),
+            attr("denom", native_coin.denom.clone()),
+            attr("from_amount", native_coin.amount.clone()),
+            attr("to_amount", amount),
+        ]))
     } else {
         return Err(StdError::generic_err("invalid cw20 hook message"));
     }
 }
 
+#[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -311,7 +267,7 @@ pub fn withdraw_tokens(
     env: Env,
     info: MessageInfo,
     asset_infos: Vec<AssetInfo>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config = read_config(deps.storage)?;
     let owner = deps.api.addr_humanize(&config.owner)?;
     if owner != info.sender {
@@ -326,28 +282,17 @@ pub fn withdraw_tokens(
             info: asset,
             amount: balance.clone(),
         }
-        .into_msg(
-            None,
-            &deps.querier,
-            env.contract.address.clone(),
-            owner.clone(),
-        )?;
+        .into_msg(None, &deps.querier, owner.clone())?;
         messages.push(message);
-        attributes.extend(vec![attr("amount", balance.to_string())])
+        attributes.push(attr("amount", balance.to_string()))
     }
 
-    Ok(HandleResponse {
-        messages,
-        attributes,
-        data: None,
-    })
+    Ok(Response::new()
+        .add_messages(messages)
+        .add_attributes(attributes))
 }
 
-pub fn migrate(
-    _deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: MigrateMsg,
-) -> StdResult<MigrateResponse> {
-    Ok(MigrateResponse::default())
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
 }

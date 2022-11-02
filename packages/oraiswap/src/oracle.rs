@@ -83,7 +83,7 @@ pub enum OracleExchangeQuery {
 pub enum OracleContractQuery {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
-    #[returns(Coin)]
+    #[returns(RewardPoolResponse)]
     RewardPool { denom: String },
 }
 
@@ -147,6 +147,11 @@ pub struct ContractInfoResponse {
     pub max_rate: Decimal,
     // pub min_stability_spread: Decimal,
     // pub base_pool: Uint128,
+}
+
+#[cw_serde]
+pub struct RewardPoolResponse {
+    pub balance: Coin,
 }
 
 /// We currently take no arguments for migrations

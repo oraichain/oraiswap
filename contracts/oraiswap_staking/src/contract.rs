@@ -11,8 +11,7 @@ use crate::state::{
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
-    HandleResponse, InitResponse, MessageInfo, MigrateResponse, Order, StdError, StdResult,
-    Uint128,
+    MessageInfo, Order, Response, Response, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
@@ -27,7 +26,7 @@ pub fn init(
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     store_config(
         deps.storage,
         &Config {
@@ -42,15 +41,10 @@ pub fn init(
         },
     )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> StdResult<HandleResponse> {
+pub fn handle(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
@@ -103,7 +97,7 @@ pub fn receive_cw20(
     deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
         Ok(Cw20HookMsg::Bond { asset_info }) => {
             // check permission
@@ -139,7 +133,7 @@ pub fn update_config(
     info: MessageInfo,
     owner: Option<Addr>,
     rewarder: Option<Addr>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(&info.sender)? != config.owner {
@@ -155,7 +149,7 @@ pub fn update_config(
     }
 
     store_config(deps.storage, &config)?;
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "update_config")],
         data: None,
@@ -169,7 +163,7 @@ fn update_rewards_per_sec(
     info: MessageInfo,
     asset_info: AssetInfo,
     assets: Vec<Asset>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(&info.sender)? != config.owner {
@@ -207,7 +201,7 @@ fn update_rewards_per_sec(
 
     store_rewards_per_sec(deps.storage, &asset_key, raw_assets)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "update_rewards_per_sec")],
         data: None,
@@ -219,7 +213,7 @@ fn register_asset(
     info: MessageInfo,
     asset_info: AssetInfo,
     staking_token: Addr,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(&info.sender)? {
@@ -244,7 +238,7 @@ fn register_asset(
         },
     )?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![
             attr("action", "register_asset"),
@@ -259,7 +253,7 @@ fn deprecate_staking_token(
     info: MessageInfo,
     asset_info: AssetInfo,
     new_staking_token: Addr,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(&info.sender)? {
@@ -286,7 +280,7 @@ fn deprecate_staking_token(
 
     store_pool_info(deps.storage, &asset_key, &pool_info)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![
             attr("action", "depcrecate_staking_token"),
@@ -382,7 +376,7 @@ pub fn migrate(
     _env: Env,
     _info: MessageInfo,
     msg: MigrateMsg,
-) -> StdResult<MigrateResponse> {
+) -> StdResult<Response> {
     // migrate_pool_infos(deps.storage)?;
     // migrate_config(deps.storage)?;
     migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
@@ -403,5 +397,5 @@ pub fn migrate(
     //     msg.new_staking_token,
     // )?;
 
-    Ok(MigrateResponse::default())
+    Ok(Response::default())
 }

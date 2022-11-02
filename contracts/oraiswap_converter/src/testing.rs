@@ -2,18 +2,18 @@ use std::ops::Mul;
 
 use cosmwasm_std::{
     attr, coin,
-    testing::{mock_dependencies, mock_env, mock_info},
-    to_binary, BankMsg, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
+    testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
+    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
     asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
     converter::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo},
-    mock_app::ATOM_DENOM,
+    testing::ATOM_DENOM,
     Decimal256, Uint256,
 };
 
-use crate::contract::{handle, init, query};
+use crate::contract::{execute, instantiate, query};
 
 #[test]
 fn test_decimal() {
@@ -27,7 +27,7 @@ fn test_decimal() {
 }
 #[test]
 fn test_convert_reverse() {
-    let mut deps = mock_dependencies(&[
+    let mut deps = mock_dependencies_with_balance(&[
         coin(10000000000u128, ORAI_DENOM),
         coin(20000000000u128, ATOM_DENOM),
     ]);
@@ -36,20 +36,20 @@ fn test_convert_reverse() {
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
     let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
     //pair1
     let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
             decimals: 18,
         },
         to: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset2".into(),
+                contract_addr: Addr::unchecked("asset2"),
             },
             decimals: 6,
         },
@@ -57,33 +57,33 @@ fn test_convert_reverse() {
 
     //register pair1
     let info = mock_info("addr", &[]);
-    handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     //convert_reverse asset2 to asset1
     let info = mock_info("asset2", &[]);
     let convert_msg = Cw20HookMsg::ConvertReverse {
         from: AssetInfo::Token {
-            contract_addr: "asset1".into(),
+            contract_addr: Addr::unchecked("asset1"),
         },
     };
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
-        sender: info.sender.clone(),
-        msg: Some(to_binary(&convert_msg).unwrap()),
+        sender: info.sender.to_string(),
+        msg: to_binary(&convert_msg).unwrap(),
     });
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     assert_eq!(
         res.messages,
-        vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset1".into(),
+        vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "asset1".to_string(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: info.sender.clone(),
+                recipient: info.sender.to_string(),
                 amount: Uint128::from(10u128.pow(12))
             })
             .unwrap(),
-            send: vec![]
-        })]
+            funds: vec![]
+        }))]
     );
 
     assert_eq!(
@@ -99,15 +99,15 @@ fn test_convert_reverse() {
     let info = mock_info("addr", &[]);
     let convert_msg = Cw20HookMsg::ConvertReverse {
         from: AssetInfo::Token {
-            contract_addr: "asset1".into(),
+            contract_addr: Addr::unchecked("asset1"),
         },
     };
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
-        sender: info.sender.clone(),
-        msg: Some(to_binary(&convert_msg).unwrap()),
+        sender: info.sender.to_string(),
+        msg: to_binary(&convert_msg).unwrap(),
     });
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone());
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
     match res {
         Err(StdError::GenericErr { msg }) => assert_eq!(msg, "invalid cw20 hook message"),
@@ -118,7 +118,7 @@ fn test_convert_reverse() {
     let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
             decimals: 6,
         },
@@ -130,30 +130,30 @@ fn test_convert_reverse() {
         },
     };
     let info = mock_info("addr", &[]);
-    handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+    execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
 
     //convert_reverse
     let msg = ExecuteMsg::ConvertReverse {
         from_asset: AssetInfo::Token {
-            contract_addr: "asset1".into(),
+            contract_addr: Addr::unchecked("asset1"),
         },
     };
 
     //convert 10^12 ORAI to asset1
     let info = mock_info("addr", &[coin(1000000000000u128, ORAI_DENOM)]);
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     assert_eq!(
         res.messages,
-        vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset1".into(),
+        vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "asset1".to_string(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: info.sender.clone(),
+                recipient: info.sender.to_string(),
                 amount: Uint128::from(1u128)
             })
             .unwrap(),
-            send: vec![]
-        })]
+            funds: vec![]
+        }))]
     );
 
     assert_eq!(
@@ -169,13 +169,13 @@ fn test_convert_reverse() {
     //check if not send Orai to convert to asset1
     let msg = ExecuteMsg::ConvertReverse {
         from_asset: AssetInfo::Token {
-            contract_addr: "asset1".into(),
+            contract_addr: Addr::unchecked("asset1"),
         },
     };
 
     //convert 10^12 ORAI to asset1
     let info = mock_info("addr", &[coin(1000000000000u128, ATOM_DENOM)]);
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone());
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
     match res {
         Err(StdError::GenericErr { msg }) => assert_eq!(msg, "invalid cw20 hook message"),
@@ -185,38 +185,38 @@ fn test_convert_reverse() {
 
 #[test]
 fn test_remove_pair() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {};
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
     let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
     let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
             decimals: 16,
         },
         to: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset2".into(),
+                contract_addr: Addr::unchecked("asset2"),
             },
             decimals: 16,
         },
     };
     let info = mock_info("addr", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
 
     let _res = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::ConvertInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
         },
     )
@@ -225,19 +225,19 @@ fn test_remove_pair() {
     let msg = ExecuteMsg::UnregisterPair {
         from: TokenInfo {
             info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
             decimals: 16,
         },
     };
     let info = mock_info("addr", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
     let res = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::ConvertInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset1".into(),
+                contract_addr: Addr::unchecked("asset1"),
             },
         },
     );
@@ -250,7 +250,7 @@ fn test_remove_pair() {
 
 #[test]
 fn test_withdraw_tokens() {
-    let mut deps = mock_dependencies(&[
+    let mut deps = mock_dependencies_with_balance(&[
         coin(10000000000u128, ORAI_DENOM),
         coin(20000000000u128, ATOM_DENOM),
     ]);
@@ -265,7 +265,7 @@ fn test_withdraw_tokens() {
     );
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     //test proper withdraw tokens
     let msg = ExecuteMsg::WithdrawTokens {
@@ -280,21 +280,19 @@ fn test_withdraw_tokens() {
     };
 
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     assert_eq!(
         res.messages,
         vec![
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: mock_env().contract.address,
-                to_address: info.sender.clone(),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: info.sender.to_string(),
                 amount: vec![coin(10000000000u128, ORAI_DENOM),],
-            }),
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: mock_env().contract.address,
-                to_address: info.sender,
+            })),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: info.sender.to_string(),
                 amount: vec![coin(20000000000u128, ATOM_DENOM),],
-            })
+            }))
         ]
     );
     assert_eq!(
@@ -319,7 +317,7 @@ fn test_withdraw_tokens() {
     };
 
     let info = mock_info("addr1", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone());
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
     match res {
         Err(StdError::GenericErr { msg }) => assert_eq!(msg, "unauthorized"),

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, HandleResponse, InitResponse,
-    MessageInfo, QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper,
+    Response, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cosmwasm_std::{QueryRequest, WasmQuery};
 
@@ -26,7 +26,7 @@ pub fn init(
     env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     store_config(
         deps.storage,
         &Config {
@@ -39,15 +39,10 @@ pub fn init(
         },
     )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> StdResult<HandleResponse> {
+pub fn handle(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::UpdateConfig {
             owner,
@@ -65,7 +60,7 @@ pub fn update_config(
     owner: Option<Addr>,
     staking_contract: Option<Addr>,
     distribution_interval: Option<u64>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
     if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
@@ -85,7 +80,7 @@ pub fn update_config(
 
     store_config(deps.storage, &config)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "update_config")],
         data: None,
@@ -94,11 +89,7 @@ pub fn update_config(
 
 /// Distribute
 /// Anyone can handle distribute operation to distribute
-pub fn distribute(
-    deps: DepsMut,
-    env: Env,
-    asset_infos: Vec<AssetInfo>,
-) -> StdResult<HandleResponse> {
+pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
     let now = env.block.time;
@@ -132,7 +123,7 @@ pub fn distribute(
         });
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: staking_contract,
             msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,

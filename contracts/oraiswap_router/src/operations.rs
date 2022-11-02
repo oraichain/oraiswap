@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    to_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, MessageInfo,
-    StdError, StdResult, Uint128, WasmMsg,
+    to_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
 
@@ -23,7 +23,7 @@ pub fn handle_swap_operation(
     info: MessageInfo,
     operation: SwapOperation,
     to: Option<Addr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if env.contract.address != info.sender {
         return Err(ContractError::Unauthorized {});
     }
@@ -71,7 +71,7 @@ pub fn handle_swap_operation(
         }
     };
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![],
         data: None,
@@ -85,7 +85,7 @@ pub fn handle_swap_operations(
     operations: Vec<SwapOperation>,
     minimum_receive: Option<Uint128>,
     to: Option<Addr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let operations_len = operations.len();
     if operations_len == 0 {
         return Err(ContractError::NoSwapOperation {});
@@ -133,7 +133,7 @@ pub fn handle_swap_operations(
         }))
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![],
         data: None,

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, HandleResponse, InitResponse,
-    MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, QueryRequest, Response,
+    Response, StdError, StdResult, Uint128, WasmQuery,
 };
 use oraiswap::error::ContractError;
 
@@ -22,7 +22,7 @@ pub fn init(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     CONFIG.save(
         deps.storage,
         &Config {
@@ -30,7 +30,7 @@ pub fn init(
         },
     )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -38,7 +38,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::ExecuteSwapOperations {
@@ -70,7 +70,7 @@ pub fn receive_cw20(
     env: Env,
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // throw empty data as well when decoding
     match from_binary(&cw20_msg.msg.unwrap_or_default())? {
         Cw20HookMsg::ExecuteSwapOperations {
@@ -94,7 +94,7 @@ fn assert_minium_receive(
     prev_balance: Uint128,
     minium_receive: Uint128,
     receiver: Addr,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
     let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
 
@@ -105,7 +105,7 @@ fn assert_minium_receive(
         });
     }
 
-    Ok(HandleResponse::default())
+    Ok(Response::default())
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

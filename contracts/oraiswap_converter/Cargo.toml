@@ -1,7 +1,7 @@
 [package]
 name = "oraiswap-converter"
 version = "0.0.0"
-authors = ["Terraform Labs, PTE.","Oraichain Labs"]
+authors = ["Terraform Labs, PTE.", "Oraichain Labs"]
 edition = "2018"
 description = "A Oraiswap rewarder contract - auto distribute reward to oraiswap_staking contract"
 license = "MIT"

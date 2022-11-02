@@ -5,8 +5,8 @@ use crate::state::{
     rewards_read, rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse,
-    MessageInfo, Order, StdError, StdResult, Storage, Uint128,
+    attr, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdError, StdResult, Storage, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
 use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
@@ -19,7 +19,7 @@ pub fn deposit_reward(
     deps: DepsMut,
     info: MessageInfo,
     rewards: Vec<Asset>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config = read_config(deps.storage)?;
 
     // only rewarder can execute this message, rewarder may be a contract
@@ -52,7 +52,7 @@ pub fn deposit_reward(
         rewards_amount += asset.amount;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         data: None,
         attributes: vec![
@@ -68,7 +68,7 @@ pub fn withdraw_reward(
     env: Env,
     info: MessageInfo,
     asset_info: Option<AssetInfo>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let staker_addr = deps.api.addr_canonicalize(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
@@ -86,7 +86,7 @@ pub fn withdraw_reward(
         })
         .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![attr("action", "withdraw_reward")],
         data: None,
@@ -99,7 +99,7 @@ pub fn withdraw_reward_others(
     info: MessageInfo,
     staker_addrs: Vec<Addr>,
     asset_info: Option<AssetInfo>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config = read_config(deps.storage)?;
 
     // only admin can execute this message
@@ -116,7 +116,7 @@ pub fn withdraw_reward_others(
         process_reward_assets(deps.storage, &staker_addr_raw, &asset_key.clone(), false)?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "withdraw_reward_others")],
         data: None,

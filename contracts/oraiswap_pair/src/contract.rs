@@ -2,8 +2,7 @@ use crate::state::PAIR_INFO;
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, HandleResponse, InitResponse, MessageInfo, MigrateResponse, StdResult, Uint128,
-    WasmMsg,
+    DepsMut, Env, MessageInfo, Response, Response, Response, StdResult, Uint128, WasmMsg,
 };
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
@@ -13,8 +12,8 @@ use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
-    compute_swap, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolResponse, QueryMsg,
-    ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
+    compute_swap, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PairResponse, PoolResponse,
+    QueryMsg, ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
 use oraiswap::token::InstantiateMsg as TokenInstantiateMsg;
@@ -26,7 +25,7 @@ pub fn init(
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     let pair_info = &PairInfoRaw {
         // return infomation from oracle, update by multisig wallet
         oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
@@ -82,7 +81,7 @@ pub fn init(
         );
     }
 
-    Ok(InitResponse {
+    Ok(Response {
         messages,
         attributes: vec![],
     })
@@ -93,7 +92,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         // when liquidity token is deploy, need to update the address
         ExecuteMsg::PostInitialize {} => try_post_initialize(deps, env, info),
@@ -135,7 +134,7 @@ pub fn receive_cw20(
     env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let contract_addr = info.sender.clone();
 
     match from_binary(&cw20_msg.msg.unwrap_or_default()) {
@@ -196,7 +195,7 @@ pub fn try_post_initialize(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // borrow dynamic
     let mut pair_info = PAIR_INFO.load(deps.storage)?;
 
@@ -209,7 +208,7 @@ pub fn try_post_initialize(
     pair_info.liquidity_token = deps.api.addr_canonicalize(&info.sender)?;
     PAIR_INFO.save(deps.storage, &pair_info)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         attributes: vec![attr("liquidity_token_address", info.sender.to_string())],
         messages: vec![],
         data: None,
@@ -224,7 +223,7 @@ pub fn provide_liquidity(
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
     receiver: Option<Addr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     for asset in assets.iter() {
         asset.assert_sent_native_token_balance(&info)?;
     }
@@ -302,7 +301,7 @@ pub fn provide_liquidity(
         send: vec![],
     }));
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![
             attr("action", "provide_liquidity"),
@@ -321,7 +320,7 @@ pub fn withdraw_liquidity(
     _info: MessageInfo,
     sender: Addr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
     let liquidity_addr = deps.api.addr_humanize(&pair_info.liquidity_token)?;
 
@@ -366,7 +365,7 @@ pub fn withdraw_liquidity(
     ];
 
     // update pool info
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![
             attr("action", "withdraw_liquidity"),
@@ -393,7 +392,7 @@ pub fn swap(
     belief_price: Option<Decimal>,
     max_spread: Option<Decimal>,
     to: Option<Addr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     offer_asset.assert_sent_native_token_balance(&info)?;
 
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
@@ -464,7 +463,7 @@ pub fn swap(
 
     // 1. send collateral token from the contract to a user
     // 2. send inactive commission to collector
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![
             attr("action", "swap"),
@@ -497,9 +496,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
 
 pub fn query_pair_info(deps: Deps) -> Result<PairInfo, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
-    let pair_info = pair_info.to_normal(deps.api)?;
-
-    Ok(pair_info)
+    pair_info
+        .to_normal(deps.api)
+        .map(|info| PairResponse { info })
 }
 
 pub fn query_pool(deps: Deps) -> Result<PoolResponse, ContractError> {
@@ -716,6 +715,6 @@ pub fn migrate(
     _env: Env,
     _info: MessageInfo,
     _msg: MigrateMsg,
-) -> Result<MigrateResponse, ContractError> {
-    Ok(MigrateResponse::default())
+) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }

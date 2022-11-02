@@ -4,9 +4,10 @@ use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
     hook::InitHook,
+    Decimal256, Uint256,
 };
 
-use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 /// Default commission rate == 0.3%
@@ -63,7 +64,7 @@ pub enum Cw20HookMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(PairInfo)]
+    #[returns(PairResponse)]
     Pair {},
     #[returns(PoolResponse)]
     Pool {},
@@ -80,20 +81,25 @@ pub struct PoolResponse {
     pub total_share: Uint128,
 }
 
+#[cw_serde]
+pub struct PairResponse {
+    pub info: PairInfo,
+}
+
 /// SimulationResponse returns swap simulation response
 #[cw_serde]
 pub struct SimulationResponse {
-    pub return_amount: Uint256,
-    pub spread_amount: Uint256,
-    pub commission_amount: Uint256,
+    pub return_amount: Uint128,
+    pub spread_amount: Uint128,
+    pub commission_amount: Uint128,
 }
 
 /// ReverseSimulationResponse returns reverse swap simulation response
 #[cw_serde]
 pub struct ReverseSimulationResponse {
-    pub offer_amount: Uint256,
-    pub spread_amount: Uint256,
-    pub commission_amount: Uint256,
+    pub offer_amount: Uint128,
+    pub spread_amount: Uint128,
+    pub commission_amount: Uint128,
 }
 
 /// We currently take no arguments for migrations
@@ -105,7 +111,7 @@ pub fn compute_swap(
     ask_pool: Uint128,
     offer_amount: Uint128,
     commission_rate: Decimal256,
-) -> Result<(Uint256, Uint256, Uint256), ContractError> {
+) -> Result<(Uint128, Uint128, Uint128), ContractError> {
     if offer_pool.is_zero() {
         return Err(ContractError::OfferPoolIsZero {});
     }
@@ -130,5 +136,9 @@ pub fn compute_swap(
 
     // commission will be absorbed to pool
     let return_amount = return_amount - commission_amount;
-    Ok((return_amount, spread_amount, commission_amount))
+    Ok((
+        return_amount.into(),
+        spread_amount.into(),
+        commission_amount.into(),
+    ))
 }

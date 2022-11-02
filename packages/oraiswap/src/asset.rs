@@ -12,6 +12,7 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 
 pub const ORAI_DENOM: &str = "orai";
+pub const DECIMAL_FRACTION: u128 = 1_000_000_000_000_000_000u128;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Asset {
@@ -40,7 +41,6 @@ impl Asset {
             if denom == ORAI_DENOM {
                 Ok(Uint128::from(0u64))
             } else {
-                let decimal_faction = Uint128::from(1_000_000_000_000_000_000u128);
                 // get oracle params from oracle contract
                 let tax_rate = oracle_contract.query_tax_rate(querier)?.rate;
                 let tax_cap = oracle_contract
@@ -48,8 +48,8 @@ impl Asset {
                     .cap;
                 Ok(std::cmp::min(
                     amount.checked_sub(amount.multiply_ratio(
-                        decimal_faction,
-                        decimal_faction * tax_rate + decimal_faction,
+                        DECIMAL_FRACTION,
+                        (Uint128::from(DECIMAL_FRACTION) * tax_rate).u128() + DECIMAL_FRACTION,
                     ))?,
                     tax_cap,
                 ))

@@ -4,8 +4,8 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env,
-    HandleResponse, MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
@@ -19,7 +19,7 @@ pub fn bond(
     staker_addr: Addr,
     asset_info: AssetInfo,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(&staker_addr)?;
     _increase_bond_amount(
         deps.storage,
@@ -29,7 +29,7 @@ pub fn bond(
         amount,
     )?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![
             attr("action", "bond"),
@@ -47,7 +47,7 @@ pub fn unbond(
     staker_addr: Addr,
     asset_info: AssetInfo,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(&staker_addr)?;
     let (staking_token, reward_assets) = _decrease_bond_amount(
         deps.storage,
@@ -82,7 +82,7 @@ pub fn unbond(
             .collect::<StdResult<Vec<CosmosMsg>>>()?,
     );
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages,
         attributes: vec![
             attr("action", "unbond"),
@@ -101,7 +101,7 @@ pub fn update_list_stakers(
     info: MessageInfo,
     asset_info: AssetInfo,
     stakers: Vec<Addr>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(&info.sender)? != config.owner {
@@ -113,7 +113,7 @@ pub fn update_list_stakers(
             .save(deps.api.addr_canonicalize(&staker)?.as_slice(), &true)?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "update_list_stakers")],
         data: None,
@@ -126,7 +126,7 @@ pub fn auto_stake(
     info: MessageInfo,
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
 
@@ -182,7 +182,7 @@ pub fn auto_stake(
     // 2. Increase allowance of token for pair contract
     // 3. Provide liquidity
     // 4. Execute staking hook, will stake in the name of the sender
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![
             WasmMsg::Execute {
                 contract_addr: token_addr.clone(),
@@ -259,7 +259,7 @@ pub fn auto_stake_hook(
     staking_token: Addr,
     staker_addr: Addr,
     prev_staking_token_amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> StdResult<Response> {
     // only can be called by itself
     if info.sender != env.contract.address {
         return Err(StdError::generic_err("unauthorized"));

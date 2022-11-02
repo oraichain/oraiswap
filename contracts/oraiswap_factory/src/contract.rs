@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, InitResponse,
-    MessageInfo, MigrateResponse, StdResult, WasmMsg,
+    attr, to_binary, Addr, Binary, CanonicalAddr, Deps, DepsMut, Env, MessageInfo, Response,
+    Response, Response, StdResult, WasmMsg,
 };
 use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
@@ -19,7 +19,7 @@ pub fn init(
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<InitResponse> {
+) -> StdResult<Response> {
     let config = Config {
         oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
         owner: deps.api.addr_canonicalize(&info.sender)?,
@@ -32,7 +32,7 @@ pub fn init(
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -40,7 +40,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::UpdateConfig {
             owner,
@@ -63,7 +63,7 @@ pub fn handle_update_config(
     owner: Option<String>,
     token_code_id: Option<u64>,
     pair_code_id: Option<u64>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
     // permission check
@@ -85,7 +85,7 @@ pub fn handle_update_config(
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![attr("action", "update_config")],
         data: None,
@@ -99,7 +99,7 @@ pub fn handle_create_pair(
     _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
     auto_register: bool,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
         asset_infos[0].to_raw(deps.api)?,
@@ -136,7 +136,7 @@ pub fn handle_create_pair(
         None
     };
 
-    Ok(HandleResponse {
+    Ok(Response {
         // instantiate pair with hook to call register after work
         messages: vec![WasmMsg::Instantiate {
             code_id: config.pair_code_id,
@@ -166,7 +166,7 @@ pub fn handle_register_pair(
     _env: Env,
     info: MessageInfo,
     asset_infos: [AssetInfo; 2],
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let raw_infos = [
         asset_infos[0].to_raw(deps.api)?,
         asset_infos[1].to_raw(deps.api)?,
@@ -186,7 +186,7 @@ pub fn handle_register_pair(
 
     PAIRS.save(deps.storage, &pair_key, &pair_info)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
         attributes: vec![
             attr("pair_contract_address", info.sender.to_string()),
@@ -255,6 +255,6 @@ pub fn migrate(
     _env: Env,
     _info: MessageInfo,
     _msg: MigrateMsg,
-) -> StdResult<MigrateResponse> {
-    Ok(MigrateResponse::default())
+) -> StdResult<Response> {
+    Ok(Response::default())
 }

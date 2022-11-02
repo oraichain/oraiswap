@@ -10,6 +10,9 @@ pub mod rewarder;
 pub mod router;
 pub mod staking;
 
+mod math;
+pub use crate::math::{Decimal256, Uint256};
+
 // for other to use, but not compile to wasm
 #[cfg(not(target_arch = "wasm32"))]
 pub mod testing;
