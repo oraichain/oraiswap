@@ -44,7 +44,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
 #[test]
 pub fn test() {
     let contract = oraiswap::create_entry_points_testing!(crate);
-    let mut app = oraiswap::mock_app::MockApp::new(&[]);
+    let mut app = oraiswap::testing::MockApp::new(&[]);
     let code_id = app.upload(contract);
     println!("contract code id {}", code_id);
 }
