@@ -1,12 +1,12 @@
 use crate::contract::{init, query_config};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use oraiswap::rewarder::{ConfigResponse, InitMsg};
+use oraiswap::rewarder::{ConfigResponse, InstantiateMsg};
 
 #[test]
 fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         staking_contract: "staking".into(),
         distribution_interval: Some(600),
     };

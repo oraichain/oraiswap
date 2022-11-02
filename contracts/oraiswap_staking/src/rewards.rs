@@ -23,7 +23,7 @@ pub fn deposit_reward(
     let config = read_config(deps.storage)?;
 
     // only rewarder can execute this message, rewarder may be a contract
-    if config.rewarder != deps.api.canonical_address(&info.sender)? {
+    if config.rewarder != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -69,7 +69,7 @@ pub fn withdraw_reward(
     info: MessageInfo,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<HandleResponse> {
-    let staker_addr = deps.api.canonical_address(&info.sender)?;
+    let staker_addr = deps.api.addr_canonicalize(&info.sender)?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
     let reward_assets = process_reward_assets(deps.storage, &staker_addr, &asset_key, true)?;
@@ -103,7 +103,7 @@ pub fn withdraw_reward_others(
     let config = read_config(deps.storage)?;
 
     // only admin can execute this message
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -112,7 +112,7 @@ pub fn withdraw_reward_others(
 
     // withdraw reward for each staker
     for staker_addr in staker_addrs {
-        let staker_addr_raw = deps.api.canonical_address(&staker_addr)?;
+        let staker_addr_raw = deps.api.addr_canonicalize(&staker_addr)?;
         process_reward_assets(deps.storage, &staker_addr_raw, &asset_key.clone(), false)?;
     }
 
@@ -237,7 +237,7 @@ pub fn query_reward_info(
     staker_addr: Addr,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<RewardInfoResponse> {
-    let staker_addr_raw = deps.api.canonical_address(&staker_addr)?;
+    let staker_addr_raw = deps.api.addr_canonicalize(&staker_addr)?;
 
     let reward_infos: Vec<RewardInfoResponseItem> =
         _read_reward_infos_response(deps.api, deps.storage, &staker_addr_raw, &asset_info)?;
@@ -259,7 +259,7 @@ pub fn query_all_reward_infos(
     let order_by = Order::try_from(order.unwrap_or(1))?;
     let asset_key = asset_info.to_vec(deps.api)?;
     let start_after = start_after
-        .map_or(None, |a| deps.api.canonical_address(&a).ok())
+        .map_or(None, |a| deps.api.addr_canonicalize(&a).ok())
         .map(|c| c.to_vec());
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;

@@ -10,7 +10,7 @@ use cw_multi_test::ContractWrapper;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_app::MockApp;
 use oraiswap::oracle::{
-    ExchangeRateResponse, InitMsg, OracleContract, OracleExchangeMsg, OracleExchangeQuery,
+    ExchangeRateResponse, InstantiateMsg, OracleContract, OracleExchangeMsg, OracleExchangeQuery,
     OracleMsg, OracleQuery, OracleTreasuryQuery,
 };
 
@@ -19,7 +19,7 @@ const OWNER: &str = "owner0000";
 fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let mut deps = mock_dependencies(&coins(100000, ORAI_DENOM));
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         name: None,
         version: None,
         admin: None,

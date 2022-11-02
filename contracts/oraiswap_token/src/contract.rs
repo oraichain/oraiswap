@@ -10,7 +10,6 @@ use cw20_base::{
     },
     msg::{InstantiateMsg, MigrateMsg, QueryMsg},
 };
-use cw_multi_test::App;
 
 #[entry_point]
 pub fn instantiate(
@@ -22,6 +21,7 @@ pub fn instantiate(
     cw20_instantiate(deps, env, info, msg)
 }
 
+#[entry_point]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -43,8 +43,8 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
 
 #[test]
 pub fn test() {
-    let contract = crate::create_entry_points_testing!(crate);
-    let mut app = App::default();
-    let code_id = app.store_code(contract);
+    let contract = oraiswap::create_entry_points_testing!(crate);
+    let mut app = oraiswap::mock_app::MockApp::new(&[]);
+    let code_id = app.upload(contract);
     println!("contract code id {}", code_id);
 }

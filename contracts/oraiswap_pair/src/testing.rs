@@ -3,7 +3,7 @@ use cosmwasm_std::{attr, to_binary, Coin, Decimal, StdError, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
 use oraiswap::mock_app::{MockApp, ATOM_DENOM};
-use oraiswap::pair::{Cw20HookMsg, HandleMsg, InitMsg};
+use oraiswap::pair::{Cw20HookMsg, ExecuteMsg, InstantiateMsg};
 
 #[test]
 fn provide_liquidity_both_native() {
@@ -34,7 +34,7 @@ fn provide_liquidity_both_native() {
         (&"asset".to_string(), &[]),
     ]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
@@ -56,7 +56,7 @@ fn provide_liquidity_both_native() {
         .unwrap();
 
     // successfully provide liquidity for the exist pool
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
@@ -122,7 +122,7 @@ fn provide_liquidity() {
 
     let asset_addr = app.get_token_addr("asset").unwrap();
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
@@ -147,7 +147,7 @@ fn provide_liquidity() {
     app.execute(
         MOCK_CONTRACT_ADDR.into(),
         asset_addr.clone(),
-        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.clone(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -157,7 +157,7 @@ fn provide_liquidity() {
     .unwrap();
 
     // successfully provide liquidity for the exist pool
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -204,7 +204,7 @@ fn provide_liquidity() {
     app.execute(
         MOCK_CONTRACT_ADDR.into(),
         asset_addr.clone(),
-        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.clone(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -213,7 +213,7 @@ fn provide_liquidity() {
     )
     .unwrap();
 
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -246,7 +246,7 @@ fn provide_liquidity() {
         .unwrap();
 
     // check wrong argument
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -313,7 +313,7 @@ fn withdraw_liquidity() {
 
     let liquidity_addr = app.get_token_addr("liquidity").unwrap();
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
@@ -338,7 +338,7 @@ fn withdraw_liquidity() {
     app.execute(
         "addr0000".into(),
         liquidity_addr.clone(),
-        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.clone(),
             amount: Uint128::from(1000u128),
             expires: None,
@@ -347,7 +347,7 @@ fn withdraw_liquidity() {
     )
     .unwrap();
 
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
@@ -381,7 +381,7 @@ fn withdraw_liquidity() {
         .unwrap();
 
     // withdraw liquidity
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".into(),
         msg: to_binary(&Cw20HookMsg::WithdrawLiquidity {}).ok(),
         amount: Uint128::from(100u128),

@@ -16,22 +16,27 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
-    RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
+    QueryMsg, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
 
-pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     store_config(
         deps.storage,
         &Config {
             owner: deps
                 .api
-                .canonical_address(&msg.owner.unwrap_or(info.sender.clone()))?,
-            rewarder: deps.api.canonical_address(&msg.rewarder)?,
-            oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
-            factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
+                .addr_canonicalize(&msg.owner.unwrap_or(info.sender.clone()))?,
+            rewarder: deps.api.addr_canonicalize(&msg.rewarder)?,
+            oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
+            factory_addr: deps.api.addr_canonicalize(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
         },
@@ -44,36 +49,36 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        HandleMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
-        HandleMsg::UpdateRewardsPerSec { asset_info, assets } => {
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
+        ExecuteMsg::UpdateRewardsPerSec { asset_info, assets } => {
             update_rewards_per_sec(deps, info, asset_info, assets)
         }
-        HandleMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
-        HandleMsg::RegisterAsset {
+        ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
+        ExecuteMsg::RegisterAsset {
             asset_info,
             staking_token,
         } => register_asset(deps, info, asset_info, staking_token),
-        HandleMsg::DeprecateStakingToken {
+        ExecuteMsg::DeprecateStakingToken {
             asset_info,
             new_staking_token,
         } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
-        HandleMsg::Unbond { asset_info, amount } => {
+        ExecuteMsg::Unbond { asset_info, amount } => {
             unbond(deps, env, info.sender, asset_info, amount)
         }
-        HandleMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
-        HandleMsg::WithdrawOthers {
+        ExecuteMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
+        ExecuteMsg::WithdrawOthers {
             asset_info,
             staker_addrs,
         } => withdraw_reward_others(deps, env, info, staker_addrs, asset_info),
-        HandleMsg::AutoStake {
+        ExecuteMsg::AutoStake {
             assets,
             slippage_tolerance,
         } => auto_stake(deps, env, info, assets, slippage_tolerance),
-        HandleMsg::AutoStakeHook {
+        ExecuteMsg::AutoStakeHook {
             asset_info,
             staking_token,
             staker_addr,
@@ -87,7 +92,7 @@ pub fn handle(
             staker_addr,
             prev_staking_token_amount,
         ),
-        HandleMsg::UpdateListStakers {
+        ExecuteMsg::UpdateListStakers {
             asset_info,
             stakers,
         } => update_list_stakers(deps, env, info, asset_info, stakers),
@@ -106,7 +111,7 @@ pub fn receive_cw20(
             let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
             // only staking token contract can execute this message
-            let token_raw = deps.api.canonical_address(&info.sender)?;
+            let token_raw = deps.api.addr_canonicalize(&info.sender)?;
             if pool_info.staking_token != token_raw {
                 // if user is trying to bond old token, return friendly error message
                 if let Some(params) = pool_info.migration_params {
@@ -137,16 +142,16 @@ pub fn update_config(
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
-    if deps.api.canonical_address(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.canonical_address(&owner)?;
+        config.owner = deps.api.addr_canonicalize(&owner)?;
     }
 
     if let Some(rewarder) = rewarder {
-        config.rewarder = deps.api.canonical_address(&rewarder)?;
+        config.rewarder = deps.api.addr_canonicalize(&rewarder)?;
     }
 
     store_config(deps.storage, &config)?;
@@ -167,7 +172,7 @@ fn update_rewards_per_sec(
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
-    if deps.api.canonical_address(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -217,7 +222,7 @@ fn register_asset(
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -231,7 +236,7 @@ fn register_asset(
         deps.storage,
         &asset_key,
         &PoolInfo {
-            staking_token: deps.api.canonical_address(&staking_token)?,
+            staking_token: deps.api.addr_canonicalize(&staking_token)?,
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
@@ -257,7 +262,7 @@ fn deprecate_staking_token(
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -277,7 +282,7 @@ fn deprecate_staking_token(
         index_snapshot: pool_info.reward_index,
         deprecated_staking_token: pool_info.staking_token,
     });
-    pool_info.staking_token = deps.api.canonical_address(&new_staking_token)?;
+    pool_info.staking_token = deps.api.addr_canonicalize(&new_staking_token)?;
 
     store_pool_info(deps.storage, &asset_key, &pool_info)?;
 

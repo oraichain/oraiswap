@@ -10,17 +10,22 @@ use crate::state::{
 };
 
 use oraiswap::converter::{
-    ConfigResponse, ConvertInfoResponse, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, QueryMsg,
-    TokenInfo, TokenRatio,
+    ConfigResponse, ConvertInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
+    QueryMsg, TokenInfo, TokenRatio,
 };
 
 use oraiswap::asset::{Asset, AssetInfo, DECIMAL_FRACTION};
 
-pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, _msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     store_config(
         deps.storage,
         &Config {
-            owner: deps.api.canonical_address(&info.sender)?,
+            owner: deps.api.addr_canonicalize(&info.sender)?,
         },
     )?;
 
@@ -31,27 +36,27 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-        HandleMsg::UpdateConfig { owner } => update_config(deps, info, owner),
-        HandleMsg::UpdatePair { from, to } => update_pair(deps, info, from, to),
-        HandleMsg::UnregisterPair { from } => unregister_pair(deps, info, from),
-        HandleMsg::Convert {} => convert(deps, env, info),
-        HandleMsg::ConvertReverse { from_asset } => convert_reverse(deps, env, info, from_asset),
-        HandleMsg::WithdrawTokens { asset_infos } => withdraw_tokens(deps, env, info, asset_infos),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::UpdateConfig { owner } => update_config(deps, info, owner),
+        ExecuteMsg::UpdatePair { from, to } => update_pair(deps, info, from, to),
+        ExecuteMsg::UnregisterPair { from } => unregister_pair(deps, info, from),
+        ExecuteMsg::Convert {} => convert(deps, env, info),
+        ExecuteMsg::ConvertReverse { from_asset } => convert_reverse(deps, env, info, from_asset),
+        ExecuteMsg::WithdrawTokens { asset_infos } => withdraw_tokens(deps, env, info, asset_infos),
     }
 }
 
 pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    config.owner = deps.api.canonical_address(&owner)?;
+    config.owner = deps.api.addr_canonicalize(&owner)?;
 
     store_config(deps.storage, &config)?;
 
@@ -84,7 +89,7 @@ pub fn receive_cw20(
     match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
         Ok(Cw20HookMsg::Convert {}) => {
             // check permission
-            let token_raw = deps.api.canonical_address(&info.sender)?;
+            let token_raw = deps.api.addr_canonicalize(&info.sender)?;
             let token_ratio = read_token_ratio(deps.storage, token_raw.as_slice())?;
             let amount = cw20_msg.amount * token_ratio.ratio;
             let message = Asset {
@@ -154,7 +159,7 @@ pub fn update_pair(
     to: TokenInfo,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -183,7 +188,7 @@ pub fn unregister_pair(
     from: TokenInfo,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 

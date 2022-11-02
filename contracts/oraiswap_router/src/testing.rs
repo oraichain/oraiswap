@@ -1,7 +1,7 @@
 use cosmwasm_std::{Coin, Decimal, Uint128};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::router::{
-    HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse, SwapOperation,
+    ExecuteMsg, InstantiateMsg, QueryMsg, SimulateSwapOperationsResponse, SwapOperation,
 };
 
 use oraiswap::mock_app::{MockApp, ATOM_DENOM};
@@ -56,7 +56,7 @@ fn simulate_swap_operations_test() {
 
     // provide liquidity
     // successfully provide liquidity for the exist pool
-    let msg = oraiswap::pair::HandleMsg::ProvideLiquidity {
+    let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
@@ -93,7 +93,7 @@ fn simulate_swap_operations_test() {
         )
         .unwrap();
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         factory_addr: app.factory_addr.clone(),
     };
 
@@ -186,7 +186,7 @@ fn handle_swap_operations() {
     let pair_addr2 = app.set_pair(asset_infos2.clone()).unwrap();
 
     // provide liquidity
-    let msg = oraiswap::pair::HandleMsg::ProvideLiquidity {
+    let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
@@ -209,7 +209,7 @@ fn handle_swap_operations() {
     app.execute(
         "addr0000".into(),
         asset_addr.clone(),
-        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
             spender: pair_addr1.clone(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -230,7 +230,7 @@ fn handle_swap_operations() {
         )
         .unwrap();
 
-    let msg = oraiswap::pair::HandleMsg::ProvideLiquidity {
+    let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
@@ -253,7 +253,7 @@ fn handle_swap_operations() {
     app.execute(
         "addr0000".into(),
         asset_addr.clone(),
-        &oraiswap_token::msg::HandleMsg::IncreaseAllowance {
+        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
             spender: pair_addr2.clone(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -274,7 +274,7 @@ fn handle_swap_operations() {
         )
         .unwrap();
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         factory_addr: app.factory_addr.clone(),
     };
 
@@ -285,7 +285,7 @@ fn handle_swap_operations() {
         .instantiate(code_id, "addr0000".into(), &msg, &[], "router")
         .unwrap();
 
-    let msg = HandleMsg::ExecuteSwapOperations {
+    let msg = ExecuteMsg::ExecuteSwapOperations {
         operations: vec![],
         minimum_receive: None,
         to: None,
@@ -297,7 +297,7 @@ fn handle_swap_operations() {
         _ => panic!("DO NOT ENTER HERE"),
     }
 
-    let msg = HandleMsg::ExecuteSwapOperations {
+    let msg = ExecuteMsg::ExecuteSwapOperations {
         operations: vec![
             SwapOperation::OraiSwap {
                 offer_asset_info: AssetInfo::NativeToken {

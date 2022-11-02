@@ -89,8 +89,8 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
-                owner: deps.api.canonical_address(&"owner0000".into()).unwrap(),
+                oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
+                owner: deps.api.addr_canonicalize(&"owner0000".into()).unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
                 commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
@@ -149,32 +149,32 @@ mod test {
     fn pair_info_legacy_compatibility() {
         let mut deps = mock_dependencies(&[]);
         let pair_info = PairInfoRaw {
-            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.canonical_address(&"token0000".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize(&"token0000".into()).unwrap(),
                 },
             ],
-            contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
-            liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize(&"pair0000".into()).unwrap(),
+            liquidity_token: deps.api.addr_canonicalize(&"liquidity0000".into()).unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 
         let pair_info2 = PairInfoRaw {
-            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.canonical_address(&"token0001".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize(&"token0001".into()).unwrap(),
                 },
             ],
-            contract_addr: deps.api.canonical_address(&"pair0001".into()).unwrap(),
-            liquidity_token: deps.api.canonical_address(&"liquidity0001".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize(&"pair0001".into()).unwrap(),
+            liquidity_token: deps.api.addr_canonicalize(&"liquidity0001".into()).unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 

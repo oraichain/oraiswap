@@ -14,9 +14,9 @@ use oraiswap::oracle::{
 };
 
 use oraiswap::error::ContractError;
-use oraiswap::oracle::InitMsg;
+use oraiswap::oracle::InstantiateMsg;
 
-// use crate::msg::{HandleMsg, InitMsg};
+// use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{CONTRACT_INFO, EXCHANGE_RATES, TAX_CAP, TAX_RATE};
 
 // version info for migration info
@@ -29,16 +29,16 @@ pub fn init(
     deps: DepsMut,
     _env: Env,
     msg_info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> StdResult<InitResponse> {
-    let creator = deps.api.canonical_address(&msg_info.sender)?;
+    let creator = deps.api.addr_canonicalize(&msg_info.sender)?;
     let info = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
         creator: creator.clone(),
         // admin should be multisig
         admin: if let Some(admin) = msg.admin {
-            deps.api.canonical_address(&admin)?
+            deps.api.addr_canonicalize(&admin)?
         } else {
             creator
         },
@@ -91,7 +91,7 @@ pub fn handle_update_tax_cap(
     cap: Uint128,
 ) -> Result<HandleResponse, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.canonical_address(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -111,7 +111,7 @@ pub fn handle_update_tax_rate(
     rate: Decimal,
 ) -> Result<HandleResponse, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.canonical_address(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     // check authorized, TODO: min and max tax_rate
     if contract_info.admin.ne(&sender_addr) {
@@ -132,7 +132,7 @@ pub fn handle_update_admin(
     admin: Addr,
 ) -> Result<HandleResponse, ContractError> {
     let mut contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.canonical_address(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -140,7 +140,7 @@ pub fn handle_update_admin(
     }
 
     // update new admin
-    contract_info.admin = deps.api.canonical_address(&admin)?;
+    contract_info.admin = deps.api.addr_canonicalize(&admin)?;
     CONTRACT_INFO.save(deps.storage, &contract_info)?;
 
     // return nothing new
@@ -154,7 +154,7 @@ pub fn handle_update_exchange_rate(
     exchange_rate: Decimal,
 ) -> Result<HandleResponse, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.canonical_address(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -172,7 +172,7 @@ pub fn handle_delete_exchange_rate(
     denom: String,
 ) -> Result<HandleResponse, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.canonical_address(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {

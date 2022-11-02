@@ -11,9 +11,9 @@ pub fn query_token_balance(
     account_addr: Addr,
 ) -> StdResult<Uint128> {
     let res: Cw20BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr,
+        contract_addr: contract_addr.to_string(),
         msg: to_binary(&Cw20QueryMsg::Balance {
-            address: account_addr,
+            address: account_addr.to_string(),
         })?,
     }))?;
 
@@ -27,7 +27,7 @@ pub fn query_token_info(
 ) -> StdResult<TokenInfoResponse> {
     // load price form the oracle
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr,
+        contract_addr: contract_addr.to_string(),
         msg: to_binary(&Cw20QueryMsg::TokenInfo {})?,
     }))
 }
@@ -43,7 +43,7 @@ pub fn query_pair_info(
     asset_infos: &[AssetInfo; 2],
 ) -> StdResult<PairInfo> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: factory_addr,
+        contract_addr: factory_addr.to_string(),
         msg: to_binary(&FactoryQueryMsg::Pair {
             asset_infos: asset_infos.clone(),
         })?,
@@ -55,7 +55,7 @@ pub fn query_pair_config(
     factory_addr: Addr,
 ) -> StdResult<ConfigResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: factory_addr,
+        contract_addr: factory_addr.to_string(),
         msg: to_binary(&FactoryQueryMsg::Config {})?,
     }))
 }
@@ -66,7 +66,7 @@ pub fn simulate(
     offer_asset: &Asset,
 ) -> StdResult<SimulationResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: pair_addr,
+        contract_addr: pair_addr.to_string(),
         msg: to_binary(&PairQueryMsg::Simulation {
             offer_asset: offer_asset.clone(),
         })?,
@@ -79,7 +79,7 @@ pub fn reverse_simulate(
     ask_asset: &Asset,
 ) -> StdResult<ReverseSimulationResponse> {
     querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: pair_addr,
+        contract_addr: pair_addr.to_string(),
         msg: to_binary(&PairQueryMsg::ReverseSimulation {
             ask_asset: ask_asset.clone(),
         })?,

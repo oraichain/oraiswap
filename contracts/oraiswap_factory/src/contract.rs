@@ -9,13 +9,20 @@ use crate::querier::query_liquidity_token;
 use crate::state::{pair_key, read_pairs, Config, CONFIG, PAIRS};
 
 use oraiswap::asset::{AssetInfo, PairInfo, PairInfoRaw};
-use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, MigrateMsg, PairsResponse, QueryMsg};
-use oraiswap::pair::{InitMsg as PairInitMsg, DEFAULT_COMMISSION_RATE};
+use oraiswap::factory::{
+    ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, PairsResponse, QueryMsg,
+};
+use oraiswap::pair::{InstantiateMsg as PairInstantiateMsg, DEFAULT_COMMISSION_RATE};
 
-pub fn init(deps: DepsMut, _env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     let config = Config {
-        oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
-        owner: deps.api.canonical_address(&info.sender)?,
+        oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
+        owner: deps.api.addr_canonicalize(&info.sender)?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
         commission_rate: msg
@@ -32,19 +39,19 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::UpdateConfig {
+        ExecuteMsg::UpdateConfig {
             owner,
             token_code_id,
             pair_code_id,
         } => handle_update_config(deps, env, info, owner, token_code_id, pair_code_id),
-        HandleMsg::CreatePair {
+        ExecuteMsg::CreatePair {
             asset_infos,
             auto_register,
         } => handle_create_pair(deps, env, info, asset_infos, auto_register),
-        HandleMsg::Register { asset_infos } => handle_register_pair(deps, env, info, asset_infos),
+        ExecuteMsg::Register { asset_infos } => handle_register_pair(deps, env, info, asset_infos),
     }
 }
 
@@ -60,12 +67,12 @@ pub fn handle_update_config(
     let mut config = CONFIG.load(deps.storage)?;
 
     // permission check
-    if deps.api.canonical_address(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.canonical_address(&Addr(owner))?;
+        config.owner = deps.api.addr_canonicalize(&Addr(owner))?;
     }
 
     if let Some(token_code_id) = token_code_id {
@@ -121,7 +128,7 @@ pub fn handle_create_pair(
     let init_hook = if auto_register {
         Some(InitHook {
             contract_addr: env.contract.address,
-            msg: to_binary(&HandleMsg::Register {
+            msg: to_binary(&ExecuteMsg::Register {
                 asset_infos: asset_infos.clone(),
             })?,
         })
@@ -135,7 +142,7 @@ pub fn handle_create_pair(
             code_id: config.pair_code_id,
             send: vec![],
             label: None,
-            msg: to_binary(&PairInitMsg {
+            msg: to_binary(&PairInstantiateMsg {
                 oracle_addr: deps.api.addr_humanize(&config.oracle_addr)?,
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
@@ -175,7 +182,7 @@ pub fn handle_register_pair(
 
     // the contract must follow the standard interface
     pair_info.liquidity_token = query_liquidity_token(deps.querier, info.sender.clone())?;
-    pair_info.contract_addr = deps.api.canonical_address(&info.sender)?;
+    pair_info.contract_addr = deps.api.addr_canonicalize(&info.sender)?;
 
     PAIRS.save(deps.storage, &pair_key, &pair_info)?;
 

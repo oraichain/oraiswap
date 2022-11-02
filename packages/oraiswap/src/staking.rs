@@ -1,12 +1,11 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+#[cw_serde]
+pub struct InstantiateMsg {
     // default is sender
     pub owner: Option<Addr>,
     pub rewarder: Addr,
@@ -16,9 +15,8 @@ pub struct InitMsg {
     pub base_denom: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+#[cw_serde]
+pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
 
     ////////////////////////
@@ -83,15 +81,14 @@ pub enum HandleMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Cw20HookMsg {
     // this call from LP token contract
     Bond { asset_info: AssetInfo },
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {
     pub staker_addrs: Vec<Addr>,
     // pub amount_infos: Vec<AmountInfo>,
@@ -99,27 +96,28 @@ pub struct MigrateMsg {
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AmountInfo {
     pub asset_info: AssetInfo,
     pub amount: Uint128,
     // pub new_staking_token: Addr,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
-    PoolInfo {
-        asset_info: AssetInfo,
-    },
-    RewardsPerSec {
-        asset_info: AssetInfo,
-    },
+    #[returns(PoolInfoResponse)]
+    PoolInfo { asset_info: AssetInfo },
+    #[returns(RewardsPerSecResponse)]
+    RewardsPerSec { asset_info: AssetInfo },
+    #[returns(RewardInfoResponse)]
     RewardInfo {
         staker_addr: Addr,
         asset_info: Option<AssetInfo>,
     },
+    #[returns(Vec<RewardInfoResponse>)]
     // Query all staker belong to the pool
     RewardInfos {
         asset_info: AssetInfo,
@@ -131,7 +129,7 @@ pub enum QueryMsg {
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ConfigResponse {
     pub owner: Addr,
     pub rewarder: Addr,
@@ -140,13 +138,13 @@ pub struct ConfigResponse {
     pub base_denom: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardsPerSecResponse {
     pub assets: Vec<Asset>,
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PoolInfoResponse {
     pub asset_info: AssetInfo,
     pub staking_token: Addr,
@@ -158,13 +156,13 @@ pub struct PoolInfoResponse {
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardInfoResponse {
     pub staker_addr: Addr,
     pub reward_infos: Vec<RewardInfoResponseItem>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardInfoResponseItem {
     pub asset_info: AssetInfo,
     pub bond_amount: Uint128,

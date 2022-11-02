@@ -5,23 +5,13 @@ use crate::mock_app::MockApp;
 use crate::querier::{query_supply, query_token_balance};
 
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
-use cosmwasm_std::{Coin, Uint128};
-use cw_multi_test::{Contract, ContractWrapper};
-
-fn contract_cw20() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(
-        cw20_base::contract::handle,
-        cw20_base::contract::init,
-        cw20_base::contract::query,
-    );
-    Box::new(contract)
-}
+use cosmwasm_std::{Addr, Coin, Uint128};
 
 #[test]
 fn token_balance_querier() {
-    let mut app = MockApp::new();
+    let mut app = MockApp::new(&[]);
 
-    app.set_token_contract(contract_cw20());
+    app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
 
     app.set_token_balances(&[(
         &"AIRI".to_string(),
@@ -33,7 +23,7 @@ fn token_balance_querier() {
         query_token_balance(
             &app.as_querier(),
             app.get_token_addr("AIRI").unwrap(),
-            MOCK_CONTRACT_ADDR.into(),
+            Addr::unchecked(MOCK_CONTRACT_ADDR),
         )
         .unwrap()
     );
@@ -41,17 +31,16 @@ fn token_balance_querier() {
 
 #[test]
 fn balance_querier() {
-    let mut app = MockApp::new();
-    app.set_balance(
-        MOCK_CONTRACT_ADDR.into(),
+    let app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
         &[Coin {
             denom: "uusd".to_string(),
             amount: Uint128::from(200u128),
         }],
-    );
+    )]);
 
     assert_eq!(
-        app.query_balance(MOCK_CONTRACT_ADDR.into(), "uusd".to_string())
+        app.query_balance(Addr::unchecked(MOCK_CONTRACT_ADDR), "uusd".to_string())
             .unwrap(),
         Uint128::from(200u128)
     );
@@ -59,9 +48,8 @@ fn balance_querier() {
 
 #[test]
 fn all_balances_querier() {
-    let mut app = MockApp::new();
-    app.set_balance(
-        MOCK_CONTRACT_ADDR.into(),
+    let app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
         &[
             Coin {
                 denom: "uusd".to_string(),
@@ -72,9 +60,11 @@ fn all_balances_querier() {
                 amount: Uint128::from(300u128),
             },
         ],
-    );
+    )]);
 
-    let mut balance1 = app.query_all_balances(MOCK_CONTRACT_ADDR.into()).unwrap();
+    let mut balance1 = app
+        .query_all_balances(Addr::unchecked(MOCK_CONTRACT_ADDR))
+        .unwrap();
     balance1.sort_by(|a, b| a.denom.cmp(&b.denom));
     let mut balance2 = vec![
         Coin {
@@ -92,8 +82,8 @@ fn all_balances_querier() {
 
 #[test]
 fn supply_querier() {
-    let mut app = MockApp::new();
-    app.set_token_contract(contract_cw20());
+    let mut app = MockApp::new(&[]);
+    app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
     app.set_token_balances(&[(
         &"LPA".to_string(),
         &[
@@ -112,15 +102,15 @@ fn supply_querier() {
 
 #[test]
 fn test_asset_info() {
-    let mut app = MockApp::new();
-    app.set_token_contract(contract_cw20());
-    app.set_balance(
-        MOCK_CONTRACT_ADDR.into(),
+    let mut app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
         &[Coin {
             denom: "uusd".to_string(),
             amount: Uint128::from(123u128),
         }],
-    );
+    )]);
+    app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
+
     app.set_token_balances(&[(
         &"ASSET".to_string(),
         &[
@@ -144,13 +134,13 @@ fn test_asset_info() {
 
     assert_eq!(
         token_info
-            .query_pool(&app.as_querier(), MOCK_CONTRACT_ADDR.into())
+            .query_pool(&app.as_querier(), Addr::unchecked(MOCK_CONTRACT_ADDR))
             .unwrap(),
         Uint128::from(123u128)
     );
     assert_eq!(
         native_token_info
-            .query_pool(&app.as_querier(), MOCK_CONTRACT_ADDR.into())
+            .query_pool(&app.as_querier(), Addr::unchecked(MOCK_CONTRACT_ADDR))
             .unwrap(),
         Uint128::from(123u128)
     );

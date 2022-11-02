@@ -34,7 +34,7 @@ mod test {
         store_config(
             &mut deps.storage,
             &Config {
-                factory_addr: deps.api.canonical_address(&"addr0000".into()).unwrap(),
+                factory_addr: deps.api.addr_canonicalize(&"addr0000".into()).unwrap(),
             },
         )
         .unwrap();

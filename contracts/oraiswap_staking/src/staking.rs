@@ -10,9 +10,9 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
-use oraiswap::pair::HandleMsg as PairHandleMsg;
+use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
 use oraiswap::querier::{query_pair_info, query_token_balance};
-use oraiswap::staking::HandleMsg;
+use oraiswap::staking::ExecuteMsg;
 
 pub fn bond(
     deps: DepsMut,
@@ -20,7 +20,7 @@ pub fn bond(
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
+    let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(&staker_addr)?;
     _increase_bond_amount(
         deps.storage,
         deps.api,
@@ -48,7 +48,7 @@ pub fn unbond(
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let staker_addr_raw: CanonicalAddr = deps.api.canonical_address(&staker_addr)?;
+    let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(&staker_addr)?;
     let (staking_token, reward_assets) = _decrease_bond_amount(
         deps.storage,
         deps.api,
@@ -104,13 +104,13 @@ pub fn update_list_stakers(
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
-    if deps.api.canonical_address(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
     let asset_info_raw = asset_info.to_raw(deps.api)?;
     for staker in stakers {
         stakers_store(deps.storage, asset_info_raw.as_bytes())
-            .save(deps.api.canonical_address(&staker)?.as_slice(), &true)?;
+            .save(deps.api.addr_canonicalize(&staker)?.as_slice(), &true)?;
     }
 
     Ok(HandleResponse {
@@ -160,9 +160,9 @@ pub fn auto_stake(
 
     // assert the token and lp token match with pool info
     let pool_info: PoolInfo =
-        read_pool_info(deps.storage, &deps.api.canonical_address(&token_addr)?)?;
+        read_pool_info(deps.storage, &deps.api.addr_canonicalize(&token_addr)?)?;
 
-    if pool_info.staking_token != deps.api.canonical_address(&oraiswap_pair.liquidity_token)? {
+    if pool_info.staking_token != deps.api.addr_canonicalize(&oraiswap_pair.liquidity_token)? {
         return Err(StdError::generic_err("Invalid staking token"));
     }
 
@@ -206,7 +206,7 @@ pub fn auto_stake(
             .into(),
             WasmMsg::Execute {
                 contract_addr: oraiswap_pair.contract_addr.clone(),
-                msg: to_binary(&PairHandleMsg::ProvideLiquidity {
+                msg: to_binary(&PairExecuteMsg::ProvideLiquidity {
                     assets: [
                         Asset {
                             amount: Asset::checked_sub(native_asset.amount, tax_amount)?,
@@ -230,7 +230,7 @@ pub fn auto_stake(
             .into(),
             WasmMsg::Execute {
                 contract_addr: env.contract.address,
-                msg: to_binary(&HandleMsg::AutoStakeHook {
+                msg: to_binary(&ExecuteMsg::AutoStakeHook {
                     asset_info: AssetInfo::Token {
                         contract_addr: token_addr.clone(),
                     },

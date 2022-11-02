@@ -1,13 +1,13 @@
-use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use cosmwasm_schema::{cw_serde, QueryResponses};
+use serde::de::DeserializeOwned;
 
 use cosmwasm_std::{
-    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128,
-    WasmMsg, WasmQuery,
+    to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult,
+    Uint128, WasmMsg, WasmQuery,
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+#[cw_serde]
+pub struct InstantiateMsg {
     /// name of the NFT contract, can use default
     pub name: Option<String>,
     pub version: Option<String>,
@@ -16,14 +16,12 @@ pub struct InitMsg {
     pub max_rate: Option<Decimal>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum OracleContractMsg {
     UpdateAdmin { admin: Addr },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum OracleExchangeMsg {
     UpdateExchangeRate {
         denom: String,
@@ -34,16 +32,14 @@ pub enum OracleExchangeMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum OracleTreasuryMsg {
     UpdateTaxCap { denom: String, cap: Uint128 },
     // RateMax: 1%
     UpdateTaxRate { rate: Decimal },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum OracleMsg {
     Contract(OracleContractMsg),
     Exchange(OracleExchangeMsg),
@@ -51,76 +47,81 @@ pub enum OracleMsg {
 }
 
 /// OracleQuery is defines available query datas
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum OracleQuery {
     Treasury(OracleTreasuryQuery),
     Exchange(OracleExchangeQuery),
     Contract(OracleContractQuery),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum OracleTreasuryQuery {
+    #[returns(TaxRateResponse)]
     TaxRate {},
+    #[returns(TaxCapResponse)]
     TaxCap { denom: String },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum OracleExchangeQuery {
+    #[returns(ExchangeRateResponse)]
     ExchangeRate {
         base_denom: Option<String>,
         quote_denom: String,
     },
+    #[returns(ExchangeRatesResponse)]
     ExchangeRates {
         base_denom: Option<String>,
         quote_denoms: Vec<String>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum OracleContractQuery {
+    #[returns(ContractInfoResponse)]
     ContractInfo {},
+    #[returns(Coin)]
     RewardPool { denom: String },
 }
 
 /// TaxRateResponse is data format returned from TreasuryRequest::TaxRate query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct TaxRateResponse {
     pub rate: Decimal,
 }
 
 /// TaxCapResponse is data format returned from TreasuryRequest::TaxCap query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct TaxCapResponse {
     pub cap: Uint128,
 }
 
 /// ExchangeRateItem is data format returned from OracleRequest::ExchangeRates query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ExchangeRateItem {
     pub quote_denom: String,
     pub exchange_rate: Decimal,
 }
 
 /// ExchangeRatesResponse is data format returned from OracleRequest::ExchangeRates query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ExchangeRatesResponse {
     pub base_denom: String,
     pub items: Vec<ExchangeRateItem>,
 }
 
 /// ExchangeRateResponse is data format returned from OracleRequest::ExchangeRate query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ExchangeRateResponse {
     pub base_denom: String,
     pub item: ExchangeRateItem,
 }
 
 /// ContractInfo is data format stored
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ContractInfo {
     pub name: String,
     pub version: String,
@@ -135,7 +136,7 @@ pub struct ContractInfo {
 }
 
 /// ContractInfoResponse is data format returned from WasmRequest::ContractInfo query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ContractInfoResponse {
     pub name: String,
     pub version: String,
@@ -149,14 +150,14 @@ pub struct ContractInfoResponse {
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}
 
 /// OracleContract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw721CanonicalContract via .canonical()
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct OracleContract(pub Addr);
 
 impl OracleContract {
@@ -164,18 +165,22 @@ impl OracleContract {
         self.0.clone()
     }
 
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
     /// Convert this address to a form fit for storage
     pub fn canonical<A: Api>(&self, api: &A) -> StdResult<OracleCanonicalContract> {
-        let canon = api.canonical_address(&self.0)?;
+        let canon = api.addr_canonicalize(&self.0.as_str())?;
         Ok(OracleCanonicalContract(canon))
     }
 
     pub fn call(&self, msg: OracleMsg) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg)?;
         Ok(WasmMsg::Execute {
-            contract_addr: self.addr(),
+            contract_addr: self.to_string(),
             msg,
-            send: vec![],
+            funds: vec![],
         }
         .into())
     }
@@ -186,7 +191,7 @@ impl OracleContract {
         req: OracleQuery,
     ) -> StdResult<T> {
         let query = WasmQuery::Smart {
-            contract_addr: self.addr(),
+            contract_addr: self.to_string(),
             msg: to_binary(&req)?,
         }
         .into();
@@ -254,7 +259,7 @@ impl OracleContract {
 
 /// This is a respresentation of OracleContract for storage.
 /// Don't use it directly, just translate to the OracleContract when needed.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct OracleCanonicalContract(pub CanonicalAddr);
 
 impl OracleCanonicalContract {

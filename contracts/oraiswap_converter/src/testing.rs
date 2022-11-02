@@ -8,7 +8,7 @@ use cosmwasm_std::{
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
     asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
-    converter::{Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo},
+    converter::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo},
     mock_app::ATOM_DENOM,
     Decimal256, Uint256,
 };
@@ -32,7 +32,7 @@ fn test_convert_reverse() {
         coin(20000000000u128, ATOM_DENOM),
     ]);
 
-    let msg = InitMsg {};
+    let msg = InstantiateMsg {};
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
@@ -40,7 +40,7 @@ fn test_convert_reverse() {
     let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
     //pair1
-    let msg = HandleMsg::UpdatePair {
+    let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
                 contract_addr: "asset1".into(),
@@ -66,7 +66,7 @@ fn test_convert_reverse() {
             contract_addr: "asset1".into(),
         },
     };
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
         sender: info.sender.clone(),
         msg: Some(to_binary(&convert_msg).unwrap()),
@@ -102,7 +102,7 @@ fn test_convert_reverse() {
             contract_addr: "asset1".into(),
         },
     };
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
         sender: info.sender.clone(),
         msg: Some(to_binary(&convert_msg).unwrap()),
@@ -115,7 +115,7 @@ fn test_convert_reverse() {
     };
 
     //pair2
-    let msg = HandleMsg::UpdatePair {
+    let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
                 contract_addr: "asset1".into(),
@@ -133,7 +133,7 @@ fn test_convert_reverse() {
     handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
 
     //convert_reverse
-    let msg = HandleMsg::ConvertReverse {
+    let msg = ExecuteMsg::ConvertReverse {
         from_asset: AssetInfo::Token {
             contract_addr: "asset1".into(),
         },
@@ -167,7 +167,7 @@ fn test_convert_reverse() {
     );
 
     //check if not send Orai to convert to asset1
-    let msg = HandleMsg::ConvertReverse {
+    let msg = ExecuteMsg::ConvertReverse {
         from_asset: AssetInfo::Token {
             contract_addr: "asset1".into(),
         },
@@ -187,14 +187,14 @@ fn test_convert_reverse() {
 fn test_remove_pair() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InitMsg {};
+    let msg = InstantiateMsg {};
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
     let _res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
 
-    let msg = HandleMsg::UpdatePair {
+    let msg = ExecuteMsg::UpdatePair {
         from: TokenInfo {
             info: AssetInfo::Token {
                 contract_addr: "asset1".into(),
@@ -222,7 +222,7 @@ fn test_remove_pair() {
     )
     .unwrap();
 
-    let msg = HandleMsg::UnregisterPair {
+    let msg = ExecuteMsg::UnregisterPair {
         from: TokenInfo {
             info: AssetInfo::Token {
                 contract_addr: "asset1".into(),
@@ -255,7 +255,7 @@ fn test_withdraw_tokens() {
         coin(20000000000u128, ATOM_DENOM),
     ]);
 
-    let msg = InitMsg {};
+    let msg = InstantiateMsg {};
     let info = mock_info(
         "addr",
         &[
@@ -268,7 +268,7 @@ fn test_withdraw_tokens() {
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     //test proper withdraw tokens
-    let msg = HandleMsg::WithdrawTokens {
+    let msg = ExecuteMsg::WithdrawTokens {
         asset_infos: vec![
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.into(),
@@ -307,7 +307,7 @@ fn test_withdraw_tokens() {
     );
 
     //test unauthorized withdraw tokens
-    let msg = HandleMsg::WithdrawTokens {
+    let msg = ExecuteMsg::WithdrawTokens {
         asset_infos: vec![
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.into(),

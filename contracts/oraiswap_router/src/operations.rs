@@ -11,9 +11,9 @@ use crate::state::{Config, CONFIG};
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
-use oraiswap::pair::HandleMsg as PairHandleMsg;
+use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
-use oraiswap::router::{HandleMsg, SwapOperation};
+use oraiswap::router::{ExecuteMsg, SwapOperation};
 
 /// Execute swap operation
 /// swap all offer asset to ask asset
@@ -105,7 +105,7 @@ pub fn handle_swap_operations(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: env.contract.address.clone(),
                 send: vec![],
-                msg: to_binary(&HandleMsg::ExecuteSwapOperation {
+                msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: op,
                     to: if operation_index == operations_len {
                         Some(to.clone())
@@ -124,7 +124,7 @@ pub fn handle_swap_operations(
         messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: env.contract.address.clone(),
             send: vec![],
-            msg: to_binary(&HandleMsg::AssertMinimumReceive {
+            msg: to_binary(&ExecuteMsg::AssertMinimumReceive {
                 asset_info: target_asset_info,
                 prev_balance: receiver_balance,
                 minimum_receive,
@@ -166,7 +166,7 @@ fn asset_into_swap_msg(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: pair_contract,
                 send: vec![Coin { denom, amount }],
-                msg: to_binary(&PairHandleMsg::Swap {
+                msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset: Asset {
                         amount,
                         ..offer_asset
@@ -183,7 +183,7 @@ fn asset_into_swap_msg(
             msg: to_binary(&Cw20ExecuteMsg::Send {
                 contract: pair_contract,
                 amount: offer_asset.amount,
-                msg: to_binary(&PairHandleMsg::Swap {
+                msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset,
                     belief_price: None,
                     max_spread,

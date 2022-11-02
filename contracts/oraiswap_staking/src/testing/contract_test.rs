@@ -4,14 +4,15 @@ use cosmwasm_std::{attr, coin, from_binary, to_binary, Addr, Decimal, Order, Std
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg,
+    RewardInfoResponse,
 };
 
 #[test]
 fn proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         owner: Some("owner".into()),
         rewarder: "reward".into(),
         minter: Some("mint".into()),
@@ -44,7 +45,7 @@ fn proper_initialization() {
 fn update_config() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         owner: Some("owner".into()),
         rewarder: "reward".into(),
         minter: Some("mint".into()),
@@ -58,7 +59,7 @@ fn update_config() {
 
     // update owner
     let info = mock_info("owner", &[]);
-    let msg = HandleMsg::UpdateConfig {
+    let msg = ExecuteMsg::UpdateConfig {
         owner: Some("owner2".into()),
         rewarder: None,
     };
@@ -82,7 +83,7 @@ fn update_config() {
 
     // unauthorized err
     let info = mock_info("owner", &[]);
-    let msg = HandleMsg::UpdateConfig {
+    let msg = ExecuteMsg::UpdateConfig {
         rewarder: None,
         owner: None,
     };
@@ -98,7 +99,7 @@ fn update_config() {
 fn test_register() {
     let mut deps = mock_dependencies(&[]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         owner: Some("owner".into()),
         rewarder: "reward".into(),
         minter: Some("mint".into()),
@@ -112,7 +113,7 @@ fn test_register() {
     // we can just call .unwrap() to assert this was a success
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -168,7 +169,7 @@ fn test_register() {
 fn test_query_staker_pagination() {
     let mut deps = mock_dependencies(&[coin(10000000000u128, ORAI_DENOM)]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         owner: Some("owner".into()),
         rewarder: "rewarder".into(),
         minter: Some("mint".into()),
@@ -182,7 +183,7 @@ fn test_query_staker_pagination() {
 
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardsPerSec {
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -196,7 +197,7 @@ fn test_query_staker_pagination() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -208,7 +209,7 @@ fn test_query_staker_pagination() {
 
     // bond 100 tokens for 100 stakers
     for i in 0..100 {
-        let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+        let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: format!("addr{}", i).into(),
             amount: Uint128(100u128),
             msg: to_binary(&Cw20HookMsg::Bond {

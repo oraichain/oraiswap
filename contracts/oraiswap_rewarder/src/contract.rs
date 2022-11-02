@@ -9,10 +9,10 @@ use crate::state::{
 };
 
 use oraiswap::staking::QueryMsg as StakingQueryMsg;
-use oraiswap::staking::{HandleMsg as StakingHandleMsg, RewardsPerSecResponse};
+use oraiswap::staking::{ExecuteMsg as StakingExecuteMsg, RewardsPerSecResponse};
 
 use oraiswap::rewarder::{
-    ConfigResponse, DistributionInfoResponse, HandleMsg, InitMsg, QueryMsg,
+    ConfigResponse, DistributionInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg,
     RewardAmountPerSecondResponse,
 };
 
@@ -21,13 +21,18 @@ use oraiswap::asset::{Asset, AssetInfo};
 // 600 seconds default
 const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
 
-pub fn init(deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     store_config(
         deps.storage,
         &Config {
             init_time: env.block.time,
-            owner: deps.api.canonical_address(&info.sender)?,
-            staking_contract: deps.api.canonical_address(&msg.staking_contract)?,
+            owner: deps.api.addr_canonicalize(&info.sender)?,
+            staking_contract: deps.api.addr_canonicalize(&msg.staking_contract)?,
             distribution_interval: msg
                 .distribution_interval
                 .unwrap_or(DEFAULT_DISTRIBUTION_INTERVAL),
@@ -41,16 +46,16 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::UpdateConfig {
+        ExecuteMsg::UpdateConfig {
             owner,
             staking_contract,
             distribution_interval,
         } => update_config(deps, info, owner, staking_contract, distribution_interval),
 
-        HandleMsg::Distribute { asset_infos } => distribute(deps, env, asset_infos),
+        ExecuteMsg::Distribute { asset_infos } => distribute(deps, env, asset_infos),
     }
 }
 
@@ -62,16 +67,16 @@ pub fn update_config(
     distribution_interval: Option<u64>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.canonical_address(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.canonical_address(&owner)?;
+        config.owner = deps.api.addr_canonicalize(&owner)?;
     }
 
     if let Some(staking_contract) = staking_contract {
-        config.staking_contract = deps.api.canonical_address(&staking_contract)?;
+        config.staking_contract = deps.api.addr_canonicalize(&staking_contract)?;
     }
 
     if let Some(distribution_interval) = distribution_interval {
@@ -130,7 +135,7 @@ pub fn distribute(
     Ok(HandleResponse {
         messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: staking_contract,
-            msg: to_binary(&StakingHandleMsg::DepositReward { rewards })?,
+            msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,
             send: vec![],
         })],
         data: None,

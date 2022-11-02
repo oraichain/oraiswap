@@ -1,22 +1,20 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::{
-    asset::{Asset, AssetInfo},
+    asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
     hook::InitHook,
-    Decimal256, Uint256,
 };
 
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Decimal256, Uint128, Uint256};
 use cw20::Cw20ReceiveMsg;
 
 /// Default commission rate == 0.3%
 /// in the future need to update ?
 pub const DEFAULT_COMMISSION_RATE: &str = "0.003";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+#[cw_serde]
+pub struct InstantiateMsg {
     /// Asset infos
     pub asset_infos: [AssetInfo; 2],
     /// Token contract code id for initialization
@@ -31,9 +29,8 @@ pub struct InitMsg {
     pub init_hook: Option<InitHook>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+#[cw_serde]
+pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     /// Post initize step to allow user to set controlled contract address after creating it
     PostInitialize {},
@@ -52,8 +49,7 @@ pub enum HandleMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Cw20HookMsg {
     /// Sell a given amount of asset
     Swap {
@@ -64,40 +60,44 @@ pub enum Cw20HookMsg {
     WithdrawLiquidity {},
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(PairInfo)]
     Pair {},
+    #[returns(PoolResponse)]
     Pool {},
+    #[returns(SimulationResponse)]
     Simulation { offer_asset: Asset },
+    #[returns(ReverseSimulationResponse)]
     ReverseSimulation { ask_asset: Asset },
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PoolResponse {
     pub assets: [Asset; 2],
     pub total_share: Uint128,
 }
 
 /// SimulationResponse returns swap simulation response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct SimulationResponse {
-    pub return_amount: Uint128,
-    pub spread_amount: Uint128,
-    pub commission_amount: Uint128,
+    pub return_amount: Uint256,
+    pub spread_amount: Uint256,
+    pub commission_amount: Uint256,
 }
 
 /// ReverseSimulationResponse returns reverse swap simulation response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ReverseSimulationResponse {
-    pub offer_amount: Uint128,
-    pub spread_amount: Uint128,
-    pub commission_amount: Uint128,
+    pub offer_amount: Uint256,
+    pub spread_amount: Uint256,
+    pub commission_amount: Uint256,
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}
 
 pub fn compute_swap(
@@ -105,7 +105,7 @@ pub fn compute_swap(
     ask_pool: Uint128,
     offer_amount: Uint128,
     commission_rate: Decimal256,
-) -> Result<(Uint128, Uint128, Uint128), ContractError> {
+) -> Result<(Uint256, Uint256, Uint256), ContractError> {
     if offer_pool.is_zero() {
         return Err(ContractError::OfferPoolIsZero {});
     }
@@ -117,21 +117,18 @@ pub fn compute_swap(
 
     // offer => ask
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
-    let cp: Uint256 = offer_pool * ask_pool;
-    let return_amount: Uint256 = (Decimal256::from_uint256(ask_pool)
-        - Decimal256::from_ratio(cp, offer_pool + offer_amount))
-        * Uint256::one();
+    let cp = offer_pool * ask_pool;
+
+    let return_amount =
+        ask_pool - Decimal256::from_ratio(cp, offer_pool + offer_amount) * Uint256::one();
 
     // calculate spread & commission
-    let spread_amount: Uint256 =
+    let spread_amount =
         (offer_amount * Decimal256::from_ratio(ask_pool, offer_pool)) - return_amount;
-    let commission_amount: Uint256 = return_amount * commission_rate;
+
+    let commission_amount = return_amount * commission_rate;
 
     // commission will be absorbed to pool
-    let return_amount: Uint256 = return_amount - commission_amount;
-    Ok((
-        return_amount.into(),
-        spread_amount.into(),
-        commission_amount.into(),
-    ))
+    let return_amount = return_amount - commission_amount;
+    Ok((return_amount, spread_amount, commission_amount))
 }

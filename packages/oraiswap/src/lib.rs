@@ -9,19 +9,14 @@ pub mod querier;
 pub mod rewarder;
 pub mod router;
 pub mod staking;
-pub mod token;
-
-mod math;
-pub use crate::math::{Decimal256, Uint256};
-
-// for other to use, but not compile to wasm
-#[cfg(test)]
-pub mod mock_app;
 
 #[cfg(test)]
 mod testing;
 
-#[cfg(test)]
+// for other to use, but not compile to wasm
+#[cfg(not(target_arch = "wasm32"))]
+pub mod mock_app;
+
 #[macro_export]
 macro_rules! create_entry_points_testing {
     ($contract:ident) => {

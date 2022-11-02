@@ -13,15 +13,20 @@ use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
-    SwapOperation,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+    SimulateSwapOperationsResponse, SwapOperation,
 };
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     CONFIG.save(
         deps.storage,
         &Config {
-            factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
+            factory_addr: deps.api.addr_canonicalize(&msg.factory_addr)?,
         },
     )?;
 
@@ -32,20 +37,20 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-        HandleMsg::ExecuteSwapOperations {
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
         } => handle_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
-        HandleMsg::ExecuteSwapOperation { operation, to } => {
+        ExecuteMsg::ExecuteSwapOperation { operation, to } => {
             handle_swap_operation(deps, env, info, operation, to)
         }
 
-        HandleMsg::AssertMinimumReceive {
+        ExecuteMsg::AssertMinimumReceive {
             asset_info,
             prev_balance,
             minimum_receive,

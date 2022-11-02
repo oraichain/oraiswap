@@ -13,20 +13,25 @@ use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
-    compute_swap, Cw20HookMsg, HandleMsg, InitMsg, MigrateMsg, PoolResponse, QueryMsg,
+    compute_swap, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolResponse, QueryMsg,
     ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
-use oraiswap::token::InitMsg as TokenInitMsg;
+use oraiswap::token::InstantiateMsg as TokenInstantiateMsg;
 use oraiswap::{Decimal256, Uint256};
 use std::str::FromStr;
 
-pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<InitResponse> {
     let pair_info = &PairInfoRaw {
         // return infomation from oracle, update by multisig wallet
-        oracle_addr: deps.api.canonical_address(&msg.oracle_addr)?,
+        oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
         // the current contract address
-        contract_addr: deps.api.canonical_address(&env.contract.address)?,
+        contract_addr: deps.api.addr_canonicalize(&env.contract.address)?,
         // liquidity token address is ow20 to reward, mint and burn
         liquidity_token: CanonicalAddr::default(),
         // pair info
@@ -45,7 +50,7 @@ pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdRes
     // Create LP token, with PostInitialize msg to update the liquidity token address
     let mut messages = vec![WasmMsg::Instantiate {
         code_id: msg.token_code_id,
-        msg: to_binary(&TokenInitMsg {
+        msg: to_binary(&TokenInstantiateMsg {
             name: "oraiswap liquidity token".to_string(),
             symbol: "uLP".to_string(),
             decimals: 6,
@@ -56,7 +61,7 @@ pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdRes
                 cap: None,
             }),
             init_hook: Some(InitHook {
-                msg: to_binary(&HandleMsg::PostInitialize {})?,
+                msg: to_binary(&ExecuteMsg::PostInitialize {})?,
                 contract_addr: env.contract.address,
             }),
         })?,
@@ -87,21 +92,21 @@ pub fn handle(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         // when liquidity token is deploy, need to update the address
-        HandleMsg::PostInitialize {} => try_post_initialize(deps, env, info),
+        ExecuteMsg::PostInitialize {} => try_post_initialize(deps, env, info),
         // when transfer ow20 token to this contract
-        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         // add more liquidity
-        HandleMsg::ProvideLiquidity {
+        ExecuteMsg::ProvideLiquidity {
             assets,
             slippage_tolerance,
             receiver,
         } => provide_liquidity(deps, env, info, assets, slippage_tolerance, receiver),
         // swap token, can not swap native token directly
-        HandleMsg::Swap {
+        ExecuteMsg::Swap {
             offer_asset,
             belief_price,
             max_spread,
@@ -176,7 +181,7 @@ pub fn receive_cw20(
         // remove liquidity
         Ok(Cw20HookMsg::WithdrawLiquidity {}) => {
             let config: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
-            if deps.api.canonical_address(&info.sender)? != config.liquidity_token {
+            if deps.api.addr_canonicalize(&info.sender)? != config.liquidity_token {
                 return Err(ContractError::Unauthorized {});
             }
 
@@ -201,7 +206,7 @@ pub fn try_post_initialize(
     }
 
     // update liquidity_token
-    pair_info.liquidity_token = deps.api.canonical_address(&info.sender)?;
+    pair_info.liquidity_token = deps.api.addr_canonicalize(&info.sender)?;
     PAIR_INFO.save(deps.storage, &pair_info)?;
 
     Ok(HandleResponse {

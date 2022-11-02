@@ -6,7 +6,7 @@ use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_app::ATOM_DENOM;
 use oraiswap::staking::{
-    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
 
@@ -17,7 +17,7 @@ fn test_deprecate() {
         coin(20000000000u128, ATOM_DENOM),
     ]);
 
-    let msg = InitMsg {
+    let msg = InstantiateMsg {
         owner: Some("owner".into()),
         rewarder: "rewarder".into(),
         minter: Some("mint".into()),
@@ -29,7 +29,7 @@ fn test_deprecate() {
     let info = mock_info("addr", &[]);
     let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -39,13 +39,13 @@ fn test_deprecate() {
     let info = mock_info("owner", &[]);
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let asset_key = deps.api.canonical_address(&"asset".into()).unwrap();
+    let asset_key = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(&mut deps.storage, &asset_key, &pool_info).unwrap();
 
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardsPerSec {
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -68,7 +68,7 @@ fn test_deprecate() {
     let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
@@ -83,7 +83,7 @@ fn test_deprecate() {
 
     // owner of reward contract deposit 100 reward tokens
     // distribute weight => 80:20
-    let msg = HandleMsg::DepositReward {
+    let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
             info: AssetInfo::Token {
                 contract_addr: "asset".into(),
@@ -149,7 +149,7 @@ fn test_deprecate() {
     );
 
     // handle deprecate
-    let msg = HandleMsg::DeprecateStakingToken {
+    let msg = ExecuteMsg::DeprecateStakingToken {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -159,7 +159,7 @@ fn test_deprecate() {
     handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // deposit more rewards
-    let msg = HandleMsg::DepositReward {
+    let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
             info: AssetInfo::Token {
                 contract_addr: "asset".into(),
@@ -224,7 +224,7 @@ fn test_deprecate() {
     );
 
     // try to bond new or old staking token, should fail both
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
@@ -248,7 +248,7 @@ fn test_deprecate() {
     );
 
     // unbond all the old tokens
-    let msg = HandleMsg::Unbond {
+    let msg = ExecuteMsg::Unbond {
         asset_info: AssetInfo::Token {
             contract_addr: "asset".into(),
         },
@@ -297,7 +297,7 @@ fn test_deprecate() {
     );
 
     // now can bond the new staking token
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
@@ -312,7 +312,7 @@ fn test_deprecate() {
 
     // deposit new rewards
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::DepositReward {
+    let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
             info: AssetInfo::Token {
                 contract_addr: "asset".into(),
@@ -352,7 +352,7 @@ fn test_deprecate() {
     );
 
     // completely new users can bond
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "newaddr".into(),
         amount: Uint128(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {

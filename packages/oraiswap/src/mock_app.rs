@@ -1,7 +1,6 @@
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    Addr, AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Binary, Coin, Decimal,
-    QuerierWrapper, QueryRequest, StdResult, Uint128,
+    Addr, AllBalanceResponse, BalanceResponse, BankQuery, Coin, Decimal, Empty, QuerierWrapper,
+    QueryRequest, StdResult, Uint128,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -10,16 +9,10 @@ use std::collections::HashMap;
 use crate::asset::{AssetInfo, PairInfo};
 
 use crate::pair::DEFAULT_COMMISSION_RATE;
-use cw_multi_test::{next_block, App, Contract, SimpleBank};
+use cw_multi_test::{next_block, App, AppResponse, Contract, Executor};
 
 pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
 const APP_OWNER: &str = "admin";
-
-#[derive(Default, Clone, Debug)]
-pub struct Response {
-    pub attributes: Vec<Attribute>,
-    pub data: Option<Binary>,
-}
 
 pub struct MockApp {
     app: App,
@@ -30,29 +23,34 @@ pub struct MockApp {
 }
 
 impl MockApp {
-    pub fn new() -> Self {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = SimpleBank {};
-
-        let app = App::new(Box::new(api), env.block, bank, || {
-            Box::new(MockStorage::new())
+    pub fn new(init_balances: &[(&String, &[Coin])]) -> Self {
+        let app = App::new(|router, _, storage| {
+            for (owner, init_funds) in init_balances.iter() {
+                router
+                    .bank
+                    .init_balance(
+                        storage,
+                        &Addr::unchecked(owner.to_owned()),
+                        init_funds.to_vec(),
+                    )
+                    .unwrap();
+            }
         });
 
         MockApp {
             app,
             token_id: 0,
-            factory_addr: Addr::default(),
+            oracle_addr: Addr::unchecked(""),
+            factory_addr: Addr::unchecked(""),
             token_map: HashMap::new(),
-            oracle_addr: Addr::default(),
         }
     }
 
-    pub fn set_token_contract(&mut self, code: Box<dyn Contract>) {
+    pub fn set_token_contract(&mut self, code: Box<dyn Contract<Empty>>) {
         self.token_id = self.upload(code);
     }
 
-    pub fn upload(&mut self, code: Box<dyn Contract>) -> u64 {
+    pub fn upload(&mut self, code: Box<dyn Contract<Empty>>) -> u64 {
         let code_id = self.app.store_code(code);
         self.app.update_block(next_block);
         code_id
@@ -68,41 +66,27 @@ impl MockApp {
     ) -> Result<Addr, String> {
         let contract_addr = self
             .app
-            .instantiate_contract(code_id, sender, init_msg, send_funds, label)?;
-        // simulate bank transfer when run sent_funds
-        self.set_balance(contract_addr.clone(), send_funds);
+            .instantiate_contract(code_id, sender, init_msg, send_funds, label, None)
+            .map_err(|err| err.to_string())?;
         self.app.update_block(next_block);
         Ok(contract_addr)
     }
 
-    pub fn execute<T: Serialize>(
+    pub fn execute<T: Serialize + std::fmt::Debug>(
         &mut self,
         sender: Addr,
         contract_addr: Addr,
         msg: &T,
         send_funds: &[Coin],
-    ) -> Result<Response, String> {
-        // simulate bank transfer when run sent_funds by updating the balance
-        let mut balance = self.query_all_balances(contract_addr.clone()).unwrap();
-        for fund in send_funds {
-            if let Some(current_fund) = balance.iter_mut().find(|v| v.denom.eq(&fund.denom)) {
-                current_fund.amount += fund.amount;
-            } else {
-                balance.push(fund.clone());
-            }
-        }
-
-        self.set_balance(contract_addr.clone(), &balance);
-
+    ) -> Result<AppResponse, String> {
         let response = self
             .app
-            .execute_contract(sender, contract_addr, msg, send_funds)?;
+            .execute_contract(sender, contract_addr, msg, send_funds)
+            .map_err(|err| err.to_string())?;
 
         self.app.update_block(next_block);
-        Ok(Response {
-            attributes: response.attributes,
-            data: response.data,
-        })
+
+        Ok(response)
     }
 
     pub fn query<T: DeserializeOwned, U: Serialize>(
@@ -113,13 +97,13 @@ impl MockApp {
         self.app.wrap().query_wasm_smart(contract_addr, msg)
     }
 
-    pub fn set_oracle_contract(&mut self, code: Box<dyn Contract>) {
+    pub fn set_oracle_contract(&mut self, code: Box<dyn Contract<Empty>>) {
         let code_id = self.upload(code);
         self.oracle_addr = self
             .instantiate(
                 code_id,
-                APP_OWNER.into(),
-                &crate::oracle::InitMsg {
+                Addr::unchecked(APP_OWNER),
+                &crate::oracle::InstantiateMsg {
                     name: None,
                     version: None,
                     admin: None,
@@ -134,8 +118,8 @@ impl MockApp {
 
     pub fn set_factory_and_pair_contract(
         &mut self,
-        factory_code: Box<dyn Contract>,
-        pair_code: Box<dyn Contract>,
+        factory_code: Box<dyn Contract<Empty>>,
+        pair_code: Box<dyn Contract<Empty>>,
     ) {
         let factory_id = self.upload(factory_code);
         let pair_code_id = self.upload(pair_code);
@@ -143,8 +127,8 @@ impl MockApp {
         self.factory_addr = self
             .instantiate(
                 factory_id,
-                APP_OWNER.into(),
-                &crate::factory::InitMsg {
+                Addr::unchecked(APP_OWNER),
+                &crate::factory::InstantiateMsg {
                     pair_code_id,
                     token_code_id: self.token_id,
                     oracle_addr: self.oracle_addr.clone(),
@@ -164,7 +148,7 @@ impl MockApp {
     }
 
     pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
-        if !self.factory_addr.is_empty() {
+        if !self.factory_addr.as_str().is_empty() {
             let crate::factory::ConfigResponse {
                 token_code_id,
                 pair_code_id,
@@ -181,8 +165,8 @@ impl MockApp {
             let pair_addr = self
                 .instantiate(
                     pair_code_id,
-                    APP_OWNER.into(),
-                    &crate::pair::InitMsg {
+                    Addr::unchecked(APP_OWNER),
+                    &crate::pair::InstantiateMsg {
                         asset_infos: asset_infos.clone(),
                         token_code_id,
                         oracle_addr,
@@ -197,7 +181,7 @@ impl MockApp {
             self.execute(
                 pair_addr.clone(),
                 self.factory_addr.clone(),
-                &crate::factory::HandleMsg::CreatePair {
+                &crate::factory::ExecuteMsg::CreatePair {
                     asset_infos: asset_infos.clone(),
                     auto_register: false,
                 },
@@ -209,7 +193,7 @@ impl MockApp {
             self.execute(
                 pair_addr.clone(),
                 self.factory_addr.clone(),
-                &crate::factory::HandleMsg::Register { asset_infos },
+                &crate::factory::ExecuteMsg::Register { asset_infos },
                 &[],
             )
             .unwrap();
@@ -221,7 +205,7 @@ impl MockApp {
     }
 
     pub fn query_pair(&self, asset_infos: [AssetInfo; 2]) -> StdResult<PairInfo> {
-        if !self.factory_addr.is_empty() {
+        if !self.factory_addr.as_str().is_empty() {
             return self.app.wrap().query_wasm_smart(
                 self.factory_addr.clone(),
                 &crate::factory::QueryMsg::Pair { asset_infos },
@@ -233,10 +217,10 @@ impl MockApp {
     }
 
     pub fn set_tax(&mut self, rate: Decimal, caps: &[(&String, &Uint128)]) {
-        if !self.oracle_addr.is_empty() {
+        if !self.oracle_addr.as_str().is_empty() {
             // update rate
             self.execute(
-                APP_OWNER.into(),
+                Addr::unchecked(APP_OWNER),
                 self.oracle_addr.clone(),
                 &crate::oracle::OracleMsg::Treasury(
                     crate::oracle::OracleTreasuryMsg::UpdateTaxRate { rate },
@@ -248,7 +232,7 @@ impl MockApp {
             // update caps
             for (denom, &cap) in caps.iter() {
                 self.execute(
-                    APP_OWNER.into(),
+                    Addr::unchecked(APP_OWNER),
                     self.oracle_addr.clone(),
                     &crate::oracle::OracleMsg::Treasury(
                         crate::oracle::OracleTreasuryMsg::UpdateTaxCap {
@@ -269,7 +253,7 @@ impl MockApp {
             self.app
                 .wrap()
                 .query(&QueryRequest::Bank(BankQuery::Balance {
-                    address: account_addr,
+                    address: account_addr.to_string(),
                     denom,
                 }))?;
         Ok(balance.amount.amount)
@@ -281,7 +265,7 @@ impl MockApp {
             self.app
                 .wrap()
                 .query(&QueryRequest::Bank(BankQuery::AllBalances {
-                    address: account_addr,
+                    address: account_addr.to_string(),
                 }))?;
         Ok(all_balances.amount)
     }
@@ -299,7 +283,7 @@ impl MockApp {
             let res: cw20::BalanceResponse = self.query(
                 contract_addr.clone(),
                 &cw20::Cw20QueryMsg::Balance {
-                    address: account_addr.clone(),
+                    address: account_addr.to_string(),
                 },
             )?;
             balances.push(Coin {
@@ -308,12 +292,6 @@ impl MockApp {
             });
         }
         Ok(balances)
-    }
-
-    pub fn set_balance(&mut self, addr: Addr, balance: &[Coin]) {
-        // init balance for client
-        self.app.set_bank_balance(addr, balance.to_vec()).unwrap();
-        self.app.update_block(next_block);
     }
 
     pub fn as_querier(&self) -> QuerierWrapper {
@@ -328,16 +306,17 @@ impl MockApp {
         let addr = self
             .instantiate(
                 self.token_id,
-                APP_OWNER.into(),
-                &cw20_base::msg::InitMsg {
+                Addr::unchecked(APP_OWNER),
+                &cw20_base::msg::InstantiateMsg {
                     name: token.to_string(),
                     symbol: token.to_string(),
                     decimals: 6,
                     initial_balances: vec![],
                     mint: Some(cw20::MinterResponse {
-                        minter: Addr(APP_OWNER.to_string()),
+                        minter: APP_OWNER.to_string(),
                         cap: None,
                     }),
+                    marketing: None,
                 },
                 &[],
                 "cw20",
@@ -364,8 +343,8 @@ impl MockApp {
                     self.execute(
                         sender.clone(),
                         contract_addr.clone(),
-                        &cw20_base::msg::HandleMsg::Mint {
-                            recipient: Addr(recipient.to_string()),
+                        &cw20_base::msg::ExecuteMsg::Mint {
+                            recipient: recipient.to_string(),
                             amount,
                         },
                         &[],
@@ -378,6 +357,6 @@ impl MockApp {
 
     // configure the mint whitelist mock querier
     pub fn set_token_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
-        self.set_token_balances_from(APP_OWNER.into(), balances)
+        self.set_token_balances_from(Addr::unchecked(APP_OWNER), balances)
     }
 }
