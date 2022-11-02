@@ -4,7 +4,7 @@ use cosmwasm_std::{
     attr, coin, from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128,
     WasmMsg,
 };
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
 use oraiswap::mock_app::{MockApp, ATOM_DENOM};
 use oraiswap::staking::{
@@ -299,7 +299,7 @@ fn test_unbond() {
         vec![
             WasmMsg::Execute {
                 contract_addr: "staking".into(),
-                msg: to_binary(&Cw20HandleMsg::Transfer {
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: "addr".into(),
                     amount: Uint128(100u128),
                 })

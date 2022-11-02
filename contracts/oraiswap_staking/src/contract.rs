@@ -10,9 +10,9 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, Order, StdError,
-    StdResult, Uint128,
+    attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
+    HandleResponse, InitResponse, MessageInfo, MigrateResponse, Order, StdError, StdResult,
+    Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
@@ -112,7 +112,7 @@ pub fn receive_cw20(
                 if let Some(params) = pool_info.migration_params {
                     if params.deprecated_staking_token == token_raw {
                         let staking_token_addr =
-                            deps.api.human_address(&pool_info.staking_token)?;
+                            deps.api.addr_humanize(&pool_info.staking_token)?;
                         return Err(StdError::generic_err(format!(
                             "The staking token for this asset has been migrated to {}",
                             staking_token_addr
@@ -132,8 +132,8 @@ pub fn receive_cw20(
 pub fn update_config(
     deps: DepsMut,
     info: MessageInfo,
-    owner: Option<HumanAddr>,
-    rewarder: Option<HumanAddr>,
+    owner: Option<Addr>,
+    rewarder: Option<Addr>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -213,7 +213,7 @@ fn register_asset(
     deps: DepsMut,
     info: MessageInfo,
     asset_info: AssetInfo,
-    staking_token: HumanAddr,
+    staking_token: Addr,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
@@ -253,7 +253,7 @@ fn deprecate_staking_token(
     deps: DepsMut,
     info: MessageInfo,
     asset_info: AssetInfo,
-    new_staking_token: HumanAddr,
+    new_staking_token: Addr,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
@@ -270,7 +270,7 @@ fn deprecate_staking_token(
         ));
     }
 
-    let deprecated_token_addr = deps.api.human_address(&pool_info.staking_token)?;
+    let deprecated_token_addr = deps.api.addr_humanize(&pool_info.staking_token)?;
 
     pool_info.total_bond_amount = Uint128::zero();
     pool_info.migration_params = Some(MigrationParams {
@@ -325,10 +325,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
-        owner: deps.api.human_address(&state.owner)?,
-        rewarder: deps.api.human_address(&state.rewarder)?,
-        oracle_addr: deps.api.human_address(&state.oracle_addr)?,
-        factory_addr: deps.api.human_address(&state.factory_addr)?,
+        owner: deps.api.addr_humanize(&state.owner)?,
+        rewarder: deps.api.addr_humanize(&state.rewarder)?,
+        oracle_addr: deps.api.addr_humanize(&state.oracle_addr)?,
+        factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
         base_denom: state.base_denom,
     };
 
@@ -340,13 +340,13 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
     let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
         asset_info,
-        staking_token: deps.api.human_address(&pool_info.staking_token)?,
+        staking_token: deps.api.addr_humanize(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
         reward_index: pool_info.reward_index,
         pending_reward: pool_info.pending_reward,
         migration_deprecated_staking_token: pool_info.migration_params.clone().map(|params| {
             deps.api
-                .human_address(&params.deprecated_staking_token)
+                .addr_humanize(&params.deprecated_staking_token)
                 .unwrap()
         }),
         migration_index_snapshot: pool_info
@@ -386,7 +386,7 @@ pub fn migrate(
     // when the migration is executed, deprecate directly the MIR pool
     // let config = read_config(deps.storage)?;
     // let self_info = MessageInfo {
-    //     sender: deps.api.human_address(&config.owner)?,
+    //     sender: deps.api.addr_humanize(&config.owner)?,
     //     sent_funds: vec![],
     // };
 

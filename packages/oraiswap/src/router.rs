@@ -1,14 +1,14 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 use crate::asset::AssetInfo;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
-    pub factory_addr: HumanAddr,
+    pub factory_addr: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -37,14 +37,14 @@ pub enum HandleMsg {
     ExecuteSwapOperations {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
-        to: Option<HumanAddr>,
+        to: Option<Addr>,
     },
 
     /// Internal use
     /// Swap all offer tokens to ask token
     ExecuteSwapOperation {
         operation: SwapOperation,
-        to: Option<HumanAddr>,
+        to: Option<Addr>,
     },
     /// Internal use
     /// Check the swap amount is exceed minimum_receive
@@ -52,7 +52,7 @@ pub enum HandleMsg {
         asset_info: AssetInfo,
         prev_balance: Uint128,
         minimum_receive: Uint128,
-        receiver: HumanAddr,
+        receiver: Addr,
     },
 }
 
@@ -79,7 +79,7 @@ pub enum QueryMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub factory_addr: HumanAddr,
+    pub factory_addr: Addr,
 }
 
 // We define a custom struct for each query response

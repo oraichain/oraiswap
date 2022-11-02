@@ -121,7 +121,7 @@ The factory contract owner can change relevant code IDs for future pair contract
 {
     "update_config":
     {
-        "owner": Option<HumanAddr>,
+        "owner": Option<Addr>,
         "pair_code_id": Option<u64>,
         "token_code_id": Option<u64>,
     }

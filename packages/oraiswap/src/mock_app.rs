@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Binary, Coin, Decimal, HumanAddr,
+    Addr, AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Binary, Coin, Decimal,
     QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
 use serde::de::DeserializeOwned;
@@ -24,9 +24,9 @@ pub struct Response {
 pub struct MockApp {
     app: App,
     pub token_id: u64,
-    pub token_map: HashMap<String, HumanAddr>, // map token name to address
-    pub oracle_addr: HumanAddr,
-    pub factory_addr: HumanAddr,
+    pub token_map: HashMap<String, Addr>, // map token name to address
+    pub oracle_addr: Addr,
+    pub factory_addr: Addr,
 }
 
 impl MockApp {
@@ -42,9 +42,9 @@ impl MockApp {
         MockApp {
             app,
             token_id: 0,
-            factory_addr: HumanAddr::default(),
+            factory_addr: Addr::default(),
             token_map: HashMap::new(),
-            oracle_addr: HumanAddr::default(),
+            oracle_addr: Addr::default(),
         }
     }
 
@@ -61,11 +61,11 @@ impl MockApp {
     pub fn instantiate<T: Serialize>(
         &mut self,
         code_id: u64,
-        sender: HumanAddr,
+        sender: Addr,
         init_msg: &T,
         send_funds: &[Coin],
         label: &str,
-    ) -> Result<HumanAddr, String> {
+    ) -> Result<Addr, String> {
         let contract_addr = self
             .app
             .instantiate_contract(code_id, sender, init_msg, send_funds, label)?;
@@ -77,8 +77,8 @@ impl MockApp {
 
     pub fn execute<T: Serialize>(
         &mut self,
-        sender: HumanAddr,
-        contract_addr: HumanAddr,
+        sender: Addr,
+        contract_addr: Addr,
         msg: &T,
         send_funds: &[Coin],
     ) -> Result<Response, String> {
@@ -107,7 +107,7 @@ impl MockApp {
 
     pub fn query<T: DeserializeOwned, U: Serialize>(
         &self,
-        contract_addr: HumanAddr,
+        contract_addr: Addr,
         msg: &U,
     ) -> StdResult<T> {
         self.app.wrap().query_wasm_smart(contract_addr, msg)
@@ -163,7 +163,7 @@ impl MockApp {
         }
     }
 
-    pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<HumanAddr> {
+    pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
         if !self.factory_addr.is_empty() {
             let crate::factory::ConfigResponse {
                 token_code_id,
@@ -263,7 +263,7 @@ impl MockApp {
         }
     }
 
-    pub fn query_balance(&self, account_addr: HumanAddr, denom: String) -> StdResult<Uint128> {
+    pub fn query_balance(&self, account_addr: Addr, denom: String) -> StdResult<Uint128> {
         // load price form the oracle
         let balance: BalanceResponse =
             self.app
@@ -275,7 +275,7 @@ impl MockApp {
         Ok(balance.amount.amount)
     }
 
-    pub fn query_all_balances(&self, account_addr: HumanAddr) -> StdResult<Vec<Coin>> {
+    pub fn query_all_balances(&self, account_addr: Addr) -> StdResult<Vec<Coin>> {
         // load price form the oracle
         let all_balances: AllBalanceResponse =
             self.app
@@ -286,14 +286,14 @@ impl MockApp {
         Ok(all_balances.amount)
     }
 
-    pub fn register_token(&mut self, contract_addr: HumanAddr) -> StdResult<String> {
+    pub fn register_token(&mut self, contract_addr: Addr) -> StdResult<String> {
         let res: cw20::TokenInfoResponse =
             self.query(contract_addr.clone(), &cw20::Cw20QueryMsg::TokenInfo {})?;
         self.token_map.insert(res.symbol.clone(), contract_addr);
         Ok(res.symbol)
     }
 
-    pub fn query_token_balances(&self, account_addr: HumanAddr) -> StdResult<Vec<Coin>> {
+    pub fn query_token_balances(&self, account_addr: Addr) -> StdResult<Vec<Coin>> {
         let mut balances = vec![];
         for (denom, contract_addr) in self.token_map.iter() {
             let res: cw20::BalanceResponse = self.query(
@@ -310,7 +310,7 @@ impl MockApp {
         Ok(balances)
     }
 
-    pub fn set_balance(&mut self, addr: HumanAddr, balance: &[Coin]) {
+    pub fn set_balance(&mut self, addr: Addr, balance: &[Coin]) {
         // init balance for client
         self.app.set_bank_balance(addr, balance.to_vec()).unwrap();
         self.app.update_block(next_block);
@@ -320,11 +320,11 @@ impl MockApp {
         self.app.wrap()
     }
 
-    pub fn get_token_addr(&self, token: &str) -> Option<HumanAddr> {
+    pub fn get_token_addr(&self, token: &str) -> Option<Addr> {
         self.token_map.get(token).cloned()
     }
 
-    pub fn create_token(&mut self, token: &str) -> HumanAddr {
+    pub fn create_token(&mut self, token: &str) -> Addr {
         let addr = self
             .instantiate(
                 self.token_id,
@@ -335,7 +335,7 @@ impl MockApp {
                     decimals: 6,
                     initial_balances: vec![],
                     mint: Some(cw20::MinterResponse {
-                        minter: HumanAddr(APP_OWNER.to_string()),
+                        minter: Addr(APP_OWNER.to_string()),
                         cap: None,
                     }),
                 },
@@ -349,7 +349,7 @@ impl MockApp {
 
     pub fn set_token_balances_from(
         &mut self,
-        sender: HumanAddr,
+        sender: Addr,
         balances: &[(&String, &[(&String, &Uint128)])],
     ) {
         for (token, balances) in balances.iter() {
@@ -365,7 +365,7 @@ impl MockApp {
                         sender.clone(),
                         contract_addr.clone(),
                         &cw20_base::msg::HandleMsg::Mint {
-                            recipient: HumanAddr(recipient.to_string()),
+                            recipient: Addr(recipient.to_string()),
                             amount,
                         },
                         &[],

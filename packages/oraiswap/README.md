@@ -12,7 +12,7 @@ Currently there only Orai native token in Oraichain blockchain.
 ```rust
 #[serde(rename_all = "snake_case")]
 pub enum AssetInfo {
-    Token { contract_addr: HumanAddr },
+    Token { contract_addr: Addr },
     NativeToken { denom: String },
 }
 ```
@@ -34,7 +34,7 @@ It is used to represent response data of [Pair-Info-Querier](#Pair-Info-Querier)
 
 ```rust
 pub struct PairInfo {
-    pub contract_addr: HumanAddr,
+    pub contract_addr: Addr,
     pub asset_infos: [AssetInfo; 2],
 }
 ```
@@ -48,7 +48,7 @@ It uses CosmWasm standard interface to query the account balance to chain.
 ```rust
 pub fn query_balance(
     querier: &QuerierWrapper,
-    account_addr: HumanAddr,
+    account_addr: Addr,
     denom: String,
 ) -> StdResult<Uint128> {
 ```
@@ -60,8 +60,8 @@ It provides simliar query interface with [Native-Token-Balance-Querier](Native-T
 ```rust
 pub fn query_token_balance(
     querier: &QuerierWrapper,
-    contract_addr: HumanAddr,
-    account_addr: HumanAddr,
+    contract_addr: Addr,
+    account_addr: Addr,
 ) -> StdResult<Uint128> {
 ```
 
@@ -72,7 +72,7 @@ It provides token supply querier for CW20 token contract.
 ```rust
 pub fn query_supply(
     querier: &QuerierWrapper,
-    contract_addr: HumanAddr,
+    contract_addr: Addr,
 ) -> StdResult<Uint128> {
 ```
 
@@ -83,7 +83,7 @@ It also provides the query interface to query avaliable oraiswap pair contract i
 ```rust
 pub fn query_pair_info(
     querier: &QuerierWrapper,
-    factory_contract: HumanAddr,
+    factory_contract: Addr,
     asset_infos: &[AssetInfo; 2],
 ) -> StdResult<PairInfo> {
 ```

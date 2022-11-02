@@ -1,12 +1,12 @@
 use crate::state::PAIR_INFO;
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdResult, Uint128,
+    attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, HandleResponse, InitResponse, MessageInfo, MigrateResponse, StdResult, Uint128,
     WasmMsg,
 };
 
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
 use integer_sqrt::IntegerSquareRoot;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::error::ContractError;
@@ -157,7 +157,7 @@ pub fn receive_cw20(
                 return Err(ContractError::Unauthorized {});
             }
 
-            let to_addr = to.map(HumanAddr);
+            let to_addr = to.map(Addr);
 
             swap(
                 deps,
@@ -218,7 +218,7 @@ pub fn provide_liquidity(
     info: MessageInfo,
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
-    receiver: Option<HumanAddr>,
+    receiver: Option<Addr>,
 ) -> Result<HandleResponse, ContractError> {
     for asset in assets.iter() {
         asset.assert_sent_native_token_balance(&info)?;
@@ -247,7 +247,7 @@ pub fn provide_liquidity(
         if let AssetInfo::Token { contract_addr, .. } = &pool.info {
             messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract_addr.to_owned().into(),
-                msg: to_binary(&Cw20HandleMsg::TransferFrom {
+                msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
                     owner: info.sender.clone(),
                     recipient: env.contract.address.clone(),
                     amount: deposits[i],
@@ -264,7 +264,7 @@ pub fn provide_liquidity(
     // assert slippage tolerance
     assert_slippage_tolerance(&slippage_tolerance, &deposits, &pools)?;
 
-    let liquidity_token = deps.api.human_address(&pair_info.liquidity_token)?;
+    let liquidity_token = deps.api.addr_humanize(&pair_info.liquidity_token)?;
     let total_share = query_supply(&deps.querier, liquidity_token)?;
     let share = if total_share == Uint128::zero() {
         // Initial share = collateral amount
@@ -289,8 +289,8 @@ pub fn provide_liquidity(
     // mint LP token to sender
     let receiver = receiver.unwrap_or(info.sender.clone());
     messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: deps.api.human_address(&pair_info.liquidity_token)?,
-        msg: to_binary(&Cw20HandleMsg::Mint {
+        contract_addr: deps.api.addr_humanize(&pair_info.liquidity_token)?,
+        msg: to_binary(&Cw20ExecuteMsg::Mint {
             recipient: receiver.clone(),
             amount: share,
         })?,
@@ -314,11 +314,11 @@ pub fn withdraw_liquidity(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    sender: HumanAddr,
+    sender: Addr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
-    let liquidity_addr = deps.api.human_address(&pair_info.liquidity_token)?;
+    let liquidity_addr = deps.api.addr_humanize(&pair_info.liquidity_token)?;
 
     let pools: [Asset; 2] =
         pair_info.query_pools(&deps.querier, deps.api, env.contract.address.clone())?;
@@ -337,7 +337,7 @@ pub fn withdraw_liquidity(
         })
         .collect();
 
-    let oracle_contract = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
+    let oracle_contract = OracleContract(deps.api.addr_humanize(&pair_info.oracle_addr)?);
 
     let messages = vec![
         refund_assets[0].clone().into_msg(
@@ -354,8 +354,8 @@ pub fn withdraw_liquidity(
         )?,
         // burn liquidity token
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: deps.api.human_address(&pair_info.liquidity_token)?,
-            msg: to_binary(&Cw20HandleMsg::Burn { amount })?,
+            contract_addr: deps.api.addr_humanize(&pair_info.liquidity_token)?,
+            msg: to_binary(&Cw20ExecuteMsg::Burn { amount })?,
             send: vec![],
         }),
     ];
@@ -383,11 +383,11 @@ pub fn swap(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    sender: HumanAddr,
+    sender: Addr,
     offer_asset: Asset,
     belief_price: Option<Decimal>,
     max_spread: Option<Decimal>,
-    to: Option<HumanAddr>,
+    to: Option<Addr>,
 ) -> Result<HandleResponse, ContractError> {
     offer_asset.assert_sent_native_token_balance(&info)?;
 
@@ -441,7 +441,7 @@ pub fn swap(
         amount: return_amount,
     };
 
-    let oracle_contract = OracleContract(deps.api.human_address(&pair_info.oracle_addr)?);
+    let oracle_contract = OracleContract(deps.api.addr_humanize(&pair_info.oracle_addr)?);
 
     let tax_amount = return_asset.compute_tax(&oracle_contract, &deps.querier)?;
     let receiver = to.unwrap_or_else(|| sender.clone());
@@ -499,11 +499,11 @@ pub fn query_pair_info(deps: Deps) -> Result<PairInfo, ContractError> {
 
 pub fn query_pool(deps: Deps) -> Result<PoolResponse, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
-    let contract_addr = deps.api.human_address(&pair_info.contract_addr)?;
+    let contract_addr = deps.api.addr_humanize(&pair_info.contract_addr)?;
     let assets: [Asset; 2] = pair_info.query_pools(&deps.querier, deps.api, contract_addr)?;
     let total_share: Uint128 = query_supply(
         &deps.querier,
-        deps.api.human_address(&pair_info.liquidity_token)?,
+        deps.api.addr_humanize(&pair_info.liquidity_token)?,
     )?;
 
     let resp = PoolResponse {
@@ -520,7 +520,7 @@ pub fn query_simulation(
 ) -> Result<SimulationResponse, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
 
-    let contract_addr = deps.api.human_address(&pair_info.contract_addr)?;
+    let contract_addr = deps.api.addr_humanize(&pair_info.contract_addr)?;
     let pools: [Asset; 2] = pair_info.query_pools(&deps.querier, deps.api, contract_addr)?;
 
     let offer_pool: Asset;
@@ -556,7 +556,7 @@ pub fn query_reverse_simulation(
 ) -> Result<ReverseSimulationResponse, ContractError> {
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
 
-    let contract_addr = deps.api.human_address(&pair_info.contract_addr)?;
+    let contract_addr = deps.api.addr_humanize(&pair_info.contract_addr)?;
     let pools: [Asset; 2] = pair_info.query_pools(&deps.querier, deps.api, contract_addr)?;
 
     let offer_pool: Asset;

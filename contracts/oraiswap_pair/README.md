@@ -15,7 +15,7 @@ It creates liquidity token contract as init response, and execute init hook to r
     /// Token code ID for liqudity token creation
     pub token_code_id: u64,
     /// Oracle contract address for global parameters
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: Addr,
     /// Hook for post initalization, such as update the instance contract address to proxy contract map
     pub init_hook: Option<InitHook>,
 }
@@ -122,7 +122,7 @@ Any user can swap an asset by sending `swap` or invoking `send` msg to token con
           },
           "belief_price": Option<Decimal>,
           "max_spread": Option<Decimal>,
-          "to": Option<HumanAddr>
+          "to": Option<Addr>
       }
   }
   ```
@@ -134,13 +134,13 @@ Any user can swap an asset by sending `swap` or invoking `send` msg to token con
   ```json
   {
       "send": {
-          "contract": HumanAddr,
+          "contract": Addr,
           "amount": Uint128,
           "msg": Binary({
               "swap": {
                   "belief_price": Option<Decimal>,
                   "max_spread": Option<Decimal>,
-                  "to": Option<HumanAddr>
+                  "to": Option<Addr>
               }
           })
       }

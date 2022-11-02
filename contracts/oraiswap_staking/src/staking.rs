@@ -4,10 +4,10 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, HandleResponse,
-    HumanAddr, MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env,
+    HandleResponse, MessageInfo, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
-use cw20::Cw20HandleMsg;
+use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::HandleMsg as PairHandleMsg;
@@ -16,7 +16,7 @@ use oraiswap::staking::HandleMsg;
 
 pub fn bond(
     deps: DepsMut,
-    staker_addr: HumanAddr,
+    staker_addr: Addr,
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
@@ -44,7 +44,7 @@ pub fn bond(
 pub fn unbond(
     deps: DepsMut,
     env: Env,
-    staker_addr: HumanAddr,
+    staker_addr: Addr,
     asset_info: AssetInfo,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
@@ -56,10 +56,10 @@ pub fn unbond(
         &asset_info,
         amount,
     )?;
-    let staking_token_addr = deps.api.human_address(&staking_token)?;
+    let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
     let mut messages = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.clone(),
-        msg: to_binary(&Cw20HandleMsg::Transfer {
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
             recipient: staker_addr.clone(),
             amount,
         })?,
@@ -100,7 +100,7 @@ pub fn update_list_stakers(
     _env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
-    stakers: Vec<HumanAddr>,
+    stakers: Vec<Addr>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
 
@@ -128,10 +128,10 @@ pub fn auto_stake(
     slippage_tolerance: Option<Decimal>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let factory_addr = deps.api.human_address(&config.factory_addr)?;
+    let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
 
     let mut native_asset_op: Option<Asset> = None;
-    let mut token_info_op: Option<(HumanAddr, Uint128)> = None;
+    let mut token_info_op: Option<(Addr, Uint128)> = None;
     for asset in assets.iter() {
         match asset.info.clone() {
             AssetInfo::NativeToken { .. } => {
@@ -186,7 +186,7 @@ pub fn auto_stake(
         messages: vec![
             WasmMsg::Execute {
                 contract_addr: token_addr.clone(),
-                msg: to_binary(&Cw20HandleMsg::TransferFrom {
+                msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
                     owner: info.sender.clone(),
                     recipient: env.contract.address.clone(),
                     amount: token_amount,
@@ -196,7 +196,7 @@ pub fn auto_stake(
             .into(),
             WasmMsg::Execute {
                 contract_addr: token_addr.clone(),
-                msg: to_binary(&Cw20HandleMsg::IncreaseAllowance {
+                msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                     spender: oraiswap_pair.contract_addr.clone(),
                     amount: token_amount,
                     expires: None,
@@ -256,8 +256,8 @@ pub fn auto_stake_hook(
     env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
-    staking_token: HumanAddr,
-    staker_addr: HumanAddr,
+    staking_token: Addr,
+    staker_addr: Addr,
     prev_staking_token_amount: Uint128,
 ) -> StdResult<HandleResponse> {
     // only can be called by itself

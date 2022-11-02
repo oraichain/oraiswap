@@ -1,4 +1,4 @@
-use cosmwasm_std::HumanAddr;
+use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ pub struct InitMsg {
     /// Pair contract code ID, which is used to
     pub pair_code_id: u64,
     pub token_code_id: u64,
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: Addr,
     pub commission_rate: Option<String>,
 }
 
@@ -48,8 +48,8 @@ pub enum QueryMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub owner: HumanAddr,
-    pub oracle_addr: HumanAddr,
+    pub owner: Addr,
+    pub oracle_addr: Addr,
     pub pair_code_id: u64,
     pub token_code_id: u64,
 }

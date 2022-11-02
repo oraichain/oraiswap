@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, HandleResponse, InitResponse,
     MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
 };
 use oraiswap::error::ContractError;
@@ -78,7 +78,7 @@ pub fn receive_cw20(
             cw20_msg.sender,
             operations,
             minimum_receive,
-            to.map(HumanAddr),
+            to.map(Addr),
         ),
     }
 }
@@ -88,7 +88,7 @@ fn assert_minium_receive(
     asset_info: AssetInfo,
     prev_balance: Uint128,
     minium_receive: Uint128,
-    receiver: HumanAddr,
+    receiver: Addr,
 ) -> Result<HandleResponse, ContractError> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
     let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
@@ -116,7 +116,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = CONFIG.load(deps.storage)?;
     let resp = ConfigResponse {
-        factory_addr: deps.api.human_address(&state.factory_addr)?,
+        factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
     };
 
     Ok(resp)
@@ -128,7 +128,7 @@ fn simulate_swap_operations(
     operations: Vec<SwapOperation>,
 ) -> StdResult<SimulateSwapOperationsResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
-    let factory_addr = deps.api.human_address(&config.factory_addr)?;
+    let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
     let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
     let oracle_contract = OracleContract(pair_config.oracle_addr);
 

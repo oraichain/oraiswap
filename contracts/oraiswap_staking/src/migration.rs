@@ -1,4 +1,4 @@
-use cosmwasm_std::{Api, CanonicalAddr, Decimal, HumanAddr, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
 use cosmwasm_storage::ReadonlyBucket;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ pub fn legacy_rewards_read<'a>(
 pub fn migrate_rewards_store(
     store: &mut dyn Storage,
     api: &dyn Api,
-    staker_addrs: Vec<HumanAddr>,
+    staker_addrs: Vec<Addr>,
 ) -> StdResult<()> {
     let list_staker_addrs: Vec<CanonicalAddr> = staker_addrs
         .iter()

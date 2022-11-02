@@ -1,8 +1,6 @@
 use crate::contract::{handle, init, query};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{
-    attr, coin, from_binary, to_binary, Decimal, HumanAddr, Order, StdError, Uint128,
-};
+use cosmwasm_std::{attr, coin, from_binary, to_binary, Addr, Decimal, Order, StdError, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
@@ -225,7 +223,7 @@ fn test_query_staker_pagination() {
     }
 
     // query stakers by order
-    let mut start_after: Option<HumanAddr> = None;
+    let mut start_after: Option<Addr> = None;
     for _ in 0..100 / 10 {
         let data = query(
             deps.as_ref(),
@@ -241,7 +239,7 @@ fn test_query_staker_pagination() {
         )
         .unwrap();
         let res: Vec<RewardInfoResponse> = from_binary(&data).unwrap();
-        let stakers: Vec<HumanAddr> = res.into_iter().map(|r| r.staker_addr).collect();
+        let stakers: Vec<Addr> = res.into_iter().map(|r| r.staker_addr).collect();
         let staker_addrs: Vec<String> =
             stakers.clone().into_iter().map(|s| s.to_string()).collect();
         start_after = stakers.into_iter().last();

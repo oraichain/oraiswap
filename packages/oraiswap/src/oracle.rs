@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Api, CanonicalAddr, CosmosMsg, Decimal, HumanAddr, QuerierWrapper, StdResult,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128,
+    WasmMsg, WasmQuery,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -11,7 +11,7 @@ pub struct InitMsg {
     /// name of the NFT contract, can use default
     pub name: Option<String>,
     pub version: Option<String>,
-    pub admin: Option<HumanAddr>,
+    pub admin: Option<Addr>,
     pub min_rate: Option<Decimal>,
     pub max_rate: Option<Decimal>,
 }
@@ -19,7 +19,7 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OracleContractMsg {
-    UpdateAdmin { admin: HumanAddr },
+    UpdateAdmin { admin: Addr },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -139,9 +139,9 @@ pub struct ContractInfo {
 pub struct ContractInfoResponse {
     pub name: String,
     pub version: String,
-    pub creator: HumanAddr,
+    pub creator: Addr,
     // admin can update the parameter, may be multisig
-    pub admin: HumanAddr,
+    pub admin: Addr,
     pub min_rate: Decimal,
     pub max_rate: Decimal,
     // pub min_stability_spread: Decimal,
@@ -152,15 +152,15 @@ pub struct ContractInfoResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}
 
-/// OracleContract is a wrapper around HumanAddr that provides a lot of helpers
+/// OracleContract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw721CanonicalContract via .canonical()
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct OracleContract(pub HumanAddr);
+pub struct OracleContract(pub Addr);
 
 impl OracleContract {
-    pub fn addr(&self) -> HumanAddr {
+    pub fn addr(&self) -> Addr {
         self.0.clone()
     }
 
@@ -260,7 +260,7 @@ pub struct OracleCanonicalContract(pub CanonicalAddr);
 impl OracleCanonicalContract {
     /// Convert this address to a form fit for usage in messages and queries
     pub fn human<A: Api>(&self, api: &A) -> StdResult<OracleContract> {
-        let human = api.human_address(&self.0)?;
+        let human = api.addr_humanize(&self.0)?;
         Ok(OracleContract(human))
     }
 }

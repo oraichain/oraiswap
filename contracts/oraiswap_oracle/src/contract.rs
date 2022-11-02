@@ -1,7 +1,7 @@
 use std::ops::Mul;
 
 use cosmwasm_std::{
-    to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    to_binary, Addr, Binary, Coin, Decimal, Deps, DepsMut, Env, HandleResponse, InitResponse,
     MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
 
@@ -129,7 +129,7 @@ pub fn handle_update_tax_rate(
 pub fn handle_update_admin(
     deps: DepsMut,
     info: MessageInfo,
-    admin: HumanAddr,
+    admin: Addr,
 ) -> Result<HandleResponse, ContractError> {
     let mut contract_info = CONTRACT_INFO.load(deps.storage)?;
     let sender_addr = deps.api.canonical_address(&info.sender)?;
@@ -296,8 +296,8 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
     Ok(ContractInfoResponse {
         version: info.version,
         name: info.name,
-        admin: deps.api.human_address(&info.admin)?,
-        creator: deps.api.human_address(&info.creator)?,
+        admin: deps.api.addr_humanize(&info.admin)?,
+        creator: deps.api.addr_humanize(&info.creator)?,
         min_rate: info.min_rate,
         max_rate: info.max_rate,
     })

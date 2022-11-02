@@ -2,7 +2,7 @@ use crate::contract::{handle, init, query};
 use crate::state::{read_pool_info, store_pool_info};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{coin, from_binary, to_binary, Api, Decimal, StdError, Uint128, WasmMsg};
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::mock_app::ATOM_DENOM;
 use oraiswap::staking::{
@@ -261,7 +261,7 @@ fn test_deprecate() {
         res.messages,
         vec![WasmMsg::Execute {
             contract_addr: "staking".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: "addr".into(),
                 amount: Uint128(100u128),
             })

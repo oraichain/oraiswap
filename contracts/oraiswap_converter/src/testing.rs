@@ -5,7 +5,7 @@ use cosmwasm_std::{
     testing::{mock_dependencies, mock_env, mock_info},
     to_binary, BankMsg, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
 };
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
     asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
     converter::{Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, TokenInfo},
@@ -77,7 +77,7 @@ fn test_convert_reverse() {
         res.messages,
         vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset1".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.clone(),
                 amount: Uint128::from(10u128.pow(12))
             })
@@ -147,7 +147,7 @@ fn test_convert_reverse() {
         res.messages,
         vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset1".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.clone(),
                 amount: Uint128::from(1u128)
             })

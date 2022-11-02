@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cosmwasm_std::HumanAddr;
+use cosmwasm_std::Addr;
 use oraiswap::asset::{AssetInfo, PairInfo};
 use oraiswap::factory::{ConfigResponse, HandleMsg, InitMsg, PairsResponse, QueryMsg};
 use schemars::JsonSchema;
@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PairResponse {
     pub asset_infos: [AssetInfo; 2],
-    pub contract_addr: HumanAddr,
-    pub liquidity_token: HumanAddr,
+    pub contract_addr: Addr,
+    pub liquidity_token: Addr,
 
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: Addr,
     pub commission_rate: String,
 }
 

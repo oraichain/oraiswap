@@ -153,7 +153,7 @@ fn test_asset() {
             .unwrap(),
         CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".into(),
-            msg: to_binary(&cw20::Cw20HandleMsg::Transfer {
+            msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
                 recipient: "addr0000".into(),
                 amount: Uint128::from(123123u128),
             })

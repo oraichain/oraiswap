@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Decimal, HumanAddr};
+use cosmwasm_std::{Addr, Decimal};
 
 use crate::asset::AssetInfo;
 use cw20::Cw20ReceiveMsg;
@@ -32,7 +32,7 @@ pub enum HandleMsg {
     /// Owner Operations
     ///////////////////
     UpdateConfig {
-        owner: HumanAddr,
+        owner: Addr,
     },
     Convert {},
     UpdatePair {
@@ -67,7 +67,7 @@ pub enum Cw20HookMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub owner: HumanAddr,
+    pub owner: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

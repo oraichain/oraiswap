@@ -78,7 +78,7 @@ fn test_migration() {
     migrate_rewards_store(
         &mut deps.storage,
         &deps.api,
-        vec![deps.api.human_address(&staker_addr).unwrap()],
+        vec![deps.api.addr_humanize(&staker_addr).unwrap()],
     )
     .unwrap();
 

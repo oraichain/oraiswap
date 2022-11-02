@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, HandleResponse, InitResponse,
+    MessageInfo, QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cosmwasm_std::{QueryRequest, WasmQuery};
 
@@ -57,8 +57,8 @@ pub fn handle(
 pub fn update_config(
     deps: DepsMut,
     info: MessageInfo,
-    owner: Option<HumanAddr>,
-    staking_contract: Option<HumanAddr>,
+    owner: Option<Addr>,
+    staking_contract: Option<Addr>,
     distribution_interval: Option<u64>,
 ) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
@@ -95,7 +95,7 @@ pub fn distribute(
     asset_infos: Vec<AssetInfo>,
 ) -> StdResult<HandleResponse> {
     let config: Config = read_config(deps.storage)?;
-    let staking_contract = deps.api.human_address(&config.staking_contract)?;
+    let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
     let now = env.block.time;
     let mut rewards: Vec<Asset> = vec![];
     for asset_info in asset_infos {
@@ -153,8 +153,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
-        owner: deps.api.human_address(&state.owner)?,
-        staking_contract: deps.api.human_address(&state.staking_contract)?,
+        owner: deps.api.addr_humanize(&state.owner)?,
+        staking_contract: deps.api.addr_humanize(&state.staking_contract)?,
         distribution_interval: state.distribution_interval,
     };
 
@@ -179,7 +179,7 @@ pub fn query_reward_amount_per_sec(
     let state = read_config(deps.storage)?;
     let reward_amount = _read_pool_reward_per_sec(
         &deps.querier,
-        deps.api.human_address(&state.staking_contract)?,
+        deps.api.addr_humanize(&state.staking_contract)?,
         asset_info,
     )?;
 
@@ -188,7 +188,7 @@ pub fn query_reward_amount_per_sec(
 
 fn _read_pool_reward_per_sec(
     querier: &QuerierWrapper,
-    staking_contract: HumanAddr,
+    staking_contract: Addr,
     asset_info: AssetInfo,
 ) -> StdResult<Uint128> {
     let res: RewardsPerSecResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {

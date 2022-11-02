@@ -1,7 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult,
-    Uint128,
+    attr, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    HandleResponse, InitResponse, MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
 use oraiswap::{Decimal256, Uint256};
@@ -45,11 +44,7 @@ pub fn handle(
     }
 }
 
-pub fn update_config(
-    deps: DepsMut,
-    info: MessageInfo,
-    owner: HumanAddr,
-) -> StdResult<HandleResponse> {
+pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult<HandleResponse> {
     let mut config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.canonical_address(&info.sender)? {
@@ -294,7 +289,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = read_config(deps.storage)?;
     let resp = ConfigResponse {
-        owner: deps.api.human_address(&state.owner)?,
+        owner: deps.api.addr_humanize(&state.owner)?,
     };
 
     Ok(resp)
@@ -313,7 +308,7 @@ pub fn withdraw_tokens(
     asset_infos: Vec<AssetInfo>,
 ) -> StdResult<HandleResponse> {
     let config = read_config(deps.storage)?;
-    let owner = deps.api.human_address(&config.owner)?;
+    let owner = deps.api.addr_humanize(&config.owner)?;
     if owner != info.sender {
         return Err(StdError::generic_err("unauthorized"));
     }

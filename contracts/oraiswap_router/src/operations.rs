@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    to_binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    MessageInfo, StdError, StdResult, Uint128, WasmMsg,
+    to_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, MessageInfo,
+    StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
 
 use crate::state::{Config, CONFIG};
 
-use cw20::Cw20HandleMsg;
+use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::HandleMsg as PairHandleMsg;
@@ -22,14 +22,14 @@ pub fn handle_swap_operation(
     env: Env,
     info: MessageInfo,
     operation: SwapOperation,
-    to: Option<HumanAddr>,
+    to: Option<Addr>,
 ) -> Result<HandleResponse, ContractError> {
     if env.contract.address != info.sender {
         return Err(ContractError::Unauthorized {});
     }
 
     let config: Config = CONFIG.load(deps.storage)?;
-    let factory_addr = deps.api.human_address(&config.factory_addr)?;
+    let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
     let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
     let oracle_contract = OracleContract(pair_config.oracle_addr.clone());
 
@@ -81,10 +81,10 @@ pub fn handle_swap_operation(
 pub fn handle_swap_operations(
     deps: DepsMut,
     env: Env,
-    sender: HumanAddr,
+    sender: Addr,
     operations: Vec<SwapOperation>,
     minimum_receive: Option<Uint128>,
-    to: Option<HumanAddr>,
+    to: Option<Addr>,
 ) -> Result<HandleResponse, ContractError> {
     let operations_len = operations.len();
     if operations_len == 0 {
@@ -143,10 +143,10 @@ pub fn handle_swap_operations(
 fn asset_into_swap_msg(
     deps: Deps,
     oracle_contract: &OracleContract,
-    pair_contract: HumanAddr,
+    pair_contract: Addr,
     offer_asset: Asset,
     max_spread: Option<Decimal>,
-    to: Option<HumanAddr>,
+    to: Option<Addr>,
 ) -> StdResult<CosmosMsg> {
     match offer_asset.info.clone() {
         AssetInfo::NativeToken { denom } => {
@@ -180,7 +180,7 @@ fn asset_into_swap_msg(
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr,
             send: vec![],
-            msg: to_binary(&Cw20HandleMsg::Send {
+            msg: to_binary(&Cw20ExecuteMsg::Send {
                 contract: pair_contract,
                 amount: offer_asset.amount,
                 msg: to_binary(&PairHandleMsg::Swap {

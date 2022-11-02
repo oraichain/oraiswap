@@ -2,17 +2,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Decimal, HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
     // default is sender
-    pub owner: Option<HumanAddr>,
-    pub rewarder: HumanAddr,
-    pub minter: Option<HumanAddr>,
-    pub oracle_addr: HumanAddr,
-    pub factory_addr: HumanAddr,
+    pub owner: Option<Addr>,
+    pub rewarder: Addr,
+    pub minter: Option<Addr>,
+    pub oracle_addr: Addr,
+    pub factory_addr: Addr,
     pub base_denom: Option<String>,
 }
 
@@ -25,16 +25,16 @@ pub enum HandleMsg {
     /// Owner operations ///
     ////////////////////////
     UpdateConfig {
-        rewarder: Option<HumanAddr>,
-        owner: Option<HumanAddr>,
+        rewarder: Option<Addr>,
+        owner: Option<Addr>,
     },
     RegisterAsset {
         asset_info: AssetInfo, // can be ow20 token or native token
-        staking_token: HumanAddr,
+        staking_token: Addr,
     },
     DeprecateStakingToken {
         asset_info: AssetInfo,
-        new_staking_token: HumanAddr,
+        new_staking_token: Addr,
     },
     // update rewards per second for an asset
     UpdateRewardsPerSec {
@@ -62,7 +62,7 @@ pub enum HandleMsg {
     // Withdraw for others in this pool, such as when rewards per second are changed for the pool
     WithdrawOthers {
         asset_info: Option<AssetInfo>,
-        staker_addrs: Vec<HumanAddr>,
+        staker_addrs: Vec<Addr>,
     },
 
     /// Provides liquidity and automatically stakes the LP tokens
@@ -73,13 +73,13 @@ pub enum HandleMsg {
     /// Hook to stake the minted LP tokens
     AutoStakeHook {
         asset_info: AssetInfo,
-        staking_token: HumanAddr,
-        staker_addr: HumanAddr,
+        staking_token: Addr,
+        staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
     UpdateListStakers {
         asset_info: AssetInfo,
-        stakers: Vec<HumanAddr>,
+        stakers: Vec<Addr>,
     },
 }
 
@@ -93,9 +93,9 @@ pub enum Cw20HookMsg {
 /// We currently take no arguments for migrations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {
-    pub staker_addrs: Vec<HumanAddr>,
+    pub staker_addrs: Vec<Addr>,
     // pub amount_infos: Vec<AmountInfo>,
-    // pub new_staking_token: HumanAddr,
+    // pub new_staking_token: Addr,
 }
 
 /// We currently take no arguments for migrations
@@ -103,7 +103,7 @@ pub struct MigrateMsg {
 pub struct AmountInfo {
     pub asset_info: AssetInfo,
     pub amount: Uint128,
-    // pub new_staking_token: HumanAddr,
+    // pub new_staking_token: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -117,13 +117,13 @@ pub enum QueryMsg {
         asset_info: AssetInfo,
     },
     RewardInfo {
-        staker_addr: HumanAddr,
+        staker_addr: Addr,
         asset_info: Option<AssetInfo>,
     },
     // Query all staker belong to the pool
     RewardInfos {
         asset_info: AssetInfo,
-        start_after: Option<HumanAddr>,
+        start_after: Option<Addr>,
         limit: Option<u32>,
         // so can convert or throw error
         order: Option<i32>,
@@ -133,10 +133,10 @@ pub enum QueryMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub owner: HumanAddr,
-    pub rewarder: HumanAddr,
-    pub oracle_addr: HumanAddr,
-    pub factory_addr: HumanAddr,
+    pub owner: Addr,
+    pub rewarder: Addr,
+    pub oracle_addr: Addr,
+    pub factory_addr: Addr,
     pub base_denom: String,
 }
 
@@ -149,18 +149,18 @@ pub struct RewardsPerSecResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PoolInfoResponse {
     pub asset_info: AssetInfo,
-    pub staking_token: HumanAddr,
+    pub staking_token: Addr,
     pub total_bond_amount: Uint128,
     pub reward_index: Decimal,
     pub pending_reward: Uint128,
     pub migration_index_snapshot: Option<Decimal>,
-    pub migration_deprecated_staking_token: Option<HumanAddr>,
+    pub migration_deprecated_staking_token: Option<Addr>,
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct RewardInfoResponse {
-    pub staker_addr: HumanAddr,
+    pub staker_addr: Addr,
     pub reward_infos: Vec<RewardInfoResponseItem>,
 }
 

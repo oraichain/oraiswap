@@ -5,7 +5,7 @@ use crate::state::{
     rewards_read, rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    attr, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, HandleResponse,
     MessageInfo, Order, StdError, StdResult, Storage, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
@@ -97,7 +97,7 @@ pub fn withdraw_reward_others(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    staker_addrs: Vec<HumanAddr>,
+    staker_addrs: Vec<Addr>,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<HandleResponse> {
     let config = read_config(deps.storage)?;
@@ -234,7 +234,7 @@ pub fn before_share_change(pool_index: Decimal, reward_info: &mut RewardInfo) ->
 
 pub fn query_reward_info(
     deps: Deps,
-    staker_addr: HumanAddr,
+    staker_addr: Addr,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<RewardInfoResponse> {
     let staker_addr_raw = deps.api.canonical_address(&staker_addr)?;
@@ -251,7 +251,7 @@ pub fn query_reward_info(
 pub fn query_all_reward_infos(
     deps: Deps,
     asset_info: AssetInfo,
-    start_after: Option<HumanAddr>,
+    start_after: Option<Addr>,
     limit: Option<u32>,
     order: Option<i32>,
 ) -> StdResult<Vec<RewardInfoResponse>> {
@@ -281,7 +281,7 @@ pub fn query_all_reward_infos(
                 &staker_addr_raw,
                 &Some(asset_info.clone()),
             )?;
-            let staker_addr = deps.api.human_address(&staker_addr_raw)?;
+            let staker_addr = deps.api.addr_humanize(&staker_addr_raw)?;
             Ok(RewardInfoResponse {
                 staker_addr,
                 reward_infos,
@@ -365,7 +365,7 @@ fn _read_reward_infos(
                     }
                 } else {
                     AssetInfo::Token {
-                        contract_addr: api.human_address(&asset_key.into())?,
+                        contract_addr: api.addr_humanize(&asset_key.into())?,
                     }
                 };
 

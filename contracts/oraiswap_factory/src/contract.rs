@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, MigrateResponse, StdResult, WasmMsg,
+    attr, to_binary, Addr, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, InitResponse,
+    MessageInfo, MigrateResponse, StdResult, WasmMsg,
 };
 use oraiswap::error::ContractError;
 use oraiswap::hook::InitHook;
@@ -65,7 +65,7 @@ pub fn handle_update_config(
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.canonical_address(&HumanAddr(owner))?;
+        config.owner = deps.api.canonical_address(&Addr(owner))?;
     }
 
     if let Some(token_code_id) = token_code_id {
@@ -136,7 +136,7 @@ pub fn handle_create_pair(
             send: vec![],
             label: None,
             msg: to_binary(&PairInitMsg {
-                oracle_addr: deps.api.human_address(&config.oracle_addr)?,
+                oracle_addr: deps.api.addr_humanize(&config.oracle_addr)?,
                 asset_infos: asset_infos.clone(),
                 token_code_id: config.token_code_id,
                 commission_rate: Some(config.commission_rate),
@@ -185,7 +185,7 @@ pub fn handle_register_pair(
             attr("pair_contract_address", info.sender.to_string()),
             attr(
                 "liquidity_token_address",
-                deps.api.human_address(&pair_info.liquidity_token)?.as_str(),
+                deps.api.addr_humanize(&pair_info.liquidity_token)?.as_str(),
             ),
         ],
         data: None,
@@ -205,8 +205,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state: Config = CONFIG.load(deps.storage)?;
     let resp = ConfigResponse {
-        oracle_addr: deps.api.human_address(&state.oracle_addr)?,
-        owner: deps.api.human_address(&state.owner)?,
+        oracle_addr: deps.api.addr_humanize(&state.oracle_addr)?,
+        owner: deps.api.addr_humanize(&state.owner)?,
         token_code_id: state.token_code_id,
         pair_code_id: state.pair_code_id,
     };

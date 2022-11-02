@@ -8,7 +8,7 @@ use crate::{
     Decimal256, Uint256,
 };
 
-use cosmwasm_std::{Decimal, HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 /// Default commission rate == 0.3%
@@ -23,7 +23,7 @@ pub struct InitMsg {
     pub token_code_id: u64,
 
     /// Oracle contract for query oracle information
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: Addr,
 
     pub commission_rate: Option<String>,
 
@@ -41,14 +41,14 @@ pub enum HandleMsg {
     ProvideLiquidity {
         assets: [Asset; 2],
         slippage_tolerance: Option<Decimal>,
-        receiver: Option<HumanAddr>,
+        receiver: Option<Addr>,
     },
     /// Swap an offer asset to the other
     Swap {
         offer_asset: Asset,
         belief_price: Option<Decimal>,
         max_spread: Option<Decimal>,
-        to: Option<HumanAddr>,
+        to: Option<Addr>,
     },
 }
 

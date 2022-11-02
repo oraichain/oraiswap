@@ -15,24 +15,20 @@ mod math;
 pub use crate::math::{Decimal256, Uint256};
 
 // for other to use, but not compile to wasm
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
 pub mod mock_app;
 
 #[cfg(test)]
 mod testing;
 
+#[cfg(test)]
 #[macro_export]
 macro_rules! create_entry_points_testing {
     ($contract:ident) => {
-        use cw_multi_test::{Contract, ContractWrapper};
-
-        pub fn contract() -> Box<dyn Contract> {
-            let contract = ContractWrapper::new(
-                crate::contract::handle,
-                crate::contract::init,
-                crate::contract::query,
-            );
-            Box::new(contract)
-        }
+        Box::new(cw_multi_test::ContractWrapper::new(
+            $contract::contract::execute,
+            $contract::contract::instantiate,
+            $contract::contract::query,
+        ))
     };
 }
