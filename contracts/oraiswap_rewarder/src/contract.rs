@@ -83,11 +83,11 @@ pub fn update_config(
 
     store_config(deps.storage, &config)?;
 
-    Ok(Response::new().add_attribute(("action", "update_config")))
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 /// Distribute
-/// Anyone can handle distribute operation to distribute
+/// Anyone can execute distribute operation to distribute
 pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
@@ -128,7 +128,7 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
             msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,
             funds: vec![],
         }))
-        .add_attribute(("action", "distribute")))
+        .add_attribute("action", "distribute"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

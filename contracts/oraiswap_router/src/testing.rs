@@ -125,7 +125,7 @@ fn simulate_swap_operations_test() {
 }
 
 #[test]
-fn handle_swap_operations() {
+fn execute_swap_operations() {
     let mut app = MockApp::new(&[(
         &"addr0000".to_string(),
         &[

@@ -579,7 +579,7 @@ mod test {
             Decimal256::percent(4)
         );
 
-        // Can handle 18 fractional digits
+        // Can execute 18 fractional digits
         assert_eq!(
             Decimal256::from_str("7.123456789012345678").unwrap(),
             Decimal256(7123456789012345678u64.into())

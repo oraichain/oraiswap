@@ -7,7 +7,7 @@ use cosmwasm_std::{
 };
 use oraiswap::error::ContractError;
 
-use crate::operations::{handle_swap_operation, handle_swap_operations};
+use crate::operations::{execute_swap_operation, execute_swap_operations};
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
@@ -50,9 +50,9 @@ pub fn execute(
             operations,
             minimum_receive,
             to,
-        } => handle_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
+        } => execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
         ExecuteMsg::ExecuteSwapOperation { operation, to } => {
-            handle_swap_operation(deps, env, info, operation, to)
+            execute_swap_operation(deps, env, info, operation, to)
         }
 
         ExecuteMsg::AssertMinimumReceive {
@@ -85,11 +85,8 @@ pub fn receive_cw20(
             minimum_receive,
             to,
         } => {
-            let receiver = match to {
-                Some(addr) => deps.api.addr_validate(addr.as_str()).ok(),
-                None => None,
-            };
-            handle_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
+            let receiver = to.map_or(None, |addr| deps.api.addr_validate(addr.as_str()).ok());
+            execute_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
         }
     }
 }

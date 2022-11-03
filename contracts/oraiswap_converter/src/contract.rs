@@ -58,7 +58,7 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
 
     store_config(deps.storage, &config)?;
 
-    Ok(Response::new().add_attribute(("action", "update_config")))
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
@@ -93,8 +93,8 @@ pub fn receive_cw20(
 
             Ok(Response::new().add_message(message).add_attributes(vec![
                 ("action", "convert_token"),
-                ("from_amount", cw20_msg.amount),
-                ("to_amount", amount),
+                ("from_amount", &cw20_msg.amount.to_string()),
+                ("to_amount", &amount.to_string()),
             ]))
         }
         Ok(Cw20HookMsg::ConvertReverse { from }) => {
@@ -120,8 +120,8 @@ pub fn receive_cw20(
 
                 Ok(Response::new().add_message(message).add_attributes(vec![
                     ("action", "convert_token_reverse"),
-                    ("from_amount", cw20_msg.amount),
-                    ("to_amount", amount),
+                    ("from_amount", &cw20_msg.amount.to_string()),
+                    ("to_amount", &amount.to_string()),
                 ]))
             } else {
                 return Err(StdError::generic_err("invalid cw20 hook message"));
@@ -154,7 +154,7 @@ pub fn update_pair(
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
 
-    Ok(Response::new().add_attribute(("action", "update_pair")))
+    Ok(Response::new().add_attribute("action", "update_pair"))
 }
 
 pub fn unregister_pair(deps: DepsMut, info: MessageInfo, from: TokenInfo) -> StdResult<Response> {
@@ -167,25 +167,23 @@ pub fn unregister_pair(deps: DepsMut, info: MessageInfo, from: TokenInfo) -> Std
 
     token_ratio_remove(deps.storage, &asset_key);
 
-    Ok(Response::new().add_attribute(("action", "unregister_convert_info")))
+    Ok(Response::new().add_attribute("action", "unregister_convert_info"))
 }
 
 pub fn convert(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Response> {
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut attributes: Vec<Attribute> = vec![];
-    attributes.push(("action", "convert_token"));
+    attributes.push(("action", "convert_token").into());
 
     for native_coin in info.funds {
         let asset_key = native_coin.denom.as_bytes();
         let amount = native_coin.amount;
-        attributes.extend(vec![
-            ("denom", native_coin.denom.clone()),
-            ("from_amount", amount.clone()),
-        ]);
+        attributes.push(("denom", native_coin.denom.clone()).into());
+        attributes.push(("from_amount", amount.to_string()).into());
         let token_ratio = read_token_ratio(deps.storage, asset_key)?;
         let to_amount = amount * token_ratio.ratio;
 
-        attributes.push(("to_amount", to_amount));
+        attributes.push(("to_amount", to_amount).into());
 
         let message = Asset {
             info: token_ratio.info,
@@ -226,9 +224,9 @@ pub fn convert_reverse(
 
         Ok(Response::new().add_message(message).add_attributes(vec![
             ("action", "convert_token_reverse"),
-            ("denom", native_coin.denom.clone()),
-            ("from_amount", native_coin.amount.clone()),
-            ("to_amount", amount),
+            ("denom", native_coin.denom.as_str()),
+            ("from_amount", &native_coin.amount.to_string()),
+            ("to_amount", &amount.to_string()),
         ]))
     } else {
         return Err(StdError::generic_err("invalid cw20 hook message"));
@@ -270,7 +268,7 @@ pub fn withdraw_tokens(
         return Err(StdError::generic_err("unauthorized"));
     }
     let mut messages: Vec<CosmosMsg> = vec![];
-    let mut attributes: Vec<Attribute> = vec![("action", "withdraw_tokens")];
+    let mut attributes: Vec<Attribute> = vec![("action", "withdraw_tokens").into()];
 
     for asset in asset_infos {
         let balance = asset.query_pool(&deps.querier, env.contract.address.clone())?;
@@ -280,7 +278,7 @@ pub fn withdraw_tokens(
         }
         .into_msg(None, &deps.querier, owner.clone())?;
         messages.push(message);
-        attributes.push(("amount", balance.to_string()))
+        attributes.push(("amount", balance.to_string()).into())
     }
 
     Ok(Response::new()

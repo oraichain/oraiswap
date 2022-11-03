@@ -67,15 +67,15 @@ pub fn execute(
         ExecuteMsg::UpdateExchangeRate {
             denom,
             exchange_rate,
-        } => handle_update_exchange_rate(deps, info, denom, exchange_rate),
-        ExecuteMsg::DeleteExchangeRate { denom } => handle_delete_exchange_rate(deps, info, denom),
-        ExecuteMsg::UpdateTaxCap { cap, denom } => handle_update_tax_cap(deps, info, denom, cap),
-        ExecuteMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
-        ExecuteMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        } => execute_update_exchange_rate(deps, info, denom, exchange_rate),
+        ExecuteMsg::DeleteExchangeRate { denom } => execute_delete_exchange_rate(deps, info, denom),
+        ExecuteMsg::UpdateTaxCap { cap, denom } => execute_update_tax_cap(deps, info, denom, cap),
+        ExecuteMsg::UpdateTaxRate { rate } => execute_update_tax_rate(deps, info, rate),
+        ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
     }
 }
 
-pub fn handle_update_tax_cap(
+pub fn execute_update_tax_cap(
     deps: DepsMut,
     info: MessageInfo,
     denom: String,
@@ -96,7 +96,7 @@ pub fn handle_update_tax_cap(
     Ok(Response::default())
 }
 
-pub fn handle_update_tax_rate(
+pub fn execute_update_tax_rate(
     deps: DepsMut,
     info: MessageInfo,
     rate: Decimal,
@@ -117,7 +117,7 @@ pub fn handle_update_tax_rate(
     Ok(Response::default())
 }
 
-pub fn handle_update_admin(
+pub fn execute_update_admin(
     deps: DepsMut,
     info: MessageInfo,
     admin: Addr,
@@ -138,7 +138,7 @@ pub fn handle_update_admin(
     Ok(Response::default())
 }
 
-pub fn handle_update_exchange_rate(
+pub fn execute_update_exchange_rate(
     deps: DepsMut,
     info: MessageInfo,
     denom: String,
@@ -157,7 +157,7 @@ pub fn handle_update_exchange_rate(
     Ok(Response::default())
 }
 
-pub fn handle_delete_exchange_rate(
+pub fn execute_delete_exchange_rate(
     deps: DepsMut,
     info: MessageInfo,
     denom: String,

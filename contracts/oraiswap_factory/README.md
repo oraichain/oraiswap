@@ -7,11 +7,7 @@ The factory contract can perform creation of oraiswap pair contract and also be 
 ```json
 {
   "paid_code_id": "123",
-  "token_code_id": "123",
-  "init_hook": {
-    "msg": "123",
-    "contract_addr": "orai..."
-  }
+  "token_code_id": "123"
 }
 ```
 
@@ -109,7 +105,6 @@ Register verified pair contract and token contract for pair contract creation. T
     /// Pair contract code ID, which is used to
     pub pair_code_id: u64,
     pub token_code_id: u64,
-    pub init_hook: Option<InitHook>,
 }
 ```
 

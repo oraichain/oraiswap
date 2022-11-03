@@ -31,6 +31,7 @@ pub struct LegacyRewardInfo {
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)
 /// (read-only version for queries)
+#[allow(dead_code)]
 pub fn legacy_rewards_read<'a>(
     storage: &'a dyn Storage,
     owner: &CanonicalAddr,
@@ -38,6 +39,7 @@ pub fn legacy_rewards_read<'a>(
     ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
 }
 
+#[allow(dead_code)]
 pub fn migrate_rewards_store(
     store: &mut dyn Storage,
     api: &dyn Api,
@@ -45,7 +47,7 @@ pub fn migrate_rewards_store(
 ) -> StdResult<()> {
     let list_staker_addrs: Vec<CanonicalAddr> = staker_addrs
         .iter()
-        .map(|addr| Ok(api.addr_canonicalize(addr)?))
+        .map(|addr| Ok(api.addr_canonicalize(addr.as_str())?))
         .collect::<StdResult<Vec<CanonicalAddr>>>()?;
     for staker_addr in list_staker_addrs {
         let rewards_bucket = legacy_rewards_read(store, &staker_addr);

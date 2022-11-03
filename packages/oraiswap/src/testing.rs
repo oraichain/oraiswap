@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    Addr, AllBalanceResponse, BalanceResponse, BankQuery, Coin, Decimal, Empty, QuerierWrapper,
-    QueryRequest, StdResult, Uint128,
+    coin, Addr, AllBalanceResponse, BalanceResponse, BankQuery, Coin, Decimal, Empty,
+    QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 
-use crate::asset::{AssetInfo, PairInfo};
+use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
 
 use crate::pair::DEFAULT_COMMISSION_RATE;
 use cw_multi_test::{next_block, App, AppResponse, Contract, Executor};
@@ -36,6 +36,19 @@ pub struct MockApp {
 impl MockApp {
     pub fn new(init_balances: &[(&String, &[Coin])]) -> Self {
         let app = App::new(|router, _, storage| {
+            // init for App Owner a lot of balances
+            router
+                .bank
+                .init_balance(
+                    storage,
+                    &Addr::unchecked(APP_OWNER),
+                    vec![
+                        coin(1000000000000000000u128, ORAI_DENOM),
+                        coin(1000000000000000000u128, ATOM_DENOM),
+                    ],
+                )
+                .unwrap();
+
             for (owner, init_funds) in init_balances.iter() {
                 router
                     .bank
@@ -301,6 +314,28 @@ impl MockApp {
         addr
     }
 
+    pub fn set_balances_from(
+        &mut self,
+        sender: Addr,
+        balances: &[(&String, &[(&String, &Uint128)])],
+    ) {
+        for (denom, balances) in balances.iter() {
+            // send for each recipient
+            for (recipient, &amount) in balances.iter() {
+                self.app
+                    .send_tokens(
+                        sender.clone(),
+                        Addr::unchecked(recipient.as_str()),
+                        &[Coin {
+                            denom: denom.to_string(),
+                            amount,
+                        }],
+                    )
+                    .unwrap();
+            }
+        }
+    }
+
     pub fn set_token_balances_from(
         &mut self,
         sender: Addr,
@@ -328,6 +363,10 @@ impl MockApp {
                 }
             }
         }
+    }
+
+    pub fn set_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
+        self.set_balances_from(Addr::unchecked(APP_OWNER), balances)
     }
 
     // configure the mint whitelist mock querier

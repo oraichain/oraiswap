@@ -1,4 +1,7 @@
-use crate::migration::migrate_rewards_store;
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+
+// use crate::migration::migrate_rewards_store;
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
@@ -10,8 +13,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, Response, Response, StdError, StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Order, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
@@ -21,6 +24,7 @@ use oraiswap::staking::{
 
 use cw20::Cw20ReceiveMsg;
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -32,10 +36,10 @@ pub fn instantiate(
         &Config {
             owner: deps
                 .api
-                .addr_canonicalize(&msg.owner.unwrap_or(info.sender.clone()))?,
-            rewarder: deps.api.addr_canonicalize(&msg.rewarder)?,
+                .addr_canonicalize(msg.owner.unwrap_or(info.sender.clone()).as_str())?,
+            rewarder: deps.api.addr_canonicalize(msg.rewarder.as_str())?,
             oracle_addr: deps.api.addr_canonicalize(msg.oracle_addr.as_str())?,
-            factory_addr: deps.api.addr_canonicalize(&msg.factory_addr)?,
+            factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
         },
@@ -44,6 +48,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
@@ -98,7 +103,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
-    match from_binary(&cw20_msg.msg.unwrap_or(Binary::default())) {
+    match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Bond { asset_info }) => {
             // check permission
             let asset_key = asset_info.to_vec(deps.api)?;
@@ -122,7 +127,12 @@ pub fn receive_cw20(
                 return Err(StdError::generic_err("unauthorized"));
             }
 
-            bond(deps, cw20_msg.sender, asset_info, cw20_msg.amount)
+            bond(
+                deps,
+                Addr::unchecked(cw20_msg.sender),
+                asset_info,
+                cw20_msg.amount,
+            )
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
@@ -145,15 +155,11 @@ pub fn update_config(
     }
 
     if let Some(rewarder) = rewarder {
-        config.rewarder = deps.api.addr_canonicalize(&rewarder)?;
+        config.rewarder = deps.api.addr_canonicalize(rewarder.as_str())?;
     }
 
     store_config(deps.storage, &config)?;
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![attr("action", "update_config")],
-        data: None,
-    })
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 // need to withdraw all rewards of the stakers belong to the pool
@@ -201,11 +207,7 @@ fn update_rewards_per_sec(
 
     store_rewards_per_sec(deps.storage, &asset_key, raw_assets)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![attr("action", "update_rewards_per_sec")],
-        data: None,
-    })
+    Ok(Response::new().add_attribute("action", "update_rewards_per_sec"))
 }
 
 fn register_asset(
@@ -230,7 +232,7 @@ fn register_asset(
         deps.storage,
         &asset_key,
         &PoolInfo {
-            staking_token: deps.api.addr_canonicalize(&staking_token)?,
+            staking_token: deps.api.addr_canonicalize(staking_token.as_str())?,
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
@@ -238,14 +240,10 @@ fn register_asset(
         },
     )?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "register_asset"),
-            attr("asset_info", asset_info),
-        ],
-        data: None,
-    })
+    Ok(Response::new().add_attributes([
+        ("action", "register_asset"),
+        ("asset_info", &asset_info.to_string()),
+    ]))
 }
 
 fn deprecate_staking_token(
@@ -276,25 +274,22 @@ fn deprecate_staking_token(
         index_snapshot: pool_info.reward_index,
         deprecated_staking_token: pool_info.staking_token,
     });
-    pool_info.staking_token = deps.api.addr_canonicalize(&new_staking_token)?;
+    pool_info.staking_token = deps.api.addr_canonicalize(new_staking_token.as_str())?;
 
     store_pool_info(deps.storage, &asset_key, &pool_info)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "depcrecate_staking_token"),
-            attr("asset_info", asset_info),
-            attr(
-                "deprecated_staking_token",
-                deprecated_token_addr.to_string(),
-            ),
-            attr("new_staking_token", new_staking_token.to_string()),
-        ],
-        data: None,
-    })
+    Ok(Response::new().add_attributes([
+        ("action", "depcrecate_staking_token"),
+        ("asset_info", &asset_info.to_string()),
+        (
+            "deprecated_staking_token",
+            &deprecated_token_addr.to_string(),
+        ),
+        ("new_staking_token", &new_staking_token.to_string()),
+    ]))
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -371,15 +366,11 @@ pub fn query_rewards_per_sec(
 }
 
 // migrate contract
-pub fn migrate(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: MigrateMsg,
-) -> StdResult<Response> {
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     // migrate_pool_infos(deps.storage)?;
     // migrate_config(deps.storage)?;
-    migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
+    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
     // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
 
     // when the migration is executed, deprecate directly the MIR pool

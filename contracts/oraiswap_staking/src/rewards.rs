@@ -5,8 +5,8 @@ use crate::state::{
     rewards_read, rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdError, StdResult, Storage, Uint128,
+    Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response,
+    StdError, StdResult, Storage, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
 use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
@@ -52,20 +52,16 @@ pub fn deposit_reward(
         rewards_amount += asset.amount;
     }
 
-    Ok(Response {
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "deposit_reward"),
-            attr("rewards_amount", rewards_amount.to_string()),
-        ],
-    })
+    Ok(Response::new().add_attributes([
+        ("action", "deposit_reward"),
+        ("rewards_amount", &rewards_amount.to_string()),
+    ]))
 }
 
 // withdraw all rewards or single reward depending on asset_token
 pub fn withdraw_reward(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<Response> {
@@ -77,20 +73,15 @@ pub fn withdraw_reward(
     let messages = reward_assets
         .into_iter()
         .map(|ra| {
-            Ok(ra.to_normal(deps.api)?.into_msg(
-                None,
-                &deps.querier,
-                env.contract.address.clone(),
-                info.sender.clone(),
-            )?)
+            Ok(ra
+                .to_normal(deps.api)?
+                .into_msg(None, &deps.querier, info.sender.clone())?)
         })
         .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
-    Ok(Response {
-        messages,
-        attributes: vec![attr("action", "withdraw_reward")],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_messages(messages)
+        .add_attribute("action", "withdraw_reward"))
 }
 
 pub fn withdraw_reward_others(
@@ -112,15 +103,11 @@ pub fn withdraw_reward_others(
 
     // withdraw reward for each staker
     for staker_addr in staker_addrs {
-        let staker_addr_raw = deps.api.addr_canonicalize(&staker_addr)?;
+        let staker_addr_raw = deps.api.addr_canonicalize(staker_addr.as_str())?;
         process_reward_assets(deps.storage, &staker_addr_raw, &asset_key.clone(), false)?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![attr("action", "withdraw_reward_others")],
-        data: None,
-    })
+    Ok(Response::new().add_attribute("action", "withdraw_reward_others"))
 }
 
 fn update_reward_assets_amount(reward_assets: &mut Vec<AssetRaw>, rw: AssetRaw, amount: Uint128) {
@@ -222,10 +209,8 @@ pub fn process_reward_assets(
 
 // withdraw reward to pending reward
 pub fn before_share_change(pool_index: Decimal, reward_info: &mut RewardInfo) -> StdResult<()> {
-    let pending_reward = Asset::checked_sub(
-        reward_info.bond_amount * pool_index,
-        reward_info.bond_amount * reward_info.index,
-    )?;
+    let pending_reward = (reward_info.bond_amount * pool_index)
+        .checked_sub(reward_info.bond_amount * reward_info.index)?;
 
     reward_info.index = pool_index;
     reward_info.pending_reward += pending_reward;
@@ -237,7 +222,7 @@ pub fn query_reward_info(
     staker_addr: Addr,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<RewardInfoResponse> {
-    let staker_addr_raw = deps.api.addr_canonicalize(&staker_addr)?;
+    let staker_addr_raw = deps.api.addr_canonicalize(staker_addr.as_str())?;
 
     let reward_infos: Vec<RewardInfoResponseItem> =
         _read_reward_infos_response(deps.api, deps.storage, &staker_addr_raw, &asset_info)?;
@@ -259,7 +244,7 @@ pub fn query_all_reward_infos(
     let order_by = Order::try_from(order.unwrap_or(1))?;
     let asset_key = asset_info.to_vec(deps.api)?;
     let start_after = start_after
-        .map_or(None, |a| deps.api.addr_canonicalize(&a).ok())
+        .map_or(None, |a| deps.api.addr_canonicalize(a.as_str()).ok())
         .map(|c| c.to_vec());
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;

@@ -55,13 +55,13 @@ pub fn execute(
             owner,
             token_code_id,
             pair_code_id,
-        } => handle_update_config(deps, env, info, owner, token_code_id, pair_code_id),
-        ExecuteMsg::CreatePair { asset_infos } => handle_create_pair(deps, env, info, asset_infos),
+        } => execute_update_config(deps, env, info, owner, token_code_id, pair_code_id),
+        ExecuteMsg::CreatePair { asset_infos } => execute_create_pair(deps, env, info, asset_infos),
     }
 }
 
 // Only owner can execute it
-pub fn handle_update_config(
+pub fn execute_update_config(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -94,7 +94,7 @@ pub fn handle_update_config(
 }
 
 // Anyone can execute it to create swap pair
-pub fn handle_create_pair(
+pub fn execute_create_pair(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,

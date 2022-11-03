@@ -17,7 +17,7 @@ use oraiswap::router::{ExecuteMsg, SwapOperation};
 
 /// Execute swap operation
 /// swap all offer asset to ask asset
-pub fn handle_swap_operation(
+pub fn execute_swap_operation(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -74,7 +74,7 @@ pub fn handle_swap_operation(
     Ok(Response::new().add_messages(messages))
 }
 
-pub fn handle_swap_operations(
+pub fn execute_swap_operations(
     deps: DepsMut,
     env: Env,
     sender: Addr,

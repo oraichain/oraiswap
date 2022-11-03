@@ -19,13 +19,12 @@ pub fn rewards_store<'a>(
 
 #[test]
 fn test_migration() {
-    let mut deps = mock_dependencies(&[]);
-    deps.api.canonical_length = 54;
+    let mut deps = mock_dependencies();
     let mut legacy_store = pool_infos_old_store(&mut deps.storage);
 
-    let asset_1 = deps.api.addr_canonicalize(&"asset1".into()).unwrap();
+    let asset_1 = deps.api.addr_canonicalize("asset1").unwrap();
     let pool_info_1 = LegacyPoolInfo {
-        staking_token: deps.api.addr_canonicalize(&"staking1".into()).unwrap(),
+        staking_token: deps.api.addr_canonicalize("staking1").unwrap(),
         total_bond_amount: Uint128::from(1u128),
         total_short_amount: Uint128::from(1u128),
         reward_index: Decimal::percent(1),
@@ -37,9 +36,9 @@ fn test_migration() {
         premium_updated_time: 1,
         migration_params: None,
     };
-    let asset_2 = deps.api.addr_canonicalize(&"asset2".into()).unwrap();
+    let asset_2 = deps.api.addr_canonicalize("asset2").unwrap();
     let pool_info_2 = LegacyPoolInfo {
-        staking_token: deps.api.addr_canonicalize(&"staking2".into()).unwrap(),
+        staking_token: deps.api.addr_canonicalize("staking2").unwrap(),
         total_bond_amount: Uint128::from(2u128),
         total_short_amount: Uint128::from(2u128),
         reward_index: Decimal::percent(2),
@@ -58,7 +57,7 @@ fn test_migration() {
     // update reward store
     let staker_addr = deps
         .api
-        .addr_canonicalize(&"orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g".into())
+        .addr_canonicalize("orai1g4h64yjt0fvzv5v2j8tyfnpe5kmnetejvfgs7g")
         .unwrap();
     let asset_key = "foobar".as_bytes();
     // store legacy reward info

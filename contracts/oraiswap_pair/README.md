@@ -6,7 +6,7 @@
 
 This is mainly used from oraiswap factory contract to create new oraiswap pair. It initialize all swap created parameters which can be updated later with owner key.
 
-It creates liquidity token contract as init response, and execute init hook to register created liquidity token contract to self.
+It creates liquidity token contract as init response, and execute reply on success to register created liquidity token contract to self.
 
 ```rust
 {
@@ -16,8 +16,7 @@ It creates liquidity token contract as init response, and execute init hook to r
     pub token_code_id: u64,
     /// Oracle contract address for global parameters
     pub oracle_addr: Addr,
-    /// Hook for post initalization, such as update the instance contract address to proxy contract map
-    pub init_hook: Option<InitHook>,
+
 }
 ```
 
