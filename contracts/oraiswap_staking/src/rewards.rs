@@ -23,7 +23,7 @@ pub fn deposit_reward(
     let config = read_config(deps.storage)?;
 
     // only rewarder can execute this message, rewarder may be a contract
-    if config.rewarder != deps.api.addr_canonicalize(&info.sender)? {
+    if config.rewarder != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -69,7 +69,7 @@ pub fn withdraw_reward(
     info: MessageInfo,
     asset_info: Option<AssetInfo>,
 ) -> StdResult<Response> {
-    let staker_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let staker_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
     let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
 
     let reward_assets = process_reward_assets(deps.storage, &staker_addr, &asset_key, true)?;
@@ -103,7 +103,7 @@ pub fn withdraw_reward_others(
     let config = read_config(deps.storage)?;
 
     // only admin can execute this message
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 

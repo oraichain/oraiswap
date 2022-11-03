@@ -1,13 +1,13 @@
 {
   "scripts": {
     "gen-ts": "node gen-ts.js",
-    "build": "bash build_release.sh",
-    "postinstall": "patch-package"
+    "build": "bash build_release.sh"
   },
   "dependencies": {
-    "@cosmwasm/ts-codegen": "^0.11.1"
+    "@cosmwasm/ts-codegen": "^0.20.0"
   },
   "devDependencies": {
-    "patch-package": "^6.4.7"
+    "@cosmjs/amino": "^0.29.3",
+    "@cosmjs/cosmwasm-stargate": "^0.29.3"
   }
 }

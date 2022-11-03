@@ -21,7 +21,7 @@ use oraiswap::staking::{
 
 use cw20::Cw20ReceiveMsg;
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -44,7 +44,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
@@ -105,7 +105,7 @@ pub fn receive_cw20(
             let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
             // only staking token contract can execute this message
-            let token_raw = deps.api.addr_canonicalize(&info.sender)?;
+            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
             if pool_info.staking_token != token_raw {
                 // if user is trying to bond old token, return friendly error message
                 if let Some(params) = pool_info.migration_params {
@@ -136,7 +136,7 @@ pub fn update_config(
 ) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
 
-    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -166,7 +166,7 @@ fn update_rewards_per_sec(
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
-    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -216,7 +216,7 @@ fn register_asset(
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
@@ -256,7 +256,7 @@ fn deprecate_staking_token(
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 

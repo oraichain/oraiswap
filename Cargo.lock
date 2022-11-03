@@ -555,6 +555,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "oraiswap-oracle"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw20",
+ "oraiswap",
+ "oraiswap-token",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "oraiswap-token"
 version = "0.0.0"
 dependencies = [

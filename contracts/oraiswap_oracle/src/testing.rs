@@ -1,23 +1,24 @@
 use crate::contract::*;
 use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR,
+    mock_dependencies_with_balance, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    MOCK_CONTRACT_ADDR,
 };
 use cosmwasm_std::{
-    coins, from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, OwnedDeps, StdError, Uint128,
-    WasmMsg,
+    coins, from_binary, to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, OwnedDeps, StdError,
+    Uint128, WasmMsg,
 };
-use cw_multi_test::ContractWrapper;
+
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_app::MockApp;
+use oraiswap::create_entry_points_testing;
 use oraiswap::oracle::{
-    ExchangeRateResponse, InstantiateMsg, OracleContract, OracleExchangeMsg, OracleExchangeQuery,
-    OracleMsg, OracleQuery, OracleTreasuryQuery,
+    ExchangeRateResponse, InstantiateMsg, OracleContract, OracleMsg, OracleQuery,
 };
+use oraiswap::testing::MockApp;
 
 const OWNER: &str = "owner0000";
 
 fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&coins(100000, ORAI_DENOM));
+    let mut deps = mock_dependencies_with_balance(&coins(100000, ORAI_DENOM));
 
     let msg = InstantiateMsg {
         name: None,
@@ -27,7 +28,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
         max_rate: None,
     };
     let info = mock_info(OWNER, &[]);
-    let res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(0, res.messages.len());
     deps
 }
@@ -36,17 +37,17 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
 fn proper_initialization() {
     let mut deps = setup_contract();
 
-    let msg = OracleMsg::Exchange(OracleExchangeMsg::UpdateExchangeRate {
+    let msg = OracleMsg::UpdateExchangeRate {
         denom: "usdt".to_string(),
         exchange_rate: Decimal::percent(10), // 1 orai = 10 usdt
-    });
+    };
 
-    let _res = handle(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
 
-    let msg = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRate {
+    let msg = OracleQuery::ExchangeRate {
         base_denom: Some("usdt".to_string()),
         quote_denom: ORAI_DENOM.to_string(),
-    });
+    };
 
     let res = query(deps.as_ref(), mock_env(), msg).unwrap();
     let exchange_rate_res: ExchangeRateResponse = from_binary(&res).unwrap();
@@ -58,9 +59,9 @@ fn proper_initialization() {
 fn tax_cap_notfound() {
     let deps = setup_contract();
 
-    let msg = OracleQuery::Treasury(OracleTreasuryQuery::TaxCap {
+    let msg = OracleQuery::TaxCap {
         denom: "airi".to_string(),
-    });
+    };
 
     let res = query(deps.as_ref(), mock_env(), msg);
     match res {
@@ -73,17 +74,15 @@ fn tax_cap_notfound() {
 
 #[test]
 fn test_asset() {
-    let mut app = MockApp::new();
-
-    app.set_token_contract(oraiswap_token::testutils::contract());
-
-    app.set_balance(
-        MOCK_CONTRACT_ADDR.into(),
+    let mut app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
         &[Coin {
             denom: "uusd".to_string(),
             amount: Uint128::from(123u128),
         }],
-    );
+    )]);
+
+    app.set_token_contract(create_entry_points_testing!(oraiswap_token));
 
     app.set_token_balances(&[(
         &"asset".to_string(),
@@ -96,7 +95,7 @@ fn test_asset() {
     )]);
 
     // set code implementation
-    app.set_oracle_contract(Box::new(ContractWrapper::new(handle, init, query)));
+    app.set_oracle_contract(create_entry_points_testing!(crate));
 
     app.set_tax(
         Decimal::percent(1),
@@ -106,7 +105,7 @@ fn test_asset() {
     let token_asset = Asset {
         amount: Uint128::from(123123u128),
         info: AssetInfo::Token {
-            contract_addr: "asset0000".into(),
+            contract_addr: Addr::unchecked("asset0000"),
         },
     };
 
@@ -147,8 +146,7 @@ fn test_asset() {
             .into_msg(
                 Some(&orai_oracle),
                 &app.as_querier(),
-                MOCK_CONTRACT_ADDR.into(),
-                "addr0000".into()
+                Addr::unchecked("addr0000")
             )
             .unwrap(),
         CosmosMsg::Wasm(WasmMsg::Execute {
@@ -158,7 +156,7 @@ fn test_asset() {
                 amount: Uint128::from(123123u128),
             })
             .unwrap(),
-            send: vec![],
+            funds: vec![],
         })
     );
 
@@ -167,12 +165,10 @@ fn test_asset() {
             .into_msg(
                 Some(&orai_oracle),
                 &app.as_querier(),
-                MOCK_CONTRACT_ADDR.into(),
-                "addr0000".into()
+                Addr::unchecked("addr0000")
             )
             .unwrap(),
         CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: "addr0000".into(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),

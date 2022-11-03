@@ -17,7 +17,7 @@ use oraiswap::router::{
     SimulateSwapOperationsResponse, SwapOperation,
 };
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -33,7 +33,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,

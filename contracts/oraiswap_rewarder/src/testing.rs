@@ -12,7 +12,7 @@ fn proper_initialization() {
     };
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), mock_info("owner", &[]), msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), mock_info("owner", &[]), msg).unwrap();
 
     // it worked, let's query the state
     let contract_info = query_config(deps.as_ref()).unwrap();

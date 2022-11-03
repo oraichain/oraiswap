@@ -64,13 +64,9 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
 fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
     let nominator = Uint256::from(nominator);
     let denominator = Decimal256::from(denominator);
+    let fraction = Uint256::from(DECIMAL_FRACTION);
 
-    (nominator
-        * Decimal256::from_ratio(
-            Uint256::from(DECIMAL_FRACTION),
-            Uint256::from(DECIMAL_FRACTION) * denominator,
-        ))
-    .into()
+    (nominator * Decimal256::from_ratio(fraction, fraction * denominator)).into()
 }
 
 pub fn receive_cw20(

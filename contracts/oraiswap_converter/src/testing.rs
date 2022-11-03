@@ -17,7 +17,7 @@ use crate::contract::{execute, instantiate, query};
 
 #[test]
 fn test_decimal() {
-    let t: Uint256 = Uint256::from(DECIMAL_FRACTION);
+    let t = Uint256::from(DECIMAL_FRACTION);
     let decimal = Decimal::from_ratio(10u128.pow(18), 10u128.pow(6));
     let denom: Uint256 = t.mul(Decimal256::from(decimal));
     println!("denom: {:?}", denom);

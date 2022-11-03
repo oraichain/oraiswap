@@ -1,16 +1,15 @@
-use std::ops::Mul;
+use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, Response,
-    Response, StdError, StdResult, Uint128,
+    to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 
 use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
-    ExchangeRatesResponse, MigrateMsg, OracleContractMsg, OracleContractQuery, OracleExchangeMsg,
-    OracleExchangeQuery, OracleMsg, OracleQuery, OracleTreasuryMsg, OracleTreasuryQuery,
-    RewardPoolResponse, TaxCapResponse, TaxRateResponse,
+    ExchangeRatesResponse, MigrateMsg, OracleMsg, OracleQuery, RewardPoolResponse, TaxCapResponse,
+    TaxRateResponse,
 };
 
 use oraiswap::error::ContractError;
@@ -25,20 +24,21 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // whitelist of denom?
 // base on denom address as ow20 can call burn
-pub fn init(
+#[entry_point]
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     msg_info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
-    let creator = deps.api.addr_canonicalize(&msg_info.sender)?;
+    let creator = deps.api.addr_canonicalize(msg_info.sender.as_str())?;
     let info = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
         creator: creator.clone(),
         // admin should be multisig
         admin: if let Some(admin) = msg.admin {
-            deps.api.addr_canonicalize(&admin)?
+            deps.api.addr_canonicalize(admin.as_str())?
         } else {
             creator
         },
@@ -56,31 +56,22 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(
+#[entry_point]
+pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: OracleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        OracleMsg::Exchange(handle_data) => match handle_data {
-            OracleExchangeMsg::UpdateExchangeRate {
-                denom,
-                exchange_rate,
-            } => handle_update_exchange_rate(deps, info, denom, exchange_rate),
-            OracleExchangeMsg::DeleteExchangeRate { denom } => {
-                handle_delete_exchange_rate(deps, info, denom)
-            }
-        },
-        OracleMsg::Treasury(handle_data) => match handle_data {
-            OracleTreasuryMsg::UpdateTaxCap { cap, denom } => {
-                handle_update_tax_cap(deps, info, denom, cap)
-            }
-            OracleTreasuryMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
-        },
-        OracleMsg::Contract(handle_data) => match handle_data {
-            OracleContractMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
-        },
+        OracleMsg::UpdateExchangeRate {
+            denom,
+            exchange_rate,
+        } => handle_update_exchange_rate(deps, info, denom, exchange_rate),
+        OracleMsg::DeleteExchangeRate { denom } => handle_delete_exchange_rate(deps, info, denom),
+        OracleMsg::UpdateTaxCap { cap, denom } => handle_update_tax_cap(deps, info, denom, cap),
+        OracleMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
+        OracleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
     }
 }
 
@@ -91,7 +82,7 @@ pub fn handle_update_tax_cap(
     cap: Uint128,
 ) -> Result<Response, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -111,7 +102,7 @@ pub fn handle_update_tax_rate(
     rate: Decimal,
 ) -> Result<Response, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     // check authorized, TODO: min and max tax_rate
     if contract_info.admin.ne(&sender_addr) {
@@ -132,7 +123,7 @@ pub fn handle_update_admin(
     admin: Addr,
 ) -> Result<Response, ContractError> {
     let mut contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -140,7 +131,7 @@ pub fn handle_update_admin(
     }
 
     // update new admin
-    contract_info.admin = deps.api.addr_canonicalize(&admin)?;
+    contract_info.admin = deps.api.addr_canonicalize(admin.as_str())?;
     CONTRACT_INFO.save(deps.storage, &contract_info)?;
 
     // return nothing new
@@ -154,7 +145,7 @@ pub fn handle_update_exchange_rate(
     exchange_rate: Decimal,
 ) -> Result<Response, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -172,7 +163,7 @@ pub fn handle_delete_exchange_rate(
     denom: String,
 ) -> Result<Response, ContractError> {
     let contract_info = CONTRACT_INFO.load(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(&info.sender)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     // check authorized
     if contract_info.admin.ne(&sender_addr) {
@@ -184,36 +175,29 @@ pub fn handle_delete_exchange_rate(
     Ok(Response::default())
 }
 
+#[entry_point]
 pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
     match msg {
-        OracleQuery::Treasury(query_data) => match query_data {
-            OracleTreasuryQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
-            OracleTreasuryQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
-        },
-        OracleQuery::Exchange(query_data) => match query_data {
-            OracleExchangeQuery::ExchangeRate {
-                base_denom,
-                quote_denom,
-            } => to_binary(&query_exchange_rate(
-                deps,
-                base_denom.unwrap_or(ORAI_DENOM.to_string()),
-                quote_denom,
-            )?),
-            OracleExchangeQuery::ExchangeRates {
-                base_denom,
-                quote_denoms,
-            } => to_binary(&query_exchange_rates(
-                deps,
-                base_denom.unwrap_or(ORAI_DENOM.to_string()),
-                quote_denoms,
-            )?),
-        },
-        OracleQuery::Contract(query_data) => match query_data {
-            OracleContractQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
-            OracleContractQuery::RewardPool { denom } => {
-                to_binary(&query_reward_pool(deps, env, denom)?)
-            }
-        },
+        OracleQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
+        OracleQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
+        OracleQuery::ExchangeRate {
+            base_denom,
+            quote_denom,
+        } => to_binary(&query_exchange_rate(
+            deps,
+            base_denom.unwrap_or(ORAI_DENOM.to_string()),
+            quote_denom,
+        )?),
+        OracleQuery::ExchangeRates {
+            base_denom,
+            quote_denoms,
+        } => to_binary(&query_exchange_rates(
+            deps,
+            base_denom.unwrap_or(ORAI_DENOM.to_string()),
+            quote_denoms,
+        )?),
+        OracleQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+        OracleQuery::RewardPool { denom } => to_binary(&query_reward_pool(deps, env, denom)?),
     }
 }
 
@@ -244,12 +228,9 @@ pub fn query_exchange_rate(
 ) -> StdResult<ExchangeRateResponse> {
     let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
     let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
-
+    let fraction = Uint128::from(DECIMAL_FRACTION);
     // quote = ask, offer = base
-    let exchange_rate = Decimal::from_ratio(
-        quote_rate.mul(DECIMAL_FRACTION),
-        base_rate.mul(DECIMAL_FRACTION),
-    );
+    let exchange_rate = Decimal::from_ratio(fraction * quote_rate, fraction * base_rate);
 
     let res = ExchangeRateResponse {
         base_denom: base_denom.clone(),
@@ -273,14 +254,12 @@ pub fn query_exchange_rates(
     };
 
     let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
+    let fraction = Uint128::from(DECIMAL_FRACTION);
 
     for quote_denom in quote_denoms {
         let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
 
-        let exchange_rate = Decimal::from_ratio(
-            quote_rate.mul(DECIMAL_FRACTION),
-            base_rate.mul(DECIMAL_FRACTION),
-        );
+        let exchange_rate = Decimal::from_ratio(fraction * quote_rate, fraction * base_rate);
 
         res.items.push(ExchangeRateItem {
             quote_denom,
@@ -305,8 +284,9 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
 
 /// query_reward_pool: return native balance, currently only Orai denom
 pub fn query_reward_pool(deps: Deps, env: Env, denom: String) -> StdResult<RewardPoolResponse> {
-    let balance = deps.querier.query_balance(env.contract.address, &denom);
-    RewardPoolResponse { balance }
+    deps.querier
+        .query_balance(env.contract.address, &denom)
+        .map(|balance| RewardPoolResponse { balance })
 }
 
 fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {
@@ -317,11 +297,7 @@ fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {
     EXCHANGE_RATES.load(deps.storage, denom.as_bytes())
 }
 
-pub fn migrate(
-    _deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: MigrateMsg,
-) -> Result<Response, ContractError> {
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     Ok(Response::default())
 }

@@ -20,7 +20,7 @@ use oraiswap::token::InstantiateMsg as TokenInstantiateMsg;
 use oraiswap::{Decimal256, Uint256};
 use std::str::FromStr;
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
@@ -87,7 +87,7 @@ pub fn init(
     })
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -180,7 +180,7 @@ pub fn receive_cw20(
         // remove liquidity
         Ok(Cw20HookMsg::WithdrawLiquidity {}) => {
             let config: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
-            if deps.api.addr_canonicalize(&info.sender)? != config.liquidity_token {
+            if deps.api.addr_canonicalize(info.sender.as_str())? != config.liquidity_token {
                 return Err(ContractError::Unauthorized {});
             }
 
@@ -205,7 +205,7 @@ pub fn try_post_initialize(
     }
 
     // update liquidity_token
-    pair_info.liquidity_token = deps.api.addr_canonicalize(&info.sender)?;
+    pair_info.liquidity_token = deps.api.addr_canonicalize(info.sender.as_str())?;
     PAIR_INFO.save(deps.storage, &pair_info)?;
 
     Ok(Response {

@@ -14,7 +14,7 @@ use oraiswap::factory::{
 };
 use oraiswap::pair::{InstantiateMsg as PairInstantiateMsg, DEFAULT_COMMISSION_RATE};
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -22,7 +22,7 @@ pub fn init(
 ) -> StdResult<Response> {
     let config = Config {
         oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
-        owner: deps.api.addr_canonicalize(&info.sender)?,
+        owner: deps.api.addr_canonicalize(info.sender.as_str())?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,
         commission_rate: msg
@@ -35,7 +35,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -67,7 +67,7 @@ pub fn handle_update_config(
     let mut config = CONFIG.load(deps.storage)?;
 
     // permission check
-    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -182,7 +182,7 @@ pub fn handle_register_pair(
 
     // the contract must follow the standard interface
     pair_info.liquidity_token = query_liquidity_token(deps.querier, info.sender.clone())?;
-    pair_info.contract_addr = deps.api.addr_canonicalize(&info.sender)?;
+    pair_info.contract_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
 
     PAIRS.save(deps.storage, &pair_key, &pair_info)?;
 

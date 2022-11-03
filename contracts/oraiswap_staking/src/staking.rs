@@ -104,7 +104,7 @@ pub fn update_list_stakers(
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
-    if deps.api.addr_canonicalize(&info.sender)? != config.owner {
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
     let asset_info_raw = asset_info.to_raw(deps.api)?;

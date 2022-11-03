@@ -17,12 +17,10 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum OracleContractMsg {
-    UpdateAdmin { admin: Addr },
-}
-
-#[cw_serde]
-pub enum OracleExchangeMsg {
+pub enum OracleMsg {
+    UpdateAdmin {
+        admin: Addr,
+    },
     UpdateExchangeRate {
         denom: String,
         exchange_rate: Decimal,
@@ -30,42 +28,24 @@ pub enum OracleExchangeMsg {
     DeleteExchangeRate {
         denom: String,
     },
-}
-
-#[cw_serde]
-pub enum OracleTreasuryMsg {
-    UpdateTaxCap { denom: String, cap: Uint128 },
+    UpdateTaxCap {
+        denom: String,
+        cap: Uint128,
+    },
     // RateMax: 1%
-    UpdateTaxRate { rate: Decimal },
-}
-
-#[cw_serde]
-pub enum OracleMsg {
-    Contract(OracleContractMsg),
-    Exchange(OracleExchangeMsg),
-    Treasury(OracleTreasuryMsg),
+    UpdateTaxRate {
+        rate: Decimal,
+    },
 }
 
 /// OracleQuery is defines available query datas
 #[cw_serde]
-pub enum OracleQuery {
-    Treasury(OracleTreasuryQuery),
-    Exchange(OracleExchangeQuery),
-    Contract(OracleContractQuery),
-}
-
-#[cw_serde]
 #[derive(QueryResponses)]
-pub enum OracleTreasuryQuery {
+pub enum OracleQuery {
     #[returns(TaxRateResponse)]
     TaxRate {},
     #[returns(TaxCapResponse)]
     TaxCap { denom: String },
-}
-
-#[cw_serde]
-#[derive(QueryResponses)]
-pub enum OracleExchangeQuery {
     #[returns(ExchangeRateResponse)]
     ExchangeRate {
         base_denom: Option<String>,
@@ -76,11 +56,6 @@ pub enum OracleExchangeQuery {
         base_denom: Option<String>,
         quote_denoms: Vec<String>,
     },
-}
-
-#[cw_serde]
-#[derive(QueryResponses)]
-pub enum OracleContractQuery {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
     #[returns(RewardPoolResponse)]
@@ -210,15 +185,15 @@ impl OracleContract {
         querier: &QuerierWrapper,
         denom: T,
     ) -> StdResult<TaxCapResponse> {
-        let request = OracleQuery::Treasury(OracleTreasuryQuery::TaxCap {
+        let request = OracleQuery::TaxCap {
             denom: denom.into(),
-        });
+        };
 
         self.query(querier, request)
     }
 
     pub fn query_tax_rate(&self, querier: &QuerierWrapper) -> StdResult<TaxRateResponse> {
-        let request = OracleQuery::Treasury(OracleTreasuryQuery::TaxRate {});
+        let request = OracleQuery::TaxRate {};
 
         self.query(querier, request)
     }
@@ -230,10 +205,10 @@ impl OracleContract {
         base_denom: T,
         quote_denom: T,
     ) -> StdResult<ExchangeRateResponse> {
-        let request = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRate {
+        let request = OracleQuery::ExchangeRate {
             base_denom: Some(base_denom.into()),
             quote_denom: quote_denom.into(),
-        });
+        };
 
         self.query(querier, request)
     }
@@ -244,10 +219,10 @@ impl OracleContract {
         base_denom: T,
         quote_denoms: Vec<T>,
     ) -> StdResult<ExchangeRatesResponse> {
-        let request = OracleQuery::Exchange(OracleExchangeQuery::ExchangeRates {
+        let request = OracleQuery::ExchangeRates {
             base_denom: Some(base_denom.into()),
             quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
-        });
+        };
 
         self.query(querier, request)
     }
@@ -256,7 +231,7 @@ impl OracleContract {
         &self,
         querier: &QuerierWrapper,
     ) -> StdResult<ContractInfoResponse> {
-        let request = OracleQuery::Contract(OracleContractQuery::ContractInfo {});
+        let request = OracleQuery::ContractInfo {};
 
         self.query(querier, request)
     }

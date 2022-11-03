@@ -46,11 +46,11 @@ impl Asset {
                 let tax_cap = oracle_contract
                     .query_tax_cap(querier, denom.to_string())?
                     .cap;
+                let fraction = Uint128::from(DECIMAL_FRACTION);
                 Ok(std::cmp::min(
-                    amount.checked_sub(amount.multiply_ratio(
-                        DECIMAL_FRACTION,
-                        (Uint128::from(DECIMAL_FRACTION) * tax_rate).u128() + DECIMAL_FRACTION,
-                    ))?,
+                    amount.checked_sub(
+                        amount.multiply_ratio(fraction, fraction * tax_rate + fraction),
+                    )?,
                     tax_cap,
                 ))
             }

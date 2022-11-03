@@ -21,7 +21,7 @@ use oraiswap::asset::{Asset, AssetInfo};
 // 600 seconds default
 const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -31,7 +31,7 @@ pub fn init(
         deps.storage,
         &Config {
             init_time: env.block.time,
-            owner: deps.api.addr_canonicalize(&info.sender)?,
+            owner: deps.api.addr_canonicalize(info.sender.as_str())?,
             staking_contract: deps.api.addr_canonicalize(&msg.staking_contract)?,
             distribution_interval: msg
                 .distribution_interval
@@ -42,7 +42,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::UpdateConfig {
             owner,
@@ -62,7 +62,7 @@ pub fn update_config(
     distribution_interval: Option<u64>,
 ) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
-    if config.owner != deps.api.addr_canonicalize(&info.sender)? {
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 

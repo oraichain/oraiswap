@@ -24,7 +24,7 @@ fn proper_initialization() {
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
@@ -55,7 +55,7 @@ fn update_config() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // update owner
     let info = mock_info("owner", &[]);
@@ -64,7 +64,7 @@ fn update_config() {
         rewarder: None,
     };
 
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(0, res.messages.len());
 
     // it worked, let's query the state
@@ -88,7 +88,7 @@ fn update_config() {
         owner: None,
     };
 
-    let res = handle(deps.as_mut(), mock_env(), info, msg);
+    let res = execute(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
         _ => panic!("Must return unauthorized error"),
@@ -111,7 +111,7 @@ fn test_register() {
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -122,14 +122,14 @@ fn test_register() {
 
     // failed with unauthorized error
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+    let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
     match res {
         StdError::GenericErr { msg, .. } => assert_eq!(msg, "unauthorized"),
         _ => panic!("DO NOT ENTER HERE"),
     }
 
     let info = mock_info("owner", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.attributes,
         vec![
@@ -179,7 +179,7 @@ fn test_query_staker_pagination() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
@@ -195,7 +195,7 @@ fn test_query_staker_pagination() {
         }],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -205,7 +205,7 @@ fn test_query_staker_pagination() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens for 100 stakers
     for i in 0..100 {
@@ -220,7 +220,7 @@ fn test_query_staker_pagination() {
             .ok(),
         });
         let info = mock_info("staking", &[]);
-        let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     }
 
     // query stakers by order

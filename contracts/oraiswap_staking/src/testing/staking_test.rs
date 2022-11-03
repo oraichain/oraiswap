@@ -26,7 +26,7 @@ fn test_bond_tokens() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -36,7 +36,7 @@ fn test_bond_tokens() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
@@ -50,7 +50,7 @@ fn test_bond_tokens() {
     });
 
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     let data = query(
         deps.as_ref(),
         mock_env(),
@@ -118,7 +118,7 @@ fn test_bond_tokens() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let data = query(
         deps.as_ref(),
@@ -159,7 +159,7 @@ fn test_bond_tokens() {
     });
 
     let info = mock_info("staking2", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg);
+    let res = execute(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
         _ => panic!("Must return unauthorized error"),
@@ -183,7 +183,7 @@ fn test_unbond() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -206,7 +206,7 @@ fn test_unbond() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // register asset
     let msg = ExecuteMsg::RegisterAsset {
@@ -217,7 +217,7 @@ fn test_unbond() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -231,7 +231,7 @@ fn test_unbond() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
@@ -242,7 +242,7 @@ fn test_unbond() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -265,7 +265,7 @@ fn test_unbond() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond 150 tokens; failed
     let msg = ExecuteMsg::Unbond {
@@ -276,7 +276,7 @@ fn test_unbond() {
     };
 
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     match res {
         StdError::GenericErr { msg, .. } => {
             assert_eq!(msg, "Cannot unbond more than bond amount");
@@ -293,7 +293,7 @@ fn test_unbond() {
     };
 
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
         vec![

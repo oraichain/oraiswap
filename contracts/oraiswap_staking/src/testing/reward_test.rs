@@ -27,7 +27,7 @@ fn test_deposit_reward() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -50,7 +50,7 @@ fn test_deposit_reward() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -60,7 +60,7 @@ fn test_deposit_reward() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let token_raw = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
@@ -78,7 +78,7 @@ fn test_deposit_reward() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
@@ -90,7 +90,7 @@ fn test_deposit_reward() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
     let res: PoolInfoResponse = from_binary(
@@ -128,7 +128,7 @@ fn test_deposit_reward() {
     )
     .unwrap();
 
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let res: PoolInfoResponse = from_binary(
         &query(
@@ -171,7 +171,7 @@ fn test_deposit_reward_when_no_bonding() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -194,7 +194,7 @@ fn test_deposit_reward_when_no_bonding() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -204,7 +204,7 @@ fn test_deposit_reward_when_no_bonding() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let token_raw = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
@@ -220,7 +220,7 @@ fn test_deposit_reward_when_no_bonding() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
     let res: PoolInfoResponse = from_binary(
@@ -258,7 +258,7 @@ fn test_deposit_reward_when_no_bonding() {
     )
     .unwrap();
 
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let res: PoolInfoResponse = from_binary(
         &query(
@@ -301,7 +301,7 @@ fn test_before_share_changes() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -324,7 +324,7 @@ fn test_before_share_changes() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -334,7 +334,7 @@ fn test_before_share_changes() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let token_raw = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
@@ -352,7 +352,7 @@ fn test_before_share_changes() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
@@ -364,7 +364,7 @@ fn test_before_share_changes() {
     };
 
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let asset_key = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let addr_raw = deps.api.addr_canonicalize(&"addr".into()).unwrap();
@@ -393,7 +393,7 @@ fn test_before_share_changes() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let reward_bucket = rewards_read(&deps.storage, &addr_raw);
     let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
@@ -418,7 +418,7 @@ fn test_before_share_changes() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond
     let msg = ExecuteMsg::Unbond {
@@ -428,7 +428,7 @@ fn test_before_share_changes() {
         amount: Uint128(100u128),
     };
     let info = mock_info("addr", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let reward_bucket = rewards_read(&deps.storage, &addr_raw);
     let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
@@ -630,7 +630,7 @@ fn test_update_rewards_per_sec() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -653,7 +653,7 @@ fn test_update_rewards_per_sec() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -663,7 +663,7 @@ fn test_update_rewards_per_sec() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let token_raw = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
@@ -681,7 +681,7 @@ fn test_update_rewards_per_sec() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit 300 reward tokens
     let msg = ExecuteMsg::DepositReward {
@@ -693,10 +693,10 @@ fn test_update_rewards_per_sec() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // change rewards per second for the pool
-    let _res = handle(
+    let _res = execute(
         deps.as_mut(),
         mock_env(),
         mock_info("owner", &[]),
@@ -732,7 +732,7 @@ fn test_update_rewards_per_sec() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check reward info, pending reward should be zero because of withdrawal
     let data = query(
@@ -792,7 +792,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
@@ -815,7 +815,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -825,7 +825,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let token_raw = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
@@ -843,7 +843,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // factory deposit 300 reward tokens
     let msg = ExecuteMsg::DepositReward {
@@ -855,10 +855,10 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // change rewards per second for the pool
-    let _res = handle(
+    let _res = execute(
         deps.as_mut(),
         mock_env(),
         mock_info("owner", &[]),
@@ -896,7 +896,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let data = query(
         deps.as_ref(),
@@ -934,7 +934,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check reward info, pending reward should be zero because of withdrawal
     let data = query(

@@ -27,7 +27,7 @@ fn test_deprecate() {
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
@@ -37,7 +37,7 @@ fn test_deprecate() {
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let asset_key = deps.api.addr_canonicalize(&"asset".into()).unwrap();
     let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
@@ -65,7 +65,7 @@ fn test_deprecate() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -79,7 +79,7 @@ fn test_deprecate() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // owner of reward contract deposit 100 reward tokens
     // distribute weight => 80:20
@@ -92,7 +92,7 @@ fn test_deprecate() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query pool and reward info
     let res: PoolInfoResponse = from_binary(
@@ -156,7 +156,7 @@ fn test_deprecate() {
         new_staking_token: "new_staking".into(),
     };
     let info = mock_info("owner", &[]);
-    handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // deposit more rewards
     let msg = ExecuteMsg::DepositReward {
@@ -168,7 +168,7 @@ fn test_deprecate() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query again
     let res: PoolInfoResponse = from_binary(
@@ -235,13 +235,13 @@ fn test_deprecate() {
         .ok(),
     });
     let info = mock_info("staking", &[]);
-    let err = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+    let err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
     assert_eq!(
         err,
         StdError::generic_err("The staking token for this asset has been migrated to new_staking")
     );
     let info = mock_info("new_staking", &[]);
-    let err = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     assert_eq!(
         err,
         StdError::generic_err("The LP token for this asset has been deprecated, withdraw all your deprecated tokens to migrate your position")
@@ -255,7 +255,7 @@ fn test_deprecate() {
         amount: Uint128(100u128),
     };
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     // make sure that we are receiving deprecated lp tokens tokens
     assert_eq!(
         res.messages,
@@ -308,7 +308,7 @@ fn test_deprecate() {
         .ok(),
     });
     let info = mock_info("new_staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // deposit new rewards
     // will also add to the index the pending rewards from before the migration
@@ -321,7 +321,7 @@ fn test_deprecate() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // expect to have 80 * 3 rewards
     // initial + deposit after deprecation + deposit after bonding again
@@ -363,7 +363,7 @@ fn test_deprecate() {
         .ok(),
     });
     let info = mock_info("new_staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let data = query(
         deps.as_ref(),

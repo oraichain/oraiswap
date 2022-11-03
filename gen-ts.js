@@ -52,8 +52,8 @@ if (package) {
     process.argv.includes("--force") ||
     process.argv.includes("-f")
   ) {
-    const ret = execSync(`cargo run -q --example schema`, {
-      cwd: package,
+    const ret = execSync(`cargo run -q --bin schema`, {
+      cwd: artifactsFolder,
     }).toString();
     console.log(ret);
   }
