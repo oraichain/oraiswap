@@ -37,6 +37,12 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 
   Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
 
+- oraiswap_staking
+
+  Mainnet: `orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu`
+
+  Testnet: `orai1yzncqj7f8sculc3849w9hg9r4f4u79e3swnlr7`
+
 - oraiswap_token
 
   Mainnet (CodeID): 3
