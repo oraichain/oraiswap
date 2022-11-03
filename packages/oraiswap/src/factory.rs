@@ -24,10 +24,7 @@ pub enum ExecuteMsg {
     CreatePair {
         /// Asset infos
         asset_infos: [AssetInfo; 2],
-        auto_register: bool,
     },
-    /// Register is invoked from created pair contract after initialzation
-    Register { asset_infos: [AssetInfo; 2] },
 }
 
 #[cw_serde]

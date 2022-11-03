@@ -1,7 +1,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper,
-    Response, StdError, StdResult, Uint128, WasmMsg,
+    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper, Response,
+    StdError, StdResult, Uint128, WasmMsg,
 };
 use cosmwasm_std::{QueryRequest, WasmQuery};
 
@@ -83,7 +83,7 @@ pub fn update_config(
 
     store_config(deps.storage, &config)?;
 
-    Ok(Response::new().add_attributes(vec![attr("action", "update_config")]))
+    Ok(Response::new().add_attribute(("action", "update_config")))
 }
 
 /// Distribute
@@ -128,7 +128,7 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
             msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,
             funds: vec![],
         }))
-        .add_attributes(vec![attr("action", "distribute")]))
+        .add_attribute(("action", "distribute")))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

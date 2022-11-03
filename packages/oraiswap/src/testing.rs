@@ -27,8 +27,8 @@ macro_rules! create_entry_points_testing {
 
 pub struct MockApp {
     app: App,
+    token_map: HashMap<String, Addr>, // map token name to address
     pub token_id: u64,
-    pub token_map: HashMap<String, Addr>, // map token name to address
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
 }
@@ -152,63 +152,32 @@ impl MockApp {
     }
 
     // configure the oraiswap pair
-    pub fn set_pairs(&mut self, asset_infos_list: &[[AssetInfo; 2]]) {
+    pub fn create_pairs(&mut self, asset_infos_list: &[[AssetInfo; 2]]) {
         for asset_infos in asset_infos_list.iter() {
-            self.set_pair(asset_infos.clone());
+            self.create_pair(asset_infos.clone());
         }
     }
 
-    pub fn set_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
+    pub fn create_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
         if !self.factory_addr.as_str().is_empty() {
-            let crate::factory::ConfigResponse {
-                token_code_id,
-                pair_code_id,
-                oracle_addr,
-                ..
-            } = self
-                .as_querier()
-                .query_wasm_smart(
-                    self.factory_addr.clone(),
-                    &crate::factory::QueryMsg::Config {},
-                )
-                .unwrap();
-
-            let pair_addr = self
-                .instantiate(
-                    pair_code_id,
+            let res = self
+                .execute(
                     Addr::unchecked(APP_OWNER),
-                    &crate::pair::InstantiateMsg {
+                    self.factory_addr.clone(),
+                    &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
-                        token_code_id,
-                        oracle_addr,
-                        commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
                     },
                     &[],
-                    "pair",
                 )
                 .unwrap();
 
-            self.execute(
-                pair_addr.clone(),
-                self.factory_addr.clone(),
-                &crate::factory::ExecuteMsg::CreatePair {
-                    asset_infos: asset_infos.clone(),
-                    auto_register: false,
-                },
-                &[],
-            )
-            .unwrap();
-
-            // then register
-            self.execute(
-                pair_addr.clone(),
-                self.factory_addr.clone(),
-                &crate::factory::ExecuteMsg::Register { asset_infos },
-                &[],
-            )
-            .unwrap();
-
-            return Some(pair_addr);
+            for event in res.events {
+                for attr in event.attributes {
+                    if attr.key.eq("pair_contract_address") {
+                        return Some(Addr::unchecked(attr.value));
+                    }
+                }
+            }
         }
 
         None

@@ -37,7 +37,7 @@ pub fn read_pairs(
     limit: Option<u32>,
 ) -> StdResult<Vec<PairInfo>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after).map(Bound::exclusive);
+    let start = calc_range_start(start_after).map(Bound::ExclusiveRaw);
 
     PAIRS
         .range(storage, start, None, Order::Ascending)
@@ -85,12 +85,12 @@ mod test {
 
     #[test]
     fn config_legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         store_config(
             &mut deps.storage,
             &Config {
-                oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
-                owner: deps.api.addr_canonicalize(&"owner0000".into()).unwrap(),
+                oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
+                owner: deps.api.addr_canonicalize("owner0000").unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
                 commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
@@ -147,34 +147,34 @@ mod test {
 
     #[test]
     fn pair_info_legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let pair_info = PairInfoRaw {
-            oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.addr_canonicalize(&"token0000".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize("token0000").unwrap(),
                 },
             ],
-            contract_addr: deps.api.addr_canonicalize(&"pair0000".into()).unwrap(),
-            liquidity_token: deps.api.addr_canonicalize(&"liquidity0000".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize("pair0000").unwrap(),
+            liquidity_token: deps.api.addr_canonicalize("liquidity0000").unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 
         let pair_info2 = PairInfoRaw {
-            oracle_addr: deps.api.addr_canonicalize(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.addr_canonicalize(&"token0001".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize("token0001").unwrap(),
                 },
             ],
-            contract_addr: deps.api.addr_canonicalize(&"pair0001".into()).unwrap(),
-            liquidity_token: deps.api.addr_canonicalize(&"liquidity0001".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize("pair0001").unwrap(),
+            liquidity_token: deps.api.addr_canonicalize("liquidity0001").unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 

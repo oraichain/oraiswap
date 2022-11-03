@@ -52,7 +52,7 @@ fn simulate_swap_operations_test() {
     ];
 
     // create pair
-    let pair_addr = app.set_pair(asset_infos.clone()).unwrap();
+    let pair_addr = app.create_pair(asset_infos.clone()).unwrap();
 
     // provide liquidity
     // successfully provide liquidity for the exist pool
@@ -182,8 +182,8 @@ fn handle_swap_operations() {
     ];
 
     // create pair
-    let pair_addr1 = app.set_pair(asset_infos1.clone()).unwrap();
-    let pair_addr2 = app.set_pair(asset_infos2.clone()).unwrap();
+    let pair_addr1 = app.create_pair(asset_infos1.clone()).unwrap();
+    let pair_addr2 = app.create_pair(asset_infos2.clone()).unwrap();
 
     // provide liquidity
     let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {

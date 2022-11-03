@@ -1,6 +1,8 @@
 use crate::asset::{Asset, AssetInfo, PairInfo};
 use crate::factory::{ConfigResponse, QueryMsg as FactoryQueryMsg};
-use crate::pair::{QueryMsg as PairQueryMsg, ReverseSimulationResponse, SimulationResponse};
+use crate::pair::{
+    PairResponse, QueryMsg as PairQueryMsg, ReverseSimulationResponse, SimulationResponse,
+};
 
 use cosmwasm_std::{to_binary, Addr, QuerierWrapper, QueryRequest, StdResult, Uint128, WasmQuery};
 use cw20::{BalanceResponse as Cw20BalanceResponse, Cw20QueryMsg, TokenInfoResponse};
@@ -84,4 +86,16 @@ pub fn reverse_simulate(
             ask_asset: ask_asset.clone(),
         })?,
     }))
+}
+
+pub fn query_pair_info_from_pair(
+    querier: &QuerierWrapper,
+    pair_contract: Addr,
+) -> StdResult<PairInfo> {
+    querier
+        .query::<PairResponse>(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: pair_contract.to_string(),
+            msg: to_binary(&PairQueryMsg::Pair {})?,
+        }))
+        .map(|res| res.info)
 }

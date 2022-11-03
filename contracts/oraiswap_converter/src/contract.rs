@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
+    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
@@ -58,7 +58,7 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
 
     store_config(deps.storage, &config)?;
 
-    Ok(Response::new().add_attributes(vec![attr("action", "update_config")]))
+    Ok(Response::new().add_attribute(("action", "update_config")))
 }
 
 fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
@@ -92,9 +92,9 @@ pub fn receive_cw20(
             )?;
 
             Ok(Response::new().add_message(message).add_attributes(vec![
-                attr("action", "convert_token"),
-                attr("from_amount", cw20_msg.amount),
-                attr("to_amount", amount),
+                ("action", "convert_token"),
+                ("from_amount", cw20_msg.amount),
+                ("to_amount", amount),
             ]))
         }
         Ok(Cw20HookMsg::ConvertReverse { from }) => {
@@ -119,9 +119,9 @@ pub fn receive_cw20(
                 )?;
 
                 Ok(Response::new().add_message(message).add_attributes(vec![
-                    attr("action", "convert_token_reverse"),
-                    attr("from_amount", cw20_msg.amount),
-                    attr("to_amount", amount),
+                    ("action", "convert_token_reverse"),
+                    ("from_amount", cw20_msg.amount),
+                    ("to_amount", amount),
                 ]))
             } else {
                 return Err(StdError::generic_err("invalid cw20 hook message"));
@@ -154,7 +154,7 @@ pub fn update_pair(
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
 
-    Ok(Response::new().add_attributes(vec![attr("action", "update_pair")]))
+    Ok(Response::new().add_attribute(("action", "update_pair")))
 }
 
 pub fn unregister_pair(deps: DepsMut, info: MessageInfo, from: TokenInfo) -> StdResult<Response> {
@@ -167,25 +167,25 @@ pub fn unregister_pair(deps: DepsMut, info: MessageInfo, from: TokenInfo) -> Std
 
     token_ratio_remove(deps.storage, &asset_key);
 
-    Ok(Response::new().add_attributes(vec![attr("action", "unregister_convert_info")]))
+    Ok(Response::new().add_attribute(("action", "unregister_convert_info")))
 }
 
 pub fn convert(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Response> {
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut attributes: Vec<Attribute> = vec![];
-    attributes.push(attr("action", "convert_token"));
+    attributes.push(("action", "convert_token"));
 
     for native_coin in info.funds {
         let asset_key = native_coin.denom.as_bytes();
         let amount = native_coin.amount;
         attributes.extend(vec![
-            attr("denom", native_coin.denom.clone()),
-            attr("from_amount", amount.clone()),
+            ("denom", native_coin.denom.clone()),
+            ("from_amount", amount.clone()),
         ]);
         let token_ratio = read_token_ratio(deps.storage, asset_key)?;
         let to_amount = amount * token_ratio.ratio;
 
-        attributes.push(attr("to_amount", to_amount));
+        attributes.push(("to_amount", to_amount));
 
         let message = Asset {
             info: token_ratio.info,
@@ -225,10 +225,10 @@ pub fn convert_reverse(
         .into_msg(None, &deps.querier, info.sender.clone())?;
 
         Ok(Response::new().add_message(message).add_attributes(vec![
-            attr("action", "convert_token_reverse"),
-            attr("denom", native_coin.denom.clone()),
-            attr("from_amount", native_coin.amount.clone()),
-            attr("to_amount", amount),
+            ("action", "convert_token_reverse"),
+            ("denom", native_coin.denom.clone()),
+            ("from_amount", native_coin.amount.clone()),
+            ("to_amount", amount),
         ]))
     } else {
         return Err(StdError::generic_err("invalid cw20 hook message"));
@@ -270,7 +270,7 @@ pub fn withdraw_tokens(
         return Err(StdError::generic_err("unauthorized"));
     }
     let mut messages: Vec<CosmosMsg> = vec![];
-    let mut attributes: Vec<Attribute> = vec![attr("action", "withdraw_tokens")];
+    let mut attributes: Vec<Attribute> = vec![("action", "withdraw_tokens")];
 
     for asset in asset_infos {
         let balance = asset.query_pool(&deps.querier, env.contract.address.clone())?;
@@ -280,7 +280,7 @@ pub fn withdraw_tokens(
         }
         .into_msg(None, &deps.querier, owner.clone())?;
         messages.push(message);
-        attributes.push(attr("amount", balance.to_string()))
+        attributes.push(("amount", balance.to_string()))
     }
 
     Ok(Response::new()

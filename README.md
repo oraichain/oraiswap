@@ -74,6 +74,15 @@ yarn
 # gen protobuf response.rs
 cargo install protobuf-codegen
 protoc --rust_out . response.proto
+tee -a response.proto << END
+impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
+    type Error = ::protobuf::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+       ::protobuf::Message::parse_from_bytes(value)
+    }
+}
+END
 
 # gen oraiswap_pair typescript and schema
 yarn gen-ts contracts/oraiswap_[package]

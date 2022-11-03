@@ -406,7 +406,7 @@ fn test_auto_stake() {
     ];
 
     // create pair
-    let pair_addr = app.set_pair(asset_infos.clone()).unwrap();
+    let pair_addr = app.create_pair(asset_infos.clone()).unwrap();
 
     let pair_info: PairInfo = app
         .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})

@@ -560,9 +560,27 @@ dependencies = [
  "cw-multi-test",
  "cw20",
  "cw20-base",
+ "protobuf",
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "oraiswap-factory"
+version = "0.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "oraiswap",
+ "oraiswap-oracle",
+ "oraiswap-pair",
+ "oraiswap-token",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -597,7 +615,6 @@ dependencies = [
  "oraiswap",
  "oraiswap-oracle",
  "oraiswap-token",
- "protobuf",
  "schemars",
  "serde",
  "thiserror",

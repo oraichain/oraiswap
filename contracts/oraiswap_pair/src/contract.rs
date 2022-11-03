@@ -1,12 +1,10 @@
-use crate::response::MsgInstantiateContractResponse;
 use crate::state::PAIR_INFO;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use protobuf::Message;
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps, DepsMut,
+    Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
@@ -20,7 +18,9 @@ use oraiswap::pair::{
     QueryMsg, ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
+use oraiswap::response::MsgInstantiateContractResponse;
 use oraiswap::{Decimal256, Uint256};
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 const INSTANTIATE_REPLY_ID: u64 = 1;
@@ -185,10 +185,9 @@ pub fn receive_cw20(
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
     let data = msg.result.unwrap().data.unwrap();
 
-    let res: MsgInstantiateContractResponse =
-        Message::parse_from_bytes(data.as_slice()).map_err(|_| {
-            StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
-        })?;
+    let res = MsgInstantiateContractResponse::try_from(data.as_slice()).map_err(|_| {
+        StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
+    })?;
     let liquidity_token = &res.address;
 
     let api = deps.api;
@@ -347,10 +346,10 @@ pub fn withdraw_liquidity(
 
     // update pool info
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "withdraw_liquidity"),
-        attr("sender", sender.as_str()),
-        attr("withdrawn_share", &amount.to_string()),
-        attr(
+        ("action", "withdraw_liquidity"),
+        ("sender", sender.as_str()),
+        ("withdrawn_share", &amount.to_string()),
+        (
             "refund_assets",
             &format!("{}, {}", refund_assets[0], refund_assets[1]),
         ),
@@ -440,16 +439,16 @@ pub fn swap(
     // 1. send collateral token from the contract to a user
     // 2. send inactive commission to collector
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "swap"),
-        attr("sender", sender.as_str()),
-        attr("receiver", receiver.as_str()),
-        attr("offer_asset", &offer_asset.info.to_string()),
-        attr("ask_asset", &ask_pool.info.to_string()),
-        attr("offer_amount", &offer_amount.to_string()),
-        attr("return_amount", &return_amount.to_string()),
-        attr("tax_amount", &tax_amount.to_string()),
-        attr("spread_amount", &spread_amount.to_string()),
-        attr("commission_amount", &commission_amount.to_string()),
+        ("action", "swap"),
+        ("sender", sender.as_str()),
+        ("receiver", receiver.as_str()),
+        ("offer_asset", &offer_asset.info.to_string()),
+        ("ask_asset", &ask_pool.info.to_string()),
+        ("offer_amount", &offer_amount.to_string()),
+        ("return_amount", &return_amount.to_string()),
+        ("tax_amount", &tax_amount.to_string()),
+        ("spread_amount", &spread_amount.to_string()),
+        ("commission_amount", &commission_amount.to_string()),
     ]))
 }
 

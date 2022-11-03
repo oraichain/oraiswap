@@ -213,3 +213,11 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
         ::protobuf::reflect::FileDescriptor::new_generated_2(generated_file_descriptor)
     })
 }
+
+impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
+    type Error = ::protobuf::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+       ::protobuf::Message::parse_from_bytes(value)
+    }
+}
