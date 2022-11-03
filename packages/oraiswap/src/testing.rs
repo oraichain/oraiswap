@@ -318,7 +318,7 @@ impl MockApp {
                     self.execute(
                         sender.clone(),
                         contract_addr.clone(),
-                        &cw20_base::msg::ExecuteMsg::Mint {
+                        &cw20::Cw20ExecuteMsg::Mint {
                             recipient: recipient.to_string(),
                             amount,
                         },

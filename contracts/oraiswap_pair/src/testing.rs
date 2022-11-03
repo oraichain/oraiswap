@@ -152,7 +152,7 @@ fn provide_liquidity() {
     app.execute(
         Addr::unchecked(MOCK_CONTRACT_ADDR),
         asset_addr.clone(),
-        &cw20_base::msg::ExecuteMsg::IncreaseAllowance {
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.to_string(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -197,7 +197,7 @@ fn provide_liquidity() {
     app.execute(
         Addr::unchecked(MOCK_CONTRACT_ADDR),
         asset_addr.clone(),
-        &cw20_base::msg::ExecuteMsg::IncreaseAllowance {
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.to_string(),
             amount: Uint128::from(100u128),
             expires: None,
@@ -327,7 +327,7 @@ fn withdraw_liquidity() {
     app.execute(
         Addr::unchecked("addr0000"),
         liquidity_addr.clone(),
-        &cw20_base::msg::ExecuteMsg::IncreaseAllowance {
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
             spender: pair_addr.to_string(),
             amount: Uint128::from(1000u128),
             expires: None,

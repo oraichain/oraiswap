@@ -71,11 +71,7 @@ pub fn handle_swap_operation(
         }
     };
 
-    Ok(Response {
-        messages,
-        attributes: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_messages(messages))
 }
 
 pub fn handle_swap_operations(
@@ -103,8 +99,8 @@ pub fn handle_swap_operations(
         .map(|op| {
             operation_index += 1;
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: env.contract.address.clone(),
-                send: vec![],
+                contract_addr: env.contract.address.to_string(),
+                funds: vec![],
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: op,
                     to: if operation_index == operations_len {
@@ -122,8 +118,8 @@ pub fn handle_swap_operations(
         let receiver_balance = target_asset_info.query_pool(&deps.querier, to.clone())?;
 
         messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: env.contract.address.clone(),
-            send: vec![],
+            contract_addr: env.contract.address.to_string(),
+            funds: vec![],
             msg: to_binary(&ExecuteMsg::AssertMinimumReceive {
                 asset_info: target_asset_info,
                 prev_balance: receiver_balance,
@@ -133,11 +129,7 @@ pub fn handle_swap_operations(
         }))
     }
 
-    Ok(Response {
-        messages,
-        attributes: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_messages(messages))
 }
 
 fn asset_into_swap_msg(
@@ -158,14 +150,13 @@ fn asset_into_swap_msg(
             };
 
             // deduct tax first
-            let amount = Asset::checked_sub(
-                offer_asset.amount,
-                return_asset.compute_tax(oracle_contract, &deps.querier)?,
-            )?;
+            let amount = offer_asset
+                .amount
+                .checked_sub(return_asset.compute_tax(oracle_contract, &deps.querier)?)?;
 
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: pair_contract,
-                send: vec![Coin { denom, amount }],
+                contract_addr: pair_contract.to_string(),
+                funds: vec![Coin { denom, amount }],
                 msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset: Asset {
                         amount,
@@ -178,18 +169,17 @@ fn asset_into_swap_msg(
             }))
         }
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr,
-            send: vec![],
+            contract_addr: contract_addr.to_string(),
+            funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Send {
-                contract: pair_contract,
+                contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
                 msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset,
                     belief_price: None,
                     max_spread,
                     to,
-                })
-                .ok(),
+                })?,
             })?,
         })),
     }

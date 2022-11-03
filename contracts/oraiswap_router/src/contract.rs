@@ -1,6 +1,9 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, QueryRequest, Response,
-    Response, StdError, StdResult, Uint128, WasmQuery,
+    StdError, StdResult, Uint128, WasmQuery,
 };
 use oraiswap::error::ContractError;
 
@@ -17,6 +20,7 @@ use oraiswap::router::{
     SimulateSwapOperationsResponse, SwapOperation,
 };
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -26,13 +30,14 @@ pub fn instantiate(
     CONFIG.save(
         deps.storage,
         &Config {
-            factory_addr: deps.api.addr_canonicalize(&msg.factory_addr)?,
+            factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
         },
     )?;
 
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -71,20 +76,21 @@ pub fn receive_cw20(
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let sender = deps.api.addr_validate(&cw20_msg.sender)?;
+
     // throw empty data as well when decoding
-    match from_binary(&cw20_msg.msg.unwrap_or_default())? {
+    match from_binary(&cw20_msg.msg)? {
         Cw20HookMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
-        } => handle_swap_operations(
-            deps,
-            env,
-            cw20_msg.sender,
-            operations,
-            minimum_receive,
-            to.map(Addr),
-        ),
+        } => {
+            let receiver = match to {
+                Some(addr) => deps.api.addr_validate(addr.as_str()).ok(),
+                None => None,
+            };
+            handle_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
+        }
     }
 }
 
@@ -96,7 +102,7 @@ fn assert_minium_receive(
     receiver: Addr,
 ) -> Result<Response, ContractError> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
-    let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
+    let swap_amount = receiver_balance.checked_sub(prev_balance)?;
 
     if swap_amount < minium_receive {
         return Err(ContractError::SwapAssertionFailure {
@@ -108,6 +114,7 @@ fn assert_minium_receive(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -163,14 +170,12 @@ fn simulate_swap_operations(
                 };
 
                 // Deduct tax before querying simulation, with native token only
-                offer_amount = Asset::checked_sub(
-                    offer_amount,
-                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
-                )?;
+                offer_amount = offer_amount
+                    .checked_sub(return_asset.compute_tax(&oracle_contract, &deps.querier)?)?;
 
                 let mut res: SimulationResponse =
                     deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                        contract_addr: pair_info.contract_addr.clone(),
+                        contract_addr: pair_info.contract_addr.to_string(),
                         msg: to_binary(&PairQueryMsg::Simulation {
                             offer_asset: Asset {
                                 info: offer_asset_info,
@@ -185,10 +190,9 @@ fn simulate_swap_operations(
                 };
 
                 // Deduct tax after querying simulation, with native token only
-                res.return_amount = Asset::checked_sub(
-                    res.return_amount,
-                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
-                )?;
+                res.return_amount = res
+                    .return_amount
+                    .checked_sub(return_asset.compute_tax(&oracle_contract, &deps.querier)?)?;
 
                 offer_amount = res.return_amount;
             }

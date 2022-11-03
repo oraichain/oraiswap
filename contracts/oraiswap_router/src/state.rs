@@ -30,11 +30,11 @@ mod test {
 
     #[test]
     fn legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         store_config(
             &mut deps.storage,
             &Config {
-                factory_addr: deps.api.addr_canonicalize(&"addr0000".into()).unwrap(),
+                factory_addr: deps.api.addr_canonicalize("addr0000").unwrap(),
             },
         )
         .unwrap();

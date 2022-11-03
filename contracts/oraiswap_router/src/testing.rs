@@ -1,17 +1,16 @@
-use cosmwasm_std::{Coin, Decimal, Uint128};
+use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::create_entry_points_testing;
 use oraiswap::router::{
     ExecuteMsg, InstantiateMsg, QueryMsg, SimulateSwapOperationsResponse, SwapOperation,
 };
 
-use oraiswap::mock_app::{MockApp, ATOM_DENOM};
+use oraiswap::testing::{MockApp, ATOM_DENOM};
 
 #[test]
 fn simulate_swap_operations_test() {
-    let mut app = MockApp::new();
-
-    app.set_balance(
-        "addr0000".into(),
+    let mut app = MockApp::new(&[(
+        &"addr0000".to_string(),
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -22,15 +21,20 @@ fn simulate_swap_operations_test() {
                 amount: Uint128::from(1000u128),
             },
         ],
-    );
+    )]);
 
-    app.set_oracle_contract(oraiswap_oracle::testutils::contract());
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
-    app.set_token_contract(oraiswap_token::testutils::contract());
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     app.set_factory_and_pair_contract(
-        oraiswap_factory::testutils::contract(),
-        oraiswap_pair::testutils::contract(),
+        Box::new(
+            create_entry_points_testing!(oraiswap_factory)
+                .with_reply(oraiswap_factory::contract::reply),
+        ),
+        Box::new(
+            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+        ),
     );
 
     // set tax rate as 0.3%
@@ -77,7 +81,7 @@ fn simulate_swap_operations_test() {
 
     let _res = app
         .execute(
-            "addr0000".into(),
+            Addr::unchecked("addr0000"),
             pair_addr,
             &msg,
             &[
@@ -97,11 +101,11 @@ fn simulate_swap_operations_test() {
         factory_addr: app.factory_addr.clone(),
     };
 
-    let code_id = app.upload(crate::testutils::contract());
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, "addr0000".into(), &msg, &[], "router")
+        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
         .unwrap();
 
     let msg = QueryMsg::SimulateSwapOperations {
@@ -122,28 +126,8 @@ fn simulate_swap_operations_test() {
 
 #[test]
 fn handle_swap_operations() {
-    let mut app = MockApp::new();
-
-    app.set_oracle_contract(oraiswap_oracle::testutils::contract());
-
-    app.set_token_contract(oraiswap_token::testutils::contract());
-
-    app.set_factory_and_pair_contract(
-        oraiswap_factory::testutils::contract(),
-        oraiswap_pair::testutils::contract(),
-    );
-
-    // set tax rate as 0.3%
-    app.set_tax(
-        Decimal::permille(3),
-        &[
-            (&ORAI_DENOM.to_string(), &Uint128::from(10000000u128)),
-            (&ATOM_DENOM.to_string(), &Uint128::from(10000000u128)),
-        ],
-    );
-
-    app.set_balance(
-        "addr0000".into(),
+    let mut app = MockApp::new(&[(
+        &"addr0000".to_string(),
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -153,6 +137,28 @@ fn handle_swap_operations() {
                 denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(1000u128),
             },
+        ],
+    )]);
+
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_factory_and_pair_contract(
+        Box::new(
+            create_entry_points_testing!(oraiswap_factory)
+                .with_reply(oraiswap_factory::contract::reply),
+        ),
+        Box::new(
+            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+        ),
+    );
+    // set tax rate as 0.3%
+    app.set_tax(
+        Decimal::permille(3),
+        &[
+            (&ORAI_DENOM.to_string(), &Uint128::from(10000000u128)),
+            (&ATOM_DENOM.to_string(), &Uint128::from(10000000u128)),
         ],
     );
 
@@ -207,10 +213,10 @@ fn handle_swap_operations() {
 
     // set allowance
     app.execute(
-        "addr0000".into(),
+        Addr::unchecked("addr0000"),
         asset_addr.clone(),
-        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
-            spender: pair_addr1.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr1.to_string(),
             amount: Uint128::from(100u128),
             expires: None,
         },
@@ -220,7 +226,7 @@ fn handle_swap_operations() {
 
     let _res = app
         .execute(
-            "addr0000".into(),
+            Addr::unchecked("addr0000"),
             pair_addr1.clone(),
             &msg,
             &[Coin {
@@ -251,10 +257,10 @@ fn handle_swap_operations() {
 
     // set allowance
     app.execute(
-        "addr0000".into(),
+        Addr::unchecked("addr0000"),
         asset_addr.clone(),
-        &oraiswap_token::msg::ExecuteMsg::IncreaseAllowance {
-            spender: pair_addr2.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr2.to_string(),
             amount: Uint128::from(100u128),
             expires: None,
         },
@@ -264,7 +270,7 @@ fn handle_swap_operations() {
 
     let _res = app
         .execute(
-            "addr0000".into(),
+            Addr::unchecked("addr0000"),
             pair_addr2.clone(),
             &msg,
             &[Coin {
@@ -278,11 +284,11 @@ fn handle_swap_operations() {
         factory_addr: app.factory_addr.clone(),
     };
 
-    let code_id = app.upload(crate::testutils::contract());
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, "addr0000".into(), &msg, &[], "router")
+        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
         .unwrap();
 
     let msg = ExecuteMsg::ExecuteSwapOperations {
@@ -291,10 +297,10 @@ fn handle_swap_operations() {
         to: None,
     };
 
-    let res = app.execute("addr0000".into(), router_addr.clone(), &msg, &[]);
-    match res {
-        Err(err) => assert_eq!(err, "must provide operations"),
-        _ => panic!("DO NOT ENTER HERE"),
+    let res = app.execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[]);
+    match res.err() {
+        Some(msg) => assert_eq!(msg.contains("error executing WasmMsg"), true),
+        None => panic!("Must return generic error"),
     }
 
     let msg = ExecuteMsg::ExecuteSwapOperations {
@@ -322,7 +328,7 @@ fn handle_swap_operations() {
 
     let res = app
         .execute(
-            "addr0000".into(),
+            Addr::unchecked("addr0000"),
             router_addr.clone(),
             &msg,
             &[
@@ -338,5 +344,5 @@ fn handle_swap_operations() {
         )
         .unwrap();
 
-    println!("{:?}", res.attributes);
+    println!("{:?}", res.events);
 }
