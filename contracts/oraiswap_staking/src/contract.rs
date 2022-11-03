@@ -141,7 +141,7 @@ pub fn update_config(
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.addr_canonicalize(&owner)?;
+        config.owner = deps.api.addr_canonicalize(owner.as_str())?;
     }
 
     if let Some(rewarder) = rewarder {

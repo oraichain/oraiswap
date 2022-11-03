@@ -8,7 +8,7 @@ use cosmwasm_std::{
 use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
-    ExchangeRatesResponse, MigrateMsg, OracleMsg, OracleQuery, RewardPoolResponse, TaxCapResponse,
+    ExchangeRatesResponse, ExecuteMsg, MigrateMsg, QueryMsg, RewardPoolResponse, TaxCapResponse,
     TaxRateResponse,
 };
 
@@ -61,17 +61,17 @@ pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: OracleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        OracleMsg::UpdateExchangeRate {
+        ExecuteMsg::UpdateExchangeRate {
             denom,
             exchange_rate,
         } => handle_update_exchange_rate(deps, info, denom, exchange_rate),
-        OracleMsg::DeleteExchangeRate { denom } => handle_delete_exchange_rate(deps, info, denom),
-        OracleMsg::UpdateTaxCap { cap, denom } => handle_update_tax_cap(deps, info, denom, cap),
-        OracleMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
-        OracleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        ExecuteMsg::DeleteExchangeRate { denom } => handle_delete_exchange_rate(deps, info, denom),
+        ExecuteMsg::UpdateTaxCap { cap, denom } => handle_update_tax_cap(deps, info, denom, cap),
+        ExecuteMsg::UpdateTaxRate { rate } => handle_update_tax_rate(deps, info, rate),
+        ExecuteMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
     }
 }
 
@@ -176,11 +176,11 @@ pub fn handle_delete_exchange_rate(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        OracleQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
-        OracleQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
-        OracleQuery::ExchangeRate {
+        QueryMsg::TaxRate {} => to_binary(&query_tax_rate(deps)?),
+        QueryMsg::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
+        QueryMsg::ExchangeRate {
             base_denom,
             quote_denom,
         } => to_binary(&query_exchange_rate(
@@ -188,7 +188,7 @@ pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
             base_denom.unwrap_or(ORAI_DENOM.to_string()),
             quote_denom,
         )?),
-        OracleQuery::ExchangeRates {
+        QueryMsg::ExchangeRates {
             base_denom,
             quote_denoms,
         } => to_binary(&query_exchange_rates(
@@ -196,8 +196,8 @@ pub fn query(deps: Deps, env: Env, msg: OracleQuery) -> StdResult<Binary> {
             base_denom.unwrap_or(ORAI_DENOM.to_string()),
             quote_denoms,
         )?),
-        OracleQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
-        OracleQuery::RewardPool { denom } => to_binary(&query_reward_pool(deps, env, denom)?),
+        QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+        QueryMsg::RewardPool { denom } => to_binary(&query_reward_pool(deps, env, denom)?),
     }
 }
 

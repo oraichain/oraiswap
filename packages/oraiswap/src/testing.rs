@@ -233,7 +233,7 @@ impl MockApp {
             self.execute(
                 Addr::unchecked(APP_OWNER),
                 self.oracle_addr.clone(),
-                &crate::oracle::OracleMsg::UpdateTaxRate { rate },
+                &crate::oracle::ExecuteMsg::UpdateTaxRate { rate },
                 &[],
             )
             .unwrap();
@@ -243,7 +243,7 @@ impl MockApp {
                 self.execute(
                     Addr::unchecked(APP_OWNER),
                     self.oracle_addr.clone(),
-                    &crate::oracle::OracleMsg::UpdateTaxCap {
+                    &crate::oracle::ExecuteMsg::UpdateTaxCap {
                         denom: denom.to_string(),
                         cap: cap.clone(),
                     },

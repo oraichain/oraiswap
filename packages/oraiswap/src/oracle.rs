@@ -17,7 +17,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum OracleMsg {
+pub enum ExecuteMsg {
     UpdateAdmin {
         admin: Addr,
     },
@@ -38,10 +38,10 @@ pub enum OracleMsg {
     },
 }
 
-/// OracleQuery is defines available query datas
+/// QueryMsg is defines available query datas
 #[cw_serde]
 #[derive(QueryResponses)]
-pub enum OracleQuery {
+pub enum QueryMsg {
     #[returns(TaxRateResponse)]
     TaxRate {},
     #[returns(TaxCapResponse)]
@@ -155,7 +155,7 @@ impl OracleContract {
         Ok(OracleCanonicalContract(canon))
     }
 
-    pub fn call(&self, msg: OracleMsg) -> StdResult<CosmosMsg> {
+    pub fn call(&self, msg: ExecuteMsg) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg)?;
         Ok(WasmMsg::Execute {
             contract_addr: self.to_string(),
@@ -168,7 +168,7 @@ impl OracleContract {
     pub fn query<T: DeserializeOwned>(
         &self,
         querier: &QuerierWrapper,
-        req: OracleQuery,
+        req: QueryMsg,
     ) -> StdResult<T> {
         let query = WasmQuery::Smart {
             contract_addr: self.to_string(),
@@ -185,7 +185,7 @@ impl OracleContract {
         querier: &QuerierWrapper,
         denom: T,
     ) -> StdResult<TaxCapResponse> {
-        let request = OracleQuery::TaxCap {
+        let request = QueryMsg::TaxCap {
             denom: denom.into(),
         };
 
@@ -193,7 +193,7 @@ impl OracleContract {
     }
 
     pub fn query_tax_rate(&self, querier: &QuerierWrapper) -> StdResult<TaxRateResponse> {
-        let request = OracleQuery::TaxRate {};
+        let request = QueryMsg::TaxRate {};
 
         self.query(querier, request)
     }
@@ -205,7 +205,7 @@ impl OracleContract {
         base_denom: T,
         quote_denom: T,
     ) -> StdResult<ExchangeRateResponse> {
-        let request = OracleQuery::ExchangeRate {
+        let request = QueryMsg::ExchangeRate {
             base_denom: Some(base_denom.into()),
             quote_denom: quote_denom.into(),
         };
@@ -219,7 +219,7 @@ impl OracleContract {
         base_denom: T,
         quote_denoms: Vec<T>,
     ) -> StdResult<ExchangeRatesResponse> {
-        let request = OracleQuery::ExchangeRates {
+        let request = QueryMsg::ExchangeRates {
             base_denom: Some(base_denom.into()),
             quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
         };
@@ -231,7 +231,7 @@ impl OracleContract {
         &self,
         querier: &QuerierWrapper,
     ) -> StdResult<ContractInfoResponse> {
-        let request = OracleQuery::ContractInfo {};
+        let request = QueryMsg::ContractInfo {};
 
         self.query(querier, request)
     }

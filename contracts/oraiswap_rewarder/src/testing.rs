@@ -1,13 +1,16 @@
-use crate::contract::{init, query_config};
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+use crate::contract::{instantiate, query_config};
+use cosmwasm_std::{
+    testing::{mock_dependencies, mock_env, mock_info},
+    Addr,
+};
 use oraiswap::rewarder::{ConfigResponse, InstantiateMsg};
 
 #[test]
 fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
-        staking_contract: "staking".into(),
+        staking_contract: Addr::unchecked("staking"),
         distribution_interval: Some(600),
     };
 
@@ -20,8 +23,8 @@ fn proper_initialization() {
     assert_eq!(
         contract_info,
         ConfigResponse {
-            owner: "owner".into(),
-            staking_contract: "staking".into(),
+            owner: Addr::unchecked("owner"),
+            staking_contract: Addr::unchecked("staking"),
             distribution_interval: 600,
         }
     );

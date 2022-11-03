@@ -11,7 +11,7 @@ use cosmwasm_std::{
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
 use oraiswap::oracle::{
-    ExchangeRateResponse, InstantiateMsg, OracleContract, OracleMsg, OracleQuery,
+    ExchangeRateResponse, ExecuteMsg, InstantiateMsg, OracleContract, QueryMsg,
 };
 use oraiswap::testing::MockApp;
 
@@ -37,14 +37,14 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
 fn proper_initialization() {
     let mut deps = setup_contract();
 
-    let msg = OracleMsg::UpdateExchangeRate {
+    let msg = ExecuteMsg::UpdateExchangeRate {
         denom: "usdt".to_string(),
         exchange_rate: Decimal::percent(10), // 1 orai = 10 usdt
     };
 
     let _res = execute(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
 
-    let msg = OracleQuery::ExchangeRate {
+    let msg = QueryMsg::ExchangeRate {
         base_denom: Some("usdt".to_string()),
         quote_denom: ORAI_DENOM.to_string(),
     };
@@ -59,7 +59,7 @@ fn proper_initialization() {
 fn tax_cap_notfound() {
     let deps = setup_contract();
 
-    let msg = OracleQuery::TaxCap {
+    let msg = QueryMsg::TaxCap {
         denom: "airi".to_string(),
     };
 

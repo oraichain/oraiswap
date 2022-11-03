@@ -1,6 +1,7 @@
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper,
-    Response, Response, StdError, StdResult, Uint128, WasmMsg,
+    Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cosmwasm_std::{QueryRequest, WasmQuery};
 
@@ -21,6 +22,7 @@ use oraiswap::asset::{Asset, AssetInfo};
 // 600 seconds default
 const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
 
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -30,9 +32,9 @@ pub fn instantiate(
     store_config(
         deps.storage,
         &Config {
-            init_time: env.block.time,
+            init_time: env.block.time.seconds(),
             owner: deps.api.addr_canonicalize(info.sender.as_str())?,
-            staking_contract: deps.api.addr_canonicalize(&msg.staking_contract)?,
+            staking_contract: deps.api.addr_canonicalize(msg.staking_contract.as_str())?,
             distribution_interval: msg
                 .distribution_interval
                 .unwrap_or(DEFAULT_DISTRIBUTION_INTERVAL),
@@ -42,6 +44,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::UpdateConfig {
@@ -67,11 +70,11 @@ pub fn update_config(
     }
 
     if let Some(owner) = owner {
-        config.owner = deps.api.addr_canonicalize(&owner)?;
+        config.owner = deps.api.addr_canonicalize(owner.as_str())?;
     }
 
     if let Some(staking_contract) = staking_contract {
-        config.staking_contract = deps.api.addr_canonicalize(&staking_contract)?;
+        config.staking_contract = deps.api.addr_canonicalize(staking_contract.as_str())?;
     }
 
     if let Some(distribution_interval) = distribution_interval {
@@ -80,11 +83,7 @@ pub fn update_config(
 
     store_config(deps.storage, &config)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![attr("action", "update_config")],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![attr("action", "update_config")]))
 }
 
 /// Distribute
@@ -92,7 +91,7 @@ pub fn update_config(
 pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
-    let now = env.block.time;
+    let now = env.block.time.seconds();
     let mut rewards: Vec<Asset> = vec![];
     for asset_info in asset_infos {
         let asset_key = asset_info.to_vec(deps.api)?;
@@ -114,7 +113,7 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
             _read_pool_reward_per_sec(&deps.querier, staking_contract.clone(), asset_info.clone())?;
 
         // get total reward amount for a pool
-        let distribution_amount = Uint128(reward_amount.u128() * (last_time_elapsed as u128));
+        let distribution_amount = Uint128::from(reward_amount.u128() * (last_time_elapsed as u128));
 
         // update rewards
         rewards.push(Asset {
@@ -123,17 +122,16 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
         });
     }
 
-    Ok(Response {
-        messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: staking_contract,
+    Ok(Response::new()
+        .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: staking_contract.to_string(),
             msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,
-            send: vec![],
-        })],
-        data: None,
-        attributes: vec![attr("action", "distribute")],
-    })
+            funds: vec![],
+        }))
+        .add_attributes(vec![attr("action", "distribute")]))
 }
 
+#[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -188,7 +186,7 @@ fn _read_pool_reward_per_sec(
     asset_info: AssetInfo,
 ) -> StdResult<Uint128> {
     let res: RewardsPerSecResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: staking_contract,
+        contract_addr: staking_contract.to_string(),
         msg: to_binary(&StakingQueryMsg::RewardsPerSec { asset_info })?,
     }))?;
 

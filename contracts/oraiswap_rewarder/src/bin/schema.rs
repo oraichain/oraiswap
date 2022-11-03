@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use oraiswap::oracle::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use oraiswap::rewarder::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
