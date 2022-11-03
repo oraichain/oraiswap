@@ -183,7 +183,6 @@ pub fn receive_cw20(
 /// This just stores the result for future query
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
-    println!("msg {:?}", msg);
     let data = msg.result.unwrap().data.unwrap();
 
     let res: MsgInstantiateContractResponse =
