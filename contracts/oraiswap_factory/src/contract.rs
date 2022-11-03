@@ -21,7 +21,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let config = Config {
-        oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
+        oracle_addr: deps.api.addr_canonicalize(msg.oracle_addr.as_str())?,
         owner: deps.api.addr_canonicalize(info.sender.as_str())?,
         token_code_id: msg.token_code_id,
         pair_code_id: msg.pair_code_id,

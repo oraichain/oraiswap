@@ -82,7 +82,7 @@ fn test_asset() {
         }],
     )]);
 
-    app.set_token_contract(create_entry_points_testing!(oraiswap_token));
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     app.set_token_balances(&[(
         &"asset".to_string(),
@@ -95,7 +95,7 @@ fn test_asset() {
     )]);
 
     // set code implementation
-    app.set_oracle_contract(create_entry_points_testing!(crate));
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(crate)));
 
     app.set_tax(
         Decimal::percent(1),

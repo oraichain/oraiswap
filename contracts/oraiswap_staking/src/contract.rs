@@ -34,7 +34,7 @@ pub fn instantiate(
                 .api
                 .addr_canonicalize(&msg.owner.unwrap_or(info.sender.clone()))?,
             rewarder: deps.api.addr_canonicalize(&msg.rewarder)?,
-            oracle_addr: deps.api.addr_canonicalize(&msg.oracle_addr)?,
+            oracle_addr: deps.api.addr_canonicalize(msg.oracle_addr.as_str())?,
             factory_addr: deps.api.addr_canonicalize(&msg.factory_addr)?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),

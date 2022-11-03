@@ -17,11 +17,11 @@ const APP_OWNER: &str = "admin";
 #[macro_export]
 macro_rules! create_entry_points_testing {
     ($contract:ident) => {
-        Box::new(cw_multi_test::ContractWrapper::new(
+        cw_multi_test::ContractWrapper::new(
             $contract::contract::execute,
             $contract::contract::instantiate,
             $contract::contract::query,
-        ))
+        )
     };
 }
 
@@ -182,7 +182,6 @@ impl MockApp {
                         token_code_id,
                         oracle_addr,
                         commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
-                        init_hook: None,
                     },
                     &[],
                     "pair",
@@ -382,7 +381,7 @@ mod tests {
     fn token_balance_querier() {
         let mut app = MockApp::new(&[]);
 
-        app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
+        app.set_token_contract(Box::new(crate::create_entry_points_testing!(cw20_base)));
 
         app.set_token_balances(&[(
             &"AIRI".to_string(),
@@ -454,7 +453,7 @@ mod tests {
     #[test]
     fn supply_querier() {
         let mut app = MockApp::new(&[]);
-        app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
+        app.set_token_contract(Box::new(crate::create_entry_points_testing!(cw20_base)));
         app.set_token_balances(&[(
             &"LPA".to_string(),
             &[
@@ -480,7 +479,7 @@ mod tests {
                 amount: Uint128::from(123u128),
             }],
         )]);
-        app.set_token_contract(crate::create_entry_points_testing!(cw20_base));
+        app.set_token_contract(Box::new(crate::create_entry_points_testing!(cw20_base)));
 
         app.set_token_balances(&[(
             &"ASSET".to_string(),

@@ -11,7 +11,7 @@ use cw20_base::{
     msg::{InstantiateMsg, MigrateMsg, QueryMsg},
 };
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -21,7 +21,7 @@ pub fn instantiate(
     cw20_instantiate(deps, env, info, msg)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -31,19 +31,19 @@ pub fn execute(
     cw20_execute(deps, env, info, msg)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     cw20_query(deps, env, msg)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw20_migrate(deps, env, msg)
 }
 
 #[test]
 pub fn test() {
-    let contract = oraiswap::create_entry_points_testing!(crate);
+    let contract = Box::new(oraiswap::create_entry_points_testing!(crate));
     let mut app = oraiswap::testing::MockApp::new(&[]);
     let code_id = app.upload(contract);
     println!("contract code id {}", code_id);

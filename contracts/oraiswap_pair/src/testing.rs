@@ -22,9 +22,9 @@ fn provide_liquidity_both_native() {
         ],
     )]);
 
-    app.set_oracle_contract(create_entry_points_testing!(oraiswap_oracle));
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
-    app.set_token_contract(create_entry_points_testing!(oraiswap_token));
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     app.set_token_balances(&[
         (
@@ -49,7 +49,10 @@ fn provide_liquidity_both_native() {
     };
 
     // we can just call .unwrap() to assert this was a success
-    let code_id = app.upload(create_entry_points_testing!(crate));
+    let code_id = app.upload(Box::new(
+        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+    ));
+
     let pair_addr = app
         .instantiate(code_id, Addr::unchecked("owner"), &msg, &[], "pair")
         .unwrap();

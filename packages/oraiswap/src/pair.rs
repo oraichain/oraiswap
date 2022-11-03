@@ -3,7 +3,6 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
-    hook::InitHook,
     Decimal256, Uint256,
 };
 
@@ -25,16 +24,11 @@ pub struct InstantiateMsg {
     pub oracle_addr: Addr,
 
     pub commission_rate: Option<String>,
-
-    /// Hook for post initalization
-    pub init_hook: Option<InitHook>,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
-    /// Post initize step to allow user to set controlled contract address after creating it
-    PostInitialize {},
     /// ProvideLiquidity a user provides pool liquidity
     ProvideLiquidity {
         assets: [Asset; 2],

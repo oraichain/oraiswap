@@ -1,5 +1,5 @@
 [workspace]
-members = ["packages/*", "contracts/oraiswap_token","contracts/oraiswap_converter","contracts/oraiswap_oracle","contracts/oraiswap_rewarder"]
+members = ["packages/*", "contracts/oraiswap_token","contracts/oraiswap_oracle","contracts/oraiswap_pair"]
 
 [profile.release]
 opt-level = 3

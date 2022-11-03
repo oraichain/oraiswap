@@ -71,6 +71,10 @@ The optimized contracts are generated in the artifacts/ directory.
 
 ```bash
 yarn
+# gen protobuf response.rs
+cargo install protobuf-codegen
+protoc --rust_out . response.proto
+
 # gen oraiswap_pair typescript and schema
 yarn gen-ts contracts/oraiswap_[package]
 ```
