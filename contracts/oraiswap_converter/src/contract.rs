@@ -1,14 +1,14 @@
+use std::convert::TryInto;
+
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Decimal256,
+    Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, Uint256,
 };
 use cw20::Cw20ReceiveMsg;
 
 use crate::state::{
     read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_remove, Config,
 };
-
-use oraiswap::{Decimal256, Uint256};
 
 use oraiswap::converter::{
     ConfigResponse, ConvertInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
@@ -66,7 +66,9 @@ fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
     let denominator = Decimal256::from(denominator);
     let fraction = Uint256::from(DECIMAL_FRACTION);
 
-    (nominator * Decimal256::from_ratio(fraction, fraction * denominator)).into()
+    let result = nominator * Decimal256::from_ratio(fraction, fraction * denominator);
+
+    u128::from_le_bytes(result.to_le_bytes()[0..16].try_into().unwrap()).into()
 }
 
 pub fn receive_cw20(

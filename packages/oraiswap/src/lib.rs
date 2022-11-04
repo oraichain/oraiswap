@@ -11,9 +11,6 @@ pub mod rewarder;
 pub mod router;
 pub mod staking;
 
-mod math;
-pub use crate::math::{Decimal256, Uint256};
-
 #[cfg(not(target_arch = "wasm32"))]
 pub use cw_multi_test;
 

@@ -1,10 +1,11 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
+use std::convert::TryInto;
 
 use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
-    Decimal256, Uint256,
 };
+use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Decimal256, Uint256};
 
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
@@ -38,7 +39,7 @@ pub enum ExecuteMsg {
     /// Swap an offer asset to the other
     Swap {
         offer_asset: Asset,
-        belief_price: Option<Decimal>,
+        belief_price: Option<Uint128>,
         max_spread: Option<Decimal>,
         to: Option<Addr>,
     },
@@ -48,7 +49,7 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     /// Sell a given amount of asset
     Swap {
-        belief_price: Option<Decimal>,
+        belief_price: Option<Uint128>,
         max_spread: Option<Decimal>,
         to: Option<String>,
     },
@@ -131,8 +132,53 @@ pub fn compute_swap(
     // commission will be absorbed to pool
     let return_amount = return_amount - commission_amount;
     Ok((
-        return_amount.into(),
-        spread_amount.into(),
-        commission_amount.into(),
+        u128::from_le_bytes(return_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        u128::from_le_bytes(spread_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        u128::from_le_bytes(commission_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+    ))
+}
+
+pub fn compute_offer_amount(
+    offer_pool: Uint128,
+    ask_pool: Uint128,
+    ask_amount: Uint128,
+    commission_rate: Decimal256,
+) -> Result<(Uint128, Uint128, Uint128), ContractError> {
+    let offer_pool: Uint256 = offer_pool.into();
+    let ask_pool: Uint256 = ask_pool.into();
+    let ask_amount: Uint256 = ask_amount.into();
+
+    // ask => offer
+    // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
+    let cp: Uint256 = offer_pool * ask_pool;
+
+    let one_minus_commission = Decimal256::one() - commission_rate;
+    let inv_one_minus_commission = Decimal256::one() / one_minus_commission;
+
+    let offer_amount: Uint256 = Uint256::one()
+        .multiply_ratio(cp, ask_pool - ask_amount * inv_one_minus_commission)
+        - offer_pool;
+
+    let before_commission_deduction: Uint256 = ask_amount * inv_one_minus_commission;
+    let before_spread_deduction: Uint256 =
+        offer_amount * Decimal256::from_ratio(ask_pool, offer_pool);
+
+    let spread_amount = if before_spread_deduction > before_commission_deduction {
+        before_spread_deduction - before_commission_deduction
+    } else {
+        Uint256::zero()
+    };
+
+    let commission_amount = before_commission_deduction * commission_rate;
+
+    // check small amount swap
+    if spread_amount.is_zero() || commission_amount.is_zero() {
+        return Err(ContractError::TooSmallOfferAmount {});
+    }
+
+    Ok((
+        u128::from_le_bytes(offer_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        u128::from_le_bytes(spread_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        u128::from_le_bytes(commission_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
     ))
 }

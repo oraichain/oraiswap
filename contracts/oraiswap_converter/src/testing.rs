@@ -1,19 +1,28 @@
-use std::ops::Mul;
+use std::{convert::TryInto, ops::Mul};
 
 use cosmwasm_std::{
     attr, coin,
     testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
-    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
+    to_binary, Addr, BankMsg, CosmosMsg, Decimal, Decimal256, StdError, SubMsg, Uint128, Uint256,
+    WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
     asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
     converter::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo},
     testing::ATOM_DENOM,
-    Decimal256, Uint256,
 };
 
 use crate::contract::{execute, instantiate, query};
+
+#[test]
+fn test_u256() {
+    let t = Uint256::from(8_000_000u128);
+    let val = t * t;
+    let arr = val.to_le_bytes();
+    let val = u128::from_le_bytes(arr[0..16].try_into().unwrap());
+    assert_eq!(val, 64_000_000_000_000u128.into());
+}
 
 #[test]
 fn test_decimal() {
@@ -25,6 +34,7 @@ fn test_decimal() {
     println!("decimal: {}", val);
     println!("check: {}", Uint256::from(10u128.pow(20)).mul(val));
 }
+
 #[test]
 fn test_convert_reverse() {
     let mut deps = mock_dependencies_with_balance(&[

@@ -3,8 +3,9 @@ use crate::state::PAIR_INFO;
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Decimal256,
+    Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128,
+    Uint256, WasmMsg,
 };
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, MinterResponse};
@@ -14,12 +15,12 @@ use oraiswap::asset::{Asset, AssetInfo, PairInfoRaw};
 use oraiswap::error::ContractError;
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{
-    compute_swap, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PairResponse, PoolResponse,
-    QueryMsg, ReverseSimulationResponse, SimulationResponse, DEFAULT_COMMISSION_RATE,
+    compute_offer_amount, compute_swap, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
+    PairResponse, PoolResponse, QueryMsg, ReverseSimulationResponse, SimulationResponse,
+    DEFAULT_COMMISSION_RATE,
 };
 use oraiswap::querier::query_supply;
 use oraiswap::response::MsgInstantiateContractResponse;
-use oraiswap::{Decimal256, Uint256};
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -365,7 +366,7 @@ pub fn swap(
     info: MessageInfo,
     sender: Addr,
     offer_asset: Asset,
-    belief_price: Option<Decimal>,
+    belief_price: Option<Uint128>,
     max_spread: Option<Decimal>,
     to: Option<Addr>,
 ) -> Result<Response, ContractError> {
@@ -569,56 +570,11 @@ pub fn amount_of(coins: &[Coin], denom: String) -> Uint128 {
     }
 }
 
-fn compute_offer_amount(
-    offer_pool: Uint128,
-    ask_pool: Uint128,
-    ask_amount: Uint128,
-    commission_rate: Decimal256,
-) -> Result<(Uint128, Uint128, Uint128), ContractError> {
-    let offer_pool: Uint256 = offer_pool.into();
-    let ask_pool: Uint256 = ask_pool.into();
-    let ask_amount: Uint256 = ask_amount.into();
-
-    // ask => offer
-    // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
-    let cp: Uint256 = offer_pool * ask_pool;
-
-    let one_minus_commission = Decimal256::one() - commission_rate;
-    let inv_one_minus_commission = Decimal256::one() / one_minus_commission;
-
-    let offer_amount: Uint256 = Uint256::one()
-        .multiply_ratio(cp, ask_pool - ask_amount * inv_one_minus_commission)
-        - offer_pool;
-
-    let before_commission_deduction: Uint256 = ask_amount * inv_one_minus_commission;
-    let before_spread_deduction: Uint256 =
-        offer_amount * Decimal256::from_ratio(ask_pool, offer_pool);
-
-    let spread_amount = if before_spread_deduction > before_commission_deduction {
-        before_spread_deduction - before_commission_deduction
-    } else {
-        Uint256::zero()
-    };
-
-    let commission_amount = before_commission_deduction * commission_rate;
-
-    // check small amount swap
-    if spread_amount.is_zero() || commission_amount.is_zero() {
-        return Err(ContractError::TooSmallOfferAmount {});
-    }
-
-    Ok((
-        offer_amount.into(),
-        spread_amount.into(),
-        commission_amount.into(),
-    ))
-}
-
 /// If `belief_price` and `max_spread` both are given,
 /// we compute new spread else we just use oraiswap
 /// spread to check `max_spread`
 pub fn assert_max_spread(
-    belief_price: Option<Decimal>,
+    belief_price: Option<Uint128>,
     max_spread: Option<Decimal>,
     offer_amount: Uint128,
     return_amount: Uint128,
@@ -629,10 +585,13 @@ pub fn assert_max_spread(
     let spread_amount: Uint256 = spread_amount.into();
 
     if let (Some(max_spread), Some(belief_price)) = (max_spread, belief_price) {
-        let belief_price: Decimal256 = belief_price.into();
+        let belief_price: Uint256 = belief_price.into();
         let max_spread: Decimal256 = max_spread.into();
 
-        let expected_return = offer_amount / belief_price;
+        let expected_return = offer_amount
+            .checked_div(belief_price)
+            .map_err(|err| ContractError::Std(err.into()))?;
+
         let spread_amount = if expected_return > return_amount {
             expected_return - return_amount
         } else {
