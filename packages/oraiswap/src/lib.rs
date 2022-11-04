@@ -12,6 +12,7 @@ pub mod staking;
 
 mod math;
 pub use crate::math::{Decimal256, Uint256};
+pub use cw_multi_test;
 
 // for other to use, but not compile to wasm
 #[cfg(not(target_arch = "wasm32"))]

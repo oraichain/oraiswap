@@ -17,7 +17,7 @@ const APP_OWNER: &str = "admin";
 #[macro_export]
 macro_rules! create_entry_points_testing {
     ($contract:ident) => {
-        cw_multi_test::ContractWrapper::new(
+        $crate::cw_multi_test::ContractWrapper::new(
             $contract::contract::execute,
             $contract::contract::instantiate,
             $contract::contract::query,
