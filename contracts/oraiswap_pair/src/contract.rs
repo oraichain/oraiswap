@@ -366,7 +366,7 @@ pub fn swap(
     info: MessageInfo,
     sender: Addr,
     offer_asset: Asset,
-    belief_price: Option<Uint128>,
+    belief_price: Option<Decimal>,
     max_spread: Option<Decimal>,
     to: Option<Addr>,
 ) -> Result<Response, ContractError> {
@@ -574,7 +574,7 @@ pub fn amount_of(coins: &[Coin], denom: String) -> Uint128 {
 /// we compute new spread else we just use oraiswap
 /// spread to check `max_spread`
 pub fn assert_max_spread(
-    belief_price: Option<Uint128>,
+    belief_price: Option<Decimal>,
     max_spread: Option<Decimal>,
     offer_amount: Uint128,
     return_amount: Uint128,
@@ -585,12 +585,10 @@ pub fn assert_max_spread(
     let spread_amount: Uint256 = spread_amount.into();
 
     if let (Some(max_spread), Some(belief_price)) = (max_spread, belief_price) {
-        let belief_price: Uint256 = belief_price.into();
+        let belief_price: Decimal256 = belief_price.into();
         let max_spread: Decimal256 = max_spread.into();
-
-        let expected_return = offer_amount
-            .checked_div(belief_price)
-            .map_err(|err| ContractError::Std(err.into()))?;
+        // mul with belief_price inv
+        let expected_return = offer_amount * (Decimal256::one() / belief_price);
 
         let spread_amount = if expected_return > return_amount {
             expected_return - return_amount

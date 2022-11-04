@@ -39,7 +39,7 @@ pub enum ExecuteMsg {
     /// Swap an offer asset to the other
     Swap {
         offer_asset: Asset,
-        belief_price: Option<Uint128>,
+        belief_price: Option<Decimal>,
         max_spread: Option<Decimal>,
         to: Option<Addr>,
     },
@@ -49,7 +49,7 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     /// Sell a given amount of asset
     Swap {
-        belief_price: Option<Uint128>,
+        belief_price: Option<Decimal>,
         max_spread: Option<Decimal>,
         to: Option<String>,
     },
