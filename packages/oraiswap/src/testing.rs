@@ -1,9 +1,9 @@
+use cosmwasm_schema::serde::de::DeserializeOwned;
+use cosmwasm_schema::serde::Serialize;
 use cosmwasm_std::{
     coin, Addr, AllBalanceResponse, BalanceResponse, BankQuery, Coin, Decimal, Empty,
     QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};

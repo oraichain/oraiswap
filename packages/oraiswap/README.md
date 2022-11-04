@@ -10,7 +10,7 @@ AssetInfo is a convience wrapper to represent the native token and the contract 
 Currently there only Orai native token in Oraichain blockchain.
 
 ```rust
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum AssetInfo {
     Token { contract_addr: Addr },
     NativeToken { denom: String },

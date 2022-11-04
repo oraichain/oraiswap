@@ -47,6 +47,8 @@ if (package) {
   const artifactsFolder = path.join(package, "artifacts");
   const schemaFolder = path.join(artifactsFolder, "schema");
 
+  if (!fs.existsSync(artifactsFolder)) fs.mkdirSync(artifactsFolder);
+
   if (
     !fs.existsSync(schemaFolder) ||
     process.argv.includes("--force") ||

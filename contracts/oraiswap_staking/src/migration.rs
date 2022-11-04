@@ -1,11 +1,10 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
 use cosmwasm_storage::ReadonlyBucket;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use crate::state::{rewards_store, MigrationParams, RewardInfo, PREFIX_REWARD};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct LegacyPoolInfo {
     pub staking_token: CanonicalAddr,
     pub pending_reward: Uint128, // not distributed amount due to zero bonding
@@ -21,7 +20,7 @@ pub struct LegacyPoolInfo {
 }
 
 // migrate reward store
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct LegacyRewardInfo {
     pub index: Decimal,
     pub bond_amount: Uint128,

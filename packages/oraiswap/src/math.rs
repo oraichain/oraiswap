@@ -1,5 +1,5 @@
-use schemars::JsonSchema;
-use serde::{de, ser, Deserialize, Deserializer, Serialize};
+use cosmwasm_schema::schemars::JsonSchema;
+use cosmwasm_schema::serde::{de, ser, Deserialize, Deserializer, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{self, Write};
 use std::ops;

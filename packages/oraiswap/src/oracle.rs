@@ -1,5 +1,5 @@
+use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use serde::de::DeserializeOwned;
 
 use cosmwasm_std::{
     to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult,
