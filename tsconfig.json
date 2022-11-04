@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "strict": false,
+    },
+    "include": [
+        "global.d.ts",
+        "contracts/**/artifacts/ts/*.ts",
+        "examples",
+    ],
+    "exclude": [
+        "node_modules"
+    ],
+    "ts-node": {
+        "transpileOnly": true
+    }
+}
