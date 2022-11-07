@@ -589,7 +589,6 @@ dependencies = [
  "cosmwasm-storage",
  "cw20",
  "oraiswap",
- "serde",
 ]
 
 [[package]]
@@ -604,7 +603,6 @@ dependencies = [
  "oraiswap-oracle",
  "oraiswap-pair",
  "oraiswap-token",
- "serde",
 ]
 
 [[package]]
