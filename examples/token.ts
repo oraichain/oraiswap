@@ -1,10 +1,11 @@
 import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import "dotenv/config";
-import { OraiswapTokenQueryClient } from "../contracts/oraiswap_token/artifacts/ts/OraiswapToken.client";
+import { contracts } from "../build";
 
 (async () => {
   const client = await CosmWasmClient.connect(process.env.RPC_URL);
-  const tokenClient = new OraiswapTokenQueryClient(
+
+  const tokenClient = new contracts.OraiswapToken.OraiswapTokenQueryClient(
     client,
     process.env.ORAIX_CONTRACT
   );

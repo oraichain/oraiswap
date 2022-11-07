@@ -1,11 +1,13 @@
 {
     "compilerOptions": {
         "strict": false,
+        "resolveJsonModule": true,
+        "isolatedModules": true
     },
     "include": [
         "global.d.ts",
-        "contracts/**/artifacts/ts/*.ts",
-        "examples",
+        "build/*.ts",
+        "examples"
     ],
     "exclude": [
         "node_modules"

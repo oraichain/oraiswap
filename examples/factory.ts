@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { OraiswapFactoryClient } from "../contracts/oraiswap_factory/artifacts/ts/OraiswapFactory.client";
+import { contracts } from "../build";
 
 (async () => {
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(
@@ -16,7 +16,7 @@ import { OraiswapFactoryClient } from "../contracts/oraiswap_factory/artifacts/t
     process.env.RPC_URL,
     wallet
   );
-  const factoryClient = new OraiswapFactoryClient(
+  const factoryClient = new contracts.OraiswapFactory.OraiswapFactoryClient(
     client,
     firstAccount.address,
     process.env.FACTORY_CONTRACT

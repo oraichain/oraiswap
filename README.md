@@ -90,6 +90,6 @@ impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
 }
 END
 
-# gen oraiswap_pair typescript and schema
-yarn gen-ts contracts/oraiswap_[package]
+# gen typescript code
+yarn gen-ts
 ```
