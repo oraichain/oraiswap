@@ -61,14 +61,19 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> Uint128 {
+pub fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> StdResult<Uint128> {
     let nominator = Uint256::from(nominator);
     let denominator = Decimal256::from(denominator);
     let fraction = Uint256::from(DECIMAL_FRACTION);
 
     let result = nominator * Decimal256::from_ratio(fraction, fraction * denominator);
 
-    u128::from_le_bytes(result.to_le_bytes()[0..16].try_into().unwrap()).into()
+    Ok(u128::from_le_bytes(
+        result.to_le_bytes()[0..16]
+            .try_into()
+            .map_err(|_| StdError::generic_err("conversion error in div_ratio_decimal()"))?,
+    )
+    .into())
 }
 
 pub fn receive_cw20(
@@ -108,7 +113,7 @@ pub fn receive_cw20(
                     return Err(StdError::generic_err("invalid cw20 hook message"));
                 }
 
-                let amount = div_ratio_decimal(cw20_msg.amount.clone(), token_ratio.ratio.clone());
+                let amount = div_ratio_decimal(cw20_msg.amount.clone(), token_ratio.ratio.clone())?;
 
                 let message = Asset {
                     info: from,
@@ -212,24 +217,23 @@ pub fn convert_reverse(
 
     if let AssetInfo::NativeToken { denom } = token_ratio.info {
         //check funds includes To token
-        let native_coin = info.funds.iter().find(|a| a.denom.eq(&denom));
-        if native_coin.is_none() {
-            return Err(StdError::generic_err("invalid cw20 hook message"));
-        }
-        let native_coin = native_coin.unwrap();
-        let amount = div_ratio_decimal(native_coin.amount.clone(), token_ratio.ratio.clone());
-        let message = Asset {
-            info: from_asset,
-            amount: amount.clone(),
-        }
-        .into_msg(None, &deps.querier, info.sender.clone())?;
+        if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
+            let amount = div_ratio_decimal(native_coin.amount.clone(), token_ratio.ratio.clone())?;
+            let message = Asset {
+                info: from_asset,
+                amount: amount.clone(),
+            }
+            .into_msg(None, &deps.querier, info.sender.clone())?;
 
-        Ok(Response::new().add_message(message).add_attributes(vec![
-            ("action", "convert_token_reverse"),
-            ("denom", native_coin.denom.as_str()),
-            ("from_amount", &native_coin.amount.to_string()),
-            ("to_amount", &amount.to_string()),
-        ]))
+            return Ok(Response::new().add_message(message).add_attributes(vec![
+                ("action", "convert_token_reverse"),
+                ("denom", native_coin.denom.as_str()),
+                ("from_amount", &native_coin.amount.to_string()),
+                ("to_amount", &amount.to_string()),
+            ]));
+        } else {
+            return Err(StdError::generic_err("Cannot find the native token that matches the input to convert in convert_reverse()"));
+        };
     } else {
         return Err(StdError::generic_err("invalid cw20 hook message"));
     }

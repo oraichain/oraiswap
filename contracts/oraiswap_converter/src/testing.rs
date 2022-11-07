@@ -13,7 +13,7 @@ use oraiswap::{
     testing::ATOM_DENOM,
 };
 
-use crate::contract::{execute, instantiate, query};
+use crate::contract::{div_ratio_decimal, execute, instantiate, query};
 
 #[test]
 fn test_u256() {
@@ -33,6 +33,38 @@ fn test_decimal() {
     let val = Decimal256::from_ratio(t, denom);
     println!("decimal: {}", val);
     println!("check: {}", Uint256::from(10u128.pow(20)).mul(val));
+}
+
+#[test]
+fn test_decimal_valid_same_decimal() {
+    let result = div_ratio_decimal(
+        Uint128::from(1u128),
+        Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(6u32)),
+    )
+    .unwrap();
+
+    assert_eq!(result, Uint128::from(1u128))
+}
+
+#[test]
+fn test_decimal_valid_different_decimal() {
+    let result = div_ratio_decimal(
+        Uint128::from(1u128),
+        Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(18u32)),
+    )
+    .unwrap();
+
+    assert_eq!(result, Uint128::from(1000000000000u128))
+}
+
+#[test]
+fn test_decimal_valid_large_number() {
+    let result = div_ratio_decimal(
+        Uint128::from(100000000000000000000000000000000000000u128),
+        Decimal::from_ratio(10u128.pow(18u32), 10u128.pow(6u32)),
+    );
+
+    println!("result: {:?}", result)
 }
 
 #[test]
