@@ -1,8 +1,7 @@
-use std::convert::TryInto;
-
 use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
+    math::Converter,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal256, Uint256};
@@ -130,9 +129,9 @@ pub fn compute_swap(
     // commission will be absorbed to pool
     let return_amount = return_amount - commission_amount;
     Ok((
-        u128::from_le_bytes(return_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
-        u128::from_le_bytes(spread_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
-        u128::from_le_bytes(commission_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        return_amount.into_u128(),
+        spread_amount.into_u128(),
+        commission_amount.into_u128(),
     ))
 }
 
@@ -174,8 +173,8 @@ pub fn compute_offer_amount(
     }
 
     Ok((
-        u128::from_le_bytes(offer_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
-        u128::from_le_bytes(spread_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
-        u128::from_le_bytes(commission_amount.to_le_bytes()[0..16].try_into().unwrap()).into(),
+        offer_amount.into_u128(),
+        spread_amount.into_u128(),
+        commission_amount.into_u128(),
     ))
 }
