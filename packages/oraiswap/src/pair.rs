@@ -120,12 +120,10 @@ pub fn compute_swap(
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
     let cp = offer_pool * ask_pool;
 
-    let return_amount =
-        ask_pool - Decimal256::from_ratio(cp, offer_pool + offer_amount) * Uint256::one();
+    let return_amount = ask_pool - cp / (offer_pool + offer_amount);
 
     // calculate spread & commission
-    let spread_amount =
-        (offer_amount * Decimal256::from_ratio(ask_pool, offer_pool)) - return_amount;
+    let spread_amount = offer_amount.multiply_ratio(ask_pool, offer_pool) - return_amount;
 
     let commission_amount = return_amount * commission_rate;
 

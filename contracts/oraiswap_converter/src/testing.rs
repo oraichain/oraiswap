@@ -1,10 +1,7 @@
-use std::{convert::TryInto, ops::Mul};
-
 use cosmwasm_std::{
     attr, coin,
     testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
-    to_binary, Addr, BankMsg, CosmosMsg, Decimal, Decimal256, StdError, SubMsg, Uint128, Uint256,
-    WasmMsg,
+    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
@@ -14,26 +11,6 @@ use oraiswap::{
 };
 
 use crate::contract::{div_ratio_decimal, execute, instantiate, query};
-
-#[test]
-fn test_u256() {
-    let t = Uint256::from(8_000_000u128);
-    let val = t * t;
-    let arr = val.to_le_bytes();
-    let val = u128::from_le_bytes(arr[0..16].try_into().unwrap());
-    assert_eq!(val, 64_000_000_000_000u128.into());
-}
-
-#[test]
-fn test_decimal() {
-    let t = Decimal::one().atomics();
-    let decimal = Decimal::from_ratio(10u128.pow(18), 10u128.pow(6));
-    let denom: Uint256 = (t * decimal).into();
-    println!("denom: {:?}", denom);
-    let val = Decimal256::from_ratio(t, denom);
-    println!("decimal: {}", val);
-    println!("check: {}", Uint256::from(10u128.pow(20)).mul(val));
-}
 
 #[test]
 fn test_decimal_valid_same_decimal() {
