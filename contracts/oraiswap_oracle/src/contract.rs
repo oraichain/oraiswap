@@ -5,7 +5,7 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 
-use oraiswap::asset::{DECIMAL_FRACTION, ORAI_DENOM};
+use oraiswap::asset::ORAI_DENOM;
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
     ExchangeRatesResponse, ExecuteMsg, MigrateMsg, QueryMsg, RewardPoolResponse, TaxCapResponse,
@@ -228,9 +228,9 @@ pub fn query_exchange_rate(
 ) -> StdResult<ExchangeRateResponse> {
     let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
     let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
-    let fraction = Uint128::from(DECIMAL_FRACTION);
+
     // quote = ask, offer = base
-    let exchange_rate = Decimal::from_ratio(fraction * quote_rate, fraction * base_rate);
+    let exchange_rate = Decimal::from_ratio(quote_rate.atomics(), base_rate.atomics());
 
     let res = ExchangeRateResponse {
         base_denom: base_denom.clone(),
@@ -254,12 +254,11 @@ pub fn query_exchange_rates(
     };
 
     let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
-    let fraction = Uint128::from(DECIMAL_FRACTION);
 
     for quote_denom in quote_denoms {
         let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
 
-        let exchange_rate = Decimal::from_ratio(fraction * quote_rate, fraction * base_rate);
+        let exchange_rate = Decimal::from_ratio(quote_rate.atomics(), base_rate.atomics());
 
         res.items.push(ExchangeRateItem {
             quote_denom,

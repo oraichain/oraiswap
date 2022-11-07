@@ -1,8 +1,6 @@
-use std::convert::TryInto;
-
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Decimal256,
-    Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, Uint256,
+    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use cw20::Cw20ReceiveMsg;
 
@@ -15,7 +13,7 @@ use oraiswap::converter::{
     QueryMsg, TokenInfo, TokenRatio,
 };
 
-use oraiswap::asset::{Asset, AssetInfo, DECIMAL_FRACTION};
+use oraiswap::asset::{Asset, AssetInfo};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -62,18 +60,9 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
 }
 
 pub fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> StdResult<Uint128> {
-    let nominator = Uint256::from(nominator);
-    let denominator = Decimal256::from(denominator);
-    let fraction = Uint256::from(DECIMAL_FRACTION);
-
-    let result = nominator * Decimal256::from_ratio(fraction, fraction * denominator);
-
-    Ok(u128::from_le_bytes(
-        result.to_le_bytes()[0..16]
-            .try_into()
-            .map_err(|_| StdError::generic_err("conversion error in div_ratio_decimal()"))?,
-    )
-    .into())
+    Decimal::checked_from_ratio(nominator, denominator.atomics())
+        .map_err(|_| StdError::generic_err("conversion error in div_ratio_decimal()"))
+        .map(|val| val.atomics())
 }
 
 pub fn receive_cw20(

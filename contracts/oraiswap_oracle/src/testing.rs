@@ -53,6 +53,24 @@ fn proper_initialization() {
     let exchange_rate_res: ExchangeRateResponse = from_binary(&res).unwrap();
 
     assert_eq!("10", exchange_rate_res.item.exchange_rate.to_string());
+
+    let msg = ExecuteMsg::UpdateExchangeRate {
+        denom: "airi".to_string(),
+        exchange_rate: Decimal::percent(1), // 1 orai = 100 airi
+    };
+
+    let _res = execute(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
+
+    let msg = QueryMsg::ExchangeRate {
+        base_denom: Some("airi".to_string()),
+        quote_denom: "usdt".to_string(),
+    };
+
+    let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+    let exchange_rate_res: ExchangeRateResponse = from_binary(&res).unwrap();
+
+    // 1 usdt = 10 airi
+    assert_eq!("10", exchange_rate_res.item.exchange_rate.to_string());
 }
 
 #[test]

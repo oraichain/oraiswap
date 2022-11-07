@@ -8,7 +8,7 @@ use cosmwasm_std::{
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
-    asset::{AssetInfo, DECIMAL_FRACTION, ORAI_DENOM},
+    asset::{AssetInfo, ORAI_DENOM},
     converter::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo},
     testing::ATOM_DENOM,
 };
@@ -26,9 +26,9 @@ fn test_u256() {
 
 #[test]
 fn test_decimal() {
-    let t = Uint256::from(DECIMAL_FRACTION);
+    let t = Decimal::one().atomics();
     let decimal = Decimal::from_ratio(10u128.pow(18), 10u128.pow(6));
-    let denom: Uint256 = t.mul(Decimal256::from(decimal));
+    let denom: Uint256 = (t * decimal).into();
     println!("denom: {:?}", denom);
     let val = Decimal256::from_ratio(t, denom);
     println!("decimal: {}", val);
@@ -220,7 +220,10 @@ fn test_convert_reverse() {
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
     match res {
-        Err(StdError::GenericErr { msg }) => assert_eq!(msg, "invalid cw20 hook message"),
+        Err(StdError::GenericErr { msg }) => assert_eq!(
+            msg,
+            "Cannot find the native token that matches the input to convert in convert_reverse()"
+        ),
         _ => panic!("Must return invalid cw20 hook message"),
     };
 }

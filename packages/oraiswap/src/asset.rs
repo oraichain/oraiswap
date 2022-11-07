@@ -5,13 +5,12 @@ use crate::oracle::OracleContract;
 use crate::querier::query_token_balance;
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, MessageInfo,
+    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 
 pub const ORAI_DENOM: &str = "orai";
-pub const DECIMAL_FRACTION: u128 = 1_000_000_000_000_000_000u128;
 
 #[cw_serde]
 pub struct Asset {
@@ -45,11 +44,9 @@ impl Asset {
                 let tax_cap = oracle_contract
                     .query_tax_cap(querier, denom.to_string())?
                     .cap;
-                let fraction = Uint128::from(DECIMAL_FRACTION);
+
                 Ok(std::cmp::min(
-                    amount.checked_sub(
-                        amount.multiply_ratio(fraction, fraction * tax_rate + fraction),
-                    )?,
+                    amount.checked_sub(amount * (Decimal::one() / (tax_rate + Decimal::one())))?,
                     tax_cap,
                 ))
             }
