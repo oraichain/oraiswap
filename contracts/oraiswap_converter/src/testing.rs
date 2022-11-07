@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     attr, coin,
     testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
-    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
+    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, Uint256, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{

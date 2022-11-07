@@ -150,22 +150,21 @@ pub fn compute_offer_amount(
     // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
     let cp: Uint256 = offer_pool * ask_pool;
 
-    let one_minus_commission = Decimal256::one() - commission_rate;
-    let inv_one_minus_commission = Decimal256::one() / one_minus_commission;
+    let before_commission_deduction = ask_amount.multiply_ratio(
+        Decimal256::one().atomics(), // return DECIMAL_FRACTIONAL
+        (Decimal256::one() - commission_rate).atomics(),
+    );
 
-    let offer_amount: Uint256 = Uint256::one()
-        .multiply_ratio(cp, ask_pool - ask_amount * inv_one_minus_commission)
-        - offer_pool;
+    let offer_amount: Uint256 =
+        Uint256::one().multiply_ratio(cp, ask_pool - before_commission_deduction) - offer_pool;
 
-    let before_commission_deduction: Uint256 = ask_amount * inv_one_minus_commission;
     let before_spread_deduction: Uint256 =
         offer_amount * Decimal256::from_ratio(ask_pool, offer_pool);
 
-    let spread_amount = if before_spread_deduction > before_commission_deduction {
-        before_spread_deduction - before_commission_deduction
-    } else {
-        Uint256::zero()
-    };
+    // default return zero, and we can catch later instead of panic
+    let spread_amount = before_spread_deduction
+        .checked_sub(before_commission_deduction)
+        .unwrap_or_default();
 
     let commission_amount = before_commission_deduction * commission_rate;
 

@@ -13,7 +13,6 @@ pub enum Amount {
 }
 
 impl Amount {
-    // TODO: write test for this
     pub fn from_parts(denom: String, amount: Uint128) -> Self {
         if denom.starts_with("cw20:") {
             let address = denom.get(5..).unwrap().into();

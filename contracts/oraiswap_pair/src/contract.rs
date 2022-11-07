@@ -312,7 +312,7 @@ pub fn withdraw_liquidity(
         pair_info.query_pools(&deps.querier, deps.api, env.contract.address.clone())?;
     let total_share: Uint128 = query_supply(&deps.querier, liquidity_addr)?;
 
-    let share_ratio: Decimal = Decimal::from_ratio(amount, total_share);
+    let share_ratio = Decimal::from_ratio(amount, total_share);
     if share_ratio.is_zero() {
         return Err(ContractError::InvalidZeroRatio {});
     }
@@ -335,14 +335,15 @@ pub fn withdraw_liquidity(
             .clone()
             .into_msg(Some(&oracle_contract), &deps.querier, sender.clone())?,
         // burn liquidity token
-        CosmosMsg::Wasm(WasmMsg::Execute {
+        WasmMsg::Execute {
             contract_addr: deps
                 .api
                 .addr_humanize(&pair_info.liquidity_token)?
                 .to_string(),
             msg: to_binary(&Cw20ExecuteMsg::Burn { amount })?,
             funds: vec![],
-        }),
+        }
+        .into(),
     ];
 
     // update pool info
