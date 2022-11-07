@@ -16,7 +16,7 @@ use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     SimulateSwapOperationsResponse, SwapOperation,
 };
 
@@ -34,6 +34,11 @@ pub fn instantiate(
         },
     )?;
 
+    Ok(Response::default())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default())
 }
 

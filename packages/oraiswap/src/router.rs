@@ -11,6 +11,9 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+pub struct MigrateMsg {}
+
+#[cw_serde]
 pub enum SwapOperation {
     // swap cw20 token
     OraiSwap {

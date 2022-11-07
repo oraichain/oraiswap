@@ -13,7 +13,7 @@ use oraiswap::staking::QueryMsg as StakingQueryMsg;
 use oraiswap::staking::{ExecuteMsg as StakingExecuteMsg, RewardsPerSecResponse};
 
 use oraiswap::rewarder::{
-    ConfigResponse, DistributionInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg,
+    ConfigResponse, DistributionInfoResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     RewardAmountPerSecondResponse,
 };
 
@@ -55,6 +55,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
 
         ExecuteMsg::Distribute { asset_infos } => distribute(deps, env, asset_infos),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
 }
 
 pub fn update_config(
