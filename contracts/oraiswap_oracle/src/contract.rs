@@ -226,17 +226,15 @@ pub fn query_exchange_rate(
     base_denom: String,
     quote_denom: String,
 ) -> StdResult<ExchangeRateResponse> {
+    // quote = ask, offer = base
     let base_rate = get_orai_exchange_rate(deps, &base_denom)?;
     let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
-
-    // quote = ask, offer = base
-    let exchange_rate = Decimal::from_ratio(quote_rate.atomics(), base_rate.atomics());
 
     let res = ExchangeRateResponse {
         base_denom: base_denom.clone(),
         item: ExchangeRateItem {
             quote_denom,
-            exchange_rate,
+            exchange_rate: quote_rate / base_rate,
         },
     };
 
@@ -258,11 +256,9 @@ pub fn query_exchange_rates(
     for quote_denom in quote_denoms {
         let quote_rate = get_orai_exchange_rate(deps, &quote_denom)?;
 
-        let exchange_rate = Decimal::from_ratio(quote_rate.atomics(), base_rate.atomics());
-
         res.items.push(ExchangeRateItem {
             quote_denom,
-            exchange_rate,
+            exchange_rate: quote_rate / base_rate,
         });
     }
 

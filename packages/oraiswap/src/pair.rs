@@ -1,7 +1,7 @@
 use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
-    math::Converter,
+    math::Converter256,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal256, Uint256};
@@ -149,10 +149,8 @@ pub fn compute_offer_amount(
     // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
     let cp: Uint256 = offer_pool * ask_pool;
 
-    let before_commission_deduction = ask_amount.multiply_ratio(
-        Decimal256::one().atomics(), // return DECIMAL_FRACTIONAL
-        (Decimal256::one() - commission_rate).atomics(),
-    );
+    let before_commission_deduction =
+        ask_amount * (Decimal256::one() / (Decimal256::one() - commission_rate));
 
     let offer_amount: Uint256 =
         Uint256::one().multiply_ratio(cp, ask_pool - before_commission_deduction) - offer_pool;

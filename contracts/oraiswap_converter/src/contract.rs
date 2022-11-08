@@ -1,8 +1,9 @@
 use cosmwasm_std::{
     entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+    DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 use cw20::Cw20ReceiveMsg;
+use oraiswap::math::Converter128;
 
 use crate::state::{
     read_config, read_token_ratio, store_config, store_token_ratio, token_ratio_remove, Config,
@@ -59,12 +60,6 @@ pub fn update_config(deps: DepsMut, info: MessageInfo, owner: Addr) -> StdResult
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-pub fn div_ratio_decimal(nominator: Uint128, denominator: Decimal) -> StdResult<Uint128> {
-    Decimal::checked_from_ratio(nominator, denominator.atomics())
-        .map_err(|_| StdError::generic_err("conversion error in div_ratio_decimal()"))
-        .map(|val| val.atomics())
-}
-
 pub fn receive_cw20(
     deps: DepsMut,
     _env: Env,
@@ -102,7 +97,7 @@ pub fn receive_cw20(
                     return Err(StdError::generic_err("invalid cw20 hook message"));
                 }
 
-                let amount = div_ratio_decimal(cw20_msg.amount.clone(), token_ratio.ratio.clone())?;
+                let amount = cw20_msg.amount.checked_div_decimal(token_ratio.ratio)?;
 
                 let message = Asset {
                     info: from,
@@ -207,7 +202,7 @@ pub fn convert_reverse(
     if let AssetInfo::NativeToken { denom } = token_ratio.info {
         //check funds includes To token
         if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
-            let amount = div_ratio_decimal(native_coin.amount.clone(), token_ratio.ratio.clone())?;
+            let amount = native_coin.amount.checked_div_decimal(token_ratio.ratio)?;
             let message = Asset {
                 info: from_asset,
                 amount: amount.clone(),

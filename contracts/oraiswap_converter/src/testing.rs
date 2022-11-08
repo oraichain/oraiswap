@@ -1,45 +1,49 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{
     attr, coin,
     testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
-    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, Uint256, WasmMsg,
+    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
     asset::{AssetInfo, ORAI_DENOM},
     converter::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo},
+    math::Converter128,
     testing::ATOM_DENOM,
 };
 
-use crate::contract::{div_ratio_decimal, execute, instantiate, query};
+use crate::contract::{execute, instantiate, query};
 
 #[test]
 fn test_decimal_valid_same_decimal() {
-    let result = div_ratio_decimal(
-        Uint128::from(1u128),
-        Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(6u32)),
-    )
-    .unwrap();
+    let result = Uint128::from(1_000_000_000_000_000_000u128)
+        .checked_div_decimal(Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(7u32)))
+        .unwrap();
 
-    assert_eq!(result, Uint128::from(1u128))
+    assert_eq!(result, Uint128::from(10_000_000_000_000_000_000u128));
+
+    println!(
+        "{}",
+        Uint128::from(3u128)
+            .checked_div_decimal(Decimal::from_str("0.3").unwrap())
+            .unwrap()
+    );
 }
 
 #[test]
 fn test_decimal_valid_different_decimal() {
-    let result = div_ratio_decimal(
-        Uint128::from(1u128),
-        Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(18u32)),
-    )
-    .unwrap();
+    let result = Uint128::from(1u128)
+        .checked_div_decimal(Decimal::from_ratio(10u128.pow(6u32), 10u128.pow(18u32)))
+        .unwrap();
 
     assert_eq!(result, Uint128::from(1000000000000u128))
 }
 
 #[test]
 fn test_decimal_valid_large_number() {
-    let result = div_ratio_decimal(
-        Uint128::from(100000000000000000000000000000000000000u128),
-        Decimal::from_ratio(10u128.pow(18u32), 10u128.pow(6u32)),
-    );
+    let result = Uint128::from(100000000000000000000000000000000000000u128)
+        .checked_div_decimal(Decimal::from_ratio(10u128.pow(18u32), 10u128.pow(6u32)));
 
     println!("result: {:?}", result)
 }
