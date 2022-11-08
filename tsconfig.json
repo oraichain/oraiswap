@@ -2,7 +2,9 @@
     "compilerOptions": {
         "strict": false,
         "resolveJsonModule": true,
-        "isolatedModules": true
+        "moduleResolution": "node",
+        "isolatedModules": true,
+        "target": "esnext",
     },
     "include": [
         "global.d.ts",

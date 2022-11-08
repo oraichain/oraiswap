@@ -1,16 +1,10 @@
 import "dotenv/config";
-import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { contracts } from "../build";
+import { Contract } from ".";
 
-(async () => {
-  const client = await CosmWasmClient.connect(process.env.RPC_URL);
-
-  const tokenClient = new contracts.OraiswapToken.OraiswapTokenQueryClient(
-    client,
-    process.env.ORAIX_CONTRACT
-  );
+Contract.init().then(async () => {
+  const tokenClient = Contract.token(process.env.ORAIX_CONTRACT);
 
   const accounts = await tokenClient.allAccounts({ limit: 10 });
 
   console.log(accounts);
-})();
+});

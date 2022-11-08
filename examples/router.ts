@@ -1,27 +1,19 @@
 import "dotenv/config";
-import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { contracts } from "../build";
+import { Contract } from ".";
 
-(async () => {
-  const client = await CosmWasmClient.connect(process.env.RPC_URL);
-
-  const routerClient = new contracts.OraiswapRouter.OraiswapRouterQueryClient(
-    client,
-    process.env.ROUTER_CONTRACT
-  );
-
-  const ret = await routerClient.simulateSwapOperations({
+Contract.init().then(async () => {
+  const ret = await Contract.router.simulateSwapOperations({
     offerAmount: "10000000",
     operations: [
       {
         orai_swap: {
           offer_asset_info: {
-            native_token: { denom: process.env.DENOM },
-          },
-          ask_asset_info: {
             token: {
               contract_addr: process.env.ORAIX_CONTRACT,
             },
+          },
+          ask_asset_info: {
+            native_token: { denom: process.env.DENOM },
           },
         },
       },
@@ -29,4 +21,4 @@ import { contracts } from "../build";
   });
 
   console.log(ret);
-})();
+});

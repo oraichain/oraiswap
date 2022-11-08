@@ -1,26 +1,14 @@
 import "dotenv/config";
+import { Contract } from ".";
 
-import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { contracts } from "../build";
-
-(async () => {
-  const client = await CosmWasmClient.connect(process.env.RPC_URL);
-  const factoryClient =
-    new contracts.OraiswapFactory.OraiswapFactoryQueryClient(
-      client,
-      process.env.FACTORY_CONTRACT
-    );
-
-  const { pairs } = await factoryClient.pairs({ limit: 10 });
+Contract.init().then(async () => {
+  const { pairs } = await Contract.factory.pairs({ limit: 10 });
 
   const ret = await Promise.all(
     pairs.map((pair) => {
-      const pairClient = new contracts.OraiswapPair.OraiswapPairQueryClient(
-        client,
-        pair.contract_addr
-      );
-      return pairClient.pool();
+      const pairClient = Contract.pair(pair.contract_addr);
+      return pairClient.pair();
     })
   );
   console.log(JSON.stringify(ret, null, 2));
-})();
+});
