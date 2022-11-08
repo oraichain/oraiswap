@@ -1,5 +1,5 @@
-import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import "dotenv/config";
+import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { contracts } from "../build";
 
 (async () => {
