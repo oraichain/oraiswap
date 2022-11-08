@@ -1,28 +1,26 @@
 import "dotenv/config";
 
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { contracts } from "../build";
 
 (async () => {
-  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(
-    process.env.MNEMONIC,
-    {
-      prefix: process.env.PREFIX,
-    }
-  );
-  const [firstAccount] = await wallet.getAccounts();
-  const client = await SigningCosmWasmClient.connectWithSigner(
-    process.env.RPC_URL,
-    wallet
-  );
-  const factoryClient = new contracts.OraiswapFactory.OraiswapFactoryClient(
-    client,
-    firstAccount.address,
-    process.env.FACTORY_CONTRACT
-  );
+  const client = await CosmWasmClient.connect(process.env.RPC_URL);
+  const factoryClient =
+    new contracts.OraiswapFactory.OraiswapFactoryQueryClient(
+      client,
+      process.env.FACTORY_CONTRACT
+    );
 
-  const pairs = await factoryClient.pairs({ limit: 10 });
+  const { pairs } = await factoryClient.pairs({ limit: 10 });
 
-  console.log(pairs);
+  const ret = await Promise.all(
+    pairs.map((pair) => {
+      const pairClient = new contracts.OraiswapPair.OraiswapPairQueryClient(
+        client,
+        pair.contract_addr
+      );
+      return pairClient.pool();
+    })
+  );
+  console.log(JSON.stringify(ret, null, 2));
 })();
