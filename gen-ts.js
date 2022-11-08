@@ -1,8 +1,10 @@
 const codegen = require("@cosmwasm/ts-codegen").default;
-const { execSync } = require("child_process");
+const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const util = require("util");
 const { TypescriptParser } = require("typescript-parser");
+const execAsync = util.promisify(exec);
 
 const genTS = async (contracts, outPath) => {
   fs.rmSync(outPath, { recursive: true, force: true });
@@ -124,37 +126,38 @@ const fixTs = async (outPath) => {
   }
 };
 
+const buildSchema = async (package) => {
+  const artifactsFolder = path.join(package, "artifacts");
+  if (!fs.existsSync(artifactsFolder)) fs.mkdir(artifactsFolder);
+
+  const ret = await execAsync(`cargo run -q --bin schema`, {
+    cwd: artifactsFolder,
+  });
+  // print err or out
+  console.log(ret.stderr || ret.stdout);
+};
+
 const force = process.argv.includes("--force") || process.argv.includes("-f");
 const contractsFolder = path.resolve(__dirname, "contracts");
-const contracts = [];
 const tsFolder = path.resolve(__dirname, "build");
 
-for (const dir of fs.readdirSync(contractsFolder)) {
-  if (!dir.startsWith("oraiswap_")) continue;
-  const package = path.resolve(contractsFolder, dir);
-
-  const artifactsFolder = path.join(package, "artifacts");
-  const schemaFolder = path.join(artifactsFolder, "schema");
-
-  if (!fs.existsSync(artifactsFolder)) fs.mkdirSync(artifactsFolder);
-
-  if (force) {
-    const ret = execSync(`cargo run -q --bin schema`, {
-      cwd: artifactsFolder,
-    }).toString();
-    console.log(ret);
-  }
-
-  const baseName = path.basename(package);
-  const name = baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase());
-
-  contracts.push({
-    name,
-    dir: schemaFolder,
-  });
-}
+const packages = fs
+  .readdirSync(contractsFolder)
+  .map((dir) => path.resolve(contractsFolder, dir))
+  .filter((package) => fs.existsSync(path.join(package, "Cargo.toml")));
 
 (async () => {
+  if (force) {
+    await Promise.all(packages.map(buildSchema));
+  }
+
+  const contracts = packages.map((package) => {
+    const baseName = path.basename(package);
+    return {
+      name: baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase()),
+      dir: path.join(package, "artifacts", "schema"),
+    };
+  });
   await genTS(contracts, tsFolder);
   await fixTs(tsFolder);
 })();
