@@ -1,13 +1,16 @@
 const codegen = require("@cosmwasm/ts-codegen").default;
 const { exec } = require("child_process");
 const path = require("path");
-const fs = require("fs");
+const {
+  existsSync,
+  promises: { readdir, readFile, writeFile, rm, mkdir },
+} = require("fs");
 const util = require("util");
 const { TypescriptParser } = require("typescript-parser");
 const execAsync = util.promisify(exec);
 
-const genTS = async (contracts, outPath) => {
-  fs.rmSync(outPath, { recursive: true, force: true });
+const genTS = async (contracts, outPath, enabledReactQuery = false) => {
+  await rm(outPath, { recursive: true, force: true });
   await codegen({
     contracts,
     outPath,
@@ -25,7 +28,7 @@ const genTS = async (contracts, outPath) => {
         enabled: true,
       },
       reactQuery: {
-        enabled: process.argv.includes("--react-query"),
+        enabled: enabledReactQuery,
         optionalClient: true,
         version: "v4",
         mutations: true,
@@ -51,17 +54,55 @@ const isPrivateType = (type) => {
   );
 };
 
-const fixTs = async (outPath) => {
+const fixImport = async (clientName, ext, importData, outPath) => {
+  // react-query.ts
+  const clientFile = path.join(outPath, `${clientName}.${ext}`);
+  const clientData = await readFile(clientFile);
+
+  await writeFile(
+    clientFile,
+    clientData
+      .toString()
+      .replace(
+        new RegExp(
+          `import\\s+\\{(.*?)\\}\\s+from\\s+"\\.\\/${clientName}\\.types";`
+        ),
+        (_, g1) => {
+          const [clientImportData, typesImportData] = g1
+            .trim()
+            .split(/\s*,\s*/)
+            .reduce(
+              (ret, el) => {
+                ret[!importData.includes(el) ? 0 : 1].push(el);
+                return ret;
+              },
+              [[], []]
+            );
+
+          return `import {${typesImportData.join(
+            ", "
+          )}} from "./types";\nimport {${clientImportData.join(
+            ", "
+          )}} from "./${clientName}.types";`;
+        }
+      )
+  );
+};
+
+const fixTs = async (outPath, enabledReactQuery = false) => {
   const parser = new TypescriptParser();
   const typeExt = ".types.ts";
   const typeData = {};
-  for (const dir of fs.readdirSync(outPath)) {
-    if (dir.endsWith(typeExt)) {
+  const dirs = (await readdir(outPath)).filter((dir) => dir.endsWith(typeExt));
+
+  await Promise.all(
+    dirs.map(async (dir) => {
       const tsFile = path.join(outPath, dir);
-      const tsData = fs.readFileSync(tsFile).toString();
+      const tsData = (await readFile(tsFile)).toString();
       const parsed = await parser.parseSource(tsData);
       const modifiedTsData = [];
       const importData = [];
+
       for (let token of parsed.declarations) {
         const exportData = tsData.substring(token.start, token.end);
         if (!isPrivateType(token.name) && !typeData[token.name]) {
@@ -75,51 +116,26 @@ const fixTs = async (outPath) => {
       modifiedTsData.unshift(
         `import {${importData.join(", ")}} from "./types";`
       );
-      fs.writeFileSync(tsFile, modifiedTsData.join("\n"));
+      await writeFile(tsFile, modifiedTsData.join("\n"));
 
       // update client file
       const clientName = path.basename(dir, typeExt);
-      const clientFile = path.join(outPath, `${clientName}.client.ts`);
-      const clientData = fs.readFileSync(clientFile).toString();
+      await fixImport(clientName, "client.ts", importData, outPath);
+      if (enabledReactQuery) {
+        await fixImport(clientName, "react-query.ts", importData, outPath);
+      }
+    })
+  );
 
-      fs.writeFileSync(
-        clientFile,
-        clientData.replace(
-          new RegExp(
-            `import\\s+\\{(.*?)\\}\\s+from\\s+"\\.\\/${clientName}\\.types";`
-          ),
-          (_, g1) => {
-            const [clientImportData, typesImportData] = g1
-              .trim()
-              .split(/\s*,\s*/)
-              .reduce(
-                (ret, el) => {
-                  ret[!importData.includes(el) ? 0 : 1].push(el);
-                  return ret;
-                },
-                [[], []]
-              );
-
-            return `import {${typesImportData.join(
-              ", "
-            )}} from "./types";\nimport {${clientImportData.join(
-              ", "
-            )}} from "./${clientName}.types";`;
-          }
-        )
-      );
-    }
-  }
-
-  fs.writeFileSync(
+  await writeFile(
     path.join(outPath, "types.ts"),
     Object.values(typeData).join("\n")
   );
 
   // add export from types
-  const indexData = fs.readFileSync(path.join(outPath, "index.ts")).toString();
+  const indexData = (await readFile(path.join(outPath, "index.ts"))).toString();
   if (indexData.indexOf('export * from "./types";') === -1) {
-    fs.writeFileSync(
+    await writeFile(
       path.join(outPath, "index.ts"),
       `${indexData}\nexport * from "./types";`
     );
@@ -128,7 +144,7 @@ const fixTs = async (outPath) => {
 
 const buildSchema = async (package) => {
   const artifactsFolder = path.join(package, "artifacts");
-  if (!fs.existsSync(artifactsFolder)) fs.mkdir(artifactsFolder);
+  if (!existsSync(artifactsFolder)) await mkdir(artifactsFolder);
 
   const ret = await execAsync(`cargo run -q --bin schema`, {
     cwd: artifactsFolder,
@@ -138,15 +154,15 @@ const buildSchema = async (package) => {
 };
 
 const force = process.argv.includes("--force") || process.argv.includes("-f");
+const enabledReactQuery = process.argv.includes("--react-query");
 const contractsFolder = path.resolve(__dirname, "contracts");
 const tsFolder = path.resolve(__dirname, "build");
 
-const packages = fs
-  .readdirSync(contractsFolder)
-  .map((dir) => path.resolve(contractsFolder, dir))
-  .filter((package) => fs.existsSync(path.join(package, "Cargo.toml")));
-
 (async () => {
+  const packages = (await readdir(contractsFolder))
+    .map((dir) => path.resolve(contractsFolder, dir))
+    .filter((package) => existsSync(path.join(package, "Cargo.toml")));
+
   if (force) {
     await Promise.all(packages.map(buildSchema));
   }
@@ -158,6 +174,6 @@ const packages = fs
       dir: path.join(package, "artifacts", "schema"),
     };
   });
-  await genTS(contracts, tsFolder);
-  await fixTs(tsFolder);
+  await genTS(contracts, tsFolder, enabledReactQuery);
+  await fixTs(tsFolder, enabledReactQuery);
 })();

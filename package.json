@@ -9,6 +9,7 @@
   "devDependencies": {
     "@cosmjs/amino": "^0.29.3",
     "@cosmjs/cosmwasm-stargate": "^0.29.3",
+    "@tanstack/react-query": "^4.14.5",
     "@types/node": "^18.11.9",
     "dotenv": "^16.0.3",
     "ts-node": "^10.9.1",
