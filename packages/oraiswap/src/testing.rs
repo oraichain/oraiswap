@@ -12,7 +12,7 @@ use crate::pair::DEFAULT_COMMISSION_RATE;
 use cw_multi_test::{next_block, App, AppResponse, Contract, Executor};
 
 pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
-const APP_OWNER: &str = "admin";
+pub const APP_OWNER: &str = "admin";
 
 #[macro_export]
 macro_rules! create_entry_points_testing {

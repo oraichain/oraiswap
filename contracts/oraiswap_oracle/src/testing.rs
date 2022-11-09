@@ -1,56 +1,52 @@
-use crate::contract::*;
-use cosmwasm_std::testing::{
-    mock_dependencies_with_balance, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
-    MOCK_CONTRACT_ADDR,
-};
-use cosmwasm_std::{
-    coins, from_binary, to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, OwnedDeps, StdError,
-    Uint128, WasmMsg,
-};
+use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+use cosmwasm_std::{to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
 
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
-use oraiswap::oracle::{
-    ExchangeRateResponse, ExecuteMsg, InstantiateMsg, OracleContract, QueryMsg,
-};
-use oraiswap::testing::MockApp;
+use oraiswap::oracle::{ExecuteMsg, OracleContract};
+use oraiswap::testing::{MockApp, APP_OWNER};
 
-const OWNER: &str = "owner0000";
+fn setup_contract() -> MockApp {
+    let mut app = MockApp::new(&[(
+        &APP_OWNER.to_string(),
+        &[Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(100000u128),
+        }],
+    )]);
 
-fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies_with_balance(&coins(100000, ORAI_DENOM));
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(crate)));
 
-    let msg = InstantiateMsg {
-        name: None,
-        version: None,
-        admin: None,
-        min_rate: None,
-        max_rate: None,
-    };
-    let info = mock_info(OWNER, &[]);
-    let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-    assert_eq!(0, res.messages.len());
-    deps
+    app
 }
 
 #[test]
 fn proper_initialization() {
-    let mut deps = setup_contract();
+    let mut app = setup_contract();
 
     let msg = ExecuteMsg::UpdateExchangeRate {
         denom: "usdt".to_string(),
         exchange_rate: Decimal::percent(10), // 1 orai = 10 usdt
     };
 
-    let _res = execute(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
+    let oracle_contract = OracleContract(app.oracle_addr.clone());
 
-    let msg = QueryMsg::ExchangeRate {
-        base_denom: Some("usdt".to_string()),
-        quote_denom: ORAI_DENOM.to_string(),
-    };
+    let _res = app
+        .execute(
+            Addr::unchecked(APP_OWNER),
+            app.oracle_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
 
-    let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-    let exchange_rate_res: ExchangeRateResponse = from_binary(&res).unwrap();
+    let exchange_rate_res = oracle_contract
+        .query_exchange_rate(
+            &app.as_querier(),
+            "usdt".to_string(),
+            ORAI_DENOM.to_string(),
+        )
+        .unwrap();
 
     assert_eq!("10", exchange_rate_res.item.exchange_rate.to_string());
 
@@ -59,15 +55,18 @@ fn proper_initialization() {
         exchange_rate: Decimal::percent(1), // 1 orai = 100 airi
     };
 
-    let _res = execute(deps.as_mut(), mock_env(), mock_info(OWNER, &[]), msg).unwrap();
+    let _res = app
+        .execute(
+            Addr::unchecked(APP_OWNER),
+            app.oracle_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
 
-    let msg = QueryMsg::ExchangeRate {
-        base_denom: Some("airi".to_string()),
-        quote_denom: "usdt".to_string(),
-    };
-
-    let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-    let exchange_rate_res: ExchangeRateResponse = from_binary(&res).unwrap();
+    let exchange_rate_res = oracle_contract
+        .query_exchange_rate(&app.as_querier(), "airi".to_string(), "usdt".to_string())
+        .unwrap();
 
     // 1 usdt = 10 airi
     assert_eq!("10", exchange_rate_res.item.exchange_rate.to_string());
@@ -75,16 +74,19 @@ fn proper_initialization() {
 
 #[test]
 fn tax_cap_notfound() {
-    let deps = setup_contract();
+    let app = setup_contract();
 
-    let msg = QueryMsg::TaxCap {
-        denom: "airi".to_string(),
-    };
+    let oracle_contract = OracleContract(app.oracle_addr.clone());
 
-    let res = query(deps.as_ref(), mock_env(), msg);
+    let res = oracle_contract.query_tax_cap(&app.as_querier(), "airi".to_string());
+    println!("{:?}", res);
     match res {
-        Err(StdError::NotFound { kind }) => {
-            assert_eq!(kind, format!("Tax cap not found for denom: {}", "airi"))
+        Err(err) => {
+            assert_eq!(
+                err.to_string()
+                    .contains("Tax cap not found for denom: airi"),
+                true
+            )
         }
         _ => panic!("DO NOT ENTER HERE"),
     }
@@ -92,13 +94,7 @@ fn tax_cap_notfound() {
 
 #[test]
 fn test_asset() {
-    let mut app = MockApp::new(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        &[Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128::from(123u128),
-        }],
-    )]);
+    let mut app = setup_contract();
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 

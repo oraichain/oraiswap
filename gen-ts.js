@@ -54,7 +54,7 @@ const isPrivateType = (type) => {
   );
 };
 
-const fixImport = async (clientName, ext, importData, outPath) => {
+const fixImport = async (clientName, ext, typeData, outPath) => {
   // react-query.ts
   const clientFile = path.join(outPath, `${clientName}.${ext}`);
   const clientData = await readFile(clientFile);
@@ -73,7 +73,7 @@ const fixImport = async (clientName, ext, importData, outPath) => {
             .split(/\s*,\s*/)
             .reduce(
               (ret, el) => {
-                ret[!importData.includes(el) ? 0 : 1].push(el);
+                ret[!typeData[el] ? 0 : 1].push(el);
                 return ret;
               },
               [[], []]
@@ -120,9 +120,9 @@ const fixTs = async (outPath, enabledReactQuery = false) => {
 
       // update client file
       const clientName = path.basename(dir, typeExt);
-      await fixImport(clientName, "client.ts", importData, outPath);
+      await fixImport(clientName, "client.ts", typeData, outPath);
       if (enabledReactQuery) {
-        await fixImport(clientName, "react-query.ts", importData, outPath);
+        await fixImport(clientName, "react-query.ts", typeData, outPath);
       }
     })
   );
