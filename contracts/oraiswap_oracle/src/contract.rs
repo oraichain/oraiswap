@@ -1,4 +1,4 @@
-use cosmwasm_std::entry_point;
+use cosmwasm_std::{entry_point, Coin};
 
 use cosmwasm_std::{
     to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use oraiswap::asset::ORAI_DENOM;
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
-    ExchangeRatesResponse, ExecuteMsg, MigrateMsg, QueryMsg, RewardPoolResponse, TaxCapResponse,
-    TaxRateResponse,
+    ExchangeRatesResponse, ExecuteMsg, MigrateMsg, OracleContractQuery, OracleExchangeQuery,
+    OracleTreasuryQuery, QueryMsg, RewardPoolResponse, TaxCapResponse, TaxRateResponse,
 };
 
 use oraiswap::error::ContractError;
@@ -198,6 +198,34 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
         QueryMsg::RewardPool { denom } => to_binary(&query_reward_pool(deps, env, denom)?),
+        QueryMsg::Treasury(query_data) => match query_data {
+            OracleTreasuryQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
+            OracleTreasuryQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
+        },
+        QueryMsg::Exchange(query_data) => match query_data {
+            OracleExchangeQuery::ExchangeRate {
+                base_denom,
+                quote_denom,
+            } => to_binary(&query_exchange_rate(
+                deps,
+                base_denom.unwrap_or(ORAI_DENOM.to_string()),
+                quote_denom,
+            )?),
+            OracleExchangeQuery::ExchangeRates {
+                base_denom,
+                quote_denoms,
+            } => to_binary(&query_exchange_rates(
+                deps,
+                base_denom.unwrap_or(ORAI_DENOM.to_string()),
+                quote_denoms,
+            )?),
+        },
+        QueryMsg::Contract(query_data) => match query_data {
+            OracleContractQuery::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+            OracleContractQuery::RewardPool { denom } => {
+                to_binary(&query_contract_balance(deps, env, denom)?)
+            }
+        },
     }
 }
 
@@ -277,11 +305,14 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
     })
 }
 
+/// query_contract_balance: return native balance, currently only Orai denom
+pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
+    deps.querier.query_balance(env.contract.address, &denom)
+}
+
 /// query_reward_pool: return native balance, currently only Orai denom
 pub fn query_reward_pool(deps: Deps, env: Env, denom: String) -> StdResult<RewardPoolResponse> {
-    deps.querier
-        .query_balance(env.contract.address, &denom)
-        .map(|balance| RewardPoolResponse { balance })
+    query_contract_balance(deps, env, denom).map(|balance| RewardPoolResponse { balance })
 }
 
 fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {

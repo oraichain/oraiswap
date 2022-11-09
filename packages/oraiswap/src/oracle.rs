@@ -60,6 +60,36 @@ pub enum QueryMsg {
     ContractInfo {},
     #[returns(RewardPoolResponse)]
     RewardPool { denom: String },
+    #[returns(())]
+    Treasury(OracleTreasuryQuery),
+    #[returns(())]
+    Exchange(OracleExchangeQuery),
+    #[returns(())]
+    Contract(OracleContractQuery),
+}
+
+#[cw_serde]
+pub enum OracleTreasuryQuery {
+    TaxRate {},
+    TaxCap { denom: String },
+}
+
+#[cw_serde]
+pub enum OracleExchangeQuery {
+    ExchangeRate {
+        base_denom: Option<String>,
+        quote_denom: String,
+    },
+    ExchangeRates {
+        base_denom: Option<String>,
+        quote_denoms: Vec<String>,
+    },
+}
+
+#[cw_serde]
+pub enum OracleContractQuery {
+    ContractInfo {},
+    RewardPool { denom: String },
 }
 
 /// TaxRateResponse is data format returned from TreasuryRequest::TaxRate query
