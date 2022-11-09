@@ -2,6 +2,7 @@
     "compilerOptions": {
         "strict": false,
         "resolveJsonModule": true,
+        "useDefineForClassFields": false,
         "moduleResolution": "node",
         "isolatedModules": true,
         "target": "esnext",
