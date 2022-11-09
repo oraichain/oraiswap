@@ -93,6 +93,7 @@ const fixTs = async (outPath, enabledReactQuery = false) => {
   const parser = new TypescriptParser();
   const typeExt = ".types.ts";
   const typeData = {};
+  const parsedData = {};
   const dirs = (await readdir(outPath)).filter((dir) => dir.endsWith(typeExt));
 
   await Promise.all(
@@ -100,16 +101,29 @@ const fixTs = async (outPath, enabledReactQuery = false) => {
       const tsFile = path.join(outPath, dir);
       const tsData = (await readFile(tsFile)).toString();
       const parsed = await parser.parseSource(tsData);
+      parsedData[dir] = parsed;
+
+      for (let token of parsed.declarations) {
+        if (!isPrivateType(token.name) && !typeData[token.name]) {
+          typeData[token.name] = tsData.substring(token.start, token.end);
+        }
+      }
+    })
+  );
+
+  await Promise.all(
+    dirs.map(async (dir) => {
+      const tsFile = path.join(outPath, dir);
+      const tsData = (await readFile(tsFile)).toString();
+      const parsed = parsedData[dir];
       const modifiedTsData = [];
       const importData = [];
 
       for (let token of parsed.declarations) {
-        const exportData = tsData.substring(token.start, token.end);
-        if (!isPrivateType(token.name) && !typeData[token.name]) {
-          typeData[token.name] = exportData;
+        if (typeData[token.name]) {
           importData.push(token.name);
         } else {
-          modifiedTsData.push(exportData);
+          modifiedTsData.push(tsData.substring(token.start, token.end));
         }
       }
       // import from types, and remove from client
