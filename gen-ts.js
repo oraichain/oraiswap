@@ -5,9 +5,7 @@ const {
   existsSync,
   promises: { readdir, readFile, writeFile, rm, mkdir },
 } = require("fs");
-const util = require("util");
 const { TypescriptParser } = require("typescript-parser");
-const execAsync = util.promisify(exec);
 
 const genTS = async (contracts, outPath, enabledReactQuery = false) => {
   await rm(outPath, { recursive: true, force: true });
@@ -160,14 +158,24 @@ const buildSchema = async (package) => {
   const artifactsFolder = path.join(package, "artifacts");
   if (!existsSync(artifactsFolder)) await mkdir(artifactsFolder);
 
-  const ret = await execAsync(`cargo run -q --bin schema`, {
-    cwd: artifactsFolder,
-  });
+  const ret = await new Promise((resolve, reject) =>
+    exec(
+      `cargo run -q --bin schema`,
+      {
+        cwd: artifactsFolder,
+      },
+      (err, stdout, stderr) => {
+        if (err) return reject(err);
+        resolve(stderr || stdout);
+      }
+    )
+  );
   // print err or out
-  console.log(ret.stderr || ret.stdout);
+  console.log(ret);
 };
 
-const force = process.argv.includes("--force") || process.argv.includes("-f");
+const forceInd = process.argv.indexOf("--force");
+const force = forceInd !== -1;
 const enabledReactQuery = process.argv.includes("--react-query");
 const contractsFolder = path.resolve(__dirname, "contracts");
 const tsFolder = path.resolve(__dirname, "build");
@@ -178,7 +186,17 @@ const tsFolder = path.resolve(__dirname, "build");
     .filter((package) => existsSync(path.join(package, "Cargo.toml")));
 
   if (force) {
-    await Promise.all(packages.map(buildSchema));
+    // run custom packages or all
+    let forcePackages = process.argv[forceInd + 1];
+    forcePackages =
+      forcePackages && !forcePackages.startsWith("--")
+        ? forcePackages.split(/\s*,\s*/)
+        : packages;
+
+    // can not run cargo in parallel
+    for (const package of forcePackages) {
+      await buildSchema(package);
+    }
   }
 
   const contracts = packages.map((package) => {

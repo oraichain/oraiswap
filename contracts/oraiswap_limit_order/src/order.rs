@@ -3,12 +3,12 @@ use crate::state::{
     read_orders_with_bidder_indexer, remove_order, store_order, Order,
 };
 use cosmwasm_std::{
-    attr, Addr, CosmosMsg, Decimal, Deps, DepsMut, MessageInfo, Response, StdError, StdResult,
-    Uint128,
+    attr, Addr, CosmosMsg, Decimal, Deps, DepsMut, MessageInfo, Order as OrderBy, Response,
+    StdError, StdResult, Uint128,
 };
-use mirror_protocol::common::OrderBy;
-use mirror_protocol::limit_order::{LastOrderIdResponse, OrderResponse, OrdersResponse};
-use terraswap::asset::Asset;
+
+use oraiswap::asset::Asset;
+use oraiswap::limit_order::{LastOrderIdResponse, OrderResponse, OrdersResponse};
 
 pub fn submit_order(
     deps: DepsMut,
@@ -33,11 +33,11 @@ pub fn submit_order(
     )?;
 
     Ok(Response::new().add_attributes(vec![
-        attr("action", "submit_order"),
-        attr("order_id", order_id.to_string()),
-        attr("bidder_addr", sender),
-        attr("offer_asset", offer_asset.to_string()),
-        attr("ask_asset", ask_asset.to_string()),
+        ("action", "submit_order"),
+        ("order_id", &order_id.to_string()),
+        ("bidder_addr", sender.as_str()),
+        ("offer_asset", &offer_asset.to_string()),
+        ("ask_asset", &ask_asset.to_string()),
     ]))
 }
 
@@ -59,7 +59,9 @@ pub fn cancel_order(deps: DepsMut, info: MessageInfo, order_id: u64) -> StdResul
 
     // Build refund msg
     let messages = if left_offer_amount > Uint128::zero() {
-        vec![bidder_refund.clone().into_msg(&deps.querier, info.sender)?]
+        vec![bidder_refund
+            .clone()
+            .into_msg(None, &deps.querier, info.sender)?]
     } else {
         vec![]
     };
@@ -82,7 +84,7 @@ pub fn execute_order(
     let mut order: Order = read_order(deps.storage, order_id)?;
     if !execute_asset
         .info
-        .equal(&order.ask_asset.info.to_normal(deps.api)?)
+        .eq(&order.ask_asset.info.to_normal(deps.api)?)
     {
         return Err(StdError::generic_err("invalid asset given"));
     }
@@ -128,26 +130,27 @@ pub fn execute_order(
 
     let mut messages: Vec<CosmosMsg> = vec![];
     if !executor_receive.amount.is_zero() {
-        messages.push(
-            executor_receive
-                .clone()
-                .into_msg(&deps.querier, deps.api.addr_validate(sender.as_str())?)?,
-        );
+        // dont use oracle for limit order
+        messages.push(executor_receive.clone().into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(sender.as_str())?,
+        )?);
     }
 
     if !bidder_receive.amount.is_zero() {
         messages.push(
             bidder_receive
                 .clone()
-                .into_msg(&deps.querier, bidder_addr)?,
+                .into_msg(None, &deps.querier, bidder_addr)?,
         );
     }
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "execute_order"),
-        attr("order_id", order_id.to_string()),
-        attr("executor_receive", executor_receive.to_string()),
-        attr("bidder_receive", bidder_receive.to_string()),
+        ("action", "execute_order"),
+        ("order_id", &order_id.to_string()),
+        ("executor_receive", &executor_receive.to_string()),
+        ("bidder_receive", &bidder_receive.to_string()),
     ]))
 }
 

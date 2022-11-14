@@ -1,12 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
+use oraiswap::asset::AssetRaw;
 
-use cosmwasm_std::{CanonicalAddr, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdError, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
-use mirror_protocol::common::OrderBy;
 use std::convert::TryInto;
-use terraswap::asset::AssetRaw;
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id";
 
@@ -25,7 +23,7 @@ pub fn read_last_order_id(storage: &dyn Storage) -> StdResult<u64> {
     singleton_read(storage, KEY_LAST_ORDER_ID).load()
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Order {
     pub order_id: u64,
     pub bidder_addr: CanonicalAddr,
@@ -71,8 +69,8 @@ pub fn read_orders_with_bidder_indexer(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
-        Some(OrderBy::Asc) => (calc_range_start(start_after), None, OrderBy::Asc),
-        _ => (None, calc_range_end(start_after), OrderBy::Desc),
+        Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
+        _ => (None, calc_range_end(start_after), OrderBy::Descending),
     };
 
     position_indexer
@@ -98,8 +96,8 @@ pub fn read_orders(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
-        Some(OrderBy::Asc) => (calc_range_start(start_after), None, OrderBy::Asc),
-        _ => (None, calc_range_end(start_after), OrderBy::Desc),
+        Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
+        _ => (None, calc_range_end(start_after), OrderBy::Descending),
     };
 
     position_bucket

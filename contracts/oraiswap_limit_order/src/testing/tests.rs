@@ -699,7 +699,7 @@ fn orders_querier() {
                     bidder_addr: Some("addr0000".to_string()),
                     start_after: None,
                     limit: None,
-                    order_by: Some(OrderBy::Asc),
+                    order_by: Some(Order::Ascending),
                 }
             )
             .unwrap()
@@ -719,7 +719,7 @@ fn orders_querier() {
                     bidder_addr: None,
                     start_after: None,
                     limit: None,
-                    order_by: Some(OrderBy::Asc),
+                    order_by: Some(Order::Ascending),
                 }
             )
             .unwrap()
@@ -740,7 +740,7 @@ fn orders_querier() {
                     bidder_addr: None,
                     start_after: None,
                     limit: None,
-                    order_by: Some(OrderBy::Desc),
+                    order_by: Some(Order::Descending),
                 }
             )
             .unwrap()
@@ -780,7 +780,7 @@ fn orders_querier() {
                     bidder_addr: None,
                     start_after: Some(2u64),
                     limit: None,
-                    order_by: Some(OrderBy::Desc),
+                    order_by: Some(Order::Descending),
                 }
             )
             .unwrap()
@@ -801,7 +801,7 @@ fn orders_querier() {
                     bidder_addr: None,
                     start_after: Some(1u64),
                     limit: None,
-                    order_by: Some(OrderBy::Asc),
+                    order_by: Some(Order::Ascending),
                 }
             )
             .unwrap()

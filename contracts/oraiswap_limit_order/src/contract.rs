@@ -1,8 +1,11 @@
+use std::convert::TryFrom;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order as OrderBy, Response,
+    StdError, StdResult,
 };
 
 use crate::order::{
@@ -11,8 +14,8 @@ use crate::order::{
 use crate::state::init_last_order_id;
 
 use cw20::Cw20ReceiveMsg;
-use mirror_protocol::limit_order::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use terraswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::limit_order::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -69,7 +72,7 @@ pub fn receive_cw20(
 
     let provided_asset = Asset {
         info: AssetInfo::Token {
-            contract_addr: info.sender.to_string(),
+            contract_addr: info.sender,
         },
         amount: cw20_msg.amount,
     };
@@ -99,7 +102,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             bidder_addr,
             start_after,
             limit,
-            order_by,
+            order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
         )?),
         QueryMsg::LastOrderId {} => to_binary(&query_last_order_id(deps)?),
     }

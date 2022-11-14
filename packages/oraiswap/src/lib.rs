@@ -3,6 +3,7 @@ pub mod converter;
 pub mod error;
 pub mod factory;
 pub mod ibc;
+pub mod limit_order;
 pub mod math;
 pub mod oracle;
 pub mod pair;

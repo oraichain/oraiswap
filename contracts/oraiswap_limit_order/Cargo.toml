@@ -1,5 +1,5 @@
 [package]
-name = "mirror-limit-order"
+name = "oraiswap-limit-order"
 version = "2.2.0"
 authors = ["Terraform Labs, PTE.", "Oraichain Labs"]
 edition = "2018"
