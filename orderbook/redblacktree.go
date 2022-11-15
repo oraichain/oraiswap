@@ -12,43 +12,26 @@ import (
 
 // Tree holds elements of the red-black tree
 type Tree struct {
-	db *BatchDatabase
-	// batch   ethdb.Batch
-	rootKey []byte
-	// cache   map[string]*Item
-	// Debug bool
-	// itemCache *lru.Cache // Cache for the recent node item
-	size       uint64
-	Comparator Comparator
-	// EncodeToBytes EncodeToBytes
-	// DecodeBytes   DecodeBytes
+	db          *BatchDatabase
+	rootKey     []byte
+	size        uint64
+	Comparator  Comparator
 	FormatBytes FormatBytes
-	// EmptyKey      []byte
 }
 
 // NewWith instantiates a red-black tree with the custom comparator.
 func NewWith(comparator Comparator, db *BatchDatabase) *Tree {
-	// itemCache, _ := lru.New(itemCacheLimit)
+
 	tree := &Tree{
 		Comparator: comparator,
-		// EncodeToBytes: encode,
-		// DecodeBytes:   decode,
-		// EmptyKey:      emptyKey,
-		db: db,
-		// itemCache:     itemCache,
+		db:         db,
 	}
-
-	// tree.batch = tree.db.NewBatch()
-	// tree.cache = make(map[string]*Item)
 	return tree
 }
 
 func NewWithBytesComparator(db *BatchDatabase) *Tree {
 	return NewWith(
 		bytes.Compare,
-		// encode,
-		// decode,
-		// emptyKey,
 		db,
 	)
 }
@@ -63,11 +46,6 @@ func (tree *Tree) IsEmptyKey(key []byte) bool {
 }
 
 func (tree *Tree) SetRootKey(key []byte, size uint64) {
-	// root, err := tree.GetNode(key)
-	// tree.Root = root
-	// // bytes, _ := json.Marshal(root)
-	// // fmt.Println(string(bytes))
-	// return err
 	tree.rootKey = key
 	tree.size = size
 }
@@ -78,7 +56,6 @@ func (tree *Tree) Put(key []byte, value []byte) error {
 	var insertedNode *Node
 	if tree.IsEmptyKey(tree.rootKey) {
 		// Assert key is of comparator's type for initial tree
-		// tree.Comparator(key, key)
 		item := &Item{Value: value, Color: red, Keys: &KeyMeta{}}
 		tree.rootKey = key
 		insertedNode = &Node{Key: key, Item: item}
@@ -91,8 +68,6 @@ func (tree *Tree) Put(key []byte, value []byte) error {
 			switch {
 			case compare == 0:
 				// fmt.Printf("UPDATE CONTENT ONLY :%v\n", compare)
-				// node.Key = key
-				// item := &Item{Value: value, Keys: &KeyMeta{}}
 				node.Item.Value = value
 				tree.Save(node)
 				return nil
@@ -127,10 +102,8 @@ func (tree *Tree) Put(key []byte, value []byte) error {
 		insertedNode.ParentKey(node.Key)
 		tree.Save(insertedNode)
 
-		// fmt.Printf("Key :%s %s\n", node, insertedNode)
 	}
 
-	// tree.Save(insertedNode)
 	tree.insertCase1(insertedNode)
 	tree.Save(insertedNode)
 
@@ -142,43 +115,13 @@ func (tree *Tree) Put(key []byte, value []byte) error {
 func (tree *Tree) GetNode(key []byte) (*Node, error) {
 
 	item := &Item{}
-	// var item *Item
 
 	val, err := tree.db.Get(key, item)
 
-	// if tree.IsEmptyKey(key) {
-	// 	return nil, nil
-	// }
-	// fmt.Printf("key: %x\n", key)
-	// cacheKey := fmt.Sprintf("%x", key)
-	// var err error
-
-	// if cached, ok := tree.itemCache.Get(cacheKey); ok {
-	// if cached, ok := tree.cache[cacheKey]; ok {
-	// 	item = cached
-	// } else {
-
-	// found, err := tree.db.Has(key)
-
-	// if !found {
-	// 	return nil, err
-	// }
-
-	// bytes, err := tree.db.Get(key)
-	// if err != nil {
-	// 	fmt.Printf("Key not found :%x\n", key)
-	// 	// panic(err)
-	// 	return nil, err
-	// }
-	// item = &Item{}
-	// err = tree.DecodeBytes(bytes, item)
-	// err = json.Unmarshal(bytes, item)
 	if err != nil || val == nil {
 		return nil, err
 	}
-	// fmt.Printf("Bytes :%v", val)
-	// }
-	// item := val.(*Item)
+
 	return &Node{Key: key, Item: val.(*Item)}, err
 }
 
@@ -220,10 +163,6 @@ func (tree *Tree) Remove(key []byte) {
 	}
 
 	if left != nil && right != nil {
-		// pred := left.maximumNode(tree)
-		// node.Key = pred.Key
-		// node.Item = pred.Item
-		// node = pred
 		node = left.maximumNode(tree)
 	}
 
@@ -234,12 +173,11 @@ func (tree *Tree) Remove(key []byte) {
 			child = right
 		}
 
-		if node.Item.Color == black {
+		if node.Item.Color {
 			node.Item.Color = nodeColor(child)
 			tree.Save(node)
 
 			tree.deleteCase1(node)
-			// fmt.Println("DELETE ", tree, node)
 		}
 
 		tree.replaceNode(node, child)
@@ -419,24 +357,6 @@ func output(tree *Tree, node *Node, prefix string, isTail bool, str *string) {
 	}
 }
 
-// func (tree *Tree) lookup(key []byte) (*Node, error) {
-
-// 	return tree.GetNode(key)
-// node := tree.Root()
-// for node != nil {
-// 	compare := tree.Comparator(key, node.Key)
-// 	switch {
-// 	case compare == 0:
-// 		return node
-// 	case compare < 0:
-// 		node = node.Left(tree)
-// 	case compare > 0:
-// 		node = node.Right(tree)
-// 	}
-// }
-// return nil
-// }
-
 func (tree *Tree) rotateLeft(node *Node) {
 	right := node.Right(tree)
 	tree.replaceNode(node, right)
@@ -526,7 +446,7 @@ func (tree *Tree) insertCase1(node *Node) {
 func (tree *Tree) insertCase2(node *Node) {
 	parent := node.Parent(tree)
 	// fmt.Printf("Insert case 2, parent: %s", parent)
-	if nodeColor(parent) == black {
+	if nodeColor(parent) {
 		// tree.Save(node)
 		// fmt.Println("Breaking case2")
 		return
@@ -542,7 +462,7 @@ func (tree *Tree) insertCase3(node *Node) {
 
 	// fmt.Println("grand parent 3", grandparent)
 	// fmt.Printf("Insert case 3, uncle: %s\n", uncle)
-	if nodeColor(uncle) == red {
+	if !nodeColor(uncle) {
 		parent.Item.Color = black
 		uncle.Item.Color = black
 		tree.Save(uncle)
@@ -613,53 +533,15 @@ func (tree *Tree) Save(node *Node) error {
 
 	return tree.db.Put(node.Key, node.Item)
 
-	// cacheKey := fmt.Sprintf("%x", node.Key)
-	// if !tree.itemCache.Contains(cacheKey) {
-	// 	tree.itemCache.Add(cacheKey, node.Item)
-	// }
-
-	// just update cache without hitting the leveldb
-	// tree.cache[cacheKey] = node.Item
-
-	// go func() {
-	// 	value, err := tree.EncodeToBytes(node.Item)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return
-	// 	}
-	// 	tree.batch.Put(node.Key, value)
-	// 	fmt.Printf("Save %x, value :%x\n", node.Key, value)
-	// }()
-
-	// return tree.db.Put(node.Key, value)
 }
 
 func (tree *Tree) Commit() error {
 	return tree.db.Commit()
-	// return tree.batch.Write()
-	// batch := tree.db.NewBatch()
-	// for cacheKey, item := range tree.cache {
-	// 	value, err := tree.EncodeToBytes(item)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return err
-	// 	}
-	// 	key := common.Hex2Bytes(cacheKey)
-	// 	batch.Put(key, value)
 
-	// 	if tree.Debug {
-	// 		fmt.Printf("Save %x, value :%x\n", key, value)
-	// 	}
-	// }
-	// // commit then reset cache
-	// tree.cache = make(map[string]*Item)
-
-	// return batch.Write()
 }
 
 func (tree *Tree) deleteCase1(node *Node) {
 	if tree.IsEmptyKey(node.ParentKey()) {
-		// fmt.Println("DELETE")
 		tree.deleteNode(node, false)
 		return
 	}
@@ -671,7 +553,7 @@ func (tree *Tree) deleteCase2(node *Node) {
 	parent := node.Parent(tree)
 	sibling := node.sibling(tree)
 
-	if nodeColor(sibling) == red {
+	if !nodeColor(sibling) {
 		parent.Item.Color = red
 		sibling.Item.Color = black
 		tree.Save(parent)
@@ -693,10 +575,10 @@ func (tree *Tree) deleteCase3(node *Node) {
 	siblingLeft := sibling.Left(tree)
 	siblingRight := sibling.Right(tree)
 
-	if nodeColor(parent) == black &&
-		nodeColor(sibling) == black &&
-		nodeColor(siblingLeft) == black &&
-		nodeColor(siblingRight) == black {
+	if nodeColor(parent) &&
+		nodeColor(sibling) &&
+		nodeColor(siblingLeft) &&
+		nodeColor(siblingRight) {
 		sibling.Item.Color = red
 		tree.Save(sibling)
 		tree.deleteCase1(parent)
@@ -718,10 +600,10 @@ func (tree *Tree) deleteCase4(node *Node) {
 	siblingLeft := sibling.Left(tree)
 	siblingRight := sibling.Right(tree)
 
-	if nodeColor(parent) == red &&
-		nodeColor(sibling) == black &&
-		nodeColor(siblingLeft) == black &&
-		nodeColor(siblingRight) == black {
+	if !nodeColor(parent) &&
+		nodeColor(sibling) &&
+		nodeColor(siblingLeft) &&
+		nodeColor(siblingRight) {
 		sibling.Item.Color = red
 		parent.Item.Color = black
 		tree.Save(sibling)
@@ -738,9 +620,9 @@ func (tree *Tree) deleteCase5(node *Node) {
 	siblingRight := sibling.Right(tree)
 
 	if tree.Comparator(node.Key, parent.LeftKey()) == 0 &&
-		nodeColor(sibling) == black &&
-		nodeColor(siblingLeft) == red &&
-		nodeColor(siblingRight) == black {
+		nodeColor(sibling) &&
+		!nodeColor(siblingLeft) &&
+		nodeColor(siblingRight) {
 		sibling.Item.Color = red
 		siblingLeft.Item.Color = black
 
@@ -750,9 +632,9 @@ func (tree *Tree) deleteCase5(node *Node) {
 		tree.rotateRight(sibling)
 
 	} else if tree.Comparator(node.Key, parent.RightKey()) == 0 &&
-		nodeColor(sibling) == black &&
-		nodeColor(siblingRight) == red &&
-		nodeColor(siblingLeft) == black {
+		nodeColor(sibling) &&
+		!nodeColor(siblingRight) &&
+		nodeColor(siblingLeft) {
 		sibling.Item.Color = red
 		siblingRight.Item.Color = black
 
@@ -780,20 +662,17 @@ func (tree *Tree) deleteCase6(node *Node) {
 
 	// fmt.Println("before-update ", tree, sibling, parent, siblingLeft, siblingRight)
 
-	if tree.Comparator(node.Key, parent.LeftKey()) == 0 && nodeColor(siblingRight) == red {
+	if tree.Comparator(node.Key, parent.LeftKey()) == 0 && !nodeColor(siblingRight) {
 		siblingRight.Item.Color = black
 		tree.Save(siblingRight)
 		tree.rotateLeft(parent)
-		// parent.LeftKey(emptyKey)
-	} else if nodeColor(siblingLeft) == red {
+	} else if !nodeColor(siblingLeft) {
 		siblingLeft.Item.Color = black
 		tree.Save(siblingLeft)
 		tree.rotateRight(parent)
-		// parent.RightKey(emptyKey)
 	}
 
 	// update the parent meta then delete the current node from db
-	// tree.Save(parent)
 	tree.deleteNode(node, false)
 	// fmt.Println("update ", tree, parent, sibling)
 }
@@ -806,19 +685,9 @@ func nodeColor(node *Node) bool {
 }
 
 func (tree *Tree) deleteNode(node *Node, force bool) {
-	// update parent
-	// parent := node.Parent(tree)
-	// fmt.Println("Update parent", parent, "Delete node", node)
-	// if tree.Comparator(node.Key, parent.LeftKey()) == 0 {
-	// 	parent.LeftKey(EmptyKey())
-	// } else {
-	// 	parent.RightKey(EmptyKey())
-	// }
-	// tree.Save(parent)
-	// if force {
+	// do not delete if node is root, and at least one child (size >=2)
+	if tree.size > 1 && tree.Comparator(node.Key, tree.rootKey) == 0 {
+		return
+	}
 	tree.db.Delete(node.Key, force)
-	// } else {
-	// 	node.Item.Deleted = true
-	// 	tree.Save(node)
-	// }
 }

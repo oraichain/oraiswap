@@ -70,13 +70,6 @@ func NewOrderTree(orderDB *BatchDatabase, key []byte, orderBook *OrderBook) *Ord
 	return orderTree
 }
 
-// we use hash as offset to store order tree information
-// var OrderTreeKey = crypto.Keccak256([]byte("ordertree"))
-
-// func (orderTree *OrderTree) DB() *BatchDatabase {
-// 	return orderTree.orderDB
-// }
-
 func (orderTree *OrderTree) Save() error {
 	// commit tree changes
 	// orderTree.PriceTree.Commit()
@@ -163,9 +156,7 @@ func (orderTree *OrderTree) getKeyFromPrice(price *big.Int) []byte {
 
 	orderListKey := orderTree.getSlotFromPrice(price)
 	return GetKeyFromBig(orderListKey)
-	// price is like index of array, so it is faster to calculate with hash ordertree.price = [1,4,5]
-	// so we use hash(key . subkey)
-	// return crypto.Keccak256(orderTree.Key, GetKeyFromBig(price))
+
 }
 
 // PriceList : get the price list from the price map using price as key

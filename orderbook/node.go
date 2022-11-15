@@ -40,7 +40,7 @@ func (node *Node) String(tree *Tree) string {
 	if node == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("%v -> %x, (%v)\n", tree.FormatBytes(node.Key), node.Value(), node.Item.Keys.String(tree))
+	return fmt.Sprintf("%v -> %s, (%v)\n", tree.FormatBytes(node.Key), node.Value(), node.Item.Keys.String(tree))
 }
 
 func (node *Node) maximumNode(tree *Tree) *Node {
@@ -70,12 +70,6 @@ func (node *Node) RightKey(keys ...[]byte) []byte {
 		return nil
 	}
 	if len(keys) == 1 {
-		// if string(node.Key) == "1" {
-		// 	fmt.Printf("Update right key: %s\n", string(keys[0]))
-		// if string(keys[0]) == "3" {
-		// 	panic("should stops")
-		// }
-		// }
 		node.Item.Keys.Right = keys[0]
 	}
 
@@ -126,21 +120,11 @@ func (node *Node) Value() []byte {
 	return node.Item.Value
 }
 
-func (node *Node) grandparent(tree *Tree) *Node {
-	if node != nil && !tree.IsEmptyKey(node.ParentKey()) {
-		return node.Parent(tree).Parent(tree)
-	}
-	return nil
-}
-
 func (node *Node) uncle(tree *Tree) *Node {
 	if node == nil || tree.IsEmptyKey(node.ParentKey()) {
 		return nil
 	}
 	parent := node.Parent(tree)
-	// if tree.IsEmptyKey(parent.ParentKey()) {
-	// 	return nil
-	// }
 
 	return parent.sibling(tree)
 }

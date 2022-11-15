@@ -3,12 +3,8 @@ package orderbook
 import (
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -21,7 +17,7 @@ const (
 
 	// we use a big number as segment for storing order, order list from order tree slot.
 	// as sequential id
-	SlotSegment = common.AddressLength
+	SlotSegment = 20
 )
 
 type OrderBookItem struct {
@@ -60,12 +56,8 @@ func NewOrderBook(name string, db *BatchDatabase) *OrderBook {
 
 	// we convert to lower case, so even with name as contract address, it is still correct
 	// without converting back from hex to bytes
-	key := crypto.Keccak256([]byte(item.Name))
+	key := hash.Sum([]byte(item.Name))
 	slot := new(big.Int).SetBytes(key)
-
-	// hash ( orderBookKey . orderTreeKey )
-	// bidsKey := crypto.Keccak256(key, bidSlotKey)
-	// asksKey := crypto.Keccak256(key, askSlotKey)
 
 	// we just increase the segment at the most byte at address length level to avoid conflict
 	// somehow it is like 2 hashes has the same common prefix and it is very difficult to resolve
@@ -135,7 +127,7 @@ func (orderBook *OrderBook) GetOrderIDFromBook(key []byte) uint64 {
 func (orderBook *OrderBook) GetOrderIDFromKey(key []byte) []byte {
 	orderSlot := new(big.Int).SetBytes(key)
 	// fmt.Println("FAIL", key, orderList.slot)
-	return common.BigToHash(Add(orderBook.slot, orderSlot)).Bytes()
+	return GetKeyFromBig(Add(orderBook.slot, orderSlot))
 }
 
 func (orderBook *OrderBook) GetOrder(key []byte) *Order {
@@ -148,7 +140,6 @@ func (orderBook *OrderBook) GetOrder(key []byte) *Order {
 	// var orderItem *OrderItem
 	val, err := orderBook.db.Get(storedKey, orderItem)
 	if err != nil {
-		fmt.Printf("Key not found :%x, %v\n", storedKey, err)
 		return nil
 	}
 
@@ -200,11 +191,11 @@ func (orderBook *OrderBook) WorstAsk() (value *big.Int) {
 }
 
 // processMarketOrder : process the market order
-func (orderBook *OrderBook) processMarketOrder(quote map[string]interface{}, verbose bool) []map[string]string {
-	var trades []map[string]string
+func (orderBook *OrderBook) processMarketOrder(quote map[string]interface{}, verbose bool) []map[string]interface{} {
+	var trades []map[string]interface{}
 	quantityToTrade := ToBigInt(quote["quantity"].(string))
 	side := quote["side"]
-	var newTrades []map[string]string
+	var newTrades []map[string]interface{}
 	// speedup the comparison, do not assign because it is pointer
 	zero := Zero()
 	if side == Bid {
@@ -226,13 +217,13 @@ func (orderBook *OrderBook) processMarketOrder(quote map[string]interface{}, ver
 
 // processLimitOrder : process the limit order, can change the quote
 // If not care for performance, we should make a copy of quote to prevent further reference problem
-func (orderBook *OrderBook) processLimitOrder(quote map[string]interface{}, verbose bool) ([]map[string]string, map[string]interface{}) {
-	var trades []map[string]string
+func (orderBook *OrderBook) processLimitOrder(quote map[string]interface{}, verbose bool) ([]map[string]interface{}, map[string]interface{}) {
+	var trades []map[string]interface{}
 	quantityToTrade := ToBigInt(quote["quantity"].(string))
 	side := quote["side"]
 	price := ToBigInt(quote["price"].(string))
 
-	var newTrades []map[string]string
+	var newTrades []map[string]interface{}
 	var orderInBook map[string]interface{}
 	// speedup the comparison, do not assign because it is pointer
 	zero := Zero()
@@ -247,7 +238,7 @@ func (orderBook *OrderBook) processLimitOrder(quote map[string]interface{}, verb
 		}
 
 		if quantityToTrade.Cmp(zero) > 0 {
-			quote["order_id"] = strconv.FormatUint(orderBook.Item.NextOrderID, 10)
+			quote["order_id"] = orderBook.Item.NextOrderID
 			quote["quantity"] = quantityToTrade.String()
 			orderBook.Bids.InsertOrder(quote)
 			orderInBook = quote
@@ -264,7 +255,7 @@ func (orderBook *OrderBook) processLimitOrder(quote map[string]interface{}, verb
 		}
 
 		if quantityToTrade.Cmp(zero) > 0 {
-			quote["order_id"] = strconv.FormatUint(orderBook.Item.NextOrderID, 10)
+			quote["order_id"] = orderBook.Item.NextOrderID
 			quote["quantity"] = quantityToTrade.String()
 			orderBook.Asks.InsertOrder(quote)
 			orderInBook = quote
@@ -274,13 +265,12 @@ func (orderBook *OrderBook) processLimitOrder(quote map[string]interface{}, verb
 }
 
 // ProcessOrder : process the order
-func (orderBook *OrderBook) ProcessOrder(quote map[string]interface{}, verbose bool) ([]map[string]string, map[string]interface{}) {
+func (orderBook *OrderBook) ProcessOrder(quote map[string]interface{}, verbose bool) ([]map[string]interface{}, map[string]interface{}) {
 	orderType := quote["type"]
 	var orderInBook map[string]interface{}
-	var trades []map[string]string
+	var trades []map[string]interface{}
 
 	orderBook.UpdateTime()
-	// quote["timestamp"] = strconv.Itoa(orderBook.Time)
 	// if we do not use auto-increment orderid, we must set price slot to avoid conflict
 	orderBook.Item.NextOrderID++
 
@@ -297,10 +287,10 @@ func (orderBook *OrderBook) ProcessOrder(quote map[string]interface{}, verbose b
 }
 
 // processOrderList : process the order list
-func (orderBook *OrderBook) processOrderList(side string, orderList *OrderList, quantityStillToTrade *big.Int, quote map[string]interface{}, verbose bool) (*big.Int, []map[string]string) {
+func (orderBook *OrderBook) processOrderList(side string, orderList *OrderList, quantityStillToTrade *big.Int, quote map[string]interface{}, verbose bool) (*big.Int, []map[string]interface{}) {
 	quantityToTrade := CloneBigInt(quantityStillToTrade)
 	// quantityToTrade := quantityStillToTrade
-	var trades []map[string]string
+	var trades []map[string]interface{}
 	// speedup the comparison, do not assign because it is pointer
 	zero := Zero()
 	// var watchDog = 0
@@ -329,10 +319,8 @@ func (orderBook *OrderBook) processOrderList(side string, orderList *OrderList, 
 		} else if IsEqual(quantityToTrade, headOrder.Item.Quantity) {
 			tradedQuantity = CloneBigInt(quantityToTrade)
 			if side == Bid {
-				// orderBook.Bids.RemoveOrderByID(headOrder.Key)
 				orderBook.Bids.RemoveOrder(headOrder)
 			} else {
-				// orderBook.Asks.RemoveOrderByID(headOrder.Key)
 				orderBook.Asks.RemoveOrder(headOrder)
 			}
 			quantityToTrade = Zero()
@@ -340,31 +328,20 @@ func (orderBook *OrderBook) processOrderList(side string, orderList *OrderList, 
 		} else {
 			tradedQuantity = CloneBigInt(headOrder.Item.Quantity)
 			if side == Bid {
-				// orderBook.Bids.RemoveOrderByID(headOrder.Key)
 				orderBook.Bids.RemoveOrder(headOrder)
 			} else {
-				// orderBook.Asks.RemoveOrderByID(headOrder.Key)
-				// fmt.Printf("\nBEFORE : %s\n\n", orderList.String(0))
-				// orderList, _ = orderBook.Asks.RemoveOrder(headOrder)
 				orderBook.Asks.RemoveOrderFromOrderList(headOrder, orderList)
-				// fmt.Println("AFTER DELETE", orderList.String(0))
-				// fmt.Printf("\nAFTER : %x, %s\n\n", orderList.Item.HeadOrder, orderList.String(0))
 			}
 		}
 
 		if verbose {
 			fmt.Printf("TRADE: Timestamp - %d, Price - %s, Quantity - %s, TradeID - %d, Matching TradeID - %s\n",
 				orderBook.Item.Timestamp, tradedPrice, tradedQuantity, headOrder.Key, quote["trade_id"])
-			// fmt.Println(headOrder)
-			// watchDog++
-			// if watchDog > 10 {
-			// panic("stop")
-			// }
 
 		}
 
-		transactionRecord := make(map[string]string)
-		transactionRecord["timestamp"] = strconv.FormatUint(orderBook.Item.Timestamp, 10)
+		transactionRecord := make(map[string]interface{})
+		transactionRecord["timestamp"] = orderBook.Item.Timestamp
 		transactionRecord["price"] = tradedPrice.String()
 		transactionRecord["quantity"] = tradedQuantity.String()
 
@@ -384,9 +361,7 @@ func (orderBook *OrderBook) CancelOrder(side string, orderID uint64, price *big.
 		if order != nil {
 			_, err = orderBook.Bids.RemoveOrder(order)
 		}
-		// if orderBook.Bids.OrderExist(key, price) {
-		// 	orderBook.Bids.RemoveOrder(order)
-		// }
+
 	} else {
 
 		order := orderBook.Asks.GetOrder(key, price)
@@ -394,9 +369,6 @@ func (orderBook *OrderBook) CancelOrder(side string, orderID uint64, price *big.
 			_, err = orderBook.Asks.RemoveOrder(order)
 		}
 
-		// if orderBook.Asks.OrderExist(key) {
-		// 	orderBook.Asks.RemoveOrder(order)
-		// }
 	}
 
 	return err
@@ -407,7 +379,7 @@ func (orderBook *OrderBook) UpdateOrder(quoteUpdate map[string]interface{}) erro
 
 	price, ok := new(big.Int).SetString(quoteUpdate["price"].(string), 10)
 	if !ok {
-		return fmt.Errorf("Price is not correct :%s", quoteUpdate["price"])
+		return fmt.Errorf("price is not correct :%s", quoteUpdate["price"])
 	}
 
 	return orderBook.ModifyOrder(quoteUpdate, orderID, price)
@@ -419,17 +391,15 @@ func (orderBook *OrderBook) ModifyOrder(quoteUpdate map[string]interface{}, orde
 	orderBook.UpdateTime()
 
 	side := quoteUpdate["side"]
-	quoteUpdate["order_id"] = strconv.FormatUint(orderID, 10)
-	quoteUpdate["timestamp"] = strconv.FormatUint(orderBook.Item.Timestamp, 10)
+	quoteUpdate["order_id"] = orderID
+	quoteUpdate["timestamp"] = orderBook.Item.Timestamp
 	key := []byte(quoteUpdate["order_id"].(string))
 	if side == Bid {
 
 		if orderBook.Bids.OrderExist(key, price) {
 			return orderBook.Bids.UpdateOrder(quoteUpdate)
 		}
-		// if orderBook.Bids.OrderExist(key) {
-		// 	orderBook.Bids.UpdateOrder(quoteUpdate)
-		// }
+
 	} else {
 
 		if orderBook.Asks.OrderExist(key, price) {

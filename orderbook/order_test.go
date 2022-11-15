@@ -3,7 +3,6 @@ package orderbook
 import (
 	"bytes"
 	"math/big"
-	"strconv"
 	"testing"
 )
 
@@ -14,7 +13,7 @@ func TestNewOrder(t *testing.T) {
 	dummyOrder["quantity"] = testQuanity.String()
 	dummyOrder["price"] = testPrice.String()
 	dummyOrder["order_id"] = testOrderID
-	dummyOrder["trade_id"] = testTradeID
+
 	priceKey := GetKeyFromBig(testPrice)
 	order := NewOrder(dummyOrder, priceKey)
 
@@ -32,7 +31,7 @@ func TestNewOrder(t *testing.T) {
 		t.Errorf("price incorrect, got: %d, want: %d.", order.Item.Price, testPrice)
 	}
 
-	if !bytes.Equal(order.Key, []byte(strconv.FormatUint(dummyOrder["order_id"].(uint64), 10))) {
+	if !bytes.Equal(order.Key, new(big.Int).SetUint64(dummyOrder["order_id"].(uint64)).Bytes()) {
 		t.Errorf("order id incorrect, got: %x, want: %d.", order.Key, testOrderID)
 	}
 
@@ -46,7 +45,6 @@ func TestOrder(t *testing.T) {
 	dummyOrder["quantity"] = testQuanity.String()
 	dummyOrder["price"] = testPrice.String()
 	dummyOrder["order_id"] = testOrderID
-	dummyOrder["trade_id"] = testTradeID
 
 	order := NewOrder(dummyOrder, orderList.Key)
 	orderList.AppendOrder(order)
@@ -57,7 +55,7 @@ func TestOrder(t *testing.T) {
 	}
 
 	if !(order.Item.Timestamp == testTimestamp1) {
-		t.Errorf("trade id incorrect, got: %d, want: %d.", order.Key, testTradeID)
+		t.Errorf("trade id incorrect, got: %d, want: %d.", order.Item.Timestamp, testTimestamp1)
 	}
 
 	// log in json format
@@ -68,7 +66,7 @@ func TestOrder(t *testing.T) {
 		dummyOrder1["timestamp"] = testTimestamp1
 		dummyOrder1["quantity"] = testQuanity1.String()
 		dummyOrder1["price"] = Add(testPrice1, increment).String()
-		dummyOrder1["order_id"] = increment.String()
+		dummyOrder1["order_id"] = increment.Uint64()
 
 		order1 := NewOrder(dummyOrder1, orderList.Key)
 		orderList.AppendOrder(order1)

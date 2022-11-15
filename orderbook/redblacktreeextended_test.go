@@ -4,21 +4,19 @@ import (
 	"math/big"
 	"testing"
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func print(tree *RedBlackTreeExtended, t *testing.T) {
 	max, _ := tree.GetMax()
 	min, _ := tree.GetMin()
-	t.Logf("Value for max key: %v \n", string(max))
-	t.Logf("Value for min key: %v \n", string(min))
+	t.Logf("Value for max key: %s \n", max)
+	t.Logf("Value for min key: %s \n", min)
 	t.Log(tree)
 }
 
 func getBig(value string) []byte {
 	bigValue, _ := new(big.Int).SetString(value, 10)
-	return common.BigToHash(bigValue).Bytes()
+	return GetKeyFromBig(bigValue)
 }
 
 func TestManipulateLevelDBTree(t *testing.T) {
@@ -46,11 +44,12 @@ func TestManipulateLevelDBTree(t *testing.T) {
 
 	tree.RemoveMin() // 2->b, 3->c, 4->d, 5->e (in order)
 	tree.RemoveMax() // 2->b, 3->c, 4->d (in order)
-	tree.RemoveMin() // 3->c, 4->d (in order)
-
 	print(tree, t)
 
-	// Value for max key: c
+	tree.RemoveMin() // 3->c, 4->d (in order)
+	print(tree, t)
+
+	// Value for max key: d
 	// Value for min key: c
 	// RedBlackTree
 	//	│   ┌── 4

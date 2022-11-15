@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"strconv"
 	"strings"
 )
 
@@ -81,18 +80,16 @@ func (engine *Engine) GetOrder(pairName, orderID string) *Order {
 	return ob.GetOrder(key)
 }
 
-func (engine *Engine) ProcessOrder(quote map[string]interface{}) ([]map[string]string, map[string]interface{}) {
+func (engine *Engine) ProcessOrder(quote map[string]interface{}) ([]map[string]interface{}, map[string]interface{}) {
 
 	ob, _ := engine.getAndCreateIfNotExisted(quote["pair_name"].(string))
-	var trades []map[string]string
+	var trades []map[string]interface{}
 	var orderInBook map[string]interface{}
 
 	if ob != nil {
 		// get map as general input, we can set format later to make sure there is no problem
-		orderID := quote["order_id"].(uint64)
-
 		// insert
-		if orderID == 0 {
+		if quote["order_id"].(uint64) == 0 {
 			log.Println("Process order")
 			trades, orderInBook = ob.ProcessOrder(quote, true)
 		} else {
@@ -109,18 +106,18 @@ func (engine *Engine) ProcessOrder(quote map[string]interface{}) ([]map[string]s
 
 }
 
-func (engine *Engine) CancelOrder(quote map[string]string) error {
-	ob, err := engine.getAndCreateIfNotExisted(quote["pair_name"])
+func (engine *Engine) CancelOrder(quote map[string]interface{}) error {
+	ob, err := engine.getAndCreateIfNotExisted(quote["pair_name"].(string))
 	if ob != nil {
-		orderID, err := strconv.ParseUint(quote["order_id"], 10, 64)
+		orderID := quote["order_id"].(uint64)
 		if err == nil {
 
-			price, ok := new(big.Int).SetString(quote["price"], 10)
+			price, ok := new(big.Int).SetString(quote["price"].(string), 10)
 			if !ok {
 				return fmt.Errorf("price is not correct :%s", quote["price"])
 			}
 
-			return ob.CancelOrder(quote["side"], orderID, price)
+			return ob.CancelOrder(quote["side"].(string), orderID, price)
 		}
 	}
 

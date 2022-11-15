@@ -41,11 +41,13 @@ func (order *Order) GetPrevOrder(orderList *OrderList) *Order {
 
 // NewOrder : create new order with quote ( can be ethereum address )
 func NewOrder(quote map[string]interface{}, orderList []byte) *Order {
-	timestamp, _ := quote["timestamp"].(uint64)
+
+	timestamp := quote["timestamp"].(uint64)
 	quantity := ToBigInt(quote["quantity"].(string))
 	price := ToBigInt(quote["price"].(string))
-	orderID := ToBigInt(quote["order_id"].(string))
-	key := GetKeyFromBig(orderID)
+	orderID := quote["order_id"].(uint64)
+	key := new(big.Int).SetUint64(orderID).Bytes()
+
 	orderItem := &OrderItem{
 		Timestamp: timestamp,
 		Quantity:  quantity,

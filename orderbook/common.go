@@ -1,16 +1,17 @@
 package orderbook
 
 import (
+	"crypto"
 	"encoding/json"
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type Comparator func(a, b []byte) int
 type EncodeToBytes func(interface{}) ([]byte, error)
 type DecodeBytes func([]byte, interface{}) error
 type FormatBytes func([]byte) string
+
+var hash = crypto.SHA256.New()
 
 const (
 	TrueByte  = byte(1)
@@ -22,7 +23,7 @@ const (
 
 // use alloc to prevent reference manipulation
 func EmptyKey() []byte {
-	key := make([]byte, common.HashLength)
+	key := make([]byte, hash.Size())
 	return key
 }
 
@@ -36,7 +37,7 @@ func GetSegmentHash(key []byte, segment, index uint8) []byte {
 }
 
 func Bool2byte(bln bool) byte {
-	if bln == true {
+	if bln {
 		return TrueByte
 	}
 
@@ -44,10 +45,7 @@ func Bool2byte(bln bool) byte {
 }
 
 func Byte2bool(b byte) bool {
-	if b == TrueByte {
-		return true
-	}
-	return false
+	return b == TrueByte
 }
 
 // ToJSON : log json string
@@ -62,29 +60,16 @@ func ToJSON(object interface{}, args ...string) string {
 }
 
 func GetKeyFromUint64(key uint64) []byte {
-	return GetKeyFromBig(big.NewInt(int64(key)))
+	return GetKeyFromBig(new(big.Int).SetUint64(key))
 }
 
 func GetKeyFromString(key string) []byte {
-	var bigInt *big.Int
-	// this is too big, maybe hash string
-	if len(key) >= 2*common.AddressLength {
-		// if common.IsHexAddress(key) {
-		// 	return common.HexToHash().Bytes()
-		// }
-		bigInt = new(big.Int).SetBytes([]byte(key))
-	} else {
-		bigInt, _ = new(big.Int).SetString(key, 10)
-	}
+	bigInt, _ := new(big.Int).SetString(key, 10)
 	return GetKeyFromBig(bigInt)
 }
 
 func GetKeyFromBig(key *big.Int) []byte {
-	// orderListKey, _ := price.GobEncode()
-	// return orderListKey
-	// bigPrice := new(big.Int)
-	// bigPrice.SetString(price.String(), 10)
-	return common.BigToHash(key).Bytes()
+	return key.Bytes()
 }
 
 func Mul(x, y *big.Int) *big.Int {

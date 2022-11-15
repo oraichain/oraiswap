@@ -2,7 +2,6 @@ package orderbook
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -77,18 +76,14 @@ func (db *BatchDatabase) Close() error {
 }
 
 func (db *BatchDatabase) IsEmptyKey(key []byte) bool {
-	return key == nil || len(key) == 0 || bytes.Equal(key, db.emptyKey)
-}
-
-func (db *BatchDatabase) getCacheKey(key []byte) string {
-	return hex.EncodeToString(key)
+	return len(key) == 0 || bytes.Equal(key, db.emptyKey)
 }
 
 func (db *BatchDatabase) Has(key []byte) (bool, error) {
 	if db.IsEmptyKey(key) {
 		return false, nil
 	}
-	cacheKey := db.getCacheKey(key)
+	cacheKey := string(key)
 
 	// has in pending and is not deleted
 	if _, ok := db.pendingItems[cacheKey]; ok { // && !pendingItem.Deleted {
@@ -109,7 +104,7 @@ func (db *BatchDatabase) Get(key []byte, val interface{}) (interface{}, error) {
 		return nil, nil
 	}
 
-	cacheKey := db.getCacheKey(key)
+	cacheKey := string(key)
 
 	if pendingItem, ok := db.pendingItems[cacheKey]; ok {
 		// if pendingItem.Deleted {
@@ -155,7 +150,7 @@ func (db *BatchDatabase) Get(key []byte, val interface{}) (interface{}, error) {
 
 func (db *BatchDatabase) Put(key []byte, val interface{}) error {
 
-	cacheKey := db.getCacheKey(key)
+	cacheKey := string(key)
 
 	// fmt.Println("PUT", cacheKey, val)
 	db.pendingItems[cacheKey] = &BatchItem{Value: val}
@@ -171,7 +166,7 @@ func (db *BatchDatabase) Delete(key []byte, force bool) error {
 
 	// by default, we force delete both db and cache,
 	// for better performance, we can mark a Deleted flag, to do batch delete
-	cacheKey := db.getCacheKey(key)
+	cacheKey := string(key)
 
 	// force delete everything
 	if force {
@@ -197,16 +192,7 @@ func (db *BatchDatabase) Delete(key []byte, force bool) error {
 func (db *BatchDatabase) Commit() error {
 
 	batch := new(leveldb.Batch)
-	for cacheKey, item := range db.pendingItems {
-		key, _ := hex.DecodeString(cacheKey)
-
-		// fmt.Printf("key :%x, cacheKey :%s\n", key, cacheKey)
-
-		// if item.Deleted {
-		// 	db.db.Delete(key)
-		// 	// cache already has this item removed
-		// 	continue
-		// }
+	for key, item := range db.pendingItems {
 
 		value, err := db.EncodeToBytes(item.Value)
 		if err != nil {
@@ -214,7 +200,7 @@ func (db *BatchDatabase) Commit() error {
 			return err
 		}
 
-		batch.Put(key, value)
+		batch.Put([]byte(key), value)
 
 		if db.Debug {
 			fmt.Printf("Save %x, value :%s\n", key, ToJSON(item.Value))

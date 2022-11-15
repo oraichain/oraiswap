@@ -41,7 +41,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder["side"] = Ask
 	dummyOrder["quantity"] = "5"
 	dummyOrder["price"] = "101"
-	dummyOrder["trade_id"] = "100"
+	dummyOrder["order_id"] = uint64(100)
 
 	limitOrders = append(limitOrders, dummyOrder)
 
@@ -50,7 +50,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder1["side"] = Ask
 	dummyOrder1["quantity"] = "5"
 	dummyOrder1["price"] = "103"
-	dummyOrder1["trade_id"] = "101"
+	dummyOrder1["order_id"] = uint64(101)
 
 	limitOrders = append(limitOrders, dummyOrder1)
 
@@ -59,7 +59,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder2["side"] = Ask
 	dummyOrder2["quantity"] = "5"
 	dummyOrder2["price"] = "101"
-	dummyOrder2["trade_id"] = "102"
+	dummyOrder2["order_id"] = uint64(102)
 
 	limitOrders = append(limitOrders, dummyOrder2)
 
@@ -68,7 +68,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder7["side"] = Ask
 	dummyOrder7["quantity"] = "5"
 	dummyOrder7["price"] = "101"
-	dummyOrder7["trade_id"] = "103"
+	dummyOrder7["order_id"] = uint64(103)
 
 	limitOrders = append(limitOrders, dummyOrder7)
 
@@ -77,7 +77,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder3["side"] = Bid
 	dummyOrder3["quantity"] = "5"
 	dummyOrder3["price"] = "99"
-	dummyOrder3["trade_id"] = "100"
+	dummyOrder3["order_id"] = uint64(100)
 
 	limitOrders = append(limitOrders, dummyOrder3)
 
@@ -86,7 +86,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder4["side"] = Bid
 	dummyOrder4["quantity"] = "5"
 	dummyOrder4["price"] = "98"
-	dummyOrder4["trade_id"] = "101"
+	dummyOrder4["order_id"] = "101"
 	limitOrders = append(limitOrders, dummyOrder4)
 
 	dummyOrder5 := make(map[string]interface{})
@@ -94,7 +94,7 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder5["side"] = Bid
 	dummyOrder5["quantity"] = "5"
 	dummyOrder5["price"] = "99"
-	dummyOrder5["trade_id"] = "102"
+	dummyOrder5["order_id"] = uint64(102)
 
 	limitOrders = append(limitOrders, dummyOrder5)
 
@@ -103,14 +103,15 @@ func TestOrderBook(t *testing.T) {
 	dummyOrder6["side"] = Bid
 	dummyOrder6["quantity"] = "5"
 	dummyOrder6["price"] = "97"
-	dummyOrder6["trade_id"] = "103"
+	dummyOrder6["order_id"] = uint64(103)
 
 	limitOrders = append(limitOrders, dummyOrder6)
 
 	// t.Logf("Limit Orders :%s", ToJSON(limitOrders))
-	var trades []map[string]string
+	var trades []map[string]interface{}
 	var orderInBook map[string]interface{}
-	for _, order := range limitOrders {
+	for i, order := range limitOrders {
+		order["timestamp"] = testTimestamp + uint64(10*i)
 		trades, orderInBook = orderBook.ProcessOrder(order, true)
 		t.Logf("\nOrderBook :%s - %s", trades, orderInBook)
 	}
@@ -147,7 +148,8 @@ func TestOrderBook(t *testing.T) {
 	marketOrder["side"] = Bid
 	marketOrder["quantity"] = "2"
 	marketOrder["price"] = "102"
-	marketOrder["trade_id"] = "109"
+	marketOrder["order_id"] = uint64(109)
+	marketOrder["timestamp"] = testTimestamp
 
 	trades, orderInBook = orderBook.ProcessOrder(marketOrder, true)
 
@@ -171,30 +173,14 @@ func TestOrderBook(t *testing.T) {
 	bigOrder["side"] = Bid
 	bigOrder["quantity"] = "50"
 	bigOrder["price"] = "102"
-	bigOrder["trade_id"] = "110"
+	bigOrder["order_id"] = uint64(110)
+	bigOrder["timestamp"] = testTimestamp
 
 	trades, orderInBook = orderBook.ProcessOrder(bigOrder, true)
 
 	if len(orderInBook) == 0 {
 		t.Errorf("orderBook.ProcessOrder incorrect")
 	}
-
-	// t.Logf("\nOrderBook :%s", orderBook.String(0))
-	// t.Logf("\nTrade :%s\nOrderInBook :%s", ToJSON(trades), ToJSON(orderInBook))
-	// return
-
-	// // Market orders only require that a user specifies a side (bid or ask), a quantity, and their unique trade id
-	// marketOrder = make(map[string]string)
-	// marketOrder["type"] = "market"
-	// marketOrder["side"] = Ask
-	// marketOrder["quantity"] = "20"
-	// marketOrder["trade_id"] = "111"
-
-	// trades, orderInBook = orderBook.ProcessOrder(marketOrder, true)
-
-	// orderList := orderBook.Asks.MaxPriceList()
-	// t.Logf("Best ask List : %s", orderList.String(0))
-	// t.Log(orderBook.Asks.PriceTree)
 
 	// orderBook.SetDebug(true)
 	// Save to the database before exit
@@ -214,7 +200,7 @@ func TestOrderBookRestore(t *testing.T) {
 	orderBook.Restore()
 	t.Logf("\nOrderBook :%s", orderBook.String(0))
 
-	key := GetKeyFromString("10")
+	key := GetKeyFromUint64(uint64(10))
 	order := orderBook.GetOrder(key)
 
 	t.Logf("\nOrder : %s", order)

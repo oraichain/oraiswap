@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Item : comparable
@@ -42,9 +39,6 @@ type OrderList struct {
 // each orderlist will store information of order in a seperated domain
 func NewOrderList(price *big.Int, orderTree *OrderTree) *OrderList {
 	item := &OrderListItem{
-		// HeadOrder: nil,
-		// TailOrder: nil,
-		// set to default common.Hash
 		HeadOrder: EmptyKey(),
 		TailOrder: EmptyKey(),
 		Length:    0,
@@ -72,7 +66,7 @@ func NewOrderListWithItem(item *OrderListItem, orderTree *OrderTree) *OrderList 
 	} else {
 		// orderList.slot = Zero()
 		//
-		orderList.slot = new(big.Int).SetBytes(crypto.Keccak256(key))
+		orderList.slot = new(big.Int).SetBytes(hash.Sum(key))
 	}
 
 	return orderList
@@ -161,18 +155,6 @@ func (orderList *OrderList) Less(than *OrderList) bool {
 }
 
 func (orderList *OrderList) Save() error {
-	// value, err := orderList.orderTree.orderDB.EncodeToBytes(orderList.Item)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return err
-	// }
-	// // we use orderlist db file seperated from order
-	// // orderList.db.Put(orderList.Key, value)
-	// if orderList.orderTree.PriceTree.Debug {
-	// 	fmt.Printf("Save orderlist key %x, value :%x\n", orderList.Key, value)
-	// }
-	// // fmt.Println("AFTER UPDATE", orderList.String(0))
-	// return orderList.orderTree.PriceTree.Put(orderList.Key, value)
 
 	return orderList.orderTree.SaveOrderList(orderList)
 }
@@ -193,9 +175,8 @@ func (orderList *OrderList) GetOrderIDFromList(key []byte) uint64 {
 func (orderList *OrderList) GetOrderIDFromKey(key []byte) []byte {
 	orderSlot := new(big.Int).SetBytes(key)
 	// fmt.Println("FAIL", key, orderList.slot)
-	return common.BigToHash(Add(orderList.slot, orderSlot)).Bytes()
-	// orderbook:[1,2,3,4]
-	// return key
+	return GetKeyFromBig(Add(orderList.slot, orderSlot))
+
 }
 
 // GetOrderID return the real slot key of order in this linked list
