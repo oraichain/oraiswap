@@ -34,27 +34,27 @@ pub struct Order {
 }
 
 pub fn store_order(storage: &mut dyn Storage, order: &Order) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_ORDER).save(&order.order_id.to_be_bytes(), order)?;
+    Bucket::new(storage, PREFIX_ORDER).save(&order.order_id.to_le_bytes(), order)?;
     Bucket::multilevel(
         storage,
         &[PREFIX_ORDER_BY_BIDDER, order.bidder_addr.as_slice()],
     )
-    .save(&order.order_id.to_be_bytes(), &true)?;
+    .save(&order.order_id.to_le_bytes(), &true)?;
 
     Ok(())
 }
 
 pub fn remove_order(storage: &mut dyn Storage, order: &Order) {
-    Bucket::<Order>::new(storage, PREFIX_ORDER).remove(&order.order_id.to_be_bytes());
+    Bucket::<Order>::new(storage, PREFIX_ORDER).remove(&order.order_id.to_le_bytes());
     Bucket::<Order>::multilevel(
         storage,
         &[PREFIX_ORDER_BY_BIDDER, order.bidder_addr.as_slice()],
     )
-    .remove(&order.order_id.to_be_bytes());
+    .remove(&order.order_id.to_le_bytes());
 }
 
 pub fn read_order(storage: &dyn Storage, order_id: u64) -> StdResult<Order> {
-    ReadonlyBucket::new(storage, PREFIX_ORDER).load(&order_id.to_be_bytes())
+    ReadonlyBucket::new(storage, PREFIX_ORDER).load(&order_id.to_le_bytes())
 }
 
 pub fn read_orders_with_bidder_indexer(
@@ -122,7 +122,7 @@ fn bytes_to_u64(data: &[u8]) -> StdResult<u64> {
 // this will set the first key after the provided key, by appending a 1 byte
 fn calc_range_start(start_after: Option<u64>) -> Option<Vec<u8>> {
     start_after.map(|id| {
-        let mut v = id.to_be_bytes().to_vec();
+        let mut v = id.to_le_bytes().to_vec();
         v.push(1);
         v
     })
@@ -130,5 +130,5 @@ fn calc_range_start(start_after: Option<u64>) -> Option<Vec<u8>> {
 
 // this will set the first key after the provided key, by appending a 1 byte
 fn calc_range_end(start_after: Option<u64>) -> Option<Vec<u8>> {
-    start_after.map(|id| id.to_be_bytes().to_vec())
+    start_after.map(|id| id.to_le_bytes().to_vec())
 }
