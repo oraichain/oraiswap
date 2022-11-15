@@ -22,3 +22,6 @@ artifacts
 
 # nodejs
 node_modules
+
+# leveldb
+datadir/
