@@ -14,7 +14,7 @@ use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
-use oraiswap::testing::{MockApp, ATOM_DENOM};
+use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 #[test]
 fn test_bond_tokens() {
@@ -518,18 +518,17 @@ fn test_auto_stake() {
         slippage_tolerance: None,
     };
 
-    let res = app
-        .execute(
-            Addr::unchecked("addr"),
-            staking_addr.clone(),
-            &msg,
-            &[Coin {
-                denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            }],
-        )
-        .unwrap_err();
-    assert_eq!(res.contains("error executing WasmMsg"), true);
+    let res = app.execute(
+        Addr::unchecked("addr"),
+        staking_addr.clone(),
+        &msg,
+        &[Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(100u128),
+        }],
+    );
+
+    app.assert_fail(res);
 
     // no native asset
     let msg = ExecuteMsg::AutoStake {
@@ -550,10 +549,9 @@ fn test_auto_stake() {
         slippage_tolerance: None,
     };
 
-    let res = app
-        .execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[])
-        .unwrap_err();
-    assert_eq!(res.contains("error executing WasmMsg"), true);
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+
+    app.assert_fail(res);
 
     let msg = ExecuteMsg::AutoStake {
         assets: [
@@ -574,10 +572,8 @@ fn test_auto_stake() {
     };
 
     // attempt with no coins
-    let res = app
-        .execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[])
-        .unwrap_err();
-    assert_eq!(res.contains("error executing WasmMsg"), true);
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+    app.assert_fail(res);
 
     let _res = app
         .execute(
@@ -600,11 +596,9 @@ fn test_auto_stake() {
         staker_addr: Addr::unchecked("addr"),
         prev_staking_token_amount: Uint128::zero(),
     };
-    let res = app
-        .execute(staking_addr.clone(), staking_addr.clone(), &msg, &[])
-        .unwrap_err();
+    let res = app.execute(staking_addr.clone(), staking_addr.clone(), &msg, &[]);
     // pool not found error
-    assert_eq!(res.contains("error executing WasmMsg"), true);
+    app.assert_fail(res);
 
     // valid msg
     let msg = ExecuteMsg::AutoStakeHook {
@@ -617,10 +611,8 @@ fn test_auto_stake() {
     };
 
     // unauthorized attempt
-    let res = app
-        .execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[])
-        .unwrap_err();
-    assert_eq!(res.contains("error executing WasmMsg"), true);
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+    app.assert_fail(res);
 
     // successfull attempt
 
@@ -629,7 +621,7 @@ fn test_auto_stake() {
         .unwrap();
     assert_eq!(
         // first attribute is _contract_addr
-        res.events[1].attributes[1..],
+        res.get_attributes(1),
         vec![
             attr("action", "bond"),
             attr("staker_addr", "addr"),

@@ -268,11 +268,7 @@ fn provide_liquidity() {
         }],
     );
 
-    // new version of cosmwasm does not return detail error
-    match res.err() {
-        Some(msg) => assert_eq!(msg.contains("error executing WasmMsg"), true),
-        None => panic!("Must return generic error"),
-    }
+    app.assert_fail(res);
 }
 
 #[test]

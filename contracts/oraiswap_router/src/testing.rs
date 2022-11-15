@@ -298,10 +298,7 @@ fn execute_swap_operations() {
     };
 
     let res = app.execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[]);
-    match res.err() {
-        Some(msg) => assert_eq!(msg.contains("error executing WasmMsg"), true),
-        None => panic!("Must return generic error"),
-    }
+    app.assert_fail(res);
 
     let msg = ExecuteMsg::ExecuteSwapOperations {
         operations: vec![

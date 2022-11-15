@@ -1,7 +1,7 @@
 use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::serde::Serialize;
 use cosmwasm_std::{
-    coin, Addr, AllBalanceResponse, BalanceResponse, BankQuery, Coin, Decimal, Empty,
+    coin, Addr, AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Coin, Decimal, Empty,
     QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
 use std::collections::HashMap;
@@ -23,6 +23,16 @@ macro_rules! create_entry_points_testing {
             $contract::contract::query,
         )
     };
+}
+
+pub trait AttributeUtil {
+    fn get_attributes(&self, index: usize) -> Vec<Attribute>;
+}
+
+impl AttributeUtil for AppResponse {
+    fn get_attributes(&self, index: usize) -> Vec<Attribute> {
+        self.events[index].attributes[1..].to_vec()
+    }
 }
 
 pub struct MockApp {
@@ -340,12 +350,14 @@ impl MockApp {
         &mut self,
         sender: Addr,
         balances: &[(&String, &[(&String, &Uint128)])],
-    ) {
+    ) -> Vec<Addr> {
+        let mut contract_addrs = vec![];
         for (token, balances) in balances.iter() {
             let contract_addr = match self.token_map.get(*token) {
                 None => self.create_token(&token),
                 Some(addr) => addr.clone(),
             };
+            contract_addrs.push(contract_addr.clone());
 
             // mint for each recipient
             for (recipient, &amount) in balances.iter() {
@@ -363,6 +375,7 @@ impl MockApp {
                 }
             }
         }
+        contract_addrs
     }
 
     pub fn set_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
@@ -370,8 +383,19 @@ impl MockApp {
     }
 
     // configure the mint whitelist mock querier
-    pub fn set_token_balances(&mut self, balances: &[(&String, &[(&String, &Uint128)])]) {
+    pub fn set_token_balances(
+        &mut self,
+        balances: &[(&String, &[(&String, &Uint128)])],
+    ) -> Vec<Addr> {
         self.set_token_balances_from(Addr::unchecked(APP_OWNER), balances)
+    }
+
+    pub fn assert_fail(&self, res: Result<AppResponse, String>) {
+        // new version of cosmwasm does not return detail error
+        match res.err() {
+            Some(msg) => assert_eq!(msg.contains("error executing WasmMsg"), true),
+            None => panic!("Must return generic error"),
+        }
     }
 }
 
