@@ -2,7 +2,17 @@ package orderbook
 
 import (
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
+
+var DecimalFraction, _ = decimal.NewFromString("1000000000000000000")
+
+func TestDecimal(t *testing.T) {
+	price, _ := decimal.NewFromString("1.15")
+	price = price.Mul(DecimalFraction)
+	t.Logf("price %v", decimal.NewFromBigInt(price.BigInt(), -18))
+}
 
 func TestNewOrderBook(t *testing.T) {
 	orderBook := testOrderBook
