@@ -1,4 +1,4 @@
-use cosmwasm_std::{attr, to_binary, Addr, Coin, Uint128};
+use cosmwasm_std::{to_binary, Addr, Coin, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -39,6 +39,7 @@ fn submit_order() {
     let token_addr = app.get_token_addr("asset").unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::Token {
@@ -63,6 +64,7 @@ fn submit_order() {
     app.assert_fail(res);
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -86,6 +88,7 @@ fn submit_order() {
     app.assert_fail(res);
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -115,11 +118,11 @@ fn submit_order() {
     assert_eq!(
         res.get_attributes(1),
         vec![
-            attr("action", "submit_order"),
-            attr("order_id", "1"),
-            attr("bidder_addr", "addr0000"),
-            attr("offer_asset", format!("1000000{}", ORAI_DENOM)),
-            attr("ask_asset", format!("1000000{}", token_addr)),
+            ("action", "submit_order"),
+            ("order_id", "1"),
+            ("bidder_addr", "addr0000"),
+            ("offer_asset", &format!("1000000{}", ORAI_DENOM)),
+            ("ask_asset", &format!("1000000{}", token_addr)),
         ]
     );
 
@@ -133,6 +136,7 @@ fn submit_order() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: None,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::NativeToken {
@@ -151,11 +155,11 @@ fn submit_order() {
         // due to hook from token contract, the index is 3
         res.get_attributes(3),
         vec![
-            attr("action", "submit_order"),
-            attr("order_id", "2"),
-            attr("bidder_addr", "addr0000"),
-            attr("offer_asset", format!("1000000{}", token_addr)),
-            attr("ask_asset", format!("1000000{}", ORAI_DENOM)),
+            ("action", "submit_order"),
+            ("order_id", "2"),
+            ("bidder_addr", "addr0000"),
+            ("offer_asset", &format!("1000000{}", token_addr)),
+            ("ask_asset", &format!("1000000{}", ORAI_DENOM)),
         ]
     );
     assert_eq!(
@@ -196,6 +200,7 @@ fn cancel_order_native_token() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -222,7 +227,15 @@ fn cancel_order_native_token() {
         )
         .unwrap();
 
-    let msg = ExecuteMsg::CancelOrder { order_id: 1 };
+    let msg = ExecuteMsg::CancelOrder {
+        order_id: 1,
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        },
+    };
 
     // failed verfication failed
     let res = app.execute(
@@ -244,9 +257,9 @@ fn cancel_order_native_token() {
     assert_eq!(
         res.get_attributes(1),
         vec![
-            attr("action", "cancel_order"),
-            attr("order_id", "1"),
-            attr("bidder_refund", format!("1000000{}", ORAI_DENOM))
+            ("action", "cancel_order"),
+            ("order_id", "1"),
+            ("bidder_refund", &format!("1000000{}", ORAI_DENOM))
         ]
     );
 
@@ -294,6 +307,7 @@ fn cancel_order_token() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: None,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::NativeToken {
@@ -308,7 +322,15 @@ fn cancel_order_token() {
         .execute(Addr::unchecked("addr0000"), token_addr.clone(), &msg, &[])
         .unwrap();
 
-    let msg = ExecuteMsg::CancelOrder { order_id: 1 };
+    let msg = ExecuteMsg::CancelOrder {
+        order_id: 1,
+        ask_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        offer_info: AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        },
+    };
 
     // failed verfication failed
     let res = app.execute(
@@ -331,9 +353,9 @@ fn cancel_order_token() {
     assert_eq!(
         res.get_attributes(1),
         vec![
-            attr("action", "cancel_order"),
-            attr("order_id", "1"),
-            attr("bidder_refund", format!("1000000{}", token_addr))
+            ("action", "cancel_order"),
+            ("order_id", "1"),
+            ("bidder_refund", &format!("1000000{}", token_addr))
         ]
     );
 
@@ -391,6 +413,7 @@ fn execute_order_native_token() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -419,7 +442,10 @@ fn execute_order_native_token() {
 
     // assertion; native asset balance
     let msg = ExecuteMsg::ExecuteOrder {
-        execute_asset: Asset {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_asset: Asset {
             amount: Uint128::new(500000u128),
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -454,7 +480,10 @@ fn execute_order_native_token() {
 
     // partial execute
     let msg = ExecuteMsg::ExecuteOrder {
-        execute_asset: Asset {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_asset: Asset {
             amount: Uint128::new(500000u128),
             info: AssetInfo::NativeToken {
                 denom: ATOM_DENOM.to_string(),
@@ -476,15 +505,26 @@ fn execute_order_native_token() {
     assert_eq!(
         res.get_attributes(1),
         vec![
-            attr("action", "execute_order"),
-            attr("order_id", "1"),
-            attr("executor_receive", format!("500000{}", ORAI_DENOM)),
-            attr("bidder_receive", format!("500000{}", ATOM_DENOM)),
+            ("action", "execute_order"),
+            ("order_id", "1"),
+            ("executor_receive", &format!("500000{}", ORAI_DENOM)),
+            ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
         ]
     );
 
     let resp: OrderResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::Order { order_id: 1 })
+        .query(
+            limit_order_addr.clone(),
+            &QueryMsg::Order {
+                order_id: 1,
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+            },
+        )
         .unwrap();
     assert_eq!(resp.filled_ask_amount, Uint128::new(500000u128));
     assert_eq!(resp.filled_offer_amount, Uint128::new(500000u128));
@@ -504,15 +544,27 @@ fn execute_order_native_token() {
     assert_eq!(
         res.get_attributes(1),
         vec![
-            attr("action", "execute_order"),
-            attr("order_id", "1"),
-            attr("executor_receive", format!("500000{}", ORAI_DENOM)),
-            attr("bidder_receive", format!("500000{}", ATOM_DENOM)),
+            ("action", "execute_order"),
+            ("order_id", "1"),
+            ("executor_receive", &format!("500000{}", ORAI_DENOM)),
+            ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
         ]
     );
 
+    // no more existed
     assert!(app
-        .query::<OrderResponse, _>(limit_order_addr.clone(), &QueryMsg::Order { order_id: 1 })
+        .query::<OrderResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Order {
+                order_id: 1,
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+            }
+        )
         .is_err());
 }
 
@@ -569,6 +621,7 @@ fn execute_order_token() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: None,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::Token {
@@ -591,7 +644,13 @@ fn execute_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(500000u128),
-        msg: to_binary(&Cw20HookMsg::ExecuteOrder { order_id: 1u64 }).unwrap(),
+        msg: to_binary(&Cw20HookMsg::ExecuteOrder {
+            offer_info: AssetInfo::Token {
+                contract_addr: token_addrs[0].clone(),
+            },
+            order_id: 1u64,
+        })
+        .unwrap(),
     };
     let res = app.execute(
         Addr::unchecked("addr0001"),
@@ -614,15 +673,26 @@ fn execute_order_token() {
     assert_eq!(
         res.get_attributes(3),
         vec![
-            attr("action", "execute_order"),
-            attr("order_id", "1"),
-            attr("executor_receive", format!("500000{}", token_addrs[0])),
-            attr("bidder_receive", format!("500000{}", token_addrs[1])),
+            ("action", "execute_order"),
+            ("order_id", "1"),
+            ("executor_receive", &format!("500000{}", token_addrs[0])),
+            ("bidder_receive", &format!("500000{}", token_addrs[1])),
         ]
     );
 
     let resp: OrderResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::Order { order_id: 1 })
+        .query(
+            limit_order_addr.clone(),
+            &QueryMsg::Order {
+                offer_info: AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                ask_info: AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+                order_id: 1,
+            },
+        )
         .unwrap();
 
     assert_eq!(resp.filled_ask_amount, Uint128::new(500000u128));
@@ -640,15 +710,26 @@ fn execute_order_token() {
     assert_eq!(
         res.get_attributes(3),
         vec![
-            attr("action", "execute_order"),
-            attr("order_id", "1"),
-            attr("executor_receive", format!("500000{}", token_addrs[0])),
-            attr("bidder_receive", format!("500000{}", token_addrs[1])),
+            ("action", "execute_order"),
+            ("order_id", "1"),
+            ("executor_receive", &format!("500000{}", token_addrs[0])),
+            ("bidder_receive", &format!("500000{}", token_addrs[1])),
         ]
     );
 
     assert!(app
-        .query::<OrderResponse, _>(limit_order_addr.clone(), &QueryMsg::Order { order_id: 1 })
+        .query::<OrderResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Order {
+                order_id: 1,
+                offer_info: AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                ask_info: AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+            }
+        )
         .is_err())
 }
 
@@ -715,6 +796,7 @@ fn orders_querier() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
+        direction: None,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -746,6 +828,7 @@ fn orders_querier() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: None,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::Token {
@@ -805,11 +888,17 @@ fn orders_querier() {
 
     assert_eq!(
         OrdersResponse {
-            orders: vec![order_1.clone(), order_2.clone(),],
+            orders: vec![order_2.clone(),],
         },
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                ask_info: AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
                 bidder_addr: Some("addr0000".to_string()),
                 start_after: None,
                 limit: None,
@@ -821,11 +910,17 @@ fn orders_querier() {
 
     assert_eq!(
         OrdersResponse {
-            orders: vec![order_1.clone(), order_2.clone(),],
+            orders: vec![order_1.clone()],
         },
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
                 bidder_addr: None,
                 start_after: None,
                 limit: None,
@@ -838,11 +933,17 @@ fn orders_querier() {
     // DESC test
     assert_eq!(
         OrdersResponse {
-            orders: vec![order_2.clone(), order_1.clone(),],
+            orders: vec![order_2.clone()],
         },
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                ask_info: AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
                 bidder_addr: None,
                 start_after: None,
                 limit: None,
@@ -858,6 +959,12 @@ fn orders_querier() {
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
                 bidder_addr: Some("addr0001".to_string()),
                 start_after: None,
                 limit: None,
@@ -875,6 +982,12 @@ fn orders_querier() {
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
                 bidder_addr: None,
                 start_after: Some(2u64),
                 limit: None,
@@ -886,12 +999,16 @@ fn orders_querier() {
 
     // start after ASC
     assert_eq!(
-        OrdersResponse {
-            orders: vec![order_2],
-        },
+        OrdersResponse { orders: vec![] },
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
                 bidder_addr: None,
                 start_after: Some(1u64),
                 limit: None,

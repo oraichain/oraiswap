@@ -20,7 +20,7 @@ pub enum ExecuteMsg {
     /// User Operations ///
     ///////////////////////
     SubmitOrder {
-        direction: OrderDirection,
+        direction: Option<OrderDirection>, // default is buy, with sell then it is reversed
         offer_asset: Asset,
         ask_asset: Asset,
     },
@@ -42,7 +42,7 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     SubmitOrder {
         ask_asset: Asset,
-        direction: OrderDirection,
+        direction: Option<OrderDirection>,
     },
 
     /// Arbitrager execute order to get profit
