@@ -11,9 +11,9 @@ use oraiswap::error::ContractError;
 use oraiswap::querier::query_pair_info_from_pair;
 use oraiswap::response::MsgInstantiateContractResponse;
 
-use crate::state::{pair_key, read_pairs, Config, CONFIG, PAIRS};
+use crate::state::{read_pairs, Config, CONFIG, PAIRS};
 
-use oraiswap::asset::{AssetInfo, PairInfo, PairInfoRaw};
+use oraiswap::asset::{pair_key, AssetInfo, PairInfo, PairInfoRaw};
 use oraiswap::factory::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, PairsResponse, QueryMsg,
 };

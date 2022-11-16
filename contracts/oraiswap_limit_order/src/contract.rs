@@ -38,6 +38,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::SubmitOrder {
+            direction,
             offer_asset,
             ask_asset,
         } => {
@@ -46,19 +47,24 @@ pub fn execute(
             }
 
             offer_asset.assert_sent_native_token_balance(&info)?;
-            submit_order(deps, info.sender, offer_asset, ask_asset)
+            submit_order(deps, info.sender, direction, offer_asset, ask_asset)
         }
-        ExecuteMsg::CancelOrder { order_id } => cancel_order(deps, info, order_id),
-        ExecuteMsg::ExecuteOrder {
-            execute_asset,
+        ExecuteMsg::CancelOrder {
             order_id,
+            ask_info,
+            offer_info,
+        } => cancel_order(deps, info, offer_info, ask_info, order_id),
+        ExecuteMsg::ExecuteOrder {
+            ask_asset,
+            order_id,
+            offer_info,
         } => {
-            if !execute_asset.is_native_token() {
+            if !ask_asset.is_native_token() {
                 return Err(StdError::generic_err("must provide native token"));
             }
 
-            execute_asset.assert_sent_native_token_balance(&info)?;
-            execute_order(deps, info.sender, execute_asset, order_id)
+            ask_asset.assert_sent_native_token_balance(&info)?;
+            execute_order(deps, offer_info, info.sender, ask_asset, order_id)
         }
     }
 }
@@ -78,12 +84,14 @@ pub fn receive_cw20(
     };
 
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::SubmitOrder { ask_asset }) => {
-            submit_order(deps, sender, provided_asset, ask_asset)
-        }
-        Ok(Cw20HookMsg::ExecuteOrder { order_id }) => {
-            execute_order(deps, sender, provided_asset, order_id)
-        }
+        Ok(Cw20HookMsg::SubmitOrder {
+            ask_asset,
+            direction,
+        }) => submit_order(deps, sender, direction, provided_asset, ask_asset),
+        Ok(Cw20HookMsg::ExecuteOrder {
+            order_id,
+            offer_info,
+        }) => execute_order(deps, offer_info, sender, provided_asset, order_id),
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
     }
 }
@@ -91,14 +99,22 @@ pub fn receive_cw20(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Order { order_id } => to_binary(&query_order(deps, order_id)?),
+        QueryMsg::Order {
+            order_id,
+            offer_info,
+            ask_info,
+        } => to_binary(&query_order(deps, offer_info, ask_info, order_id)?),
         QueryMsg::Orders {
+            offer_info,
+            ask_info,
             bidder_addr,
             start_after,
             limit,
             order_by,
         } => to_binary(&query_orders(
             deps,
+            offer_info,
+            ask_info,
             bidder_addr,
             start_after,
             limit,

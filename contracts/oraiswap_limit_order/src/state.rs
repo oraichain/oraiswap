@@ -1,10 +1,9 @@
-use cosmwasm_schema::cw_serde;
-use oraiswap::asset::AssetRaw;
-
-use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdError, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 use std::convert::TryInto;
+
+use crate::orderbook::Order;
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id";
 
@@ -23,49 +22,52 @@ pub fn read_last_order_id(storage: &dyn Storage) -> StdResult<u64> {
     singleton_read(storage, KEY_LAST_ORDER_ID).load()
 }
 
-#[cw_serde]
-pub struct Order {
-    pub order_id: u64,
-    pub bidder_addr: CanonicalAddr,
-    pub offer_asset: AssetRaw,
-    pub ask_asset: AssetRaw,
-    pub filled_offer_amount: Uint128,
-    pub filled_ask_amount: Uint128,
-}
-
-pub fn store_order(storage: &mut dyn Storage, order: &Order) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_ORDER).save(&order.order_id.to_le_bytes(), order)?;
+pub fn store_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -> StdResult<()> {
+    Bucket::multilevel(storage, &[PREFIX_ORDER, pair_key])
+        .save(&order.order_id.to_le_bytes(), order)?;
     Bucket::multilevel(
         storage,
-        &[PREFIX_ORDER_BY_BIDDER, order.bidder_addr.as_slice()],
+        &[
+            PREFIX_ORDER_BY_BIDDER,
+            pair_key,
+            order.bidder_addr.as_slice(),
+        ],
     )
     .save(&order.order_id.to_le_bytes(), &true)?;
 
     Ok(())
 }
 
-pub fn remove_order(storage: &mut dyn Storage, order: &Order) {
-    Bucket::<Order>::new(storage, PREFIX_ORDER).remove(&order.order_id.to_le_bytes());
+pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) {
+    Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key])
+        .remove(&order.order_id.to_le_bytes());
     Bucket::<Order>::multilevel(
         storage,
-        &[PREFIX_ORDER_BY_BIDDER, order.bidder_addr.as_slice()],
+        &[
+            PREFIX_ORDER_BY_BIDDER,
+            pair_key,
+            order.bidder_addr.as_slice(),
+        ],
     )
     .remove(&order.order_id.to_le_bytes());
 }
 
-pub fn read_order(storage: &dyn Storage, order_id: u64) -> StdResult<Order> {
-    ReadonlyBucket::new(storage, PREFIX_ORDER).load(&order_id.to_le_bytes())
+pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdResult<Order> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).load(&order_id.to_le_bytes())
 }
 
 pub fn read_orders_with_bidder_indexer(
     storage: &dyn Storage,
     bidder_addr: &CanonicalAddr,
+    pair_key: &[u8],
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
 ) -> StdResult<Vec<Order>> {
-    let position_indexer: ReadonlyBucket<bool> =
-        ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER_BY_BIDDER, bidder_addr.as_slice()]);
+    let position_indexer: ReadonlyBucket<bool> = ReadonlyBucket::multilevel(
+        storage,
+        &[PREFIX_ORDER_BY_BIDDER, pair_key, bidder_addr.as_slice()],
+    );
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
@@ -78,7 +80,7 @@ pub fn read_orders_with_bidder_indexer(
         .take(limit)
         .map(|item| {
             let (k, _) = item?;
-            read_order(storage, bytes_to_u64(&k)?)
+            read_order(storage, pair_key, bytes_to_u64(&k)?)
         })
         .collect()
 }
@@ -88,11 +90,13 @@ const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 pub fn read_orders(
     storage: &dyn Storage,
+    pair_key: &[u8],
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
 ) -> StdResult<Vec<Order>> {
-    let position_bucket: ReadonlyBucket<Order> = ReadonlyBucket::new(storage, PREFIX_ORDER);
+    let position_bucket: ReadonlyBucket<Order> =
+        ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]);
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
@@ -112,7 +116,7 @@ pub fn read_orders(
 
 fn bytes_to_u64(data: &[u8]) -> StdResult<u64> {
     match data[0..8].try_into() {
-        Ok(bytes) => Ok(u64::from_be_bytes(bytes)),
+        Ok(bytes) => Ok(u64::from_le_bytes(bytes)),
         Err(_) => Err(StdError::generic_err(
             "Corrupted data found. 8 byte expected.",
         )),

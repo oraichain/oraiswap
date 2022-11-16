@@ -1,7 +1,13 @@
-use crate::asset::Asset;
+use crate::asset::{Asset, AssetInfo};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
+
+#[cw_serde]
+pub enum OrderDirection {
+    Buy,
+    Sell,
+}
 
 #[cw_serde]
 pub struct InstantiateMsg {}
@@ -14,17 +20,21 @@ pub enum ExecuteMsg {
     /// User Operations ///
     ///////////////////////
     SubmitOrder {
+        direction: OrderDirection,
         offer_asset: Asset,
         ask_asset: Asset,
     },
     CancelOrder {
         order_id: u64,
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
     },
 
     /// Arbitrager execute order to get profit
     ExecuteOrder {
-        execute_asset: Asset,
+        ask_asset: Asset,
         order_id: u64,
+        offer_info: AssetInfo,
     },
 }
 
@@ -32,11 +42,13 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     SubmitOrder {
         ask_asset: Asset,
+        direction: OrderDirection,
     },
 
     /// Arbitrager execute order to get profit
     ExecuteOrder {
         order_id: u64,
+        offer_info: AssetInfo,
     },
 }
 
@@ -44,9 +56,15 @@ pub enum Cw20HookMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(OrderResponse)]
-    Order { order_id: u64 },
+    Order {
+        order_id: u64,
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    },
     #[returns(OrdersResponse)]
     Orders {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
         bidder_addr: Option<String>,
         start_after: Option<u64>,
         limit: Option<u32>,

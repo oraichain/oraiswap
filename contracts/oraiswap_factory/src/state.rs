@@ -19,13 +19,6 @@ pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 // store temporary pair info while waiting for deployment
 pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pairs");
 
-pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
-    let mut asset_infos = asset_infos.to_vec();
-    asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
-
-    [asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat()
-}
-
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
@@ -72,6 +65,7 @@ mod test {
     use cosmwasm_storage::{
         bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     };
+    use oraiswap::asset::pair_key;
     use oraiswap::pair::DEFAULT_COMMISSION_RATE;
     const KEY_CONFIG: &[u8] = b"config";
 

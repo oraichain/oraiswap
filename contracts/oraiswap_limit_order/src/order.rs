@@ -1,18 +1,20 @@
+use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orders,
-    read_orders_with_bidder_indexer, remove_order, store_order, Order,
+    read_orders_with_bidder_indexer, remove_order, store_order,
 };
 use cosmwasm_std::{
-    attr, Addr, CosmosMsg, Decimal, Deps, DepsMut, MessageInfo, Order as OrderBy, Response,
-    StdError, StdResult, Uint128,
+    Addr, CosmosMsg, Decimal, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError,
+    StdResult, Uint128,
 };
 
-use oraiswap::asset::Asset;
-use oraiswap::limit_order::{LastOrderIdResponse, OrderResponse, OrdersResponse};
+use oraiswap::asset::{pair_key, Asset, AssetInfo};
+use oraiswap::limit_order::{LastOrderIdResponse, OrderDirection, OrderResponse, OrdersResponse};
 
 pub fn submit_order(
     deps: DepsMut,
     sender: Addr,
+    order_direction: OrderDirection,
     offer_asset: Asset,
     ask_asset: Asset,
 ) -> StdResult<Response> {
@@ -20,13 +22,16 @@ pub fn submit_order(
 
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
+    let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
     store_order(
         deps.storage,
+        &pair_key,
         &Order {
             order_id,
+            direction: order_direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_asset: offer_asset_raw,
-            ask_asset: ask_asset_raw,
+            offer_amount: offer_asset_raw.amount,
+            ask_amount: ask_asset_raw.amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
         },
@@ -41,19 +46,23 @@ pub fn submit_order(
     ]))
 }
 
-pub fn cancel_order(deps: DepsMut, info: MessageInfo, order_id: u64) -> StdResult<Response> {
-    let order: Order = read_order(deps.storage, order_id)?;
+pub fn cancel_order(
+    deps: DepsMut,
+    info: MessageInfo,
+    offer_info: AssetInfo,
+    ask_info: AssetInfo,
+    order_id: u64,
+) -> StdResult<Response> {
+    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let order: Order = read_order(deps.storage, &pair_key, order_id)?;
     if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
     // Compute refund asset
-    let left_offer_amount = order
-        .offer_asset
-        .amount
-        .checked_sub(order.filled_offer_amount)?;
+    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
     let bidder_refund = Asset {
-        info: order.offer_asset.info.to_normal(deps.api)?,
+        info: offer_info,
         amount: left_offer_amount,
     };
 
@@ -66,66 +75,58 @@ pub fn cancel_order(deps: DepsMut, info: MessageInfo, order_id: u64) -> StdResul
         vec![]
     };
 
-    remove_order(deps.storage, &order);
+    remove_order(deps.storage, &pair_key, &order);
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "cancel_order"),
-        attr("order_id", order_id.to_string()),
-        attr("bidder_refund", bidder_refund.to_string()),
+        ("action", "cancel_order"),
+        ("order_id", &order_id.to_string()),
+        ("bidder_refund", &bidder_refund.to_string()),
     ]))
 }
 
 pub fn execute_order(
     deps: DepsMut,
+    offer_info: AssetInfo,
     sender: Addr,
-    execute_asset: Asset,
+    ask_asset: Asset,
     order_id: u64,
 ) -> StdResult<Response> {
-    let mut order: Order = read_order(deps.storage, order_id)?;
-    if !execute_asset
-        .info
-        .eq(&order.ask_asset.info.to_normal(deps.api)?)
-    {
-        return Err(StdError::generic_err("invalid asset given"));
-    }
+    let pair_key = pair_key(&[
+        offer_info.to_raw(deps.api)?,
+        ask_asset.info.to_raw(deps.api)?,
+    ]);
+    let mut order: Order = read_order(deps.storage, &pair_key, order_id)?;
 
     // Compute left offer & ask amount
-    let left_offer_amount = order
-        .offer_asset
-        .amount
-        .checked_sub(order.filled_offer_amount)?;
-    let left_ask_amount = order
-        .ask_asset
-        .amount
-        .checked_sub(order.filled_ask_amount)?;
-    if left_ask_amount < execute_asset.amount || left_offer_amount.is_zero() {
+    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
+    let left_ask_amount = order.ask_amount.checked_sub(order.filled_ask_amount)?;
+    if left_ask_amount < ask_asset.amount || left_offer_amount.is_zero() {
         return Err(StdError::generic_err("insufficient order amount left"));
     }
 
     // Cap the send amount to left_offer_amount
     let executor_receive = Asset {
-        info: order.offer_asset.info.to_normal(deps.api)?,
-        amount: if left_ask_amount == execute_asset.amount {
+        info: offer_info,
+        amount: if left_ask_amount == ask_asset.amount {
             left_offer_amount
         } else {
             std::cmp::min(
                 left_offer_amount,
-                execute_asset.amount
-                    * Decimal::from_ratio(order.offer_asset.amount, order.ask_asset.amount),
+                ask_asset.amount * Decimal::from_ratio(order.offer_amount, order.ask_amount),
             )
         },
     };
 
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
-    let bidder_receive = execute_asset;
+    let bidder_receive = ask_asset;
 
     // When left amount is zero, close order
     if left_ask_amount == bidder_receive.amount {
-        remove_order(deps.storage, &order);
+        remove_order(deps.storage, &pair_key, &order);
     } else {
         order.filled_ask_amount += bidder_receive.amount;
         order.filled_offer_amount += executor_receive.amount;
-        store_order(deps.storage, &order)?;
+        store_order(deps.storage, &pair_key, &order)?;
     }
 
     let mut messages: Vec<CosmosMsg> = vec![];
@@ -154,13 +155,25 @@ pub fn execute_order(
     ]))
 }
 
-pub fn query_order(deps: Deps, order_id: u64) -> StdResult<OrderResponse> {
-    let order: Order = read_order(deps.storage, order_id)?;
+pub fn query_order(
+    deps: Deps,
+    offer_info: AssetInfo,
+    ask_info: AssetInfo,
+    order_id: u64,
+) -> StdResult<OrderResponse> {
+    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let order: Order = read_order(deps.storage, &pair_key, order_id)?;
     let resp = OrderResponse {
         order_id: order.order_id,
         bidder_addr: deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
-        offer_asset: order.offer_asset.to_normal(deps.api)?,
-        ask_asset: order.ask_asset.to_normal(deps.api)?,
+        offer_asset: Asset {
+            amount: order.offer_amount,
+            info: offer_info,
+        },
+        ask_asset: Asset {
+            amount: order.ask_amount,
+            info: ask_info,
+        },
         filled_offer_amount: order.filled_offer_amount,
         filled_ask_amount: order.filled_ask_amount,
     };
@@ -170,22 +183,26 @@ pub fn query_order(deps: Deps, order_id: u64) -> StdResult<OrderResponse> {
 
 pub fn query_orders(
     deps: Deps,
+    offer_info: AssetInfo,
+    ask_info: AssetInfo,
     bidder_addr: Option<String>,
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
 ) -> StdResult<OrdersResponse> {
+    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
     let orders: Vec<Order> = if let Some(bidder_addr) = bidder_addr {
         let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
         read_orders_with_bidder_indexer(
             deps.storage,
             &bidder_addr_raw,
+            &pair_key,
             start_after,
             limit,
             order_by,
         )?
     } else {
-        read_orders(deps.storage, start_after, limit, order_by)?
+        read_orders(deps.storage, &pair_key, start_after, limit, order_by)?
     };
 
     let resp = OrdersResponse {
@@ -195,8 +212,14 @@ pub fn query_orders(
                 Ok(OrderResponse {
                     order_id: order.order_id,
                     bidder_addr: deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
-                    offer_asset: order.offer_asset.to_normal(deps.api)?,
-                    ask_asset: order.ask_asset.to_normal(deps.api)?,
+                    offer_asset: Asset {
+                        amount: order.offer_amount,
+                        info: offer_info.clone(),
+                    },
+                    ask_asset: Asset {
+                        amount: order.ask_amount,
+                        info: ask_info.clone(),
+                    },
                     filled_offer_amount: order.filled_offer_amount,
                     filled_ask_amount: order.filled_ask_amount,
                 })
