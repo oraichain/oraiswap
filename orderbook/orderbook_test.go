@@ -42,7 +42,7 @@ func TestNewOrderBook(t *testing.T) {
 
 func TestOrderBook(t *testing.T) {
 	orderBook := testOrderBook
-	orderBook.Restore()
+	// orderBook.Restore()
 
 	limitOrders := make([]map[string]interface{}, 0)
 
@@ -160,6 +160,8 @@ func TestOrderBook(t *testing.T) {
 	marketOrder["price"] = "102"
 	marketOrder["order_id"] = uint64(109)
 	marketOrder["timestamp"] = testTimestamp
+
+	t.Logf("best bid %v, best ask %v\n", orderBook.Bids, orderBook.Asks)
 
 	trades, orderInBook = orderBook.ProcessOrder(marketOrder, true)
 
