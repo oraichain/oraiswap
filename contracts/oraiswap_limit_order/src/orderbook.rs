@@ -15,8 +15,34 @@ pub struct Order {
 }
 
 impl Order {
+    // create new order given a price and an offer amount
+    pub fn new(
+        order_id: u64,
+        bidder_addr: CanonicalAddr,
+        direction: OrderDirection,
+        price: Decimal,
+        offer_amount: Uint128,
+    ) -> Self {
+        let (offer_amount, ask_amount) = match direction {
+            OrderDirection::Buy => (offer_amount, price * offer_amount),
+            OrderDirection::Sell => (price * offer_amount, offer_amount),
+        };
+        Order {
+            direction,
+            order_id,
+            bidder_addr,
+            offer_amount,
+            ask_amount,
+            filled_offer_amount: Uint128::zero(),
+            filled_ask_amount: Uint128::zero(),
+        }
+    }
+
     pub fn get_price(&self) -> Decimal {
-        Decimal::from_ratio(self.ask_amount, self.offer_amount)
+        match self.direction {
+            OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
+            OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
+        }
     }
 }
 
@@ -56,10 +82,25 @@ impl Ticks {
     }
 
     pub fn find_price(&self, price: Decimal) -> (usize, bool) {
-        let i = self
-            .ticks
-            .binary_search_by(|tick| tick.price.cmp(&price))
-            .unwrap_or(self.ticks.len());
+        let mut i = 0;
+        let mut j = self.ticks.len();
+
+        while i < j {
+            let h = (i + j) >> 1; // div 2, i ≤ h < j
+            let filter_price = if self.price_increasing {
+                // sell
+                self.ticks[h].price.ge(&price)
+            } else {
+                // buy
+                self.ticks[h].price.le(&price)
+            };
+            // parition
+            if filter_price {
+                j = h // preserves left
+            } else {
+                i = h + 1 // preserves right
+            }
+        }
 
         let exact = i < self.ticks.len() && self.ticks[i].price.eq(&price);
         (i, exact)
@@ -82,6 +123,7 @@ impl Ticks {
 
     pub fn orders_at(&self, price: Decimal) -> Vec<Order> {
         let (i, exact) = self.find_price(price);
+
         if !exact {
             return vec![];
         }
@@ -92,6 +134,7 @@ impl Ticks {
         if self.ticks.is_empty() {
             return (Decimal::zero(), 0, false);
         }
+
         // get from last
         if price_increasing {
             let last_ind = self.ticks.len() - 1;
