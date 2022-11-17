@@ -10,7 +10,7 @@ The Limit Order Contract is to provide limit order interface to a bidder and als
 
 ```
 Order
-+-----------------+    Terraswap Price (UST-mAAPL)
++-----------------+    Oraiswap Price (UST-mAAPL)
 | OrderId       1 |    +------------------------+
 | Offer   100 UST |    | price 95 UST : 1 mAAPL |
 | Ask     1 mAAPL |    +------------------------+
@@ -26,7 +26,7 @@ Order
 
 ```
 Order
-+-----------------+    Terraswap Price (UST-mAAPL)
++-----------------+    Oraiswap Price (UST-mAAPL)
 | OrderId       1 |    +-------------------------+
 | Offer   1 mAAPL |    | price 110 UST : 1 mAAPL |
 | Ask     100 UST |    +-------------------------+
@@ -121,16 +121,16 @@ Depends on the `ask asset`(= `execute asset`) type
 
 - Query a order
 
-  - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"order":{"order_id": 100}}
+  - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"order":{"order_id": 100}}
 
 - Query orders
 
   - Query with bidder address
-    - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "terra~"}}
-    - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "terra~", "start_after": 50, "limit": 10, "order_by": "desc"}}
+    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "orai~"}}
+    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "orai~", "start_after": 50, "limit": 10, "order_by": "desc"}}
   - Query without filter
-    - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{}}
-    - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"start_after": 50, "limit": 10, "order_by": "desc"}}
+    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{}}
+    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"start_after": 50, "limit": 10, "order_by": "desc"}}
 
 - Query last order id
-  - https://lcd.terra.dev/wasm/contracts/`limit_order_contract`/store?query_msg={"last_order_id":{}}
+  - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"last_order_id":{}}
