@@ -1,14 +1,17 @@
 use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdError, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-
+use oraiswap::math::Truncate;
 use std::convert::TryInto;
 
 use crate::orderbook::Order;
 
-static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id";
+// only show tick with 3 floating number place
+const FLOATING_ROUND: usize = 3;
 
+static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id";
 static PREFIX_ORDER: &[u8] = b"order";
 static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder";
+static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price";
 
 pub fn init_last_order_id(storage: &mut dyn Storage) -> StdResult<()> {
     singleton(storage, KEY_LAST_ORDER_ID).save(&0u64)
@@ -23,8 +26,24 @@ pub fn read_last_order_id(storage: &dyn Storage) -> StdResult<u64> {
 }
 
 pub fn store_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -> StdResult<()> {
-    Bucket::multilevel(storage, &[PREFIX_ORDER, pair_key])
-        .save(&order.order_id.to_le_bytes(), order)?;
+    let order_id_key = &order.order_id.to_le_bytes();
+
+    Bucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).save(order_id_key, order)?;
+    // index order by price and pair key ?, store tick using price as key then sort by ID ?
+    // => query tick price from pair key => each price query order belong to price => order list
+    // insert tick => insert price entry for pair_key of prefix tick
+    // insert order to tick => update index for [pair key, price]
+
+    Bucket::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_PRICE,
+            pair_key,
+            order.get_price().to_string_round(FLOATING_ROUND).as_bytes(),
+        ],
+    )
+    .save(order_id_key, &true)?;
+
     Bucket::multilevel(
         storage,
         &[
@@ -33,15 +52,27 @@ pub fn store_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) ->
             order.bidder_addr.as_slice(),
         ],
     )
-    .save(&order.order_id.to_le_bytes(), &true)?;
+    .save(order_id_key, &true)?;
 
     Ok(())
 }
 
 pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) {
-    Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key])
-        .remove(&order.order_id.to_le_bytes());
-    Bucket::<Order>::multilevel(
+    let order_id_key = &order.order_id.to_le_bytes();
+    Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key]).remove(order_id_key);
+
+    // value is just bool to represent indexer
+    Bucket::<bool>::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_PRICE,
+            pair_key,
+            order.get_price().to_string_round(FLOATING_ROUND).as_bytes(),
+        ],
+    )
+    .remove(order_id_key);
+
+    Bucket::<bool>::multilevel(
         storage,
         &[
             PREFIX_ORDER_BY_BIDDER,
@@ -49,7 +80,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) {
             order.bidder_addr.as_slice(),
         ],
     )
-    .remove(&order.order_id.to_le_bytes());
+    .remove(order_id_key);
 }
 
 pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdResult<Order> {

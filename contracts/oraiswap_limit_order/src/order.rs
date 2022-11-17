@@ -4,8 +4,8 @@ use crate::state::{
     read_orders_with_bidder_indexer, remove_order, store_order,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Decimal, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError,
-    StdResult, Uint128,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError, StdResult,
+    Uint128,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
@@ -98,35 +98,22 @@ pub fn execute_order(
     ]);
     let mut order: Order = read_order(deps.storage, &pair_key, order_id)?;
 
-    // Compute left offer & ask amount
-    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
-    let left_ask_amount = order.ask_amount.checked_sub(order.filled_ask_amount)?;
-    if left_ask_amount < ask_asset.amount || left_offer_amount.is_zero() {
-        return Err(StdError::generic_err("insufficient order amount left"));
-    }
-
-    // Cap the send amount to left_offer_amount
+    // Compute offer amount & left ask amount
+    let (offer_amount, left_ask_amount) = order.matchable_amount(ask_asset.amount)?;
     let executor_receive = Asset {
         info: offer_info,
-        amount: if left_ask_amount == ask_asset.amount {
-            left_offer_amount
-        } else {
-            std::cmp::min(
-                left_offer_amount,
-                ask_asset.amount * Decimal::from_ratio(order.offer_amount, order.ask_amount),
-            )
-        },
+        amount: offer_amount,
     };
 
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
-    let bidder_receive = ask_asset;
 
     // When left amount is zero, close order
-    if left_ask_amount == bidder_receive.amount {
+    if left_ask_amount == ask_asset.amount {
         remove_order(deps.storage, &pair_key, &order);
     } else {
-        order.filled_ask_amount += bidder_receive.amount;
+        order.filled_ask_amount += ask_asset.amount;
         order.filled_offer_amount += executor_receive.amount;
+        // update order
         store_order(deps.storage, &pair_key, &order)?;
     }
 
@@ -140,19 +127,15 @@ pub fn execute_order(
         )?);
     }
 
-    if !bidder_receive.amount.is_zero() {
-        messages.push(
-            bidder_receive
-                .clone()
-                .into_msg(None, &deps.querier, bidder_addr)?,
-        );
+    if !ask_asset.amount.is_zero() {
+        messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
     }
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "execute_order"),
         ("order_id", &order_id.to_string()),
         ("executor_receive", &executor_receive.to_string()),
-        ("bidder_receive", &bidder_receive.to_string()),
+        ("bidder_receive", &ask_asset.to_string()),
     ]))
 }
 

@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use oraiswap::{asset::AssetInfoRaw, limit_order::OrderDirection};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, StdError, StdResult, Uint128};
 
 #[cw_serde]
 pub struct Order {
@@ -36,6 +36,26 @@ impl Order {
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
         }
+    }
+
+    // return matchable offer amount from ask amount, can differ between Sell and Buy
+    pub fn matchable_amount(&self, ask_amount: Uint128) -> StdResult<(Uint128, Uint128)> {
+        // Compute left offer & ask amount
+        let left_offer_amount = self.offer_amount.checked_sub(self.filled_offer_amount)?;
+        let left_ask_amount = self.ask_amount.checked_sub(self.filled_ask_amount)?;
+        if left_ask_amount < ask_amount || left_offer_amount.is_zero() {
+            return Err(StdError::generic_err("insufficient order amount left"));
+        }
+
+        // Cap the send amount to left_offer_amount
+        Ok((
+            if left_ask_amount == ask_amount {
+                left_offer_amount
+            } else {
+                std::cmp::min(left_offer_amount, ask_amount * self.get_price())
+            },
+            left_ask_amount,
+        ))
     }
 
     pub fn get_price(&self) -> Decimal {
@@ -153,6 +173,7 @@ impl Ticks {
     }
 }
 
+/// Ticks are stored in Ordered database, so we just need to process at 50 recent ticks is ok
 #[cw_serde]
 pub struct OrderBook {
     buys: Ticks,
