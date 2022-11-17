@@ -1,7 +1,9 @@
+use std::convert::TryFrom;
+
 use crate::orderbook::Order;
 use crate::state::{
-    increase_last_order_id, read_last_order_id, read_order, read_orders,
-    read_orders_with_bidder_indexer, remove_order, store_order,
+    increase_last_order_id, read_last_order_id, read_order, read_orders, read_orders_with_indexer,
+    remove_order, store_order, FLOATING_ROUND, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError, StdResult,
@@ -9,7 +11,10 @@ use cosmwasm_std::{
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
-use oraiswap::limit_order::{LastOrderIdResponse, OrderDirection, OrderResponse, OrdersResponse};
+use oraiswap::limit_order::{
+    LastOrderIdResponse, OrderDirection, OrderFilter, OrderResponse, OrdersResponse,
+};
+use oraiswap::math::Truncate;
 
 pub fn submit_order(
     deps: DepsMut,
@@ -23,7 +28,7 @@ pub fn submit_order(
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
     let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
-    store_order(
+    let total_orders = store_order(
         deps.storage,
         &pair_key,
         &Order {
@@ -35,6 +40,7 @@ pub fn submit_order(
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
         },
+        true,
     )?;
 
     Ok(Response::new().add_attributes(vec![
@@ -43,6 +49,7 @@ pub fn submit_order(
         ("bidder_addr", sender.as_str()),
         ("offer_asset", &offer_asset.to_string()),
         ("ask_asset", &ask_asset.to_string()),
+        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -76,12 +83,13 @@ pub fn cancel_order(
         vec![]
     };
 
-    remove_order(deps.storage, &pair_key, &order);
+    let total_orders = remove_order(deps.storage, &pair_key, &order)?;
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "cancel_order"),
         ("order_id", &order_id.to_string()),
         ("bidder_refund", &bidder_refund.to_string()),
+        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -108,14 +116,14 @@ pub fn execute_order(
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
     // When left amount is zero, close order
-    if left_ask_amount == ask_asset.amount {
-        remove_order(deps.storage, &pair_key, &order);
+    let total_orders = if left_ask_amount == ask_asset.amount {
+        remove_order(deps.storage, &pair_key, &order)?
     } else {
         order.filled_ask_amount += ask_asset.amount;
         order.filled_offer_amount += executor_receive.amount;
         // update order
-        store_order(deps.storage, &pair_key, &order)?;
-    }
+        store_order(deps.storage, &pair_key, &order, false)?
+    };
 
     let mut messages: Vec<CosmosMsg> = vec![];
     if !executor_receive.amount.is_zero() {
@@ -136,6 +144,7 @@ pub fn execute_order(
         ("order_id", &order_id.to_string()),
         ("executor_receive", &executor_receive.to_string()),
         ("bidder_receive", &ask_asset.to_string()),
+        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -146,68 +155,55 @@ pub fn query_order(
     order_id: u64,
 ) -> StdResult<OrderResponse> {
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let order: Order = read_order(deps.storage, &pair_key, order_id)?;
-    let resp = OrderResponse {
-        order_id: order.order_id,
-        bidder_addr: deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
-        offer_asset: Asset {
-            amount: order.offer_amount,
-            info: offer_info,
-        },
-        ask_asset: Asset {
-            amount: order.ask_amount,
-            info: ask_info,
-        },
-        filled_offer_amount: order.filled_offer_amount,
-        filled_ask_amount: order.filled_ask_amount,
-    };
-
-    Ok(resp)
+    let order = read_order(deps.storage, &pair_key, order_id)?;
+    order.to_response(deps.api, offer_info, ask_info)
 }
 
 pub fn query_orders(
     deps: Deps,
     offer_info: AssetInfo,
     ask_info: AssetInfo,
-    bidder_addr: Option<String>,
+    filter: OrderFilter,
     start_after: Option<u64>,
     limit: Option<u32>,
-    order_by: Option<OrderBy>,
+    order_by: Option<i32>,
 ) -> StdResult<OrdersResponse> {
+    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let orders: Vec<Order> = if let Some(bidder_addr) = bidder_addr {
-        let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
-        read_orders_with_bidder_indexer(
-            deps.storage,
-            &bidder_addr_raw,
-            &pair_key,
-            start_after,
-            limit,
-            order_by,
-        )?
-    } else {
-        read_orders(deps.storage, &pair_key, start_after, limit, order_by)?
+    let orders: Vec<Order> = match filter {
+        OrderFilter::Bidder(bidder_addr) => {
+            let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
+            read_orders_with_indexer(
+                deps.storage,
+                &[
+                    PREFIX_ORDER_BY_BIDDER,
+                    &pair_key,
+                    bidder_addr_raw.as_slice(),
+                ],
+                &pair_key,
+                start_after,
+                limit,
+                order_by,
+            )?
+        }
+        OrderFilter::Price(price) => {
+            let price_key = price.to_string_round(FLOATING_ROUND);
+            read_orders_with_indexer(
+                deps.storage,
+                &[PREFIX_ORDER_BY_PRICE, &pair_key, price_key.as_bytes()],
+                &pair_key,
+                start_after,
+                limit,
+                order_by,
+            )?
+        }
+        OrderFilter::None => read_orders(deps.storage, &pair_key, start_after, limit, order_by)?,
     };
 
     let resp = OrdersResponse {
         orders: orders
             .iter()
-            .map(|order| {
-                Ok(OrderResponse {
-                    order_id: order.order_id,
-                    bidder_addr: deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
-                    offer_asset: Asset {
-                        amount: order.offer_amount,
-                        info: offer_info.clone(),
-                    },
-                    ask_asset: Asset {
-                        amount: order.ask_amount,
-                        info: ask_info.clone(),
-                    },
-                    filled_offer_amount: order.filled_offer_amount,
-                    filled_ask_amount: order.filled_ask_amount,
-                })
-            })
+            .map(|order| order.to_response(deps.api, offer_info.clone(), ask_info.clone()))
             .collect::<StdResult<Vec<OrderResponse>>>()?,
     };
 

@@ -1,6 +1,6 @@
 use crate::asset::{Asset, AssetInfo};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -53,6 +53,13 @@ pub enum Cw20HookMsg {
 }
 
 #[cw_serde]
+pub enum OrderFilter {
+    Bidder(String),
+    Price(Decimal),
+    None,
+}
+
+#[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(OrderResponse)]
@@ -65,8 +72,22 @@ pub enum QueryMsg {
     Orders {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
-        bidder_addr: Option<String>,
+        filter: OrderFilter,
         start_after: Option<u64>,
+        limit: Option<u32>,
+        order_by: Option<i32>, // convert OrderBy to i32
+    },
+    #[returns(TickResponse)]
+    Tick {
+        price: Decimal,
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    },
+    #[returns(TicksResponse)]
+    Ticks {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+        start_after: Option<Decimal>,
         limit: Option<u32>,
         order_by: Option<i32>, // convert OrderBy to i32
     },
@@ -77,6 +98,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct OrderResponse {
     pub order_id: u64,
+    pub direction: OrderDirection,
     pub bidder_addr: String,
     pub offer_asset: Asset,
     pub ask_asset: Asset,
@@ -87,6 +109,17 @@ pub struct OrderResponse {
 #[cw_serde]
 pub struct OrdersResponse {
     pub orders: Vec<OrderResponse>,
+}
+
+#[cw_serde]
+pub struct TickResponse {
+    pub price: String,
+    pub total_orders: u64,
+}
+
+#[cw_serde]
+pub struct TicksResponse {
+    pub ticks: Vec<TickResponse>,
 }
 
 #[cw_serde]

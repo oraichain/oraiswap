@@ -1,17 +1,15 @@
-use std::convert::TryFrom;
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order as OrderBy, Response,
-    StdError, StdResult,
+    from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 
 use crate::order::{
     cancel_order, execute_order, query_last_order_id, query_order, query_orders, submit_order,
 };
 use crate::state::init_last_order_id;
+use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo};
@@ -107,7 +105,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Orders {
             offer_info,
             ask_info,
-            bidder_addr,
+            filter,
             start_after,
             limit,
             order_by,
@@ -115,12 +113,31 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             deps,
             offer_info,
             ask_info,
-            bidder_addr,
+            filter,
             start_after,
             limit,
-            order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
+            order_by,
         )?),
         QueryMsg::LastOrderId {} => to_binary(&query_last_order_id(deps)?),
+        QueryMsg::Tick {
+            price,
+            offer_info,
+            ask_info,
+        } => to_binary(&query_tick(deps, offer_info, ask_info, price)?),
+        QueryMsg::Ticks {
+            offer_info,
+            ask_info,
+            start_after,
+            limit,
+            order_by,
+        } => to_binary(&query_ticks(
+            deps,
+            offer_info,
+            ask_info,
+            start_after,
+            limit,
+            order_by,
+        )?),
     }
 }
 

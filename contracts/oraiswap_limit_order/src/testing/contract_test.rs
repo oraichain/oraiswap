@@ -1,11 +1,13 @@
-use cosmwasm_std::{to_binary, Addr, Coin, Uint128};
+use std::str::FromStr;
+
+use cosmwasm_std::{to_binary, Addr, Coin, Decimal, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::limit_order::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderResponse, OrdersResponse,
-    QueryMsg,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderDirection, OrderFilter,
+    OrderResponse, OrdersResponse, QueryMsg, TicksResponse,
 };
 
 #[test]
@@ -123,6 +125,7 @@ fn submit_order() {
             ("bidder_addr", "addr0000"),
             ("offer_asset", &format!("1000000{}", ORAI_DENOM)),
             ("ask_asset", &format!("1000000{}", token_addr)),
+            ("total_orders", "1")
         ]
     );
 
@@ -160,6 +163,7 @@ fn submit_order() {
             ("bidder_addr", "addr0000"),
             ("offer_asset", &format!("1000000{}", token_addr)),
             ("ask_asset", &format!("1000000{}", ORAI_DENOM)),
+            ("total_orders", "2")
         ]
     );
     assert_eq!(
@@ -259,7 +263,8 @@ fn cancel_order_native_token() {
         vec![
             ("action", "cancel_order"),
             ("order_id", "1"),
-            ("bidder_refund", &format!("1000000{}", ORAI_DENOM))
+            ("bidder_refund", &format!("1000000{}", ORAI_DENOM)),
+            ("total_orders", "0")
         ]
     );
 
@@ -355,7 +360,8 @@ fn cancel_order_token() {
         vec![
             ("action", "cancel_order"),
             ("order_id", "1"),
-            ("bidder_refund", &format!("1000000{}", token_addr))
+            ("bidder_refund", &format!("1000000{}", token_addr)),
+            ("total_orders", "0")
         ]
     );
 
@@ -509,6 +515,7 @@ fn execute_order_native_token() {
             ("order_id", "1"),
             ("executor_receive", &format!("500000{}", ORAI_DENOM)),
             ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
+            ("total_orders", "1")
         ]
     );
 
@@ -548,6 +555,7 @@ fn execute_order_native_token() {
             ("order_id", "1"),
             ("executor_receive", &format!("500000{}", ORAI_DENOM)),
             ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
+            ("total_orders", "0")
         ]
     );
 
@@ -677,6 +685,7 @@ fn execute_order_token() {
             ("order_id", "1"),
             ("executor_receive", &format!("500000{}", token_addrs[0])),
             ("bidder_receive", &format!("500000{}", token_addrs[1])),
+            ("total_orders", "1")
         ]
     );
 
@@ -714,6 +723,7 @@ fn execute_order_token() {
             ("order_id", "1"),
             ("executor_receive", &format!("500000{}", token_addrs[0])),
             ("bidder_receive", &format!("500000{}", token_addrs[1])),
+            ("total_orders", "0")
         ]
     );
 
@@ -865,6 +875,7 @@ fn orders_querier() {
         },
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
+        direction: OrderDirection::Buy,
     };
 
     let order_2 = OrderResponse {
@@ -884,6 +895,7 @@ fn orders_querier() {
         },
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
+        direction: OrderDirection::Buy,
     };
 
     assert_eq!(
@@ -899,7 +911,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::Token {
                     contract_addr: token_addrs[1].clone(),
                 },
-                bidder_addr: Some("addr0000".to_string()),
+                filter: OrderFilter::Bidder("addr0000".to_string()),
                 start_after: None,
                 limit: None,
                 order_by: Some(1),
@@ -921,7 +933,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                bidder_addr: None,
+                filter: OrderFilter::None,
                 start_after: None,
                 limit: None,
                 order_by: Some(1),
@@ -944,7 +956,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::Token {
                     contract_addr: token_addrs[1].clone(),
                 },
-                bidder_addr: None,
+                filter: OrderFilter::None,
                 start_after: None,
                 limit: None,
                 order_by: Some(2),
@@ -965,7 +977,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                bidder_addr: Some("addr0001".to_string()),
+                filter: OrderFilter::Bidder("addr0001".to_string()),
                 start_after: None,
                 limit: None,
                 order_by: None,
@@ -988,7 +1000,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                bidder_addr: None,
+                filter: OrderFilter::None,
                 start_after: Some(2u64),
                 limit: None,
                 order_by: Some(2),
@@ -1009,7 +1021,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
-                bidder_addr: None,
+                filter: OrderFilter::None,
                 start_after: Some(1u64),
                 limit: None,
                 order_by: Some(1),
@@ -1017,4 +1029,43 @@ fn orders_querier() {
         )
         .unwrap()
     );
+
+    // query all ticks
+    let res = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                offer_info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                ask_info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                start_after: None,
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
+
+    for tick in res.ticks {
+        let res = app
+            .query::<OrdersResponse, _>(
+                limit_order_addr.clone(),
+                &QueryMsg::Orders {
+                    offer_info: AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    ask_info: AssetInfo::NativeToken {
+                        denom: ATOM_DENOM.to_string(),
+                    },
+                    filter: OrderFilter::Price(Decimal::from_str(&tick.price).unwrap()),
+                    start_after: None,
+                    limit: None,
+                    order_by: Some(1),
+                },
+            )
+            .unwrap();
+        println!("{:?}", res);
+    }
 }

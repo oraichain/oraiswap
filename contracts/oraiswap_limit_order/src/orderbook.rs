@@ -1,7 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use oraiswap::{asset::AssetInfoRaw, limit_order::OrderDirection};
+use oraiswap::{
+    asset::{Asset, AssetInfo, AssetInfoRaw},
+    limit_order::{OrderDirection, OrderResponse},
+};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, StdError, StdResult, Uint128};
+use cosmwasm_std::{Api, CanonicalAddr, Decimal, StdError, StdResult, Uint128};
 
 #[cw_serde]
 pub struct Order {
@@ -63,6 +66,29 @@ impl Order {
             OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
             OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
         }
+    }
+
+    pub fn to_response(
+        &self,
+        api: &dyn Api,
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    ) -> StdResult<OrderResponse> {
+        Ok(OrderResponse {
+            order_id: self.order_id,
+            direction: self.direction.clone(),
+            bidder_addr: api.addr_humanize(&self.bidder_addr)?.to_string(),
+            offer_asset: Asset {
+                amount: self.offer_amount,
+                info: offer_info,
+            },
+            ask_asset: Asset {
+                amount: self.ask_amount,
+                info: ask_info,
+            },
+            filled_offer_amount: self.filled_offer_amount,
+            filled_ask_amount: self.filled_ask_amount,
+        })
     }
 }
 
@@ -252,3 +278,5 @@ impl OrderBook {
         (Decimal::zero(), false)
     }
 }
+
+// TODO: write logic for auto matching based on the orderbook
