@@ -121,19 +121,3 @@ pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResul
         ReadonlyBucket::new(storage, PREFIX_REWARDS_PER_SEC);
     weight_bucket.load(asset_key)
 }
-
-// upper bound key by 1, for Order::Ascending
-pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
-    start_after.map(|mut input| {
-        // zero out all trailing 255, increment first that is not such
-        for i in (0..input.len()).rev() {
-            if input[i] == 255 {
-                input[i] = 0;
-            } else {
-                input[i] += 1;
-                break;
-            }
-        }
-        input
-    })
-}

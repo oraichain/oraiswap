@@ -2,23 +2,12 @@ use std::convert::{TryFrom, TryInto};
 
 use cosmwasm_std::{Decimal, Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::ReadonlyBucket;
-use oraiswap::limit_order::{OrderDirection, TickResponse, TicksResponse};
+use oraiswap::{
+    limit_order::{OrderDirection, TickResponse, TicksResponse},
+    querier::calc_range_start,
+};
 
 use crate::state::{DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK};
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<Decimal>) -> Option<Vec<u8>> {
-    start_after.map(|id| {
-        let mut v = id.atomics().to_be_bytes().to_vec();
-        v.push(1);
-        v
-    })
-}
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_end(start_after: Option<Decimal>) -> Option<Vec<u8>> {
-    start_after.map(|id| id.atomics().to_be_bytes().to_vec())
-}
 
 pub fn query_ticks(
     storage: &dyn Storage,
@@ -34,9 +23,10 @@ pub fn query_ticks(
         ReadonlyBucket::multilevel(storage, &[PREFIX_TICK, pair_key, direction.as_bytes()]);
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|id| id.atomics().to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {
         Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
-        _ => (None, calc_range_end(start_after), OrderBy::Descending),
+        _ => (None, start_after, OrderBy::Descending),
     };
 
     let ticks = position_bucket

@@ -99,3 +99,19 @@ pub fn query_pair_info_from_pair(
         }))
         .map(|res| res.info)
 }
+
+// upper bound key by 1, for Order::Ascending
+pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
+    start_after.map(|mut input| {
+        // zero out all trailing 255, increment first that is not such
+        for i in (0..input.len()).rev() {
+            if input[i] == 255 {
+                input[i] = 0;
+            } else {
+                input[i] += 1;
+                break;
+            }
+        }
+        input
+    })
+}

@@ -1,5 +1,6 @@
 use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
+use oraiswap::querier::calc_range_start;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::orderbook::Order;
@@ -123,9 +124,10 @@ where
     T: Serialize + DeserializeOwned,
 {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {
         Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
-        _ => (None, calc_range_end(start_after), OrderBy::Descending),
+        _ => (None, start_after, OrderBy::Descending),
     };
 
     // just get 1 byte of value is ok
@@ -151,9 +153,10 @@ pub fn read_orders(
         ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]);
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {
         Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
-        _ => (None, calc_range_end(start_after), OrderBy::Descending),
+        _ => (None, start_after, OrderBy::Descending),
     };
 
     position_bucket
@@ -161,20 +164,6 @@ pub fn read_orders(
         .take(limit)
         .map(|item| item.map(|item| item.1))
         .collect()
-}
-
-// this will set the first key after the provided key, by appending a 1 byte, must use big endian
-fn calc_range_start(start_after: Option<u64>) -> Option<Vec<u8>> {
-    start_after.map(|id| {
-        let mut v = id.to_be_bytes().to_vec();
-        v.push(1);
-        v
-    })
-}
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_end(start_after: Option<u64>) -> Option<Vec<u8>> {
-    start_after.map(|id| id.to_be_bytes().to_vec())
 }
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess no need
