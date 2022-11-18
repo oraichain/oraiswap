@@ -52,4 +52,10 @@ pub enum ContractError {
 
     #[error("must provide operations")]
     NoSwapOperation {},
+
+    #[error("invalid cw20 hook message")]
+    InvalidCw20HookMessage {},
+
+    #[error("must provide native token")]
+    MustProvideNativeToken {}, // only allowing buy token and sell token with native token
 }

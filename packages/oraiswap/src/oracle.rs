@@ -136,8 +136,6 @@ pub struct ContractInfo {
     // constraint
     pub min_rate: Decimal,
     pub max_rate: Decimal,
-    // pub min_stability_spread: Decimal,
-    // pub base_pool: Uint128,
 }
 
 /// ContractInfoResponse is data format returned from WasmRequest::ContractInfo query
@@ -150,8 +148,6 @@ pub struct ContractInfoResponse {
     pub admin: Addr,
     pub min_rate: Decimal,
     pub max_rate: Decimal,
-    // pub min_stability_spread: Decimal,
-    // pub base_pool: Uint128,
 }
 
 #[cw_serde]

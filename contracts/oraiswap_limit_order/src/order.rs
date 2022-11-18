@@ -6,11 +6,11 @@ use crate::state::{
     remove_order, store_order, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError, StdResult,
-    Uint128,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
+use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
     LastOrderIdResponse, OrderDirection, OrderFilter, OrderResponse, OrdersResponse,
 };
@@ -21,8 +21,10 @@ pub fn submit_order(
     order_direction: Option<OrderDirection>,
     offer_asset: Asset,
     ask_asset: Asset,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
     let order_id = increase_last_order_id(deps.storage)?;
+
+    // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
 
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
@@ -58,12 +60,12 @@ pub fn cancel_order(
     offer_info: AssetInfo,
     ask_info: AssetInfo,
     order_id: u64,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let order: Order = read_order(deps.storage, &pair_key, order_id)?;
+    let order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized {});
     }
 
     // Compute refund asset
@@ -98,12 +100,12 @@ pub fn execute_order(
     sender: Addr,
     ask_asset: Asset,
     order_id: u64,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[
         offer_info.to_raw(deps.api)?,
         ask_asset.info.to_raw(deps.api)?,
     ]);
-    let mut order: Order = read_order(deps.storage, &pair_key, order_id)?;
+    let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
     // Compute offer amount & left ask amount
     let (offer_amount, left_ask_amount) = order.matchable_amount(ask_asset.amount)?;

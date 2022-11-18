@@ -20,7 +20,11 @@ fn submit_order() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(
@@ -189,7 +193,11 @@ fn cancel_order_native_token() {
 
     let token_addr = app.get_token_addr("asset").unwrap();
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(
@@ -294,7 +302,11 @@ fn cancel_order_token() {
 
     let token_addr = app.get_token_addr("asset").unwrap();
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(
@@ -404,7 +416,11 @@ fn execute_order_native_token() {
         ),
     ]);
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(
@@ -611,7 +627,11 @@ fn execute_order_token() {
         ),
     ]);
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(
@@ -791,7 +811,11 @@ fn orders_querier() {
         ),
     ]);
 
-    let msg = InstantiateMsg {};
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
         .instantiate(

@@ -1,6 +1,6 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Order as OrderBy, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use oraiswap::querier::calc_range_start;
+use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::orderbook::Order;
@@ -19,6 +19,27 @@ pub fn increase_last_order_id(storage: &mut dyn Storage) -> StdResult<u64> {
 
 pub fn read_last_order_id(storage: &dyn Storage) -> StdResult<u64> {
     singleton_read(storage, KEY_LAST_ORDER_ID).load()
+}
+
+pub fn store_config(storage: &mut dyn Storage, config: &ContractInfo) -> StdResult<()> {
+    singleton(storage, CONTRACT_INFO).save(config)
+}
+
+pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
+    singleton_read(storage, CONTRACT_INFO).load()
+}
+
+pub fn store_orderbook(
+    storage: &mut dyn Storage,
+    pair_key: &[u8],
+    min_ask_amount: Uint128,
+    min_offer_amount: Uint128,
+) -> StdResult<()> {
+    Bucket::new(storage, PREFIX_ORDER_BOOK).save(pair_key, &(min_ask_amount, min_offer_amount))
+}
+
+pub fn read_orderbook(storage: &dyn Storage, pair_key: &[u8]) -> StdResult<(Uint128, Uint128)> {
+    ReadonlyBucket::new(storage, PREFIX_ORDER_BOOK).load(pair_key)
 }
 
 pub fn store_order(
@@ -167,8 +188,10 @@ pub fn read_orders(
 }
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess no need
+static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
+static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
+
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick
-
 pub static PREFIX_TICK: &[u8] = b"tick"; // this is tick with value is the total orders

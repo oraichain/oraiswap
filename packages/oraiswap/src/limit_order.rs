@@ -1,7 +1,15 @@
 use crate::asset::{Asset, AssetInfo};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Addr, CanonicalAddr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
+
+#[cw_serde]
+pub struct ContractInfo {
+    pub name: String,
+    pub version: String,
+    // admin can update the parameter, may be multisig
+    pub admin: CanonicalAddr,
+}
 
 #[cw_serde]
 #[derive(Copy)]
@@ -25,11 +33,26 @@ impl Default for OrderDirection {
     }
 }
 #[cw_serde]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub admin: Option<Addr>,
+}
 
 #[cw_serde]
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
+
+    UpdateAdmin {
+        admin: Addr,
+    },
+
+    UpdateOrderBook {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+        min_offer_amount: Uint128,
+        min_ask_amount: Uint128,
+    },
 
     ///////////////////////
     /// User Operations ///
@@ -78,6 +101,13 @@ pub enum OrderFilter {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ContractInfoResponse)]
+    ContractInfo {},
+    #[returns(OrderBookResponse)]
+    OrderBook {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    },
     #[returns(OrderResponse)]
     Order {
         order_id: u64,
@@ -115,6 +145,15 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
+pub struct ContractInfoResponse {
+    pub name: String,
+    pub version: String,
+
+    // admin can update the parameter, may be multisig
+    pub admin: Addr,
+}
+
+#[cw_serde]
 pub struct OrderResponse {
     pub order_id: u64,
     pub direction: OrderDirection,
@@ -123,6 +162,14 @@ pub struct OrderResponse {
     pub ask_asset: Asset,
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct OrderBookResponse {
+    pub offer_info: AssetInfo,
+    pub ask_info: AssetInfo,
+    pub min_offer_amount: Uint128,
+    pub min_ask_amount: Uint128,
 }
 
 #[cw_serde]
