@@ -21,8 +21,8 @@ pub enum OrderDirection {
 impl OrderDirection {
     pub fn as_bytes(&self) -> &[u8] {
         match self {
-            OrderDirection::Buy => b"buy",
-            OrderDirection::Sell => b"sell",
+            OrderDirection::Buy => &[0u8],
+            OrderDirection::Sell => &[1u8],
         }
     }
 }
