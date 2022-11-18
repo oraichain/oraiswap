@@ -3,8 +3,7 @@ use std::convert::TryFrom;
 use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orders, read_orders_with_indexer,
-    remove_order, store_order, FLOATING_ROUND, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE,
-    PREFIX_TICK,
+    remove_order, store_order, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError, StdResult,
@@ -15,7 +14,6 @@ use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::limit_order::{
     LastOrderIdResponse, OrderDirection, OrderFilter, OrderResponse, OrdersResponse,
 };
-use oraiswap::math::Truncate;
 
 pub fn submit_order(
     deps: DepsMut,
@@ -205,10 +203,10 @@ pub fn query_orders(
             order_by,
         )?,
         OrderFilter::Price(price) => {
-            let price_key = price.to_string_round(FLOATING_ROUND);
+            let price_key = price.atomics().to_be_bytes();
             read_orders_with_indexer::<OrderDirection>(
                 deps.storage,
-                &[PREFIX_ORDER_BY_PRICE, &pair_key, price_key.as_bytes()],
+                &[PREFIX_ORDER_BY_PRICE, &pair_key, &price_key],
                 direction_filter,
                 start_after,
                 limit,

@@ -1,11 +1,10 @@
-use std::str::FromStr;
+use std::convert::TryInto;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{Asset, AssetInfo},
     limit_order::{OrderDirection, OrderResponse},
-    math::Truncate,
 };
 
 use cosmwasm_std::{
@@ -13,8 +12,7 @@ use cosmwasm_std::{
 };
 
 use crate::state::{
-    read_orders, read_orders_with_indexer, store_order, FLOATING_ROUND, PREFIX_ORDER_BY_PRICE,
-    PREFIX_TICK,
+    read_orders, read_orders_with_indexer, store_order, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 
 #[cw_serde]
@@ -117,22 +115,17 @@ impl Ticks {
         &self,
         storage: &dyn Storage,
         pair_key: &[u8],
-        price_increasing: bool,
+        price_increasing: OrderBy,
     ) -> (Decimal, u64, bool) {
         // get last tick if price_increasing is true, otherwise get first tick
         let tick_namespaces = &[PREFIX_TICK, pair_key, self.direction.as_bytes()];
         let position_bucket: ReadonlyBucket<u64> =
             ReadonlyBucket::multilevel(storage, tick_namespaces);
-        let order_by = if price_increasing {
-            OrderBy::Descending
-        } else {
-            OrderBy::Ascending
-        };
-        if let Some(item) = position_bucket.range(None, None, order_by).next() {
+
+        if let Some(item) = position_bucket.range(None, None, price_increasing).next() {
             if let Ok((price_key, total_orders)) = item {
                 // price is rounded already
-                let price =
-                    Decimal::from_str(unsafe { &String::from_utf8_unchecked(price_key) }).unwrap();
+                let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
                 return (price, total_orders, true);
             }
         }
@@ -140,11 +133,11 @@ impl Ticks {
     }
 
     pub fn highest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
-        self.best_price(storage, pair_key, self.direction == OrderDirection::Sell)
+        self.best_price(storage, pair_key, OrderBy::Descending)
     }
 
     pub fn lowest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
-        self.best_price(storage, pair_key, self.direction == OrderDirection::Buy)
+        self.best_price(storage, pair_key, OrderBy::Ascending)
     }
 }
 
@@ -183,7 +176,7 @@ impl OrderBook {
             &[
                 PREFIX_ORDER_BY_PRICE,
                 &self.pair_key,
-                price.to_string_round(FLOATING_ROUND).as_bytes(),
+                &price.atomics().to_be_bytes(),
             ],
             Box::new(move |item| direction.eq(item)),
             start_after,
@@ -206,6 +199,7 @@ impl OrderBook {
     pub fn highest_price(&self, storage: &dyn Storage) -> (Decimal, bool) {
         let (highest_buy_price, _, found_buy) = self.buys.highest_price(storage, &self.pair_key);
         let (highest_sell_price, _, found_sell) = self.sells.highest_price(storage, &self.pair_key);
+
         if found_buy && found_sell {
             return (Decimal::max(highest_buy_price, highest_sell_price), true);
         }

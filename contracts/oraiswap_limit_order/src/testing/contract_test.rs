@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, Uint128};
+use cosmwasm_std::{to_binary, Addr, Coin, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -1067,7 +1065,7 @@ fn orders_querier() {
                         denom: ATOM_DENOM.to_string(),
                     },
                     direction: None,
-                    filter: OrderFilter::Price(Decimal::from_str(&tick.price).unwrap()),
+                    filter: OrderFilter::Price(tick.price),
                     start_after: None,
                     limit: None,
                     order_by: Some(1),

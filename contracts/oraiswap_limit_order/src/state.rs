@@ -1,12 +1,8 @@
 use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use oraiswap::math::Truncate;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::orderbook::Order;
-
-// only show tick with 3 floating number place
-pub const FLOATING_ROUND: usize = 3;
 
 // settings for pagination
 pub const MAX_LIMIT: u32 = 30;
@@ -30,11 +26,8 @@ pub fn store_order(
     order: &Order,
     inserted: bool,
 ) -> StdResult<u64> {
-    let order_id_key = &order.order_id.to_le_bytes();
-    let price_key = order
-        .get_price()
-        .to_string_round(FLOATING_ROUND)
-        .into_bytes();
+    let order_id_key = &order.order_id.to_be_bytes();
+    let price_key = order.get_price().atomics().to_be_bytes();
 
     Bucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).save(order_id_key, order)?;
 
@@ -73,11 +66,8 @@ pub fn store_order(
 }
 
 pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -> StdResult<u64> {
-    let order_id_key = &order.order_id.to_le_bytes();
-    let price_key = order
-        .get_price()
-        .to_string_round(FLOATING_ROUND)
-        .into_bytes();
+    let order_id_key = &order.order_id.to_be_bytes();
+    let price_key = order.get_price().atomics().to_be_bytes();
 
     Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key]).remove(order_id_key);
 
@@ -117,7 +107,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
 }
 
 pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdResult<Order> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).load(&order_id.to_le_bytes())
+    ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).load(&order_id.to_be_bytes())
 }
 
 /// read_orders_with_indexer: namespace is PREFIX + PAIR_KEY + INDEXER
@@ -173,10 +163,10 @@ pub fn read_orders(
         .collect()
 }
 
-// this will set the first key after the provided key, by appending a 1 byte
+// this will set the first key after the provided key, by appending a 1 byte, must use big endian
 fn calc_range_start(start_after: Option<u64>) -> Option<Vec<u8>> {
     start_after.map(|id| {
-        let mut v = id.to_le_bytes().to_vec();
+        let mut v = id.to_be_bytes().to_vec();
         v.push(1);
         v
     })
@@ -184,7 +174,7 @@ fn calc_range_start(start_after: Option<u64>) -> Option<Vec<u8>> {
 
 // this will set the first key after the provided key, by appending a 1 byte
 fn calc_range_end(start_after: Option<u64>) -> Option<Vec<u8>> {
-    start_after.map(|id| id.to_le_bytes().to_vec())
+    start_after.map(|id| id.to_be_bytes().to_vec())
 }
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess no need

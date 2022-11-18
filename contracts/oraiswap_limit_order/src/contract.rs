@@ -12,7 +12,7 @@ use crate::state::init_last_order_id;
 use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
-use oraiswap::asset::{Asset, AssetInfo};
+use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::limit_order::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -126,7 +126,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             offer_info,
             ask_info,
             direction,
-        } => to_binary(&query_tick(deps, offer_info, ask_info, direction, price)?),
+        } => to_binary(&query_tick(
+            deps.storage,
+            &pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]),
+            direction,
+            price,
+        )?),
         QueryMsg::Ticks {
             offer_info,
             ask_info,
@@ -135,9 +140,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order_by,
         } => to_binary(&query_ticks(
-            deps,
-            offer_info,
-            ask_info,
+            deps.storage,
+            &pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]),
             direction,
             start_after,
             limit,

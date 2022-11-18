@@ -132,7 +132,7 @@ pub struct OrdersResponse {
 
 #[cw_serde]
 pub struct TickResponse {
-    pub price: String,
+    pub price: Decimal,
     pub total_orders: u64,
 }
 
