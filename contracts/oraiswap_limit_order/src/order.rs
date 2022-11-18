@@ -4,6 +4,7 @@ use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orders, read_orders_with_indexer,
     remove_order, store_order, FLOATING_ROUND, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE,
+    PREFIX_TICK,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdError, StdResult,
@@ -163,6 +164,7 @@ pub fn query_orders(
     deps: Deps,
     offer_info: AssetInfo,
     ask_info: AssetInfo,
+    direction: Option<OrderDirection>,
     filter: OrderFilter,
     start_after: Option<u64>,
     limit: Option<u32>,
@@ -170,28 +172,44 @@ pub fn query_orders(
 ) -> StdResult<OrdersResponse> {
     let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+
+    let (direction_filter, direction_key): (Box<dyn Fn(&OrderDirection) -> bool>, Vec<u8>) =
+        match direction {
+            // copy value to closure
+            Some(d) => (Box::new(move |x| d.eq(x)), d.as_bytes().to_vec()),
+            None => (Box::new(|_| true), OrderDirection::Buy.as_bytes().to_vec()),
+        };
+
     let orders: Vec<Order> = match filter {
         OrderFilter::Bidder(bidder_addr) => {
             let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
-            read_orders_with_indexer(
+            read_orders_with_indexer::<OrderDirection>(
                 deps.storage,
                 &[
                     PREFIX_ORDER_BY_BIDDER,
                     &pair_key,
                     bidder_addr_raw.as_slice(),
                 ],
-                &pair_key,
+                direction_filter,
                 start_after,
                 limit,
                 order_by,
             )?
         }
+        OrderFilter::Tick {} => read_orders_with_indexer::<u64>(
+            deps.storage,
+            &[PREFIX_TICK, &pair_key, &direction_key],
+            Box::new(|_| true),
+            start_after,
+            limit,
+            order_by,
+        )?,
         OrderFilter::Price(price) => {
             let price_key = price.to_string_round(FLOATING_ROUND);
-            read_orders_with_indexer(
+            read_orders_with_indexer::<OrderDirection>(
                 deps.storage,
                 &[PREFIX_ORDER_BY_PRICE, &pair_key, price_key.as_bytes()],
-                &pair_key,
+                direction_filter,
                 start_after,
                 limit,
                 order_by,

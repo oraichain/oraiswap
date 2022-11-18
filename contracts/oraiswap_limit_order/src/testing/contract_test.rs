@@ -911,6 +911,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::Token {
                     contract_addr: token_addrs[1].clone(),
                 },
+                direction: None,
                 filter: OrderFilter::Bidder("addr0000".to_string()),
                 start_after: None,
                 limit: None,
@@ -933,6 +934,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
+                direction: None,
                 filter: OrderFilter::None,
                 start_after: None,
                 limit: None,
@@ -956,6 +958,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::Token {
                     contract_addr: token_addrs[1].clone(),
                 },
+                direction: None,
                 filter: OrderFilter::None,
                 start_after: None,
                 limit: None,
@@ -977,6 +980,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
+                direction: None,
                 filter: OrderFilter::Bidder("addr0001".to_string()),
                 start_after: None,
                 limit: None,
@@ -1000,6 +1004,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
+                direction: None,
                 filter: OrderFilter::None,
                 start_after: Some(2u64),
                 limit: None,
@@ -1021,6 +1026,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
+                direction: None,
                 filter: OrderFilter::None,
                 start_after: Some(1u64),
                 limit: None,
@@ -1041,6 +1047,7 @@ fn orders_querier() {
                 ask_info: AssetInfo::NativeToken {
                     denom: ATOM_DENOM.to_string(),
                 },
+                direction: OrderDirection::Buy,
                 start_after: None,
                 limit: None,
                 order_by: Some(1),
@@ -1059,6 +1066,7 @@ fn orders_querier() {
                     ask_info: AssetInfo::NativeToken {
                         denom: ATOM_DENOM.to_string(),
                     },
+                    direction: None,
                     filter: OrderFilter::Price(Decimal::from_str(&tick.price).unwrap()),
                     start_after: None,
                     limit: None,

@@ -4,7 +4,7 @@ use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult};
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key, AssetInfo},
-    limit_order::{TickResponse, TicksResponse},
+    limit_order::{OrderDirection, TickResponse, TicksResponse},
     math::Truncate,
 };
 
@@ -28,14 +28,17 @@ pub fn query_ticks(
     deps: Deps,
     offer_info: AssetInfo,
     ask_info: AssetInfo,
+    direction: OrderDirection,
     start_after: Option<Decimal>,
     limit: Option<u32>,
     order_by: Option<i32>,
 ) -> StdResult<TicksResponse> {
     let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let position_bucket: ReadonlyBucket<u64> =
-        ReadonlyBucket::multilevel(deps.storage, &[PREFIX_TICK, &pair_key]);
+    let position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+        deps.storage,
+        &[PREFIX_TICK, &pair_key, direction.as_bytes()],
+    );
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
@@ -63,12 +66,16 @@ pub fn query_tick(
     deps: Deps,
     offer_info: AssetInfo,
     ask_info: AssetInfo,
+    direction: OrderDirection,
     price: Decimal,
 ) -> StdResult<TickResponse> {
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
     let price = price.to_string_round(FLOATING_ROUND);
-    let total_orders = ReadonlyBucket::<u64>::multilevel(deps.storage, &[PREFIX_TICK, &pair_key])
-        .load(price.as_bytes())?;
+    let total_orders = ReadonlyBucket::<u64>::multilevel(
+        deps.storage,
+        &[PREFIX_TICK, &pair_key, direction.as_bytes()],
+    )
+    .load(price.as_bytes())?;
 
     Ok(TickResponse {
         price,

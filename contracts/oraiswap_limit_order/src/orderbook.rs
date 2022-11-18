@@ -1,10 +1,21 @@
+use std::str::FromStr;
+
 use cosmwasm_schema::cw_serde;
+use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
-    asset::{Asset, AssetInfo, AssetInfoRaw},
+    asset::{Asset, AssetInfo},
     limit_order::{OrderDirection, OrderResponse},
+    math::Truncate,
 };
 
-use cosmwasm_std::{Api, CanonicalAddr, Decimal, StdError, StdResult, Uint128};
+use cosmwasm_std::{
+    Api, CanonicalAddr, Decimal, Order as OrderBy, StdError, StdResult, Storage, Uint128,
+};
+
+use crate::state::{
+    read_orders, read_orders_with_indexer, store_order, FLOATING_ROUND, PREFIX_ORDER_BY_PRICE,
+    PREFIX_TICK,
+};
 
 #[cw_serde]
 pub struct Order {
@@ -93,164 +104,108 @@ impl Order {
 }
 
 #[cw_serde]
-pub struct Tick {
-    price: Decimal,
-    orders: Vec<Order>,
-}
-
-impl Tick {
-    pub fn new(order: Order) -> Self {
-        Tick {
-            price: order.get_price(),
-            orders: vec![order],
-        }
-    }
-
-    pub fn add_order(&mut self, order: Order) {
-        self.orders.push(order);
-    }
-}
-
-#[cw_serde]
 pub struct Ticks {
-    ticks: Vec<Tick>,
-    info: AssetInfoRaw,
-    price_increasing: bool,
+    direction: OrderDirection, // buy => price_increasing false,
 }
 
 impl Ticks {
-    pub fn new(info: AssetInfoRaw, price_increasing: bool) -> Self {
-        Ticks {
-            info,
-            ticks: vec![],
-            price_increasing,
-        }
+    pub fn new(direction: OrderDirection) -> Self {
+        Ticks { direction }
     }
 
-    pub fn find_price(&self, price: Decimal) -> (usize, bool) {
-        let mut i = 0;
-        let mut j = self.ticks.len();
-
-        while i < j {
-            let h = (i + j) >> 1; // div 2, i ≤ h < j
-            let filter_price = if self.price_increasing {
-                // sell
-                self.ticks[h].price.ge(&price)
-            } else {
-                // buy
-                self.ticks[h].price.le(&price)
-            };
-            // parition
-            if filter_price {
-                j = h // preserves left
-            } else {
-                i = h + 1 // preserves right
-            }
-        }
-
-        let exact = i < self.ticks.len() && self.ticks[i].price.eq(&price);
-        (i, exact)
-    }
-
-    pub fn add_order(&mut self, order: Order) {
-        let (i, exact) = self.find_price(order.get_price());
-        if exact {
-            self.ticks[i].add_order(order)
+    fn best_price(
+        &self,
+        storage: &dyn Storage,
+        pair_key: &[u8],
+        price_increasing: bool,
+    ) -> (Decimal, u64, bool) {
+        // get last tick if price_increasing is true, otherwise get first tick
+        let tick_namespaces = &[PREFIX_TICK, pair_key, self.direction.as_bytes()];
+        let position_bucket: ReadonlyBucket<u64> =
+            ReadonlyBucket::multilevel(storage, tick_namespaces);
+        let order_by = if price_increasing {
+            OrderBy::Descending
         } else {
-            let tick = Tick::new(order);
-            if i < self.ticks.len() {
-                // Insert a new order book tick at index i.
-                self.ticks.insert(i, tick);
-            } else {
-                self.ticks.push(tick);
+            OrderBy::Ascending
+        };
+        if let Some(item) = position_bucket.range(None, None, order_by).next() {
+            if let Ok((price_key, total_orders)) = item {
+                // price is rounded already
+                let price =
+                    Decimal::from_str(unsafe { &String::from_utf8_unchecked(price_key) }).unwrap();
+                return (price, total_orders, true);
             }
         }
+        (Decimal::zero(), 0, false)
     }
 
-    pub fn orders_at(&self, price: Decimal) -> Vec<Order> {
-        let (i, exact) = self.find_price(price);
-
-        if !exact {
-            return vec![];
-        }
-        self.ticks[i].orders.clone()
+    pub fn highest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
+        self.best_price(storage, pair_key, self.direction == OrderDirection::Sell)
     }
 
-    fn best_price(&self, price_increasing: bool) -> (Decimal, usize, bool) {
-        if self.ticks.is_empty() {
-            return (Decimal::zero(), 0, false);
-        }
-
-        // get from last
-        if price_increasing {
-            let last_ind = self.ticks.len() - 1;
-            return (self.ticks[last_ind].price, last_ind, true);
-        }
-
-        (self.ticks[0].price, 0, true)
-    }
-
-    pub fn highest_price(&self) -> (Decimal, usize, bool) {
-        self.best_price(self.price_increasing)
-    }
-
-    pub fn lowest_price(&self) -> (Decimal, usize, bool) {
-        self.best_price(!self.price_increasing)
+    pub fn lowest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
+        self.best_price(storage, pair_key, self.direction == OrderDirection::Buy)
     }
 }
 
 /// Ticks are stored in Ordered database, so we just need to process at 50 recent ticks is ok
 #[cw_serde]
 pub struct OrderBook {
+    pair_key: Vec<u8>, // an unique pair of assets
     buys: Ticks,
     sells: Ticks,
 }
 
 impl OrderBook {
-    pub fn new(buy_info: AssetInfoRaw, sell_info: AssetInfoRaw, orders: Vec<Order>) -> Self {
-        let mut ob = OrderBook {
-            buys: Ticks::new(buy_info, false),
-            sells: Ticks::new(sell_info, true),
-        };
-
-        ob.add_orders(orders);
-        ob
-    }
-
-    pub fn add_orders(&mut self, orders: Vec<Order>) {
-        for order in orders {
-            match order.direction {
-                OrderDirection::Buy => self.buys.add_order(order),
-                OrderDirection::Sell => self.sells.add_order(order),
-            }
+    pub fn new(pair_key: &[u8]) -> Self {
+        OrderBook {
+            buys: Ticks::new(OrderDirection::Buy),
+            sells: Ticks::new(OrderDirection::Sell),
+            pair_key: pair_key.to_vec(),
         }
     }
 
-    // get_orders returns all orders in the order book.
-    pub fn get_orders(&self) -> Vec<Order> {
-        let mut orders = vec![];
-        for tick in self.buys.ticks.iter() {
-            orders.extend_from_slice(&tick.orders)
-        }
-
-        for tick in self.sells.ticks.iter() {
-            orders.extend_from_slice(&tick.orders)
-        }
-
-        orders
+    pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
+        store_order(storage, &self.pair_key, order, true)
     }
 
-    pub fn buy_orders_at(&self, price: Decimal) -> Vec<Order> {
-        self.buys.orders_at(price)
+    pub fn orders_at(
+        &self,
+        storage: &dyn Storage,
+        price: Decimal,
+        direction: OrderDirection,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        order_by: Option<OrderBy>,
+    ) -> StdResult<Vec<Order>> {
+        read_orders_with_indexer::<OrderDirection>(
+            storage,
+            &[
+                PREFIX_ORDER_BY_PRICE,
+                &self.pair_key,
+                price.to_string_round(FLOATING_ROUND).as_bytes(),
+            ],
+            Box::new(move |item| direction.eq(item)),
+            start_after,
+            limit,
+            order_by,
+        )
     }
 
-    pub fn sell_orders_at(&self, price: Decimal) -> Vec<Order> {
-        self.sells.orders_at(price)
+    // get_orders returns all orders in the order book, with pagination
+    pub fn get_orders(
+        &self,
+        storage: &dyn Storage,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        order_by: Option<OrderBy>,
+    ) -> StdResult<Vec<Order>> {
+        read_orders(storage, &self.pair_key, start_after, limit, order_by)
     }
 
-    pub fn highest_price(&self) -> (Decimal, bool) {
-        let (highest_buy_price, _, found_buy) = self.buys.highest_price();
-        let (highest_sell_price, _, found_sell) = self.sells.highest_price();
+    pub fn highest_price(&self, storage: &dyn Storage) -> (Decimal, bool) {
+        let (highest_buy_price, _, found_buy) = self.buys.highest_price(storage, &self.pair_key);
+        let (highest_sell_price, _, found_sell) = self.sells.highest_price(storage, &self.pair_key);
         if found_buy && found_sell {
             return (Decimal::max(highest_buy_price, highest_sell_price), true);
         }
@@ -263,9 +218,9 @@ impl OrderBook {
         (Decimal::zero(), false)
     }
 
-    pub fn lowest_price(&self) -> (Decimal, bool) {
-        let (lowest_buy_price, _, found_buy) = self.buys.lowest_price();
-        let (lowest_sell_price, _, found_sell) = self.sells.lowest_price();
+    pub fn lowest_price(&self, storage: &dyn Storage) -> (Decimal, bool) {
+        let (lowest_buy_price, _, found_buy) = self.buys.lowest_price(storage, &self.pair_key);
+        let (lowest_sell_price, _, found_sell) = self.sells.lowest_price(storage, &self.pair_key);
         if found_buy && found_sell {
             return (Decimal::min(lowest_buy_price, lowest_sell_price), true);
         }
@@ -278,5 +233,3 @@ impl OrderBook {
         (Decimal::zero(), false)
     }
 }
-
-// TODO: write logic for auto matching based on the orderbook

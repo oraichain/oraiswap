@@ -1,7 +1,7 @@
-use cosmwasm_std::{Order as OrderBy, StdError, StdResult, Storage};
+use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::math::Truncate;
-use std::convert::TryInto;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::orderbook::Order;
 
@@ -38,26 +38,26 @@ pub fn store_order(
 
     Bucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).save(order_id_key, order)?;
 
+    let tick_namespaces = &[PREFIX_TICK, pair_key, order.direction.as_bytes()];
+
     // first time then total is 0
-    let mut total_tick_orders =
-        ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key])
-            .load(&price_key)
-            .unwrap_or_default();
+    let mut total_tick_orders = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
+        .load(&price_key)
+        .unwrap_or_default();
 
     if inserted {
         total_tick_orders += 1;
     }
 
     // save total orders for a tick
-    Bucket::multilevel(storage, &[PREFIX_TICK, pair_key]).save(&price_key, &total_tick_orders)?;
+    Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders)?;
 
     // index order by price and pair key ?, store tick using price as key then sort by ID ?
     // => query tick price from pair key => each price query order belong to price => order list
     // insert tick => insert price entry for pair_key of prefix tick
     // insert order to tick => update index for [pair key, price]
-
     Bucket::multilevel(storage, &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key])
-        .save(order_id_key, &true)?;
+        .save(order_id_key, &order.direction)?;
 
     Bucket::multilevel(
         storage,
@@ -67,7 +67,7 @@ pub fn store_order(
             order.bidder_addr.as_slice(),
         ],
     )
-    .save(order_id_key, &true)?;
+    .save(order_id_key, &order.direction)?;
 
     Ok(total_tick_orders)
 }
@@ -82,20 +82,19 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key]).remove(order_id_key);
 
     // not found means total is 0
-    let mut total_tick_orders =
-        ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key])
-            .load(&price_key)
-            .unwrap_or_default();
+    let tick_namespaces = &[PREFIX_TICK, pair_key, order.direction.as_bytes()];
+    let mut total_tick_orders = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
+        .load(&price_key)
+        .unwrap_or_default();
 
     // substract one order, if total is 0 mean not existed
     if total_tick_orders > 0 {
         total_tick_orders -= 1;
         if total_tick_orders > 0 {
             // save total orders for a tick
-            Bucket::multilevel(storage, &[PREFIX_TICK, pair_key])
-                .save(&price_key, &total_tick_orders)?;
+            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders)?;
         } else {
-            Bucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key]).remove(&price_key);
+            Bucket::<u64>::multilevel(storage, tick_namespaces).remove(&price_key);
         }
     }
 
@@ -121,29 +120,33 @@ pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdR
     ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, pair_key]).load(&order_id.to_le_bytes())
 }
 
-pub fn read_orders_with_indexer(
+/// read_orders_with_indexer: namespace is PREFIX + PAIR_KEY + INDEXER
+pub fn read_orders_with_indexer<T>(
     storage: &dyn Storage,
     namespaces: &[&[u8]],
-    pair_key: &[u8],
+    filter: Box<dyn Fn(&T) -> bool>,
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
-) -> StdResult<Vec<Order>> {
+) -> StdResult<Vec<Order>>
+where
+    T: Serialize + DeserializeOwned,
+{
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let (start, end, order_by) = match order_by {
         Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
         _ => (None, calc_range_end(start_after), OrderBy::Descending),
     };
 
-    let position_indexer: ReadonlyBucket<bool> = ReadonlyBucket::multilevel(storage, namespaces);
+    // just get 1 byte of value is ok
+    let position_indexer: ReadonlyBucket<T> = ReadonlyBucket::multilevel(storage, namespaces);
+    let order_bucket = ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, namespaces[1]]);
 
     position_indexer
         .range(start.as_deref(), end.as_deref(), order_by.into())
+        .filter(|item| item.as_ref().map_or(false, |item| filter(&item.1)))
         .take(limit)
-        .map(|item| {
-            let (k, _) = item?;
-            read_order(storage, pair_key, bytes_to_u64(&k)?)
-        })
+        .map(|item| order_bucket.load(&item?.0))
         .collect()
 }
 
@@ -166,20 +169,8 @@ pub fn read_orders(
     position_bucket
         .range(start.as_deref(), end.as_deref(), order_by.into())
         .take(limit)
-        .map(|item| {
-            let (_, v) = item?;
-            Ok(v)
-        })
+        .map(|item| item.map(|item| item.1))
         .collect()
-}
-
-fn bytes_to_u64(data: &[u8]) -> StdResult<u64> {
-    match data[0..8].try_into() {
-        Ok(bytes) => Ok(u64::from_le_bytes(bytes)),
-        Err(_) => Err(StdError::generic_err(
-            "Corrupted data found. 8 byte expected.",
-        )),
-    }
 }
 
 // this will set the first key after the provided key, by appending a 1 byte

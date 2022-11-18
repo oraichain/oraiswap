@@ -4,11 +4,26 @@ use cosmwasm_std::{Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
+#[derive(Copy)]
 pub enum OrderDirection {
     Buy,
     Sell,
 }
 
+impl OrderDirection {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            OrderDirection::Buy => b"buy",
+            OrderDirection::Sell => b"sell",
+        }
+    }
+}
+
+impl Default for OrderDirection {
+    fn default() -> Self {
+        OrderDirection::Buy
+    }
+}
 #[cw_serde]
 pub struct InstantiateMsg {}
 
@@ -54,9 +69,10 @@ pub enum Cw20HookMsg {
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String),
-    Price(Decimal),
-    None,
+    Bidder(String), // filter by bidder
+    Price(Decimal), // filter by price
+    Tick,           // filter by direction
+    None,           // no filter
 }
 
 #[cw_serde]
@@ -73,6 +89,7 @@ pub enum QueryMsg {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
         filter: OrderFilter,
+        direction: Option<OrderDirection>,
         start_after: Option<u64>,
         limit: Option<u32>,
         order_by: Option<i32>, // convert OrderBy to i32
@@ -82,11 +99,13 @@ pub enum QueryMsg {
         price: Decimal,
         offer_info: AssetInfo,
         ask_info: AssetInfo,
+        direction: OrderDirection,
     },
     #[returns(TicksResponse)]
     Ticks {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
+        direction: OrderDirection,
         start_after: Option<Decimal>,
         limit: Option<u32>,
         order_by: Option<i32>, // convert OrderBy to i32
