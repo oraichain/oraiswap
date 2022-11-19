@@ -122,11 +122,11 @@ fn initialize() {
     .unwrap();
     println!("sell ticks: {:?}", sell_ticks);
 
-    let (highest, found) = ob.highest_price(deps.as_ref().storage);
+    let (highest, found, _) = ob.highest_price(deps.as_ref().storage, OrderDirection::Buy);
     assert!(found);
     assert_eq!(highest, Decimal::from_str("10.01").unwrap());
 
-    let (lowest, found) = ob.lowest_price(deps.as_ref().storage);
+    let (lowest, found, _) = ob.lowest_price(deps.as_ref().storage, OrderDirection::Sell);
     assert!(found);
     assert_eq!(lowest, Decimal::from_str("9.996").unwrap());
 }
@@ -326,7 +326,6 @@ fn highest_lowest_price() {
 
     struct HighestLowestPrice {
         ob: OrderBook,
-        found: bool,
         orders: Vec<Order>,
         highest_price: Decimal,
         lowest_price: Decimal,
@@ -336,9 +335,8 @@ fn highest_lowest_price() {
         HighestLowestPrice {
             ob: OrderBook::new(&pair_key),
             orders: vec![],
-            found: false,
-            highest_price: Decimal::zero(),
-            lowest_price: Decimal::zero(),
+            highest_price: Decimal::MAX,
+            lowest_price: Decimal::MIN,
         },
         HighestLowestPrice {
             ob: OrderBook::new(&pair_key),
@@ -358,7 +356,6 @@ fn highest_lowest_price() {
                     10000u128.into(),
                 ),
             ],
-            found: true,
             highest_price: Decimal::from_str("1.1").unwrap(),
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
@@ -380,8 +377,6 @@ fn highest_lowest_price() {
                     10000u128.into(),
                 ),
             ],
-
-            found: true,
             highest_price: Decimal::from_str("1.1").unwrap(),
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
@@ -417,8 +412,6 @@ fn highest_lowest_price() {
                     10000u128.into(),
                 ),
             ],
-
-            found: true,
             highest_price: Decimal::from_str("1.1").unwrap(),
             lowest_price: Decimal::from_str("0.9").unwrap(),
         },
@@ -435,13 +428,28 @@ fn highest_lowest_price() {
                 total_orders
             );
         }
-        let (highest, found) = tc.ob.highest_price(deps.as_ref().storage);
-        assert_eq!(tc.found, found);
-        let (lowest, found) = tc.ob.lowest_price(deps.as_ref().storage);
-        assert_eq!(tc.found, found);
-        if tc.found {
-            assert_eq!(tc.highest_price, highest);
-            assert_eq!(tc.lowest_price, lowest);
+        let (highest_buy, found_buy, _) = tc
+            .ob
+            .highest_price(deps.as_ref().storage, OrderDirection::Buy);
+        let (highest_sell, found_sell, _) = tc
+            .ob
+            .highest_price(deps.as_ref().storage, OrderDirection::Sell);
+
+        if found_buy || found_sell {
+            let highest_price = Decimal::max(highest_buy, highest_sell);
+            assert_eq!(tc.highest_price, highest_price);
+        }
+
+        let (lowest_buy, found_buy, _) = tc
+            .ob
+            .lowest_price(deps.as_ref().storage, OrderDirection::Buy);
+        let (lowest_sell, found_sell, _) = tc
+            .ob
+            .lowest_price(deps.as_ref().storage, OrderDirection::Sell);
+
+        if found_buy || found_sell {
+            let lowest_price = Decimal::min(lowest_buy, lowest_sell);
+            assert_eq!(tc.lowest_price, lowest_price);
         }
     }
 }

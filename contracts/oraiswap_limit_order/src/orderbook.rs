@@ -116,7 +116,7 @@ impl Ticks {
         storage: &dyn Storage,
         pair_key: &[u8],
         price_increasing: OrderBy,
-    ) -> (Decimal, u64, bool) {
+    ) -> (Decimal, bool, u64) {
         // get last tick if price_increasing is true, otherwise get first tick
         let tick_namespaces = &[PREFIX_TICK, pair_key, self.direction.as_bytes()];
         let position_bucket: ReadonlyBucket<u64> =
@@ -126,17 +126,26 @@ impl Ticks {
             if let Ok((price_key, total_orders)) = item {
                 // price is rounded already
                 let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                return (price, total_orders, true);
+                return (price, true, total_orders);
             }
         }
-        (Decimal::zero(), 0, false)
+
+        // return default
+        (
+            match price_increasing {
+                OrderBy::Descending => Decimal::MIN, // highest => MIN (so using max will not include)
+                OrderBy::Ascending => Decimal::MAX, // lowest => MAX (so using min will not include)
+            },
+            false,
+            0,
+        )
     }
 
-    pub fn highest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
+    pub fn highest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, bool, u64) {
         self.best_price(storage, pair_key, OrderBy::Descending)
     }
 
-    pub fn lowest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, u64, bool) {
+    pub fn lowest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, bool, u64) {
         self.best_price(storage, pair_key, OrderBy::Ascending)
     }
 }
@@ -196,34 +205,25 @@ impl OrderBook {
         read_orders(storage, &self.pair_key, start_after, limit, order_by)
     }
 
-    pub fn highest_price(&self, storage: &dyn Storage) -> (Decimal, bool) {
-        let (highest_buy_price, _, found_buy) = self.buys.highest_price(storage, &self.pair_key);
-        let (highest_sell_price, _, found_sell) = self.sells.highest_price(storage, &self.pair_key);
-
-        if found_buy && found_sell {
-            return (Decimal::max(highest_buy_price, highest_sell_price), true);
+    pub fn highest_price(
+        &self,
+        storage: &dyn Storage,
+        direction: OrderDirection,
+    ) -> (Decimal, bool, u64) {
+        match direction {
+            OrderDirection::Buy => self.buys.highest_price(storage, &self.pair_key),
+            OrderDirection::Sell => self.sells.highest_price(storage, &self.pair_key),
         }
-        if found_buy {
-            return (highest_buy_price, true);
-        }
-        if found_sell {
-            return (highest_sell_price, true);
-        }
-        (Decimal::zero(), false)
     }
 
-    pub fn lowest_price(&self, storage: &dyn Storage) -> (Decimal, bool) {
-        let (lowest_buy_price, _, found_buy) = self.buys.lowest_price(storage, &self.pair_key);
-        let (lowest_sell_price, _, found_sell) = self.sells.lowest_price(storage, &self.pair_key);
-        if found_buy && found_sell {
-            return (Decimal::min(lowest_buy_price, lowest_sell_price), true);
+    pub fn lowest_price(
+        &self,
+        storage: &dyn Storage,
+        direction: OrderDirection,
+    ) -> (Decimal, bool, u64) {
+        match direction {
+            OrderDirection::Buy => self.buys.lowest_price(storage, &self.pair_key),
+            OrderDirection::Sell => self.sells.lowest_price(storage, &self.pair_key),
         }
-        if found_buy {
-            return (lowest_buy_price, true);
-        }
-        if found_sell {
-            return (lowest_sell_price, true);
-        }
-        (Decimal::zero(), false)
     }
 }
