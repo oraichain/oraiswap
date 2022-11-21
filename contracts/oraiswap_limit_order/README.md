@@ -138,4 +138,3 @@ Depends on the `ask asset`(= `execute asset`) type
 # TODO
 
 - find matching price so that we can call intervally to auto matching
-- store total amount sell, buy for an orderbook => as liquidity (update total when remove order, store order)
