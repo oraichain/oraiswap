@@ -134,3 +134,8 @@ Depends on the `ask asset`(= `execute asset`) type
 
 - Query last order id
   - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"last_order_id":{}}
+
+# TODO
+
+- find matching price so that we can call intervally to auto matching
+- store total amount sell, buy for an orderbook => as liquidity (update total when remove order, store order)
