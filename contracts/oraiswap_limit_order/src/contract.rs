@@ -19,7 +19,7 @@ use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::limit_order::{
     ContractInfo, ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
-    OrderBookResponse, QueryMsg,
+    OrderBookResponse, OrderDirection, QueryMsg,
 };
 
 // version info for migration info
@@ -81,11 +81,20 @@ pub fn execute(
             offer_asset,
             ask_asset,
         } => {
-            if !offer_asset.is_native_token() {
+            // if sell then paid asset must be ask asset, this way we've just assumed that we offer usdt and ask for orai
+            // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
+            let paid_asset = match direction {
+                OrderDirection::Buy => &offer_asset,
+                OrderDirection::Sell => &ask_asset,
+            };
+
+            // if paid asset is cw20, we check it in Cw20HookMessage
+            if !paid_asset.is_native_token() {
                 return Err(ContractError::MustProvideNativeToken {});
             }
 
-            offer_asset.assert_sent_native_token_balance(&info)?;
+            paid_asset.assert_sent_native_token_balance(&info)?;
+            // then submit order
             submit_order(deps, info.sender, direction, offer_asset, ask_asset)
         }
         ExecuteMsg::CancelOrder {
@@ -169,6 +178,7 @@ pub fn receive_cw20(
             ask_asset,
             direction,
         }) => submit_order(deps, sender, direction, provided_asset, ask_asset),
+        // this is opposite to SubmitOrder, so offer asset is ask asset
         Ok(Cw20HookMsg::ExecuteOrder {
             order_id,
             offer_info,

@@ -461,15 +461,16 @@ fn matchable_orders() {
     let mut deps = mock_dependencies();
 
     let offer_info = AssetInfoRaw::NativeToken {
-        denom: ORAI_DENOM.to_string(),
-    };
-    let ask_info = AssetInfoRaw::NativeToken {
         denom: "usdt".to_string(),
     };
-    let pair_key = pair_key(&[offer_info, ask_info]);
+    let ask_info = AssetInfoRaw::NativeToken {
+        denom: ORAI_DENOM.to_string(),
+    };
+    let pair_key = pair_key(&[offer_info.clone(), ask_info.clone()]);
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
+    // buy is offering orai, asking usdt * orai_price, sell is asking for usdt
     let orders = vec![
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -496,7 +497,7 @@ fn matchable_orders() {
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Sell,
-            Decimal::from_str("1.099").unwrap(), // sell (offer 10000/1.099 orai, ask for 10000 usdt)
+            Decimal::from_str("1.099").unwrap(), // sell (ask for 10000 usdt, offer 10000/1.099 orai)
             10000u128.into(),
         ),
         Order::new(
@@ -511,12 +512,20 @@ fn matchable_orders() {
     let mut ob = OrderBook::new(&pair_key);
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
+        // if sell then paid asset must be ask asset
+        let paid_denom = match order.direction {
+            OrderDirection::Buy => "usdt",
+            OrderDirection::Sell => ORAI_DENOM,
+        };
+
         println!(
-            "insert order id: {}, direction: {:?}, price: {}, usdt expected: {}",
+            "insert order id: {}, paid {}{} for {:?} {} at {}",
             order.order_id,
+            order.ask_amount,
+            paid_denom,
             order.direction,
+            ORAI_DENOM,
             order.get_price(),
-            order.ask_amount
         );
     }
 }

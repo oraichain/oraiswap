@@ -18,14 +18,13 @@ use oraiswap::limit_order::{
 pub fn submit_order(
     deps: DepsMut,
     sender: Addr,
-    order_direction: Option<OrderDirection>,
+    direction: OrderDirection,
     offer_asset: Asset,
     ask_asset: Asset,
 ) -> Result<Response, ContractError> {
     let order_id = increase_last_order_id(deps.storage)?;
 
     // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
-
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
     let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
@@ -34,7 +33,7 @@ pub fn submit_order(
         &pair_key,
         &Order {
             order_id,
-            direction: order_direction.unwrap_or(OrderDirection::Buy), // default is Buy, for sell it is reversed
+            direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
             offer_amount: offer_asset_raw.amount,
             ask_amount: ask_asset_raw.amount,

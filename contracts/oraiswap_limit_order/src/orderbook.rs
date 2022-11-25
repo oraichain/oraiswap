@@ -33,11 +33,11 @@ impl Order {
         bidder_addr: CanonicalAddr,
         direction: OrderDirection,
         price: Decimal,
-        offer_amount: Uint128,
+        amount: Uint128,
     ) -> Self {
         let (offer_amount, ask_amount) = match direction {
-            OrderDirection::Buy => (offer_amount, price * offer_amount),
-            OrderDirection::Sell => (price * offer_amount, offer_amount),
+            OrderDirection::Buy => (amount, price * amount),
+            OrderDirection::Sell => (price * amount, amount),
         };
         Order {
             direction,

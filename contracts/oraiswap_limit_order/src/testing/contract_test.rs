@@ -43,7 +43,7 @@ fn submit_order() {
     let token_addr = app.get_token_addr("asset").unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Buy,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::Token {
@@ -68,7 +68,7 @@ fn submit_order() {
     app.assert_fail(res);
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Buy,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -92,7 +92,7 @@ fn submit_order() {
     app.assert_fail(res);
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Buy,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -107,6 +107,7 @@ fn submit_order() {
         },
     };
 
+    // paid 1000000orai to get 1000000 token_addr
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
@@ -141,7 +142,7 @@ fn submit_order() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
-            direction: None,
+            direction: OrderDirection::Buy,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::NativeToken {
@@ -210,7 +211,7 @@ fn cancel_order_native_token() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Buy,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -322,7 +323,7 @@ fn cancel_order_token() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
-            direction: None,
+            direction: OrderDirection::Buy,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::NativeToken {
@@ -433,7 +434,7 @@ fn execute_order_native_token() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Sell,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -448,13 +449,14 @@ fn execute_order_native_token() {
         },
     };
 
+    // offer atom, ask for orai
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
             limit_order_addr.clone(),
             &msg,
             &[Coin {
-                denom: ORAI_DENOM.to_string(),
+                denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
             }],
         )
@@ -501,12 +503,12 @@ fn execute_order_native_token() {
     // partial execute
     let msg = ExecuteMsg::ExecuteOrder {
         offer_info: AssetInfo::NativeToken {
-            denom: ORAI_DENOM.to_string(),
+            denom: ATOM_DENOM.to_string(),
         },
         ask_asset: Asset {
             amount: Uint128::new(500000u128),
             info: AssetInfo::NativeToken {
-                denom: ATOM_DENOM.to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
         },
         order_id: 1u64,
@@ -517,7 +519,7 @@ fn execute_order_native_token() {
             limit_order_addr.clone(),
             &msg,
             &[Coin {
-                denom: ATOM_DENOM.to_string(),
+                denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(500000u128),
             }],
         )
@@ -527,8 +529,8 @@ fn execute_order_native_token() {
         vec![
             ("action", "execute_order"),
             ("order_id", "1"),
-            ("executor_receive", &format!("500000{}", ORAI_DENOM)),
-            ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
+            ("executor_receive", &format!("500000{}", ATOM_DENOM)),
+            ("bidder_receive", &format!("500000{}", ORAI_DENOM)),
             ("total_orders", "1")
         ]
     );
@@ -557,7 +559,7 @@ fn execute_order_native_token() {
             limit_order_addr.clone(),
             &msg,
             &[Coin {
-                denom: ATOM_DENOM.to_string(),
+                denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(500000u128),
             }],
         )
@@ -567,8 +569,8 @@ fn execute_order_native_token() {
         vec![
             ("action", "execute_order"),
             ("order_id", "1"),
-            ("executor_receive", &format!("500000{}", ORAI_DENOM)),
-            ("bidder_receive", &format!("500000{}", ATOM_DENOM)),
+            ("executor_receive", &format!("500000{}", ATOM_DENOM)),
+            ("bidder_receive", &format!("500000{}", ORAI_DENOM)),
             ("total_orders", "0")
         ]
     );
@@ -647,7 +649,7 @@ fn execute_order_token() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
-            direction: None,
+            direction: OrderDirection::Buy,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::Token {
@@ -828,7 +830,7 @@ fn orders_querier() {
         .unwrap();
 
     let msg = ExecuteMsg::SubmitOrder {
-        direction: None,
+        direction: OrderDirection::Buy,
         offer_asset: Asset {
             amount: Uint128::from(1000000u128),
             info: AssetInfo::NativeToken {
@@ -860,7 +862,7 @@ fn orders_querier() {
         contract: limit_order_addr.to_string(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
-            direction: None,
+            direction: OrderDirection::Buy,
             ask_asset: Asset {
                 amount: Uint128::from(1000000u128),
                 info: AssetInfo::Token {
