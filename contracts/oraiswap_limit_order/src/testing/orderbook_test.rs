@@ -453,3 +453,70 @@ fn highest_lowest_price() {
         }
     }
 }
+
+#[test]
+fn matchable_orders() {
+    // buy orai with usdt and sell orai to usdt, orai and usdt(ibc) are both native tokens
+    // we show highest buy and lowest sell first
+    let mut deps = mock_dependencies();
+
+    let offer_info = AssetInfoRaw::NativeToken {
+        denom: ORAI_DENOM.to_string(),
+    };
+    let ask_info = AssetInfoRaw::NativeToken {
+        denom: "usdt".to_string(),
+    };
+    let pair_key = pair_key(&[offer_info, ask_info]);
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    let orders = vec![
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.098").unwrap(), // buy (offer 10000 orai, ask for 10980 usdt)
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.097").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.099").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.099").unwrap(), // sell (offer 10000/1.099 orai, ask for 10000 usdt)
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.108").unwrap(),
+            10000u128.into(),
+        ),
+    ];
+
+    let mut ob = OrderBook::new(&pair_key);
+    for order in orders.iter() {
+        let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
+        println!(
+            "insert order id: {}, direction: {:?}, price: {}, usdt expected: {}",
+            order.order_id,
+            order.direction,
+            order.get_price(),
+            order.ask_amount
+        );
+    }
+}

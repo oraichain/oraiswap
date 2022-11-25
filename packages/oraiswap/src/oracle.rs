@@ -211,15 +211,15 @@ impl OracleContract {
         querier: &QuerierWrapper,
         denom: T,
     ) -> StdResult<TaxCapResponse> {
-        let request = QueryMsg::TaxCap {
+        let request = QueryMsg::Treasury(OracleTreasuryQuery::TaxCap {
             denom: denom.into(),
-        };
+        });
 
         self.query(querier, request)
     }
 
     pub fn query_tax_rate(&self, querier: &QuerierWrapper) -> StdResult<TaxRateResponse> {
-        let request = QueryMsg::TaxRate {};
+        let request = QueryMsg::Treasury(OracleTreasuryQuery::TaxRate {});
 
         self.query(querier, request)
     }
@@ -231,10 +231,10 @@ impl OracleContract {
         base_denom: T,
         quote_denom: T,
     ) -> StdResult<ExchangeRateResponse> {
-        let request = QueryMsg::ExchangeRate {
+        let request = QueryMsg::Exchange(OracleExchangeQuery::ExchangeRate {
             base_denom: Some(base_denom.into()),
             quote_denom: quote_denom.into(),
-        };
+        });
 
         self.query(querier, request)
     }
@@ -245,10 +245,10 @@ impl OracleContract {
         base_denom: T,
         quote_denoms: Vec<T>,
     ) -> StdResult<ExchangeRatesResponse> {
-        let request = QueryMsg::ExchangeRates {
+        let request = QueryMsg::Exchange(OracleExchangeQuery::ExchangeRates {
             base_denom: Some(base_denom.into()),
             quote_denoms: quote_denoms.into_iter().map(|x| x.into()).collect(),
-        };
+        });
 
         self.query(querier, request)
     }
@@ -257,7 +257,7 @@ impl OracleContract {
         &self,
         querier: &QuerierWrapper,
     ) -> StdResult<ContractInfoResponse> {
-        let request = QueryMsg::ContractInfo {};
+        let request = QueryMsg::Contract(OracleContractQuery::ContractInfo {});
 
         self.query(querier, request)
     }

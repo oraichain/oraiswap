@@ -226,4 +226,20 @@ impl OrderBook {
             OrderDirection::Sell => self.sells.lowest_price(storage, &self.pair_key),
         }
     }
+
+    /// find best price that matched
+    pub fn find_match_price() {}
+
+    /// return the largest matchable amount of orders when matching orders at single price
+    pub fn find_matchable_amount_at_price() {}
+
+    /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price
+    /// The matching continues until there's no more matchable orders.
+    pub fn find_match_orders() {}
+
+    /// distributes the given order amount to the orders
+    pub fn distribute_order_amount_to_orders() {}
+
+    /// distributes the given order amount to the orders at the tick price
+    pub fn distribute_order_amount_to_tick() {}
 }
