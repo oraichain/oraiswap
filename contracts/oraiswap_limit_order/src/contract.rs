@@ -83,6 +83,8 @@ pub fn execute(
         } => {
             // if sell then paid asset must be ask asset, this way we've just assumed that we offer usdt and ask for orai
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
+            // Buy: wanting ask asset => paid offer asset
+            // Sell: paying ask asset => wating offer asset
             let paid_asset = match direction {
                 OrderDirection::Buy => &offer_asset,
                 OrderDirection::Sell => &ask_asset,

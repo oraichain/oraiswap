@@ -270,13 +270,45 @@ impl OrderBook {
         None
     }
 
-    /// return the largest matchable amount of orders when matching orders at single price
+    /// return the largest matchable amount of orders when matching orders at single price, that is total buy volume to sell at that price
     /// based on best buy price and best sell price, do the filling
-    pub fn find_matchable_amount_at_price() {}
+    pub fn find_match_amount_at_price(
+        &self,
+        storage: &dyn Storage,
+        price: Decimal,
+        direction: OrderDirection,
+    ) -> Uint128 {
+        let orders = self.find_match_orders(storage, price, direction);
+        // in Order, ask amount is alway paid amount
+        // in Orderbook, buy order is opposite to sell order
+        orders
+            .iter()
+            .map(|order| order.ask_amount.u128())
+            .sum::<u128>()
+            .into()
+    }
 
     /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price
     /// The matching continues until there's no more matchable orders.
-    pub fn find_match_orders() {}
+    pub fn find_match_orders(
+        &self,
+        storage: &dyn Storage,
+        price: Decimal,
+        direction: OrderDirection,
+    ) -> Vec<Order> {
+        let price_key = price.atomics().to_be_bytes();
+
+        // there is a limit, and we just match a batch with maximum orders reach the limit step by step
+        read_orders_with_indexer::<OrderDirection>(
+            storage,
+            &[PREFIX_ORDER_BY_PRICE, &self.pair_key, &price_key],
+            Box::new(move |x| direction.eq(x)),
+            None,
+            None,
+            Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
+        )
+        .unwrap_or_default() // default is empty list
+    }
 
     /// distributes the given order amount to the orders
     pub fn distribute_order_amount_to_orders() {}

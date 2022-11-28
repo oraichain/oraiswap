@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use cosmwasm_schema::schemars::_serde_json::to_vec_pretty;
 use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy};
 use oraiswap::{
     asset::{pair_key, AssetInfoRaw, ORAI_DENOM},
@@ -470,14 +471,14 @@ fn matchable_orders() {
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
-    // buy is offering orai, asking usdt * orai_price, sell is asking for usdt
+    // buy : wanting ask amount, sell: paying ask amount
     let orders = vec![
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Buy,
             Decimal::from_str("1.098").unwrap(), // buy (want 10000 orai, paid 10980 usdt)
-            10000u128.into(),
+            10000u128.into(),                    // buy then amount is offer
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -496,6 +497,13 @@ fn matchable_orders() {
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.099").unwrap(),
+            15000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
             OrderDirection::Sell,
             Decimal::from_str("1.099").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
             10000u128.into(),
@@ -509,7 +517,7 @@ fn matchable_orders() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key, None);
+    let mut ob = OrderBook::new(&pair_key, Some(Decimal::percent(1)));
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         // if sell then paid asset must be ask asset
@@ -532,4 +540,25 @@ fn matchable_orders() {
     let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
     // both are 1.099
     assert_eq!(best_buy_price, best_sell_price);
+
+    // now add a lower sell price but too low for precision
+    let order = Order::new(
+        increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr.clone(),
+        OrderDirection::Sell,
+        Decimal::from_str("1.008").unwrap(),
+        10000u128.into(),
+    );
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
+    // both are still 1.099, so user keeps the profit maximum
+    assert_eq!(best_buy_price, best_sell_price);
+
+    let match_buy_orders =
+        ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
+    println!(
+        "match buy orders : {}",
+        String::from_utf8(to_vec_pretty(&match_buy_orders).unwrap()).unwrap()
+    );
+    assert_eq!(match_buy_orders, orders[2..=3]);
 }
