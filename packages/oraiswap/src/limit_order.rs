@@ -50,8 +50,8 @@ pub enum ExecuteMsg {
     UpdateOrderBook {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
+        precision: Option<Decimal>,
         min_offer_amount: Uint128,
-        min_ask_amount: Uint128,
     },
 
     ///////////////////////
@@ -169,7 +169,7 @@ pub struct OrderBookResponse {
     pub offer_info: AssetInfo,
     pub ask_info: AssetInfo,
     pub min_offer_amount: Uint128,
-    pub min_ask_amount: Uint128,
+    pub precision: Option<Decimal>,
 }
 
 #[cw_serde]

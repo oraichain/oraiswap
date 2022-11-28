@@ -1,4 +1,4 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage, Uint128};
+use cosmwasm_std::{Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
 use serde::{de::DeserializeOwned, Serialize};
@@ -32,14 +32,17 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
 pub fn store_orderbook(
     storage: &mut dyn Storage,
     pair_key: &[u8],
-    min_ask_amount: Uint128,
+    precision: Option<Decimal>,
     min_offer_amount: Uint128,
 ) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_ORDER_BOOK).save(pair_key, &(min_ask_amount, min_offer_amount))
+    Bucket::new(storage, PREFIX_ORDER_BOOK).save(pair_key, &(precision, min_offer_amount))
 }
 
-pub fn read_orderbook(storage: &dyn Storage, pair_key: &[u8]) -> StdResult<(Uint128, Uint128)> {
-    ReadonlyBucket::new(storage, PREFIX_ORDER_BOOK).load(pair_key)
+// do not return error, by default it return no precision and zero min offer amount
+pub fn read_orderbook(storage: &dyn Storage, pair_key: &[u8]) -> (Option<Decimal>, Uint128) {
+    ReadonlyBucket::new(storage, PREFIX_ORDER_BOOK)
+        .load(pair_key)
+        .unwrap_or((None, Uint128::zero()))
 }
 
 pub fn store_order(

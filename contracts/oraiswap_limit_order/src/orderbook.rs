@@ -154,16 +154,18 @@ impl Ticks {
 #[cw_serde]
 pub struct OrderBook {
     pair_key: Vec<u8>, // an unique pair of assets
+    precision: Option<Decimal>,
     buys: Ticks,
     sells: Ticks,
 }
 
 impl OrderBook {
-    pub fn new(pair_key: &[u8]) -> Self {
+    pub fn new(pair_key: &[u8], precision: Option<Decimal>) -> Self {
         OrderBook {
             buys: Ticks::new(OrderDirection::Buy),
             sells: Ticks::new(OrderDirection::Sell),
             pair_key: pair_key.to_vec(),
+            precision,
         }
     }
 
@@ -227,10 +229,49 @@ impl OrderBook {
         }
     }
 
-    /// find best price that matched
-    pub fn find_match_price() {}
+    /// find best buy price and best sell price that matched a precision, currently no precision is set
+    pub fn find_match_price(&self, storage: &dyn Storage) -> Option<(Decimal, Decimal)> {
+        let (highest_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
+        if !found {
+            return None;
+        }
+
+        // if there is precision, find the best sell price closest to best buy price
+        if let Some(precision) = self.precision {
+            let precision_factor = Decimal::one() + precision;
+            let tick_namespaces = &[PREFIX_TICK, &self.pair_key, OrderDirection::Sell.as_bytes()];
+
+            // loop through sell ticks in Order descending, if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + precision)
+            if let Some(sell_price) = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
+                .range(None, None, OrderBy::Descending)
+                .find_map(|item| {
+                    if let Ok((price_key, _)) = item {
+                        let sell_price =
+                            Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                        if highest_buy_price.ge(&sell_price)
+                            && highest_buy_price.le(&(sell_price * precision_factor))
+                        {
+                            return Some(sell_price);
+                        }
+                    }
+                    None
+                })
+            {
+                return Some((highest_buy_price, sell_price));
+            }
+        } else {
+            let (lowest_sell_price, found, _) = self.lowest_price(storage, OrderDirection::Sell);
+            // there is a match, we will find the best price with precision to prevent market fluctuation
+            // we can use precision to convert price to index as well
+            if found && highest_buy_price.ge(&lowest_sell_price) {
+                return Some((highest_buy_price, lowest_sell_price));
+            }
+        }
+        None
+    }
 
     /// return the largest matchable amount of orders when matching orders at single price
+    /// based on best buy price and best sell price, do the filling
     pub fn find_matchable_amount_at_price() {}
 
     /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price

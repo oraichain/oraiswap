@@ -2,8 +2,8 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    Uint128,
+    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, Uint128,
 };
 use oraiswap::error::ContractError;
 
@@ -66,15 +66,15 @@ pub fn execute(
         ExecuteMsg::UpdateOrderBook {
             offer_info,
             ask_info,
+            precision,
             min_offer_amount,
-            min_ask_amount,
         } => execute_update_orderbook(
             deps,
             info,
             offer_info,
             ask_info,
+            precision,
             min_offer_amount,
-            min_ask_amount,
         ),
         ExecuteMsg::SubmitOrder {
             direction,
@@ -142,7 +142,7 @@ pub fn execute_update_orderbook(
     info: MessageInfo,
     ask_info: AssetInfo,
     offer_info: AssetInfo,
-    min_ask_amount: Uint128,
+    precision: Option<Decimal>,
     min_offer_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
@@ -154,7 +154,7 @@ pub fn execute_update_orderbook(
     }
 
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    store_orderbook(deps.storage, &pair_key, min_ask_amount, min_offer_amount)?;
+    store_orderbook(deps.storage, &pair_key, precision, min_offer_amount)?;
 
     Ok(Response::new().add_attributes(vec![("action", "execute_update_orderbook")]))
 }
@@ -263,12 +263,12 @@ pub fn query_orderbook(
     ask_info: AssetInfo,
 ) -> StdResult<OrderBookResponse> {
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let (min_ask_amount, min_offer_amount) = read_orderbook(deps.storage, &pair_key)?;
+    let (precision, min_offer_amount) = read_orderbook(deps.storage, &pair_key);
     Ok(OrderBookResponse {
         offer_info,
         ask_info,
         min_offer_amount,
-        min_ask_amount,
+        precision,
     })
 }
 

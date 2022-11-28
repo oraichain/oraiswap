@@ -87,7 +87,7 @@ fn initialize() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key);
+    let mut ob = OrderBook::new(&pair_key, None);
 
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
@@ -183,7 +183,7 @@ fn buy_orders_at() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key);
+    let mut ob = OrderBook::new(&pair_key, None);
 
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
@@ -274,7 +274,7 @@ fn sell_orders_at() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key);
+    let mut ob = OrderBook::new(&pair_key, None);
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         println!(
@@ -333,13 +333,13 @@ fn highest_lowest_price() {
 
     let mut test_cases: Vec<HighestLowestPrice> = vec![
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key),
+            ob: OrderBook::new(&pair_key, None),
             orders: vec![],
             highest_price: Decimal::MAX,
             lowest_price: Decimal::MIN,
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key),
+            ob: OrderBook::new(&pair_key, None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -360,7 +360,7 @@ fn highest_lowest_price() {
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key),
+            ob: OrderBook::new(&pair_key, None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -381,7 +381,7 @@ fn highest_lowest_price() {
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key),
+            ob: OrderBook::new(&pair_key, None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -476,7 +476,7 @@ fn matchable_orders() {
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Buy,
-            Decimal::from_str("1.098").unwrap(), // buy (offer 10000 orai, ask for 10980 usdt)
+            Decimal::from_str("1.098").unwrap(), // buy (want 10000 orai, paid 10980 usdt)
             10000u128.into(),
         ),
         Order::new(
@@ -497,7 +497,7 @@ fn matchable_orders() {
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Sell,
-            Decimal::from_str("1.099").unwrap(), // sell (ask for 10000 usdt, offer 10000/1.099 orai)
+            Decimal::from_str("1.099").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
             10000u128.into(),
         ),
         Order::new(
@@ -509,7 +509,7 @@ fn matchable_orders() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key);
+    let mut ob = OrderBook::new(&pair_key, None);
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         // if sell then paid asset must be ask asset
@@ -528,4 +528,8 @@ fn matchable_orders() {
             order.get_price(),
         );
     }
+
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
+    // both are 1.099
+    assert_eq!(best_buy_price, best_sell_price);
 }

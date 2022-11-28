@@ -2,8 +2,9 @@ use std::convert::TryFrom;
 
 use crate::orderbook::Order;
 use crate::state::{
-    increase_last_order_id, read_last_order_id, read_order, read_orders, read_orders_with_indexer,
-    remove_order, store_order, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
+    increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orders,
+    read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
@@ -22,12 +23,20 @@ pub fn submit_order(
     offer_asset: Asset,
     ask_asset: Asset,
 ) -> Result<Response, ContractError> {
-    let order_id = increase_last_order_id(deps.storage)?;
-
+    // check min offer amount and min ask amount
     // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
     let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
+    let (_, min_offer_amount) = read_orderbook(deps.storage, &pair_key);
+
+    // require minimum amount for the orderbook
+    if offer_asset.amount.lt(&min_offer_amount) {
+        return Err(ContractError::TooSmallOfferAmount {});
+    }
+
+    let order_id = increase_last_order_id(deps.storage)?;
+
     let total_orders = store_order(
         deps.storage,
         &pair_key,
