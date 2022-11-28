@@ -241,9 +241,9 @@ impl OrderBook {
             let precision_factor = Decimal::one() + precision;
             let tick_namespaces = &[PREFIX_TICK, &self.pair_key, OrderDirection::Sell.as_bytes()];
 
-            // loop through sell ticks in Order descending, if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + precision)
+            // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + precision)
             if let Some(sell_price) = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
-                .range(None, None, OrderBy::Descending)
+                .range(None, None, OrderBy::Ascending)
                 .find_map(|item| {
                     if let Ok((price_key, _)) = item {
                         let sell_price =
