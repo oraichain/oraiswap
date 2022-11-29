@@ -117,24 +117,6 @@ Depends on the `ask asset`(= `execute asset`) type
   )
   ```
 
-# Query Orders
-
-- Query a order
-
-  - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"order":{"order_id": 100}}
-
-- Query orders
-
-  - Query with bidder address
-    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "orai~"}}
-    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"bidder_addr": "orai~", "start_after": 50, "limit": 10, "order_by": "desc"}}
-  - Query without filter
-    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{}}
-    - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"orders":{"start_after": 50, "limit": 10, "order_by": "desc"}}
-
-- Query last order id
-  - https://lcd.orai.io/cosmwasm/wasm/contracts/`limit_order_contract`/store?query_msg={"last_order_id":{}}
-
 # Orderbook
 
 Each orderbook corresponding to a pair of assets (ask_asset, offer_asset)  
