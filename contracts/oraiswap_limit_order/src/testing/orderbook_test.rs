@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_schema::schemars::_serde_json::to_vec_pretty;
-use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy};
+use cosmwasm_std::{testing::mock_dependencies, Api, Decimal};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
     limit_order::OrderDirection,
@@ -13,6 +13,12 @@ use crate::{
     state::{increase_last_order_id, init_last_order_id},
     tick::query_ticks,
 };
+
+macro_rules! jsonstr {
+    ($arg:expr) => {
+        String::from_utf8(to_vec_pretty(&$arg).unwrap()).unwrap()
+    };
+}
 
 #[test]
 fn initialize() {
@@ -204,7 +210,6 @@ fn buy_orders_at() {
             OrderDirection::Buy,
             None,
             None,
-            Some(OrderBy::Ascending), // remain order to compare
         )
         .unwrap();
     assert_eq!(buy_orders.len(), 2);
@@ -217,7 +222,6 @@ fn buy_orders_at() {
             OrderDirection::Buy,
             None,
             None,
-            None
         )
         .unwrap()
         .is_empty());
@@ -293,7 +297,6 @@ fn sell_orders_at() {
             OrderDirection::Sell,
             None,
             None,
-            Some(OrderBy::Ascending),
         )
         .unwrap();
     assert_eq!(sell_orders.len(), 2);
@@ -305,7 +308,6 @@ fn sell_orders_at() {
             OrderDirection::Sell,
             None,
             None,
-            None
         )
         .unwrap()
         .is_empty());
@@ -512,6 +514,13 @@ fn matchable_orders() {
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Sell,
+            Decimal::from_str("1.099").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
+            5000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
             Decimal::from_str("1.108").unwrap(),
             10000u128.into(),
         ),
@@ -554,11 +563,31 @@ fn matchable_orders() {
     // both are still 1.099, so user keeps the profit maximum
     assert_eq!(best_buy_price, best_sell_price);
 
-    let match_buy_orders =
+    let mut match_buy_orders =
         ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
-    println!(
-        "match buy orders : {}",
-        String::from_utf8(to_vec_pretty(&match_buy_orders).unwrap()).unwrap()
-    );
+    println!("match buy orders : {}", jsonstr!(match_buy_orders));
     assert_eq!(match_buy_orders, orders[2..=3]);
+
+    // find sell order as ask order, and buy orders as offer
+    let mut offer_orders = ob
+        .orders_at(
+            deps.as_ref().storage,
+            best_sell_price,
+            OrderDirection::Sell,
+            None,
+            None,
+        )
+        .unwrap();
+
+    println!("offer order {}", jsonstr!(offer_orders));
+
+    let messages = ob
+        .distribute_order_to_orders(deps.as_mut(), &mut match_buy_orders[0], &mut offer_orders)
+        .unwrap();
+    println!("messages {:?}", messages);
+    println!(
+        "ask order {}\noffer order {}",
+        jsonstr!(match_buy_orders[0]),
+        jsonstr!(offer_orders)
+    );
 }

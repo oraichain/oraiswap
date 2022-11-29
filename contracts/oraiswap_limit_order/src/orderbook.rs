@@ -196,7 +196,6 @@ impl OrderBook {
         direction: OrderDirection,
         start_after: Option<u64>,
         limit: Option<u32>,
-        order_by: Option<OrderBy>,
     ) -> StdResult<Vec<Order>> {
         read_orders_with_indexer::<OrderDirection>(
             storage,
@@ -208,7 +207,7 @@ impl OrderBook {
             Box::new(move |item| direction.eq(item)),
             start_after,
             limit,
-            order_by,
+            Some(OrderBy::Ascending), // first in first out
         )
     }
 
@@ -326,6 +325,25 @@ impl OrderBook {
         .unwrap_or_default() // default is empty list
     }
 
+    pub fn fill_order(
+        &self,
+        storage: &mut dyn Storage,
+        order: &mut Order,
+        ask_amount: Uint128,
+        offer_amount: Uint128,
+    ) -> StdResult<u64> {
+        order.filled_ask_amount += ask_amount;
+        order.filled_offer_amount += offer_amount;
+
+        if order.filled_ask_amount == order.ask_amount {
+            // When natch amount equals ask amount, close order
+            remove_order(storage, &self.pair_key, &order)
+        } else {
+            // update order
+            store_order(storage, &self.pair_key, &order, false)
+        }
+    }
+
     /// distribute the given order to the orders, must call from matching logic
     /// base on the ask amount of order, we will fillup all offer orders
     pub fn distribute_order_to_orders(
@@ -342,55 +360,49 @@ impl OrderBook {
         let offer_info = self.offer_info.to_normal(deps.api)?;
         let mut messages = vec![];
         let mut executor_receive_amount = Uint128::zero();
-        let mut ask_order_amount = ask_order.ask_amount;
+        let mut lef_ask_order_amount = ask_order.ask_amount;
         for order in offer_orders {
             // offer amount is already paid, we need ask amount to be received
             // remember that ask of buy and ask of sell are opposite sides
             // ask_amount is equal match ask amount, to make sure always matched
-            let ask_amount =
-                Uint128::min(ask_order_amount, order.ask_amount - order.filled_ask_amount);
-            ask_order_amount -= ask_amount;
+            let ask_amount = Uint128::min(
+                lef_ask_order_amount,
+                order.ask_amount - order.filled_ask_amount,
+            );
+            lef_ask_order_amount -= ask_amount;
             let ask_asset = Asset {
                 info: ask_info.clone(),
                 amount: ask_amount,
             };
 
-            let (offer_amount, match_ask_amount) = order.matchable_amount(ask_asset.amount)?;
+            let (offer_amount, _) = order.matchable_amount(ask_asset.amount)?;
 
             executor_receive_amount += offer_amount;
 
             let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
-            // When natch amount equals ask amount, close order
-            if match_ask_amount == ask_asset.amount {
-                remove_order(deps.storage, &self.pair_key, &order)?
-            } else {
-                order.filled_ask_amount += ask_asset.amount;
-                order.filled_offer_amount += offer_amount;
-                // update order
-                store_order(deps.storage, &self.pair_key, &order, false)?
-            };
+            // fill this order
+            self.fill_order(deps.storage, order, ask_asset.amount, offer_amount)?;
 
             if !ask_asset.amount.is_zero() {
                 messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
             }
 
-            if ask_order_amount.is_zero() {
+            if lef_ask_order_amount.is_zero() {
                 break;
             }
         }
 
         // there is match
         if !executor_receive_amount.is_zero() {
-            // When ask order is filled, close order
-            if ask_order_amount.is_zero() {
-                remove_order(deps.storage, &self.pair_key, &ask_order)?
-            } else {
-                ask_order.filled_ask_amount += ask_order_amount;
-                ask_order.filled_offer_amount += executor_receive_amount;
-                // update order
-                store_order(deps.storage, &self.pair_key, &ask_order, false)?
-            };
+            // ask is order ask asset, not depending on order direction
+            // so we just make sure ask amount is equal on both sides
+            self.fill_order(
+                deps.storage,
+                ask_order,
+                ask_order.ask_amount - lef_ask_order_amount,
+                executor_receive_amount,
+            )?;
 
             let executor_receive = Asset {
                 info: offer_info,
