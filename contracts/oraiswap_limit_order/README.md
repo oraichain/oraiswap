@@ -4,14 +4,14 @@ The Limit Order Contract is to provide limit order interface to a bidder and als
 
 ## Use Cases
 
-1. UST -> ASSET
+1. usdt -> ASSET
 
 ```
 Order
-+-----------------+    Oraiswap Price (UST-mAAPL)
++-----------------+    Oraiswap Price (usdt-orai)
 | OrderId       1 |    +------------------------+
-| Offer   100 UST |    | price 95 UST : 1 mAAPL |
-| Ask     1 mAAPL |    +------------------------+
+| Offer   100 usdt |    | price 95 usdt : 1 orai |
+| Ask     1 orai |    +------------------------+
 +-----------------+                 |
         ^                           |
         |       +-------------+     |
@@ -20,14 +20,14 @@ Order
 
 ```
 
-2. ASSET => UST
+2. ASSET => usdt
 
 ```
 Order
-+-----------------+    Oraiswap Price (UST-mAAPL)
++-----------------+    Oraiswap Price (usdt-orai)
 | OrderId       1 |    +-------------------------+
-| Offer   1 mAAPL |    | price 110 UST : 1 mAAPL |
-| Ask     100 UST |    +-------------------------+
+| Offer   1 orai |    | price 110 usdt : 1 orai |
+| Ask     100 usdt |    +-------------------------+
 +-----------------+                 ^
         |                           |
         |       +-------------+     |
