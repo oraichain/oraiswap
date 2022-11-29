@@ -48,6 +48,7 @@ Depends on the offer asset type
       'limit_order_contract_addr',
       [Coin('denom', 'amount')],
       base64(SubmitOrder {
+          direction: OrderDirection::Buy,
           offer_asset: Asset,
           ask_asset: Asset,
       })
@@ -63,6 +64,7 @@ Depends on the offer asset type
           contract_addr: 'limit_order_contract_addr',
           amount: 'amount',
           msg: Some(base64(SubmitOrder {
+              direction: OrderDirection::Buy,
               ask_asset: Asset,
           })),
       })
