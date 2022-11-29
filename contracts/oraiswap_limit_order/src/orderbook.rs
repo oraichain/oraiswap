@@ -3,16 +3,19 @@ use std::convert::TryInto;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
-    asset::{Asset, AssetInfo},
+    asset::{pair_key, Asset, AssetInfo, AssetInfoRaw},
+    error::ContractError,
     limit_order::{OrderDirection, OrderResponse},
 };
 
 use cosmwasm_std::{
-    Api, CanonicalAddr, Decimal, Order as OrderBy, StdError, StdResult, Storage, Uint128,
+    Api, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Order as OrderBy, StdError, StdResult,
+    Storage, Uint128,
 };
 
 use crate::state::{
-    read_orders, read_orders_with_indexer, store_order, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
+    read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
+    PREFIX_TICK,
 };
 
 #[cw_serde]
@@ -52,21 +55,21 @@ impl Order {
 
     // return matchable offer amount from ask amount, can differ between Sell and Buy
     pub fn matchable_amount(&self, ask_amount: Uint128) -> StdResult<(Uint128, Uint128)> {
-        // Compute left offer & ask amount
-        let left_offer_amount = self.offer_amount.checked_sub(self.filled_offer_amount)?;
-        let left_ask_amount = self.ask_amount.checked_sub(self.filled_ask_amount)?;
-        if left_ask_amount < ask_amount || left_offer_amount.is_zero() {
+        // Compute match offer & ask amount
+        let match_offer_amount = self.offer_amount.checked_sub(self.filled_offer_amount)?;
+        let match_ask_amount = self.ask_amount.checked_sub(self.filled_ask_amount)?;
+        if match_ask_amount < ask_amount || match_offer_amount.is_zero() {
             return Err(StdError::generic_err("insufficient order amount left"));
         }
 
-        // Cap the send amount to left_offer_amount
+        // Cap the send amount to match_offer_amount
         Ok((
-            if left_ask_amount == ask_amount {
-                left_offer_amount
+            if match_ask_amount == ask_amount {
+                match_offer_amount
             } else {
-                std::cmp::min(left_offer_amount, ask_amount * self.get_price())
+                std::cmp::min(match_offer_amount, ask_amount * self.get_price())
             },
-            left_ask_amount,
+            match_ask_amount,
         ))
     }
 
@@ -154,19 +157,32 @@ impl Ticks {
 #[cw_serde]
 pub struct OrderBook {
     pair_key: Vec<u8>, // an unique pair of assets
-    precision: Option<Decimal>,
+    pub ask_info: AssetInfoRaw,
+    pub offer_info: AssetInfoRaw,
+    pub precision: Option<Decimal>,
     buys: Ticks,
     sells: Ticks,
 }
 
 impl OrderBook {
-    pub fn new(pair_key: &[u8], precision: Option<Decimal>) -> Self {
+    pub fn new(
+        ask_info: AssetInfoRaw,
+        offer_info: AssetInfoRaw,
+        precision: Option<Decimal>,
+    ) -> Self {
+        let pair_key = pair_key(&[offer_info.clone(), ask_info.clone()]);
         OrderBook {
             buys: Ticks::new(OrderDirection::Buy),
             sells: Ticks::new(OrderDirection::Sell),
-            pair_key: pair_key.to_vec(),
+            pair_key,
+            offer_info,
+            ask_info,
             precision,
         }
+    }
+
+    pub fn get_pair_key(&self) -> &[u8] {
+        &self.pair_key
     }
 
     pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
@@ -310,9 +326,83 @@ impl OrderBook {
         .unwrap_or_default() // default is empty list
     }
 
-    /// distributes the given order amount to the orders
-    pub fn distribute_order_amount_to_orders() {}
+    /// distribute the given order to the orders, must call from matching logic
+    /// base on the ask amount of order, we will fillup all offer orders
+    pub fn distribute_order_to_orders(
+        &self,
+        deps: DepsMut,
+        ask_order: &mut Order,
+        orders: &mut Vec<Order>,
+    ) -> Result<Vec<CosmosMsg>, ContractError> {
+        // this will try to fill all orders
+        // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
+        let sender = deps.api.addr_humanize(&ask_order.bidder_addr)?;
 
-    /// distributes the given order amount to the orders at the tick price
-    pub fn distribute_order_amount_to_tick() {}
+        let ask_info = self.ask_info.to_normal(deps.api)?;
+        let offer_info = self.offer_info.to_normal(deps.api)?;
+        let mut messages = vec![];
+        let mut executor_receive_amount = Uint128::zero();
+        let mut ask_order_amount = ask_order.ask_amount;
+        for order in orders {
+            // offer amount is already paid, we need ask amount to be received
+            // remember that ask of buy and ask of sell are opposite sides
+            // ask_amount is equal match ask amount, to make sure always matched
+            let ask_amount =
+                Uint128::min(ask_order_amount, order.ask_amount - order.filled_ask_amount);
+            ask_order_amount -= ask_amount;
+            let ask_asset = Asset {
+                info: ask_info.clone(),
+                amount: ask_amount,
+            };
+
+            let (offer_amount, match_ask_amount) = order.matchable_amount(ask_asset.amount)?;
+
+            executor_receive_amount += offer_amount;
+
+            let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
+
+            // When natch amount equals ask amount, close order
+            if match_ask_amount == ask_asset.amount {
+                remove_order(deps.storage, &self.pair_key, &order)?
+            } else {
+                order.filled_ask_amount += ask_asset.amount;
+                order.filled_offer_amount += offer_amount;
+                // update order
+                store_order(deps.storage, &self.pair_key, &order, false)?
+            };
+
+            if !ask_asset.amount.is_zero() {
+                messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+            }
+
+            if ask_order_amount.is_zero() {
+                break;
+            }
+        }
+
+        // there is match
+        if !executor_receive_amount.is_zero() {
+            // When ask order is filled, close order
+            if ask_order_amount.is_zero() {
+                remove_order(deps.storage, &self.pair_key, &ask_order)?
+            } else {
+                ask_order.filled_ask_amount += ask_order_amount;
+                ask_order.filled_offer_amount += executor_receive_amount;
+                // update order
+                store_order(deps.storage, &self.pair_key, &ask_order, false)?
+            };
+
+            let executor_receive = Asset {
+                info: offer_info,
+                amount: executor_receive_amount,
+            };
+            // dont use oracle for limit order
+            messages.push(executor_receive.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(sender.as_str())?,
+            )?);
+        }
+        Ok(messages)
+    }
 }

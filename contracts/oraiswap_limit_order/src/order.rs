@@ -115,8 +115,8 @@ pub fn execute_order(
     ]);
     let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
-    // Compute offer amount & left ask amount
-    let (offer_amount, left_ask_amount) = order.matchable_amount(ask_asset.amount)?;
+    // Compute offer amount & match ask amount
+    let (offer_amount, match_ask_amount) = order.matchable_amount(ask_asset.amount)?;
     let executor_receive = Asset {
         info: offer_info,
         amount: offer_amount,
@@ -124,8 +124,8 @@ pub fn execute_order(
 
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
-    // When left amount is zero, close order
-    let total_orders = if left_ask_amount == ask_asset.amount {
+    // When natch amount equals ask amount, close order
+    let total_orders = if match_ask_amount == ask_asset.amount {
         remove_order(deps.storage, &pair_key, &order)?
     } else {
         order.filled_ask_amount += ask_asset.amount;

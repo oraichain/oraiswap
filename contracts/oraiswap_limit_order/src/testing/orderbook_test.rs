@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_schema::schemars::_serde_json::to_vec_pretty;
 use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy};
 use oraiswap::{
-    asset::{pair_key, AssetInfoRaw, ORAI_DENOM},
+    asset::{AssetInfoRaw, ORAI_DENOM},
     limit_order::OrderDirection,
     testing::ATOM_DENOM,
 };
@@ -24,7 +24,7 @@ fn initialize() {
     let ask_info = AssetInfoRaw::NativeToken {
         denom: ATOM_DENOM.to_string(),
     };
-    let pair_key = pair_key(&[offer_info, ask_info]);
+
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
 
     init_last_order_id(deps.as_mut().storage).unwrap();
@@ -88,7 +88,7 @@ fn initialize() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key, None);
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
 
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
@@ -103,7 +103,7 @@ fn initialize() {
 
     let buy_ticks = query_ticks(
         deps.as_ref().storage,
-        &pair_key,
+        ob.get_pair_key(),
         OrderDirection::Buy,
         None,
         None,
@@ -114,7 +114,7 @@ fn initialize() {
 
     let sell_ticks = query_ticks(
         deps.as_ref().storage,
-        &pair_key,
+        ob.get_pair_key(),
         OrderDirection::Sell,
         None,
         None,
@@ -142,7 +142,7 @@ fn buy_orders_at() {
     let ask_info = AssetInfoRaw::NativeToken {
         denom: ATOM_DENOM.to_string(),
     };
-    let pair_key = pair_key(&[offer_info, ask_info]);
+
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
@@ -184,7 +184,7 @@ fn buy_orders_at() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key, None);
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
 
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
@@ -233,7 +233,7 @@ fn sell_orders_at() {
     let ask_info = AssetInfoRaw::NativeToken {
         denom: ATOM_DENOM.to_string(),
     };
-    let pair_key = pair_key(&[offer_info, ask_info]);
+
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
@@ -275,7 +275,7 @@ fn sell_orders_at() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key, None);
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         println!(
@@ -321,7 +321,7 @@ fn highest_lowest_price() {
     let ask_info = AssetInfoRaw::NativeToken {
         denom: ATOM_DENOM.to_string(),
     };
-    let pair_key = pair_key(&[offer_info, ask_info]);
+
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
@@ -334,13 +334,13 @@ fn highest_lowest_price() {
 
     let mut test_cases: Vec<HighestLowestPrice> = vec![
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key, None),
+            ob: OrderBook::new(ask_info.clone(), offer_info.clone(), None),
             orders: vec![],
             highest_price: Decimal::MAX,
             lowest_price: Decimal::MIN,
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key, None),
+            ob: OrderBook::new(ask_info.clone(), offer_info.clone(), None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -361,7 +361,7 @@ fn highest_lowest_price() {
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key, None),
+            ob: OrderBook::new(ask_info.clone(), offer_info.clone(), None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -382,7 +382,7 @@ fn highest_lowest_price() {
             lowest_price: Decimal::from_str("1.0").unwrap(),
         },
         HighestLowestPrice {
-            ob: OrderBook::new(&pair_key, None),
+            ob: OrderBook::new(ask_info.clone(), offer_info.clone(), None),
             orders: vec![
                 Order::new(
                     increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -467,7 +467,7 @@ fn matchable_orders() {
     let ask_info = AssetInfoRaw::NativeToken {
         denom: ORAI_DENOM.to_string(),
     };
-    let pair_key = pair_key(&[offer_info.clone(), ask_info.clone()]);
+
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
@@ -517,7 +517,7 @@ fn matchable_orders() {
         ),
     ];
 
-    let mut ob = OrderBook::new(&pair_key, Some(Decimal::percent(1)));
+    let mut ob = OrderBook::new(ask_info, offer_info, Some(Decimal::percent(1)));
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         // if sell then paid asset must be ask asset
