@@ -36,12 +36,9 @@ impl Order {
         bidder_addr: CanonicalAddr,
         direction: OrderDirection,
         price: Decimal,
-        amount: Uint128,
+        ask_amount: Uint128,
     ) -> Self {
-        let (offer_amount, ask_amount) = match direction {
-            OrderDirection::Buy => (amount, price * amount),
-            OrderDirection::Sell => (price * amount, amount),
-        };
+        let offer_amount = price * ask_amount;
         Order {
             direction,
             order_id,
@@ -74,10 +71,7 @@ impl Order {
     }
 
     pub fn get_price(&self) -> Decimal {
-        match self.direction {
-            OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
-            OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
-        }
+        Decimal::from_ratio(self.offer_amount, self.ask_amount)
     }
 
     pub fn to_response(

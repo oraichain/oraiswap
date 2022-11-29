@@ -494,7 +494,7 @@ fn matchable_orders() {
             bidder_addr.clone(),
             OrderDirection::Buy,
             Decimal::from_str("1.099").unwrap(),
-            10000u128.into(),
+            15000u128.into(),
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
@@ -530,17 +530,19 @@ fn matchable_orders() {
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         // if sell then paid asset must be ask asset
-        let paid_denom = match order.direction {
-            OrderDirection::Buy => "usdt",
-            OrderDirection::Sell => ORAI_DENOM,
+        let action = match order.direction {
+            OrderDirection::Buy => "paid",
+            OrderDirection::Sell => "want",
         };
 
         println!(
-            "insert order id: {}, paid {}{} for {:?} {} at {}",
+            "insert order id: {}, {} {}{} for {:?} {}{} at {}",
             order.order_id,
-            order.ask_amount,
-            paid_denom,
+            action,
+            order.offer_amount,
+            "usdt", // this is offer denom
             order.direction,
+            order.ask_amount,
             ORAI_DENOM,
             order.get_price(),
         );
@@ -581,13 +583,22 @@ fn matchable_orders() {
 
     println!("offer order {}", jsonstr!(offer_orders));
 
+    let ask_order = &mut match_buy_orders[0];
+
     let messages = ob
-        .distribute_order_to_orders(deps.as_mut(), &mut match_buy_orders[0], &mut offer_orders)
+        .distribute_order_to_orders(deps.as_mut(), ask_order, &mut offer_orders)
         .unwrap();
+
+    // ask order is fullfilled, as well as offer orders
+    assert_eq!(ask_order.ask_amount, ask_order.filled_ask_amount);
+    for offer_order in offer_orders.iter() {
+        assert_eq!(offer_order.ask_amount, offer_order.filled_ask_amount);
+    }
+
     println!("messages {:?}", messages);
     println!(
         "ask order {}\noffer order {}",
-        jsonstr!(match_buy_orders[0]),
+        jsonstr!(ask_order),
         jsonstr!(offer_orders)
     );
 }
