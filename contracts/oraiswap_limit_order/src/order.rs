@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 
 use crate::orderbook::Order;
 use crate::state::{
-    increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orders,
-    read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
+    increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
+    read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
@@ -13,7 +13,8 @@ use cosmwasm_std::{
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
-    LastOrderIdResponse, OrderDirection, OrderFilter, OrderResponse, OrdersResponse,
+    LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
+    OrderResponse, OrdersResponse,
 };
 
 pub fn submit_order(
@@ -28,10 +29,10 @@ pub fn submit_order(
     let offer_asset_raw = offer_asset.to_raw(deps.api)?;
     let ask_asset_raw = ask_asset.to_raw(deps.api)?;
     let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
-    let (_, min_offer_amount) = read_orderbook(deps.storage, &pair_key);
+    let order_book = read_orderbook(deps.storage, &pair_key)?;
 
     // require minimum amount for the orderbook
-    if offer_asset.amount.lt(&min_offer_amount) {
+    if offer_asset.amount.lt(&order_book.min_offer_amount) {
         return Err(ContractError::TooSmallOfferAmount {});
     }
 
@@ -241,4 +242,29 @@ pub fn query_last_order_id(deps: Deps) -> StdResult<LastOrderIdResponse> {
     let resp = LastOrderIdResponse { last_order_id };
 
     Ok(resp)
+}
+
+pub fn query_orderbooks(
+    deps: Deps,
+    start_after: Option<Vec<u8>>,
+    limit: Option<u32>,
+    order_by: Option<i32>,
+) -> StdResult<OrderBooksResponse> {
+    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
+    let order_books = read_orderbooks(deps.storage, start_after, limit, order_by)?;
+    order_books
+        .into_iter()
+        .map(|ob| ob.to_response(deps.api))
+        .collect::<StdResult<Vec<OrderBookResponse>>>()
+        .map(|order_books| OrderBooksResponse { order_books })
+}
+
+pub fn query_orderbook(
+    deps: Deps,
+    offer_info: AssetInfo,
+    ask_info: AssetInfo,
+) -> StdResult<OrderBookResponse> {
+    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let ob = read_orderbook(deps.storage, &pair_key)?;
+    ob.to_response(deps.api)
 }

@@ -3,9 +3,9 @@ use std::convert::TryInto;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
-    asset::{pair_key, Asset, AssetInfo, AssetInfoRaw},
+    asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
     error::ContractError,
-    limit_order::{OrderDirection, OrderResponse},
+    limit_order::{OrderBookResponse, OrderDirection, OrderResponse},
 };
 
 use cosmwasm_std::{
@@ -47,6 +47,25 @@ impl Order {
             ask_amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
+        }
+    }
+
+    pub fn fill_order(
+        &mut self,
+        storage: &mut dyn Storage,
+        pair_key: &[u8],
+        ask_amount: Uint128,
+        offer_amount: Uint128,
+    ) -> StdResult<u64> {
+        self.filled_ask_amount += ask_amount;
+        self.filled_offer_amount += offer_amount;
+
+        if self.filled_ask_amount == self.ask_amount {
+            // When natch amount equals ask amount, close order
+            remove_order(storage, pair_key, self)
+        } else {
+            // update order
+            store_order(storage, pair_key, self, false)
         }
     }
 
@@ -98,24 +117,56 @@ impl Order {
     }
 }
 
+/// Ticks are stored in Ordered database, so we just need to process at 50 recent ticks is ok
 #[cw_serde]
-pub struct Ticks {
-    direction: OrderDirection, // buy => price_increasing false,
+pub struct OrderBook {
+    pub ask_info: AssetInfoRaw,
+    pub offer_info: AssetInfoRaw,
+    pub precision: Option<Decimal>,
+    pub min_offer_amount: Uint128,
 }
 
-impl Ticks {
-    pub fn new(direction: OrderDirection) -> Self {
-        Ticks { direction }
+impl OrderBook {
+    pub fn new(
+        ask_info: AssetInfoRaw,
+        offer_info: AssetInfoRaw,
+        precision: Option<Decimal>,
+    ) -> Self {
+        OrderBook {
+            offer_info,
+            min_offer_amount: Uint128::zero(),
+            ask_info,
+            precision,
+        }
+    }
+
+    pub fn to_response(&self, api: &dyn Api) -> StdResult<OrderBookResponse> {
+        Ok(OrderBookResponse {
+            offer_info: self.offer_info.to_normal(api)?,
+            ask_info: self.ask_info.to_normal(api)?,
+            min_offer_amount: self.min_offer_amount,
+            precision: self.precision,
+        })
+    }
+
+    pub fn get_pair_key(&self) -> Vec<u8> {
+        pair_key_from_asset_keys(self.offer_info.as_bytes(), self.ask_info.as_bytes())
+    }
+
+    pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
+        let pair_key = &self.get_pair_key();
+        store_order(storage, pair_key, order, true)
     }
 
     fn best_price(
         &self,
         storage: &dyn Storage,
-        pair_key: &[u8],
+        direction: OrderDirection,
         price_increasing: OrderBy,
     ) -> (Decimal, bool, u64) {
+        let pair_key = &self.get_pair_key();
         // get last tick if price_increasing is true, otherwise get first tick
-        let tick_namespaces = &[PREFIX_TICK, pair_key, self.direction.as_bytes()];
+        let tick_namespaces = &[PREFIX_TICK, pair_key, direction.as_bytes()];
         let position_bucket: ReadonlyBucket<u64> =
             ReadonlyBucket::multilevel(storage, tick_namespaces);
 
@@ -138,49 +189,21 @@ impl Ticks {
         )
     }
 
-    pub fn highest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, bool, u64) {
-        self.best_price(storage, pair_key, OrderBy::Descending)
+    pub fn highest_price(
+        &self,
+        storage: &dyn Storage,
+        direction: OrderDirection,
+    ) -> (Decimal, bool, u64) {
+        self.best_price(storage, direction, OrderBy::Descending)
     }
 
-    pub fn lowest_price(&self, storage: &dyn Storage, pair_key: &[u8]) -> (Decimal, bool, u64) {
-        self.best_price(storage, pair_key, OrderBy::Ascending)
-    }
-}
+    pub fn lowest_price(
+        &self,
+        storage: &dyn Storage,
 
-/// Ticks are stored in Ordered database, so we just need to process at 50 recent ticks is ok
-#[cw_serde]
-pub struct OrderBook {
-    pair_key: Vec<u8>, // an unique pair of assets
-    pub ask_info: AssetInfoRaw,
-    pub offer_info: AssetInfoRaw,
-    pub precision: Option<Decimal>,
-    buys: Ticks,
-    sells: Ticks,
-}
-
-impl OrderBook {
-    pub fn new(
-        ask_info: AssetInfoRaw,
-        offer_info: AssetInfoRaw,
-        precision: Option<Decimal>,
-    ) -> Self {
-        let pair_key = pair_key(&[offer_info.clone(), ask_info.clone()]);
-        OrderBook {
-            buys: Ticks::new(OrderDirection::Buy),
-            sells: Ticks::new(OrderDirection::Sell),
-            pair_key,
-            offer_info,
-            ask_info,
-            precision,
-        }
-    }
-
-    pub fn get_pair_key(&self) -> &[u8] {
-        &self.pair_key
-    }
-
-    pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
-        store_order(storage, &self.pair_key, order, true)
+        direction: OrderDirection,
+    ) -> (Decimal, bool, u64) {
+        self.best_price(storage, direction, OrderBy::Ascending)
     }
 
     pub fn orders_at(
@@ -191,11 +214,12 @@ impl OrderBook {
         start_after: Option<u64>,
         limit: Option<u32>,
     ) -> StdResult<Vec<Order>> {
+        let pair_key = &self.get_pair_key();
         read_orders_with_indexer::<OrderDirection>(
             storage,
             &[
                 PREFIX_ORDER_BY_PRICE,
-                &self.pair_key,
+                pair_key,
                 &price.atomics().to_be_bytes(),
             ],
             Box::new(move |item| direction.eq(item)),
@@ -213,33 +237,13 @@ impl OrderBook {
         limit: Option<u32>,
         order_by: Option<OrderBy>,
     ) -> StdResult<Vec<Order>> {
-        read_orders(storage, &self.pair_key, start_after, limit, order_by)
-    }
-
-    pub fn highest_price(
-        &self,
-        storage: &dyn Storage,
-        direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
-        match direction {
-            OrderDirection::Buy => self.buys.highest_price(storage, &self.pair_key),
-            OrderDirection::Sell => self.sells.highest_price(storage, &self.pair_key),
-        }
-    }
-
-    pub fn lowest_price(
-        &self,
-        storage: &dyn Storage,
-        direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
-        match direction {
-            OrderDirection::Buy => self.buys.lowest_price(storage, &self.pair_key),
-            OrderDirection::Sell => self.sells.lowest_price(storage, &self.pair_key),
-        }
+        let pair_key = &self.get_pair_key();
+        read_orders(storage, pair_key, start_after, limit, order_by)
     }
 
     /// find best buy price and best sell price that matched a precision, currently no precision is set
     pub fn find_match_price(&self, storage: &dyn Storage) -> Option<(Decimal, Decimal)> {
+        let pair_key = &self.get_pair_key();
         let (highest_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
         if !found {
             return None;
@@ -248,7 +252,7 @@ impl OrderBook {
         // if there is precision, find the best sell price closest to best buy price
         if let Some(precision) = self.precision {
             let precision_factor = Decimal::one() + precision;
-            let tick_namespaces = &[PREFIX_TICK, &self.pair_key, OrderDirection::Sell.as_bytes()];
+            let tick_namespaces = &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()];
 
             // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + precision)
             if let Some(sell_price) = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
@@ -305,37 +309,19 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Vec<Order> {
+        let pair_key = &self.get_pair_key();
         let price_key = price.atomics().to_be_bytes();
 
         // there is a limit, and we just match a batch with maximum orders reach the limit step by step
         read_orders_with_indexer::<OrderDirection>(
             storage,
-            &[PREFIX_ORDER_BY_PRICE, &self.pair_key, &price_key],
+            &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key],
             Box::new(move |x| direction.eq(x)),
             None,
             None,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
         .unwrap_or_default() // default is empty list
-    }
-
-    pub fn fill_order(
-        &self,
-        storage: &mut dyn Storage,
-        order: &mut Order,
-        ask_amount: Uint128,
-        offer_amount: Uint128,
-    ) -> StdResult<u64> {
-        order.filled_ask_amount += ask_amount;
-        order.filled_offer_amount += offer_amount;
-
-        if order.filled_ask_amount == order.ask_amount {
-            // When natch amount equals ask amount, close order
-            remove_order(storage, &self.pair_key, &order)
-        } else {
-            // update order
-            store_order(storage, &self.pair_key, &order, false)
-        }
     }
 
     /// distribute the given order to the orders, must call from matching logic
@@ -346,6 +332,7 @@ impl OrderBook {
         ask_order: &mut Order,
         offer_orders: &mut Vec<Order>,
     ) -> Result<Vec<CosmosMsg>, ContractError> {
+        let pair_key = &self.get_pair_key();
         // this will try to fill all orders
         // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
         let sender = deps.api.addr_humanize(&ask_order.bidder_addr)?;
@@ -376,7 +363,7 @@ impl OrderBook {
             let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
             // fill this order
-            self.fill_order(deps.storage, order, ask_asset.amount, offer_amount)?;
+            order.fill_order(deps.storage, pair_key, ask_asset.amount, offer_amount)?;
 
             if !ask_asset.amount.is_zero() {
                 messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
@@ -391,9 +378,9 @@ impl OrderBook {
         if !executor_receive_amount.is_zero() {
             // ask is order ask asset, not depending on order direction
             // so we just make sure ask amount is equal on both sides
-            self.fill_order(
+            ask_order.fill_order(
                 deps.storage,
-                ask_order,
+                pair_key,
                 ask_order.ask_amount - lef_ask_order_amount,
                 executor_receive_amount,
             )?;

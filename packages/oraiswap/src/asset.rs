@@ -344,8 +344,13 @@ impl PairInfoRaw {
 }
 
 pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
-    let mut asset_infos = asset_infos.to_vec();
-    asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+    pair_key_from_asset_keys(asset_infos[0].as_bytes(), asset_infos[1].as_bytes())
+}
 
-    [asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat()
+pub fn pair_key_from_asset_keys(ask_asset_key: &[u8], offer_asset_key: &[u8]) -> Vec<u8> {
+    // fastest way to sort in ASC order
+    match ask_asset_key.le(offer_asset_key) {
+        true => [ask_asset_key, offer_asset_key].concat(),
+        false => [offer_asset_key, ask_asset_key].concat(),
+    }
 }

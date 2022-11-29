@@ -4,9 +4,11 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::limit_order::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrdersResponse, QueryMsg, TicksResponse,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderBooksResponse,
+    OrderDirection, OrderFilter, OrderResponse, OrdersResponse, QueryMsg, TicksResponse,
 };
+
+use crate::jsonstr;
 
 #[test]
 fn submit_order() {
@@ -40,7 +42,26 @@ fn submit_order() {
         &"asset".to_string(),
         &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
     )]);
+
     let token_addr = app.get_token_addr("asset").unwrap();
+
+    // update order book for pair [orai, token_addr]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
 
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -210,6 +231,24 @@ fn cancel_order_native_token() {
         )
         .unwrap();
 
+    // update order book for pair [orai, token_addr]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
         offer_asset: Asset {
@@ -318,6 +357,24 @@ fn cancel_order_token() {
             "limit order",
         )
         .unwrap();
+
+    // update order book for pair [orai, token_addr]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
@@ -432,6 +489,24 @@ fn execute_order_native_token() {
             "limit order",
         )
         .unwrap();
+
+    // update order book for pair [orai, atom]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::NativeToken {
+            denom: ATOM_DENOM.to_string(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
 
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Sell,
@@ -645,6 +720,24 @@ fn execute_order_token() {
         )
         .unwrap();
 
+    // update order book for pair [token_addrs[0], token_addrs[1]]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::Token {
+            contract_addr: token_addrs[0].clone(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addrs[1].clone(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000000u128),
@@ -828,6 +921,56 @@ fn orders_querier() {
             "limit order",
         )
         .unwrap();
+
+    // update order book for pair [orai, atom]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        ask_info: AssetInfo::NativeToken {
+            denom: ATOM_DENOM.to_string(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
+    // update order book for pair [token_addrs[0], token_addrs[1]]
+    let msg = ExecuteMsg::UpdateOrderBook {
+        offer_info: AssetInfo::Token {
+            contract_addr: token_addrs[0].clone(),
+        },
+        ask_info: AssetInfo::Token {
+            contract_addr: token_addrs[1].clone(),
+        },
+        precision: None,
+        min_offer_amount: Uint128::zero(),
+    };
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
+    // query all orderbooks
+    let res = app
+        .query::<OrderBooksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBooks {
+                start_after: None,
+                limit: None,
+                order_by: None,
+            },
+        )
+        .unwrap();
+
+    println!("orderbooks :{}", jsonstr!(res));
 
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,

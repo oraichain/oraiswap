@@ -30,7 +30,7 @@ pub fn query_ticks(
     };
 
     let ticks = position_bucket
-        .range(start.as_deref(), end.as_deref(), order_by.into())
+        .range(start.as_deref(), end.as_deref(), order_by)
         .take(limit)
         .map(|item| {
             let (k, total_orders) = item?;

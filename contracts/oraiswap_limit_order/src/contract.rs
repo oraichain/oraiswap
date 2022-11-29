@@ -8,18 +8,18 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_order, query_last_order_id, query_order, query_orders, submit_order,
+    cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
+    query_orderbooks, query_orders, submit_order,
 };
-use crate::state::{
-    init_last_order_id, read_config, read_orderbook, store_config, store_orderbook,
-};
+use crate::orderbook::OrderBook;
+use crate::state::{init_last_order_id, read_config, store_config, store_orderbook};
 use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::limit_order::{
     ContractInfo, ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
-    OrderBookResponse, OrderDirection, QueryMsg,
+    OrderDirection, QueryMsg,
 };
 
 // version info for migration info
@@ -156,7 +156,13 @@ pub fn execute_update_orderbook(
     }
 
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    store_orderbook(deps.storage, &pair_key, precision, min_offer_amount)?;
+    let order_book = OrderBook {
+        ask_info: ask_info.to_raw(deps.api)?,
+        offer_info: offer_info.to_raw(deps.api)?,
+        min_offer_amount,
+        precision,
+    };
+    store_orderbook(deps.storage, &pair_key, &order_book)?;
 
     Ok(Response::new().add_attributes(vec![("action", "execute_update_orderbook")]))
 }
@@ -202,6 +208,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             offer_info,
             ask_info,
         } => to_binary(&query_orderbook(deps, offer_info, ask_info)?),
+        QueryMsg::OrderBooks {
+            start_after,
+            limit,
+            order_by,
+        } => to_binary(&query_orderbooks(deps, start_after, limit, order_by)?),
         QueryMsg::Orders {
             offer_info,
             ask_info,
@@ -256,21 +267,6 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         version: info.version,
         name: info.name,
         admin: deps.api.addr_humanize(&info.admin)?,
-    })
-}
-
-pub fn query_orderbook(
-    deps: Deps,
-    offer_info: AssetInfo,
-    ask_info: AssetInfo,
-) -> StdResult<OrderBookResponse> {
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
-    let (precision, min_offer_amount) = read_orderbook(deps.storage, &pair_key);
-    Ok(OrderBookResponse {
-        offer_info,
-        ask_info,
-        min_offer_amount,
-        precision,
     })
 }
 

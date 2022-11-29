@@ -1,9 +1,9 @@
-use cosmwasm_std::{Decimal, Order as OrderBy, StdResult, Storage, Uint128};
+use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::orderbook::Order;
+use crate::orderbook::{Order, OrderBook};
 
 // settings for pagination
 pub const MAX_LIMIT: u32 = 30;
@@ -32,17 +32,33 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
 pub fn store_orderbook(
     storage: &mut dyn Storage,
     pair_key: &[u8],
-    precision: Option<Decimal>,
-    min_offer_amount: Uint128,
+    order_book: &OrderBook,
 ) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_ORDER_BOOK).save(pair_key, &(precision, min_offer_amount))
+    Bucket::new(storage, PREFIX_ORDER_BOOK).save(pair_key, order_book)
 }
 
 // do not return error, by default it return no precision and zero min offer amount
-pub fn read_orderbook(storage: &dyn Storage, pair_key: &[u8]) -> (Option<Decimal>, Uint128) {
+pub fn read_orderbook(storage: &dyn Storage, pair_key: &[u8]) -> StdResult<OrderBook> {
+    ReadonlyBucket::new(storage, PREFIX_ORDER_BOOK).load(pair_key)
+}
+
+pub fn read_orderbooks(
+    storage: &dyn Storage,
+    start_after: Option<Vec<u8>>,
+    limit: Option<u32>,
+    order_by: Option<OrderBy>,
+) -> StdResult<Vec<OrderBook>> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+
+    let (start, end, order_by) = match order_by {
+        Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
+        _ => (None, start_after, OrderBy::Descending),
+    };
     ReadonlyBucket::new(storage, PREFIX_ORDER_BOOK)
-        .load(pair_key)
-        .unwrap_or((None, Uint128::zero()))
+        .range(start.as_deref(), end.as_deref(), order_by)
+        .take(limit)
+        .map(|item| item.map(|item| item.1))
+        .collect()
 }
 
 pub fn store_order(
@@ -159,7 +175,7 @@ where
     let order_bucket = ReadonlyBucket::multilevel(storage, &[PREFIX_ORDER, namespaces[1]]);
 
     position_indexer
-        .range(start.as_deref(), end.as_deref(), order_by.into())
+        .range(start.as_deref(), end.as_deref(), order_by)
         .filter(|item| item.as_ref().map_or(false, |item| filter(&item.1)))
         .take(limit)
         .map(|item| order_bucket.load(&item?.0))
@@ -184,7 +200,7 @@ pub fn read_orders(
     };
 
     position_bucket
-        .range(start.as_deref(), end.as_deref(), order_by.into())
+        .range(start.as_deref(), end.as_deref(), order_by)
         .take(limit)
         .map(|item| item.map(|item| item.1))
         .collect()

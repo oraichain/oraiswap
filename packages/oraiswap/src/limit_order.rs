@@ -108,6 +108,12 @@ pub enum QueryMsg {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
     },
+    #[returns(OrderBooksResponse)]
+    OrderBooks {
+        start_after: Option<Vec<u8>>,
+        limit: Option<u32>,
+        order_by: Option<i32>, // convert OrderBy to i32
+    },
     #[returns(OrderResponse)]
     Order {
         order_id: u64,
@@ -170,6 +176,11 @@ pub struct OrderBookResponse {
     pub ask_info: AssetInfo,
     pub min_offer_amount: Uint128,
     pub precision: Option<Decimal>,
+}
+
+#[cw_serde]
+pub struct OrderBooksResponse {
+    pub order_books: Vec<OrderBookResponse>,
 }
 
 #[cw_serde]

@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use cosmwasm_schema::schemars::_serde_json::to_vec_pretty;
 use cosmwasm_std::{testing::mock_dependencies, Api, Decimal};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
@@ -9,16 +8,11 @@ use oraiswap::{
 };
 
 use crate::{
+    jsonstr,
     orderbook::{Order, OrderBook},
     state::{increase_last_order_id, init_last_order_id},
     tick::query_ticks,
 };
-
-macro_rules! jsonstr {
-    ($arg:expr) => {
-        String::from_utf8(to_vec_pretty(&$arg).unwrap()).unwrap()
-    };
-}
 
 #[test]
 fn initialize() {
@@ -106,10 +100,11 @@ fn initialize() {
             total_orders
         );
     }
+    let pair_key = &ob.get_pair_key();
 
     let buy_ticks = query_ticks(
         deps.as_ref().storage,
-        ob.get_pair_key(),
+        pair_key,
         OrderDirection::Buy,
         None,
         None,
@@ -120,7 +115,7 @@ fn initialize() {
 
     let sell_ticks = query_ticks(
         deps.as_ref().storage,
-        ob.get_pair_key(),
+        pair_key,
         OrderDirection::Sell,
         None,
         None,
