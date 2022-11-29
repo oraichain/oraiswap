@@ -332,7 +332,7 @@ impl OrderBook {
         &self,
         deps: DepsMut,
         ask_order: &mut Order,
-        orders: &mut Vec<Order>,
+        offer_orders: &mut Vec<Order>,
     ) -> Result<Vec<CosmosMsg>, ContractError> {
         // this will try to fill all orders
         // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
@@ -343,7 +343,7 @@ impl OrderBook {
         let mut messages = vec![];
         let mut executor_receive_amount = Uint128::zero();
         let mut ask_order_amount = ask_order.ask_amount;
-        for order in orders {
+        for order in offer_orders {
             // offer amount is already paid, we need ask amount to be received
             // remember that ask of buy and ask of sell are opposite sides
             // ask_amount is equal match ask amount, to make sure always matched
