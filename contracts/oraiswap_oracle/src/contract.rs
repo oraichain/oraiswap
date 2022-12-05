@@ -9,7 +9,7 @@ use oraiswap::asset::ORAI_DENOM;
 use oraiswap::oracle::{
     ContractInfo, ContractInfoResponse, ExchangeRateItem, ExchangeRateResponse,
     ExchangeRatesResponse, ExecuteMsg, MigrateMsg, OracleContractQuery, OracleExchangeQuery,
-    OracleTreasuryQuery, QueryMsg, RewardPoolResponse, TaxCapResponse, TaxRateResponse,
+    OracleTreasuryQuery, QueryMsg, TaxCapResponse, TaxRateResponse,
 };
 
 use oraiswap::error::ContractError;
@@ -178,26 +178,6 @@ pub fn execute_delete_exchange_rate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::TaxRate {} => to_binary(&query_tax_rate(deps)?),
-        QueryMsg::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
-        QueryMsg::ExchangeRate {
-            base_denom,
-            quote_denom,
-        } => to_binary(&query_exchange_rate(
-            deps,
-            base_denom.unwrap_or(ORAI_DENOM.to_string()),
-            quote_denom,
-        )?),
-        QueryMsg::ExchangeRates {
-            base_denom,
-            quote_denoms,
-        } => to_binary(&query_exchange_rates(
-            deps,
-            base_denom.unwrap_or(ORAI_DENOM.to_string()),
-            quote_denoms,
-        )?),
-        QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
-        QueryMsg::RewardPool { denom } => to_binary(&query_reward_pool(deps, env, denom)?),
         QueryMsg::Treasury(query_data) => match query_data {
             OracleTreasuryQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
             OracleTreasuryQuery::TaxCap { denom } => to_binary(&query_tax_cap(deps, denom)?),
@@ -308,11 +288,6 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
 /// query_contract_balance: return native balance, currently only Orai denom
 pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
     deps.querier.query_balance(env.contract.address, &denom)
-}
-
-/// query_reward_pool: return native balance, currently only Orai denom
-pub fn query_reward_pool(deps: Deps, env: Env, denom: String) -> StdResult<RewardPoolResponse> {
-    query_contract_balance(deps, env, denom).map(|balance| RewardPoolResponse { balance })
 }
 
 fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {

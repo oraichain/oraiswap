@@ -1,6 +1,7 @@
 use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
+#[allow(unused_imports)]
 use cosmwasm_std::{
     to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult,
     Uint128, WasmMsg, WasmQuery,
@@ -41,11 +42,26 @@ pub enum ExecuteMsg {
 /// QueryMsg is defines available query datas
 #[cw_serde]
 #[derive(QueryResponses)]
+#[serde(untagged)]
+#[query_responses(nested)]
 pub enum QueryMsg {
+    Treasury(OracleTreasuryQuery),
+    Exchange(OracleExchangeQuery),
+    Contract(OracleContractQuery),
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum OracleTreasuryQuery {
     #[returns(TaxRateResponse)]
     TaxRate {},
     #[returns(TaxCapResponse)]
     TaxCap { denom: String },
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum OracleExchangeQuery {
     #[returns(ExchangeRateResponse)]
     ExchangeRate {
         base_denom: Option<String>,
@@ -56,39 +72,14 @@ pub enum QueryMsg {
         base_denom: Option<String>,
         quote_denoms: Vec<String>,
     },
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum OracleContractQuery {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
-    #[returns(RewardPoolResponse)]
-    RewardPool { denom: String },
-    #[returns(())]
-    Treasury(OracleTreasuryQuery),
-    #[returns(())]
-    Exchange(OracleExchangeQuery),
-    #[returns(())]
-    Contract(OracleContractQuery),
-}
-
-#[cw_serde]
-pub enum OracleTreasuryQuery {
-    TaxRate {},
-    TaxCap { denom: String },
-}
-
-#[cw_serde]
-pub enum OracleExchangeQuery {
-    ExchangeRate {
-        base_denom: Option<String>,
-        quote_denom: String,
-    },
-    ExchangeRates {
-        base_denom: Option<String>,
-        quote_denoms: Vec<String>,
-    },
-}
-
-#[cw_serde]
-pub enum OracleContractQuery {
-    ContractInfo {},
+    #[returns(Coin)]
     RewardPool { denom: String },
 }
 
@@ -148,11 +139,6 @@ pub struct ContractInfoResponse {
     pub admin: Addr,
     pub min_rate: Decimal,
     pub max_rate: Decimal,
-}
-
-#[cw_serde]
-pub struct RewardPoolResponse {
-    pub balance: Coin,
 }
 
 /// We currently take no arguments for migrations
