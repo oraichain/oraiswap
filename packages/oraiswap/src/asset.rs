@@ -1,20 +1,18 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 use std::fmt;
 
 use crate::oracle::OracleContract;
-use crate::{error::OverflowError, querier::query_token_balance};
+use crate::querier::query_token_balance;
 
 use cosmwasm_std::{
-    coin, to_binary, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, HumanAddr, MessageInfo,
+    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
-use cw20::Cw20HandleMsg;
+use cw20::Cw20ExecuteMsg;
 
-pub const DECIMAL_FRACTION: Uint128 = Uint128(1_000_000_000_000_000_000u128);
 pub const ORAI_DENOM: &str = "orai";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Asset {
     pub info: AssetInfo,
     pub amount: Uint128,
@@ -29,19 +27,6 @@ impl fmt::Display for Asset {
 impl Asset {
     pub fn is_native_token(&self) -> bool {
         self.info.is_native_token()
-    }
-
-    pub fn checked_sub(left: Uint128, right: Uint128) -> StdResult<Uint128> {
-        left.0.checked_sub(right.0).map(Uint128).ok_or_else(|| {
-            StdError::generic_err(
-                OverflowError {
-                    operation: crate::error::OverflowOperation::Sub,
-                    operand1: left.to_string(),
-                    operand2: right.to_string(),
-                }
-                .to_string(),
-            )
-        })
     }
 
     pub fn compute_tax(
@@ -59,14 +44,9 @@ impl Asset {
                 let tax_cap = oracle_contract
                     .query_tax_cap(querier, denom.to_string())?
                     .cap;
+
                 Ok(std::cmp::min(
-                    Self::checked_sub(
-                        amount,
-                        amount.multiply_ratio(
-                            DECIMAL_FRACTION,
-                            DECIMAL_FRACTION * tax_rate + DECIMAL_FRACTION,
-                        ),
-                    )?,
+                    amount.checked_sub(amount * (Decimal::one() / (tax_rate + Decimal::one())))?,
                     tax_cap,
                 ))
             }
@@ -84,7 +64,7 @@ impl Asset {
         if let AssetInfo::NativeToken { denom } = &self.info {
             Ok(Coin {
                 denom: denom.to_string(),
-                amount: Self::checked_sub(amount, self.compute_tax(oracle_contract, querier)?)?,
+                amount: amount.checked_sub(self.compute_tax(oracle_contract, querier)?)?,
             })
         } else {
             Err(StdError::generic_err("cannot deduct tax from token asset"))
@@ -96,16 +76,18 @@ impl Asset {
         &self,
         oracle_contract: Option<&OracleContract>,
         querier: &QuerierWrapper,
-        sender: HumanAddr,
-        recipient: HumanAddr,
+        recipient: Addr,
     ) -> StdResult<CosmosMsg> {
         let amount = self.amount;
 
         match &self.info {
             AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: contract_addr.to_owned(),
-                msg: to_binary(&Cw20HandleMsg::Transfer { recipient, amount })?,
-                send: vec![],
+                contract_addr: contract_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: recipient.to_string(),
+                    amount,
+                })?,
+                funds: vec![],
             })),
             AssetInfo::NativeToken { denom } => {
                 // if there is oracle contract then calculate tax deduction
@@ -115,8 +97,7 @@ impl Asset {
                     coin(amount.u128(), denom)
                 };
                 Ok(CosmosMsg::Bank(BankMsg::Send {
-                    from_address: sender,
-                    to_address: recipient,
+                    to_address: recipient.to_string(),
                     amount: vec![send_amount],
                 }))
             }
@@ -125,7 +106,7 @@ impl Asset {
 
     pub fn assert_sent_native_token_balance(&self, message_info: &MessageInfo) -> StdResult<()> {
         if let AssetInfo::NativeToken { denom } = &self.info {
-            match message_info.sent_funds.iter().find(|x| x.denom.eq(denom)) {
+            match message_info.funds.iter().find(|x| x.denom.eq(denom)) {
                 Some(coin) => {
                     if self.amount == coin.amount {
                         Ok(())
@@ -153,7 +134,7 @@ impl Asset {
                     denom: denom.to_string(),
                 },
                 AssetInfo::Token { contract_addr } => AssetInfoRaw::Token {
-                    contract_addr: api.canonical_address(&contract_addr.to_owned().into())?,
+                    contract_addr: api.addr_canonicalize(contract_addr.as_str())?,
                 },
             },
             amount: self.amount,
@@ -163,10 +144,9 @@ impl Asset {
 
 /// AssetInfo contract_addr is usually passed from the cw20 hook
 /// so we can trust the contract_addr is properly validated.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum AssetInfo {
-    Token { contract_addr: HumanAddr },
+    Token { contract_addr: Addr },
     NativeToken { denom: String },
 }
 
@@ -184,7 +164,7 @@ impl AssetInfo {
         match self {
             AssetInfo::NativeToken { denom } => Ok(denom.as_bytes().to_vec()),
             AssetInfo::Token { contract_addr } => api
-                .canonical_address(&contract_addr)
+                .addr_canonicalize(contract_addr.as_str())
                 .map(|addr| addr.as_slice().to_vec()),
         }
     }
@@ -195,7 +175,7 @@ impl AssetInfo {
                 denom: denom.to_string(),
             }),
             AssetInfo::Token { contract_addr } => Ok(AssetInfoRaw::Token {
-                contract_addr: api.canonical_address(&contract_addr.to_owned().into())?,
+                contract_addr: api.addr_canonicalize(contract_addr.as_str())?,
             }),
         }
     }
@@ -206,10 +186,10 @@ impl AssetInfo {
             AssetInfo::Token { .. } => false,
         }
     }
-    pub fn query_pool(&self, querier: &QuerierWrapper, pool_addr: HumanAddr) -> StdResult<Uint128> {
+    pub fn query_pool(&self, querier: &QuerierWrapper, pool_addr: Addr) -> StdResult<Uint128> {
         match self {
             AssetInfo::Token { contract_addr, .. } => {
-                query_token_balance(querier, contract_addr.to_owned().into(), pool_addr)
+                query_token_balance(querier, contract_addr.to_owned(), pool_addr)
             }
             AssetInfo::NativeToken { denom, .. } => {
                 Ok(querier.query_balance(pool_addr, denom)?.amount)
@@ -237,7 +217,7 @@ impl AssetInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AssetRaw {
     pub info: AssetInfoRaw,
     pub amount: Uint128,
@@ -251,7 +231,7 @@ impl AssetRaw {
                     denom: denom.to_string(),
                 },
                 AssetInfoRaw::Token { contract_addr } => AssetInfo::Token {
-                    contract_addr: api.human_address(contract_addr)?,
+                    contract_addr: api.addr_humanize(contract_addr)?,
                 },
             },
             amount: self.amount,
@@ -259,7 +239,7 @@ impl AssetRaw {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub enum AssetInfoRaw {
     Token { contract_addr: CanonicalAddr },
     NativeToken { denom: String },
@@ -272,7 +252,7 @@ impl AssetInfoRaw {
                 denom: denom.to_string(),
             }),
             AssetInfoRaw::Token { contract_addr } => Ok(AssetInfo::Token {
-                contract_addr: api.human_address(contract_addr)?,
+                contract_addr: api.addr_humanize(contract_addr)?,
             }),
         }
     }
@@ -307,17 +287,17 @@ impl AssetInfoRaw {
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PairInfo {
     pub asset_infos: [AssetInfo; 2],
-    pub contract_addr: HumanAddr,
-    pub liquidity_token: HumanAddr,
+    pub contract_addr: Addr,
+    pub liquidity_token: Addr,
 
-    pub oracle_addr: HumanAddr,
+    pub oracle_addr: Addr,
     pub commission_rate: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PairInfoRaw {
     pub asset_infos: [AssetInfoRaw; 2],
     pub contract_addr: CanonicalAddr,
@@ -331,9 +311,9 @@ pub struct PairInfoRaw {
 impl PairInfoRaw {
     pub fn to_normal(&self, api: &dyn Api) -> StdResult<PairInfo> {
         Ok(PairInfo {
-            liquidity_token: api.human_address(&self.liquidity_token)?,
-            contract_addr: api.human_address(&self.contract_addr)?,
-            oracle_addr: api.human_address(&self.oracle_addr)?,
+            liquidity_token: api.addr_humanize(&self.liquidity_token)?,
+            contract_addr: api.addr_humanize(&self.contract_addr)?,
+            oracle_addr: api.addr_humanize(&self.oracle_addr)?,
             asset_infos: [
                 self.asset_infos[0].to_normal(api)?,
                 self.asset_infos[1].to_normal(api)?,
@@ -346,7 +326,7 @@ impl PairInfoRaw {
         &self,
         querier: &QuerierWrapper,
         api: &dyn Api,
-        contract_addr: HumanAddr,
+        contract_addr: Addr,
     ) -> StdResult<[Asset; 2]> {
         let info_0: AssetInfo = self.asset_infos[0].to_normal(api)?;
         let info_1: AssetInfo = self.asset_infos[1].to_normal(api)?;
@@ -360,5 +340,17 @@ impl PairInfoRaw {
                 info: info_1,
             },
         ])
+    }
+}
+
+pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
+    pair_key_from_asset_keys(asset_infos[0].as_bytes(), asset_infos[1].as_bytes())
+}
+
+pub fn pair_key_from_asset_keys(ask_asset_key: &[u8], offer_asset_key: &[u8]) -> Vec<u8> {
+    // fastest way to sort in ASC order
+    match ask_asset_key.le(offer_asset_key) {
+        true => [ask_asset_key, offer_asset_key].concat(),
+        false => [offer_asset_key, ask_asset_key].concat(),
     }
 }

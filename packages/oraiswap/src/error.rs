@@ -1,44 +1,5 @@
-use cosmwasm_std::{StdError, Uint128};
-use std::fmt;
+use cosmwasm_std::{OverflowError, StdError, Uint128};
 use thiserror::Error;
-
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum OverflowOperation {
-    Add,
-    Sub,
-    Mul,
-    Pow,
-    Shr,
-    Shl,
-}
-
-impl fmt::Display for OverflowOperation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-#[derive(Error, Debug, PartialEq, Eq)]
-#[error("Cannot {operation} with {operand1} and {operand2}")]
-pub struct OverflowError {
-    pub operation: OverflowOperation,
-    pub operand1: String,
-    pub operand2: String,
-}
-
-impl OverflowError {
-    pub fn new(
-        operation: OverflowOperation,
-        operand1: impl ToString,
-        operand2: impl ToString,
-    ) -> Self {
-        Self {
-            operation,
-            operand1: operand1.to_string(),
-            operand2: operand2.to_string(),
-        }
-    }
-}
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
@@ -72,6 +33,9 @@ pub enum ContractError {
     #[error("Too small offer amount")]
     TooSmallOfferAmount {},
 
+    #[error("Offer pool is zero")]
+    OfferPoolIsZero {},
+
     #[error("Pair already exists")]
     PairExisted {},
 
@@ -88,4 +52,10 @@ pub enum ContractError {
 
     #[error("must provide operations")]
     NoSwapOperation {},
+
+    #[error("invalid cw20 hook message")]
+    InvalidCw20HookMessage {},
+
+    #[error("must provide native token")]
+    MustProvideNativeToken {}, // only allowing buy token and sell token with native token
 }

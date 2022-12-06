@@ -1,7 +1,7 @@
 [package]
 name = "oraiswap"
 version = "2.4.1"
-authors = ["Terraform Labs, PTE."]
+authors = ["Oraichain Labs","Terraform Labs, PTE."]
 edition = "2018"
 description = "Common oraiswap types"
 license = "Apache-2.0"
@@ -17,15 +17,19 @@ documentation = "https://docs.oraiswap.io"
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cw20 = { version = "0.5.0" }
-cosmwasm-storage = { version = "0.13.2" }
-cosmwasm-std = { version = "0.13.2" }
-schemars = "0.7"
-bigint = "4"
-serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.21" }
+cw20 = { version = "0.16.0" }
+cosmwasm-storage = { version = "1.1.8" }
+cosmwasm-std = { version = "1.1.8" }
+thiserror = { version = "1.0.23" }
+# using cw20-base contract as library
+cw20-base = { version = "0.16.0", features = ["library"] }
+cosmwasm-schema = "1.1.8"
+schemars = "0.8.3"
+protobuf = { version = "3.2.0", features = ["with-bytes"] }
 
-[dev-dependencies]
-cosmwasm-schema = "0.13.2"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# this import is for testing library
+cw-multi-test = { version = "0.16.0" }
+
 
 

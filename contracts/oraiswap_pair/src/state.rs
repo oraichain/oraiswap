@@ -25,21 +25,21 @@ mod test {
 
     #[test]
     fn legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         store_pair_info(
             &mut deps.storage,
             &PairInfoRaw {
-                oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
+                oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
                 asset_infos: [
                     AssetInfoRaw::NativeToken {
                         denom: "uusd".to_string(),
                     },
                     AssetInfoRaw::Token {
-                        contract_addr: deps.api.canonical_address(&"token0000".into()).unwrap(),
+                        contract_addr: deps.api.addr_canonicalize("token0000").unwrap(),
                     },
                 ],
-                contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
-                liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
+                contract_addr: deps.api.addr_canonicalize("pair0000").unwrap(),
+                liquidity_token: deps.api.addr_canonicalize("liquidity0000").unwrap(),
                 commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
             },
         )

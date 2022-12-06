@@ -1,10 +1,9 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 
 use cosmwasm_std::CanonicalAddr;
 use cw_storage_plus::Item;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     pub factory_addr: CanonicalAddr,
 }
@@ -30,11 +29,11 @@ mod test {
 
     #[test]
     fn legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         store_config(
             &mut deps.storage,
             &Config {
-                factory_addr: deps.api.canonical_address(&"addr0000".into()).unwrap(),
+                factory_addr: deps.api.addr_canonicalize("addr0000").unwrap(),
             },
         )
         .unwrap();

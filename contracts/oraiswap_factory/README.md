@@ -2,20 +2,16 @@
 
 The factory contract can perform creation of oraiswap pair contract and also be used as directory contract for all pairs.
 
-## InitMsg
+## InstantiateMsg
 
 ```json
 {
   "paid_code_id": "123",
-  "token_code_id": "123",
-  "init_hook": {
-    "msg": "123",
-    "contract_addr": "orai..."
-  }
+  "token_code_id": "123"
 }
 ```
 
-## HandleMsg
+## ExecuteMsg
 
 ### `update_config`
 
@@ -109,7 +105,6 @@ Register verified pair contract and token contract for pair contract creation. T
     /// Pair contract code ID, which is used to
     pub pair_code_id: u64,
     pub token_code_id: u64,
-    pub init_hook: Option<InitHook>,
 }
 ```
 
@@ -121,7 +116,7 @@ The factory contract owner can change relevant code IDs for future pair contract
 {
     "update_config":
     {
-        "owner": Option<HumanAddr>,
+        "owner": Option<Addr>,
         "pair_code_id": Option<u64>,
         "token_code_id": Option<u64>,
     }

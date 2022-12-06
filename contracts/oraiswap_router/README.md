@@ -24,7 +24,7 @@ If the token is ow20 Orai, we can convert it to native first
 
 ```
 {
-   "handle_swap_operations":{
+   "execute_swap_operations":{
       "operations":[
          {
             "orai_swap":{

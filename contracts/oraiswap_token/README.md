@@ -27,9 +27,9 @@ You can also import much of the logic of this contract to build another
 ERC20-contract, such as a bonding curve, overiding or extending what you
 need.
 
-Basically, you just need to write your handle function and import
-`cw20_base::contract::handle_transfer`, etc and dispatch to them.
-This allows you to use custom `HandleMsg` and `QueryMsg` with your additional
+Basically, you just need to write your execute function and import
+`cw20_base::contract::execute_transfer`, etc and dispatch to them.
+This allows you to use custom `ExecuteMsg` and `QueryMsg` with your additional
 calls, but then use the underlying implementation for the standard cw20
 messages you want to support. The same with `QueryMsg`. You _could_ reuse `init`
 as it, but it is likely you will want to change it. And it is rather simple.

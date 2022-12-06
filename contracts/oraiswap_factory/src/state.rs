@@ -1,11 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 
 use cosmwasm_std::{Api, CanonicalAddr, Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Item, Map};
 use oraiswap::asset::{AssetInfoRaw, PairInfo, PairInfoRaw};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     pub owner: CanonicalAddr,
     pub oracle_addr: CanonicalAddr,
@@ -20,13 +19,6 @@ pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 // store temporary pair info while waiting for deployment
 pub const PAIRS: Map<&[u8], PairInfoRaw> = Map::new("pairs");
 
-pub fn pair_key(asset_infos: &[AssetInfoRaw; 2]) -> Vec<u8> {
-    let mut asset_infos = asset_infos.to_vec();
-    asset_infos.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
-
-    [asset_infos[0].as_bytes(), asset_infos[1].as_bytes()].concat()
-}
-
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
@@ -37,7 +29,7 @@ pub fn read_pairs(
     limit: Option<u32>,
 ) -> StdResult<Vec<PairInfo>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after).map(Bound::exclusive);
+    let start = calc_range_start(start_after).map(Bound::ExclusiveRaw);
 
     PAIRS
         .range(storage, start, None, Order::Ascending)
@@ -73,6 +65,7 @@ mod test {
     use cosmwasm_storage::{
         bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     };
+    use oraiswap::asset::pair_key;
     use oraiswap::pair::DEFAULT_COMMISSION_RATE;
     const KEY_CONFIG: &[u8] = b"config";
 
@@ -85,12 +78,12 @@ mod test {
 
     #[test]
     fn config_legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         store_config(
             &mut deps.storage,
             &Config {
-                oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
-                owner: deps.api.canonical_address(&"owner0000".into()).unwrap(),
+                oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
+                owner: deps.api.addr_canonicalize("owner0000").unwrap(),
                 pair_code_id: 1,
                 token_code_id: 1,
                 commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
@@ -147,34 +140,34 @@ mod test {
 
     #[test]
     fn pair_info_legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let pair_info = PairInfoRaw {
-            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.canonical_address(&"token0000".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize("token0000").unwrap(),
                 },
             ],
-            contract_addr: deps.api.canonical_address(&"pair0000".into()).unwrap(),
-            liquidity_token: deps.api.canonical_address(&"liquidity0000".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize("pair0000").unwrap(),
+            liquidity_token: deps.api.addr_canonicalize("liquidity0000").unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 
         let pair_info2 = PairInfoRaw {
-            oracle_addr: deps.api.canonical_address(&"oracle0000".into()).unwrap(),
+            oracle_addr: deps.api.addr_canonicalize("oracle0000").unwrap(),
             asset_infos: [
                 AssetInfoRaw::NativeToken {
                     denom: "uusd".to_string(),
                 },
                 AssetInfoRaw::Token {
-                    contract_addr: deps.api.canonical_address(&"token0001".into()).unwrap(),
+                    contract_addr: deps.api.addr_canonicalize("token0001").unwrap(),
                 },
             ],
-            contract_addr: deps.api.canonical_address(&"pair0001".into()).unwrap(),
-            liquidity_token: deps.api.canonical_address(&"liquidity0001".into()).unwrap(),
+            contract_addr: deps.api.addr_canonicalize("pair0001").unwrap(),
+            liquidity_token: deps.api.addr_canonicalize("liquidity0001").unwrap(),
             commission_rate: DEFAULT_COMMISSION_RATE.to_string(),
         };
 

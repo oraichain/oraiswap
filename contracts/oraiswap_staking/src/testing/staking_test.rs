@@ -1,66 +1,68 @@
-use crate::contract::{handle, init, query};
-use crate::testing::mock_querier::mock_dependencies_with_querier;
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{
-    attr, coin, from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128,
-    WasmMsg,
+use crate::contract::{execute, instantiate, query};
+use cosmwasm_std::testing::{
+    mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use cosmwasm_std::{
+    attr, coin, from_binary, to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, StdError, SubMsg,
+    Uint128, WasmMsg,
+};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_querier::{mock_dependencies, ATOM_DENOM};
-use oraiswap::pair::HandleMsg as PairHandleMsg;
+use oraiswap::create_entry_points_testing;
+use oraiswap::pair::PairResponse;
 use oraiswap::staking::{
-    Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem,
 };
+use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 #[test]
 fn test_bond_tokens() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "reward".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("rewarder"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        staking_token: "staking".into(),
+        staking_token: Addr::unchecked("staking"),
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr".into(),
-        amount: Uint128(100u128),
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "addr".to_string(),
+        amount: Uint128::from(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         })
-        .ok(),
+        .unwrap(),
     });
 
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     let data = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
             asset_info: Some(AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             }),
-            staker_addr: "addr".into(),
+            staker_addr: Addr::unchecked("addr"),
         },
     )
     .unwrap();
@@ -68,14 +70,14 @@ fn test_bond_tokens() {
     assert_eq!(
         res,
         RewardInfoResponse {
-            staker_addr: "addr".into(),
+            staker_addr: Addr::unchecked("addr"),
             reward_infos: vec![RewardInfoResponseItem {
                 asset_info: AssetInfo::Token {
-                    contract_addr: "asset".into()
+                    contract_addr: Addr::unchecked("asset")
                 },
                 pending_reward: Uint128::zero(),
                 pending_withdraw: vec![],
-                bond_amount: Uint128(100u128),
+                bond_amount: Uint128::from(100u128),
                 should_migrate: None,
             }],
         }
@@ -86,7 +88,7 @@ fn test_bond_tokens() {
         mock_env(),
         QueryMsg::PoolInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         },
     )
@@ -97,10 +99,10 @@ fn test_bond_tokens() {
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: Addr::unchecked("asset")
             },
-            staking_token: "staking".into(),
-            total_bond_amount: Uint128(100u128),
+            staking_token: Addr::unchecked("staking"),
+            total_bond_amount: Uint128::from(100u128),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,
@@ -109,25 +111,25 @@ fn test_bond_tokens() {
     );
 
     // bond 100 more tokens from other account
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr2".into(),
-        amount: Uint128(100u128),
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "addr2".to_string(),
+        amount: Uint128::from(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         })
-        .ok(),
+        .unwrap(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let data = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         },
     )
@@ -137,10 +139,10 @@ fn test_bond_tokens() {
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: Addr::unchecked("asset")
             },
-            staking_token: "staking".into(),
-            total_bond_amount: Uint128(200u128),
+            staking_token: Addr::unchecked("staking"),
+            total_bond_amount: Uint128::from(200u128),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,
@@ -149,19 +151,19 @@ fn test_bond_tokens() {
     );
 
     // failed with unauthorized
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr".into(),
-        amount: Uint128(100u128),
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "addr".to_string(),
+        amount: Uint128::from(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         })
-        .ok(),
+        .unwrap(),
     });
 
     let info = mock_info("staking2", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg);
+    let res = execute(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
         _ => panic!("Must return unauthorized error"),
@@ -170,27 +172,27 @@ fn test_bond_tokens() {
 
 #[test]
 fn test_unbond() {
-    let mut deps = mock_dependencies(&[
+    let mut deps = mock_dependencies_with_balance(&[
         coin(10000000000u128, ORAI_DENOM),
         coin(20000000000u128, ATOM_DENOM),
     ]);
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "rewarder".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("rewarder"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardsPerSec {
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
         assets: vec![
             Asset {
@@ -208,48 +210,48 @@ fn test_unbond() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // register asset
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        staking_token: "staking".into(),
+        staking_token: Addr::unchecked("staking"),
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr".into(),
-        amount: Uint128(100u128),
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "addr".to_string(),
+        amount: Uint128::from(100u128),
         msg: to_binary(&Cw20HookMsg::Bond {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         })
-        .ok(),
+        .unwrap(),
     });
     let info = mock_info("staking", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::DepositReward {
+    let msg = ExecuteMsg::DepositReward {
         rewards: vec![Asset {
             info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
-            amount: Uint128(300u128),
+            amount: Uint128::from(300u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardsPerSec {
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
         assets: vec![
             Asset {
@@ -267,18 +269,18 @@ fn test_unbond() {
         ],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond 150 tokens; failed
-    let msg = HandleMsg::Unbond {
+    let msg = ExecuteMsg::Unbond {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        amount: Uint128(150u128),
+        amount: Uint128::from(150u128),
     };
 
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     match res {
         StdError::GenericErr { msg, .. } => {
             assert_eq!(msg, "Cannot unbond more than bond amount");
@@ -287,40 +289,35 @@ fn test_unbond() {
     };
 
     // normal unbond
-    let msg = HandleMsg::Unbond {
+    let msg = ExecuteMsg::Unbond {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        amount: Uint128(100u128),
+        amount: Uint128::from(100u128),
     };
 
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.messages,
         vec![
-            WasmMsg::Execute {
-                contract_addr: "staking".into(),
-                msg: to_binary(&Cw20HandleMsg::Transfer {
-                    recipient: "addr".into(),
-                    amount: Uint128(100u128),
+            SubMsg::new(WasmMsg::Execute {
+                contract_addr: "staking".to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: "addr".to_string(),
+                    amount: Uint128::from(100u128),
                 })
                 .unwrap(),
-                send: vec![],
-            }
-            .into(),
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: "cosmos2contract".into(),
-                to_address: "addr".into(),
+                funds: vec![],
+            }),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
                 amount: vec![coin(99u128, ORAI_DENOM)],
-            })
-            .into(),
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: "cosmos2contract".into(),
-                to_address: "addr".into(),
+            })),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
                 amount: vec![coin(199u128, ATOM_DENOM)],
-            })
-            .into()
+            }))
         ]
     );
 
@@ -329,7 +326,7 @@ fn test_unbond() {
         mock_env(),
         QueryMsg::PoolInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         },
     )
@@ -339,9 +336,9 @@ fn test_unbond() {
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: Addr::unchecked("asset")
             },
-            staking_token: "staking".into(),
+            staking_token: Addr::unchecked("staking"),
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::from_ratio(300u128, 100u128),
             pending_reward: Uint128::zero(),
@@ -355,7 +352,7 @@ fn test_unbond() {
         mock_env(),
         QueryMsg::RewardInfo {
             asset_info: None,
-            staker_addr: "addr".into(),
+            staker_addr: Addr::unchecked("addr"),
         },
     )
     .unwrap();
@@ -363,7 +360,7 @@ fn test_unbond() {
     assert_eq!(
         res,
         RewardInfoResponse {
-            staker_addr: "addr".into(),
+            staker_addr: Addr::unchecked("addr"),
             reward_infos: vec![],
         }
     );
@@ -371,261 +368,287 @@ fn test_unbond() {
 
 #[test]
 fn test_auto_stake() {
-    let mut deps = mock_dependencies_with_querier(&[]);
-    deps.querier.with_pair_info("pair".into());
-    deps.querier.with_pool_assets([
-        Asset {
-            info: AssetInfo::NativeToken {
-                denom: "uusd".to_string(),
-            },
-            amount: Uint128::from(100u128),
-        },
-        Asset {
-            info: AssetInfo::Token {
-                contract_addr: "asset".into(),
-            },
-            amount: Uint128::from(1u128),
-        },
+    let mut app = MockApp::new(&[(&"addr".to_string(), &[coin(10000000000u128, ORAI_DENOM)])]);
+
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_factory_and_pair_contract(
+        Box::new(
+            create_entry_points_testing!(oraiswap_factory)
+                .with_reply(oraiswap_factory::contract::reply),
+        ),
+        Box::new(
+            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+        ),
+    );
+
+    let asset_addr = app.create_token("asset");
+    let reward_addr = app.create_token("reward");
+    // update other contract token balance
+    app.set_token_balances(&[
+        (
+            &"reward".to_string(),
+            &[(&"addr".to_string(), &Uint128::from(10000000000u128))],
+        ),
+        (
+            &"asset".to_string(),
+            &[(&"addr".to_string(), &Uint128::from(10000000000u128))],
+        ),
     ]);
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "reward".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let asset_infos = [
+        AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfo::Token {
+            contract_addr: asset_addr.clone(),
+        },
+    ];
+
+    // create pair
+    let pair_addr = app.create_pair(asset_infos.clone()).unwrap();
+
+    let PairResponse { info: pair_info } = app
+        .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})
+        .unwrap();
+
+    // set allowance
+    app.execute(
+        Addr::unchecked("addr"),
+        asset_addr.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr.to_string(),
+            amount: Uint128::from(100u128),
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
+
+    // provide liquidity
+    // successfully provide liquidity for the exist pool
+    let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(100u128),
+            },
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: asset_addr.clone(),
+                },
+                amount: Uint128::from(100u128),
+            },
+        ],
+        slippage_tolerance: None,
+        receiver: None,
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr"),
+            pair_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            }],
+        )
+        .unwrap();
+
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: reward_addr.clone(),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: app.oracle_addr.clone(),
+        factory_addr: app.factory_addr.clone(),
         base_denom: None,
     };
 
-    let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let staking_addr = app
+        .instantiate(code_id, Addr::unchecked("addr"), &msg, &[], "staking")
+        .unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+    // set allowance
+    app.execute(
+        Addr::unchecked("addr"),
+        asset_addr.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: staking_addr.to_string(),
+            amount: Uint128::from(100u128),
+            expires: None,
         },
-        staking_token: "lptoken".into(),
+        &[],
+    )
+    .unwrap();
+
+    let msg = ExecuteMsg::RegisterAsset {
+        asset_info: AssetInfo::Token {
+            contract_addr: asset_addr.clone(),
+        },
+        staking_token: pair_info.liquidity_token.clone(),
     };
 
-    let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = app
+        .execute(Addr::unchecked("owner"), staking_addr.clone(), &msg, &[])
+        .unwrap();
 
     // no token asset
-    let msg = HandleMsg::AutoStake {
+    let msg = ExecuteMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128(100u128),
+                amount: Uint128::from(100u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128(100u128),
+                amount: Uint128::from(100u128),
             },
         ],
         slippage_tolerance: None,
     };
-    let info = mock_info(
-        "addr0000",
+
+    let res = app.execute(
+        Addr::unchecked("addr"),
+        staking_addr.clone(),
+        &msg,
         &[Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128(100u128),
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(100u128),
         }],
     );
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert_eq!(res, StdError::generic_err("Missing token asset"));
+
+    app.assert_fail(res);
 
     // no native asset
-    let msg = HandleMsg::AutoStake {
+    let msg = ExecuteMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(1u128),
             },
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(1u128),
             },
         ],
         slippage_tolerance: None,
     };
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert_eq!(res, StdError::generic_err("Missing native asset"));
 
-    let msg = HandleMsg::AutoStake {
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+
+    app.assert_fail(res);
+
+    let msg = ExecuteMsg::AutoStake {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
-                    denom: "uusd".to_string(),
+                    denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128(100u128),
+                amount: Uint128::from(100u128),
             },
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: asset_addr.clone(),
                 },
-                amount: Uint128(1u128),
+                amount: Uint128::from(1u128),
             },
         ],
         slippage_tolerance: None,
     };
 
     // attempt with no coins
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
-    assert_eq!(
-        res,
-        StdError::generic_err(
-            "Native token balance mismatch between the argument and the transferred"
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+    app.assert_fail(res);
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr"),
+            staking_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            }],
         )
-    );
-
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128(100u128),
-        }],
-    );
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-    assert_eq!(
-        res.messages,
-        vec![
-            WasmMsg::Execute {
-                contract_addr: "asset".into(),
-                msg: to_binary(&Cw20HandleMsg::TransferFrom {
-                    owner: "addr0000".into(),
-                    recipient: MOCK_CONTRACT_ADDR.into(),
-                    amount: Uint128(1u128),
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: "asset".into(),
-                msg: to_binary(&Cw20HandleMsg::IncreaseAllowance {
-                    spender: "pair".into(),
-                    amount: Uint128(1),
-                    expires: None,
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: "pair".into(),
-                msg: to_binary(&PairHandleMsg::ProvideLiquidity {
-                    assets: [
-                        Asset {
-                            info: AssetInfo::NativeToken {
-                                denom: "uusd".to_string()
-                            },
-                            amount: Uint128(99u128),
-                        },
-                        Asset {
-                            info: AssetInfo::Token {
-                                contract_addr: "asset".into()
-                            },
-                            amount: Uint128(1u128),
-                        },
-                    ],
-                    slippage_tolerance: None,
-                    receiver: None,
-                })
-                .unwrap(),
-                send: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128(99u128), // 1% tax
-                }],
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: MOCK_CONTRACT_ADDR.into(),
-                msg: to_binary(&HandleMsg::AutoStakeHook {
-                    asset_info: AssetInfo::Token {
-                        contract_addr: "asset".into()
-                    },
-                    staking_token: "lptoken".into(),
-                    staker_addr: "addr0000".into(),
-                    prev_staking_token_amount: Uint128(0),
-                })
-                .unwrap(),
-                send: vec![],
-            }
-            .into()
-        ]
-    );
-
-    deps.querier.with_token_balance(Uint128(100u128)); // recive 100 lptoken
+        .unwrap();
 
     // wrong asset
-    let msg = HandleMsg::AutoStakeHook {
+    let msg = ExecuteMsg::AutoStakeHook {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset1".into(),
+            contract_addr: Addr::unchecked("asset1"),
         },
-        staking_token: "lptoken".into(),
-        staker_addr: "addr0000".into(),
-        prev_staking_token_amount: Uint128(0),
+        staking_token: pair_info.liquidity_token.clone(),
+        staker_addr: Addr::unchecked("addr"),
+        prev_staking_token_amount: Uint128::zero(),
     };
-    let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err(); // pool not found error
+    let res = app.execute(staking_addr.clone(), staking_addr.clone(), &msg, &[]);
+    // pool not found error
+    app.assert_fail(res);
 
     // valid msg
-    let msg = HandleMsg::AutoStakeHook {
+    let msg = ExecuteMsg::AutoStakeHook {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: asset_addr.clone(),
         },
-        staking_token: "lptoken".into(),
-        staker_addr: "addr0000".into(),
-        prev_staking_token_amount: Uint128(0),
+        staking_token: pair_info.liquidity_token.clone(),
+        staker_addr: Addr::unchecked("addr"),
+        prev_staking_token_amount: Uint128::zero(),
     };
 
     // unauthorized attempt
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
-    assert_eq!(res, StdError::generic_err("unauthorized"));
+    let res = app.execute(Addr::unchecked("addr"), staking_addr.clone(), &msg, &[]);
+    app.assert_fail(res);
 
     // successfull attempt
-    let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    let res = app
+        .execute(staking_addr.clone(), staking_addr.clone(), &msg, &[])
+        .unwrap();
     assert_eq!(
-        res.attributes,
+        // first attribute is _contract_addr
+        res.get_attributes(1),
         vec![
             attr("action", "bond"),
-            attr("staker_addr", "addr0000"),
-            attr("asset_info", "asset"),
-            attr("amount", "100"),
+            attr("staker_addr", "addr"),
+            attr("asset_info", asset_addr.as_str()),
+            attr("amount", "1"),
         ]
     );
 
-    let data = query(
-        deps.as_ref(),
-        mock_env(),
-        QueryMsg::PoolInfo {
-            asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+    let pool_info: PoolInfoResponse = app
+        .query(
+            staking_addr.clone(),
+            &QueryMsg::PoolInfo {
+                asset_info: AssetInfo::Token {
+                    contract_addr: asset_addr.clone(),
+                },
             },
-        },
-    )
-    .unwrap();
-    let pool_info: PoolInfoResponse = from_binary(&data).unwrap();
+        )
+        .unwrap();
+
     assert_eq!(
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: asset_addr.clone()
             },
-            staking_token: "lptoken".into(),
-            total_bond_amount: Uint128(100u128),
+            staking_token: pair_info.liquidity_token.clone(),
+            total_bond_amount: Uint128::from(2u128),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,

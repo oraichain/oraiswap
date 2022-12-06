@@ -1,11 +1,10 @@
-use cosmwasm_std::{Api, CanonicalAddr, Decimal, HumanAddr, Order, StdResult, Storage, Uint128};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
 use cosmwasm_storage::ReadonlyBucket;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use crate::state::{rewards_store, MigrationParams, RewardInfo, PREFIX_REWARD};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct LegacyPoolInfo {
     pub staking_token: CanonicalAddr,
     pub pending_reward: Uint128, // not distributed amount due to zero bonding
@@ -21,7 +20,7 @@ pub struct LegacyPoolInfo {
 }
 
 // migrate reward store
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct LegacyRewardInfo {
     pub index: Decimal,
     pub bond_amount: Uint128,
@@ -31,6 +30,7 @@ pub struct LegacyRewardInfo {
 
 /// returns a bucket with all rewards owned by this owner (query it by owner)
 /// (read-only version for queries)
+#[allow(dead_code)]
 pub fn legacy_rewards_read<'a>(
     storage: &'a dyn Storage,
     owner: &CanonicalAddr,
@@ -38,14 +38,15 @@ pub fn legacy_rewards_read<'a>(
     ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
 }
 
+#[allow(dead_code)]
 pub fn migrate_rewards_store(
     store: &mut dyn Storage,
     api: &dyn Api,
-    staker_addrs: Vec<HumanAddr>,
+    staker_addrs: Vec<Addr>,
 ) -> StdResult<()> {
     let list_staker_addrs: Vec<CanonicalAddr> = staker_addrs
         .iter()
-        .map(|addr| Ok(api.canonical_address(addr)?))
+        .map(|addr| Ok(api.addr_canonicalize(addr.as_str())?))
         .collect::<StdResult<Vec<CanonicalAddr>>>()?;
     for staker_addr in list_staker_addrs {
         let rewards_bucket = legacy_rewards_read(store, &staker_addr);

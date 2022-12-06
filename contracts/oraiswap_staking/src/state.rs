@@ -1,6 +1,5 @@
+use cosmwasm_schema::cw_serde;
 use oraiswap::asset::AssetRaw;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
@@ -12,7 +11,7 @@ static PREFIX_STAKER: &[u8] = b"staker";
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
 static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     pub owner: CanonicalAddr,
     pub rewarder: CanonicalAddr,
@@ -29,7 +28,7 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<Config> {
     singleton_read(storage, KEY_CONFIG).load()
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PoolInfo {
     pub staking_token: CanonicalAddr,
     pub pending_reward: Uint128, // not distributed amount due to zero bonding
@@ -38,7 +37,7 @@ pub struct PoolInfo {
     pub migration_params: Option<MigrationParams>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct MigrationParams {
     pub index_snapshot: Decimal,
     pub deprecated_staking_token: CanonicalAddr,
@@ -56,7 +55,7 @@ pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Pool
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardInfo {
     pub native_token: bool,
     pub index: Decimal,
@@ -121,20 +120,4 @@ pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResul
     let weight_bucket: ReadonlyBucket<Vec<AssetRaw>> =
         ReadonlyBucket::new(storage, PREFIX_REWARDS_PER_SEC);
     weight_bucket.load(asset_key)
-}
-
-// upper bound key by 1, for Order::Ascending
-pub fn calc_range_start(start_after: Option<Vec<u8>>) -> Option<Vec<u8>> {
-    start_after.map(|mut input| {
-        // zero out all trailing 255, increment first that is not such
-        for i in (0..input.len()).rev() {
-            if input[i] == 255 {
-                input[i] = 0;
-            } else {
-                input[i] += 1;
-                break;
-            }
-        }
-        input
-    })
 }
