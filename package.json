@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "gen-ts": "node gen-ts.js",
+    "gen-ts": "yarn ts-node gen-ts.ts",
     "build": "bash build_release.sh"
   },
   "dependencies": {
