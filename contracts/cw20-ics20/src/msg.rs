@@ -75,7 +75,6 @@ pub struct TransferMsg {
 pub struct TransferBackMsg {
     /// the local ibc endpoint you want to send tokens back on
     pub local_ibc_endpoint: IbcEndpoint,
-    pub cw20_denom: String,
     pub remote_address: String,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,

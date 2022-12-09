@@ -189,7 +189,7 @@ pub fn execute_transfer_back_to_remote_chain(
     }
 
     // should be in form port/channel/denom
-    let cw20_mapping = get_cw20_mapping_from_cw20_denom(deps.as_ref(), msg.cw20_denom)?;
+    let cw20_mapping = get_cw20_mapping_from_cw20_denom(deps.as_ref(), amount.denom())?;
     let ibc_denom = cw20_mapping.key;
 
     // ensure the requested channel is registered
@@ -825,6 +825,7 @@ mod test {
         let denom = "uatom";
         let amount = 1234567u128;
         let cw20_denom = "cw20:token-addr";
+        let cw20_raw_denom = "token-addr";
         let local_channel = "channel-1234";
         let mut deps = setup(&[remote_channel, local_channel], &[]);
 
@@ -854,7 +855,6 @@ mod test {
                 channel_id: local_channel.to_string(),
             },
             remote_address: "foreign-address".to_string(),
-            cw20_denom: cw20_denom.to_string(),
             timeout: Some(DEFAULT_TIMEOUT),
             memo: None,
         };
@@ -866,7 +866,7 @@ mod test {
         });
 
         // insufficient funds case because we need to receive from remote chain first
-        let info = mock_info("custom-addr", &[]);
+        let info = mock_info(cw20_raw_denom, &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap_err();
         assert_eq!(res, ContractError::InsufficientFunds {});
 
