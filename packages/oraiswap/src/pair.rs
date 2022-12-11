@@ -1,10 +1,11 @@
+use std::convert::TryInto;
+
 use crate::{
     asset::{Asset, AssetInfo, PairInfo},
     error::ContractError,
-    math::Converter256,
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Decimal256, Uint256};
+use cosmwasm_std::{Decimal256, StdError, Uint256};
 
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
@@ -129,9 +130,15 @@ pub fn compute_swap(
     // commission will be absorbed to pool
     let return_amount = return_amount - commission_amount;
     Ok((
-        return_amount.into_u128(),
-        spread_amount.into_u128(),
-        commission_amount.into_u128(),
+        return_amount
+            .try_into()
+            .map_err(|err| StdError::from(err))?,
+        spread_amount
+            .try_into()
+            .map_err(|err| StdError::from(err))?,
+        commission_amount
+            .try_into()
+            .map_err(|err| StdError::from(err))?,
     ))
 }
 
@@ -171,8 +178,12 @@ pub fn compute_offer_amount(
     }
 
     Ok((
-        offer_amount.into_u128(),
-        spread_amount.into_u128(),
-        commission_amount.into_u128(),
+        offer_amount.try_into().map_err(|err| StdError::from(err))?,
+        spread_amount
+            .try_into()
+            .map_err(|err| StdError::from(err))?,
+        commission_amount
+            .try_into()
+            .map_err(|err| StdError::from(err))?,
     ))
 }
