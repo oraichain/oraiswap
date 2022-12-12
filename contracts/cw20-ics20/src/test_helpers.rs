@@ -5,7 +5,7 @@ use crate::ibc::{ibc_channel_connect, ibc_channel_open, ICS20_ORDERING, ICS20_VE
 use crate::state::ChannelInfo;
 
 use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR,
 };
 use cosmwasm_std::{
     Addr, DepsMut, IbcChannel, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, OwnedDeps,
@@ -14,7 +14,7 @@ use cosmwasm_std::{
 use crate::msg::{AllowMsg, InitMsg};
 
 pub const DEFAULT_TIMEOUT: u64 = 3600; // 1 hour,
-pub const CONTRACT_PORT: &str = "ibc:wasm1234567890abcdef";
+pub const CONTRACT_PORT: &str = "wasm.cosmos2contract"; // wasm.MOCK_CONTRACT_ADDR
 pub const REMOTE_PORT: &str = "transfer";
 pub const CONNECTION_ID: &str = "connection-2";
 

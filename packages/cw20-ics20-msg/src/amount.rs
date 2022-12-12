@@ -78,10 +78,16 @@ impl Amount {
 
 impl Amount {
     fn mul_ratio_decimal(&self, ratio: Decimal) -> StdResult<Uint128> {
-        Decimal::one()
+        let result = Decimal::one()
             .checked_mul(ratio)
             .map_err(|err| StdError::generic_err(err.to_string()))
-            .map(|coeff| self.amount() * coeff)
+            .map(|coeff| self.amount() * coeff)?;
+        if result.is_zero() {
+            return Err(StdError::generic_err(
+                "Converting decimals results in a zero amount. Revert this transaction!",
+            ));
+        }
+        Ok(result)
     }
 
     pub fn convert_remote_to_cw20(

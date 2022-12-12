@@ -6,7 +6,7 @@ use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
     IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
-    IbcReceiveResponse, Reply, Response, StdError, Storage, SubMsg, SubMsgResult, Uint128, WasmMsg,
+    IbcReceiveResponse, Reply, Response, Storage, SubMsg, SubMsgResult, Uint128, WasmMsg,
 };
 
 use crate::error::{ContractError, Never};
@@ -340,6 +340,7 @@ fn handle_ibc_packet_receive_native_remote_chain(
 
     // key in form transfer/channel-0/foo
     let ibc_denom = get_key_ics20_ibc_denom(&packet.dest.port_id, &packet.dest.channel_id, denom);
+    println!("ibc denom: {}", ibc_denom);
 
     let cw20_mapping = cw20_ics20_denoms()
         .load(storage, &ibc_denom)
@@ -351,12 +352,7 @@ fn handle_ibc_packet_receive_native_remote_chain(
         msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
             recipient: msg.receiver.clone(),
             amount: to_send
-                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)
-                .map_err(|_| {
-                    ContractError::Std(StdError::generic_err(
-                        "Invalid zero amount when converting from remote to cw20",
-                    ))
-                })?,
+                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)?,
         })?,
         funds: vec![],
     }
@@ -508,12 +504,7 @@ fn on_packet_failure(
         msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
             recipient: msg.sender.clone(),
             amount: to_send
-                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)
-                .map_err(|_| {
-                    ContractError::Std(StdError::generic_err(
-                        "Invalid zero amount when converting from remote to cw20",
-                    ))
-                })?,
+                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)?,
         })?,
         funds: vec![],
     }
@@ -563,6 +554,10 @@ pub fn send_amount(amount: Amount, recipient: String, msg: Option<Binary>) -> Co
             .into()
         }
     }
+}
+
+pub fn parse_ibc_wasm_port_id(contract_addr: String) -> String {
+    format!("wasm.{}", contract_addr)
 }
 
 #[cfg(test)]
@@ -978,10 +973,7 @@ mod test {
         );
 
         let pair = Cw20PairMsg {
-            dest_ibc_endpoint: IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: send_channel.to_string(),
-            },
+            local_channel_id: send_channel.to_string(),
             denom: denom.to_string(),
             cw20_denom: cw20_denom.to_string(),
             remote_decimals: 18u8,

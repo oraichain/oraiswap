@@ -9,7 +9,7 @@ use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::ibc::Ics20Packet;
+use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, Cw20PairMsg,
     Cw20PairQuery, ExecuteMsg, InitMsg, ListAllowedResponse, ListChannelsResponse,
@@ -193,9 +193,9 @@ pub fn execute_transfer_back_to_remote_chain(
     let ibc_denom = cw20_mapping.key;
 
     // ensure the requested channel is registered
-    if !CHANNEL_INFO.has(deps.storage, &msg.local_ibc_endpoint.channel_id) {
+    if !CHANNEL_INFO.has(deps.storage, &msg.local_channel_id) {
         return Err(ContractError::NoSuchChannel {
-            id: msg.local_ibc_endpoint.channel_id,
+            id: msg.local_channel_id,
         });
     }
     let config = CONFIG.load(deps.storage)?;
@@ -208,16 +208,10 @@ pub fn execute_transfer_back_to_remote_chain(
     // timeout is in nanoseconds
     let timeout = env.block.time.plus_seconds(timeout_delta);
     // need to convert decimal of cw20 to remote decimal before transferring
-    let amount_remote = amount
-        .convert_cw20_to_remote(
-            cw20_mapping.cw20_map.remote_decimals,
-            cw20_mapping.cw20_map.cw20_decimals,
-        )
-        .map_err(|_| {
-            ContractError::Std(StdError::generic_err(
-                "Invalid zero amount when converting from cw20 to remote",
-            ))
-        })?;
+    let amount_remote = amount.convert_cw20_to_remote(
+        cw20_mapping.cw20_map.remote_decimals,
+        cw20_mapping.cw20_map.cw20_decimals,
+    )?;
 
     // build ics20 packet
     let packet = Ics20Packet::new(
@@ -232,14 +226,14 @@ pub fn execute_transfer_back_to_remote_chain(
     // because we are transferring back, we reduce the channel's balance
     reduce_channel_balance(
         deps.storage,
-        &msg.local_ibc_endpoint.channel_id,
+        &msg.local_channel_id,
         &ibc_denom,
         amount_remote,
     )?;
 
     // prepare ibc message
     let msg = IbcMsg::SendPacket {
-        channel_id: msg.local_ibc_endpoint.channel_id,
+        channel_id: msg.local_channel_id,
         data: to_binary(&packet)?,
         timeout: timeout.into(),
     };
@@ -301,15 +295,15 @@ pub fn execute_allow(
 /// It cannot block or reduce the limit to avoid forcible sticking tokens in the channel.
 pub fn execute_update_cw20_mapping_pair(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     mapping_pair_msg: Cw20PairMsg,
 ) -> Result<Response, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
     let ibc_denom = get_key_ics20_ibc_denom(
-        &mapping_pair_msg.dest_ibc_endpoint.port_id,
-        &mapping_pair_msg.dest_ibc_endpoint.channel_id,
+        &parse_ibc_wasm_port_id(env.contract.address.into_string()),
+        &mapping_pair_msg.local_channel_id,
         &mapping_pair_msg.denom,
     );
 
@@ -575,10 +569,7 @@ mod test {
             },
         )
         .unwrap_err();
-        assert_eq!(
-            err,
-            StdError::not_found("cw20_ics20_latest::state::ChannelInfo")
-        );
+        assert_eq!(err, StdError::not_found("cw20_ics20::state::ChannelInfo"));
     }
 
     #[test]
@@ -586,10 +577,7 @@ mod test {
         let mut deps = setup(&["channel-3", "channel-7"], &[]);
 
         let update = Cw20PairMsg {
-            dest_ibc_endpoint: IbcEndpoint {
-                port_id: "mars-port".to_string(),
-                channel_id: "mars-channel".to_string(),
-            },
+            local_channel_id: "mars-channel".to_string(),
             denom: "earth".to_string(),
             cw20_denom: "cw20:foobar".to_string(),
             remote_decimals: 18,
@@ -622,7 +610,7 @@ mod test {
         println!("response: {:?}", response);
         assert_eq!(
             response.pairs.first().unwrap().key,
-            "mars-port/mars-channel/earth".to_string()
+            format!("{}/mars-channel/earth", CONTRACT_PORT)
         );
 
         // not found case
@@ -830,10 +818,7 @@ mod test {
         let mut deps = setup(&[remote_channel, local_channel], &[]);
 
         let pair = Cw20PairMsg {
-            dest_ibc_endpoint: IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: local_channel.to_string(),
-            },
+            local_channel_id: local_channel.to_string(),
             denom: denom.to_string(),
             cw20_denom: cw20_denom.to_string(),
             remote_decimals: 18u8,
@@ -850,10 +835,7 @@ mod test {
 
         // execute
         let mut transfer = TransferBackMsg {
-            local_ibc_endpoint: IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: local_channel.to_string(),
-            },
+            local_channel_id: local_channel.to_string(),
             remote_address: "foreign-address".to_string(),
             timeout: Some(DEFAULT_TIMEOUT),
             memo: None,
@@ -880,7 +862,7 @@ mod test {
 
         // error cases
         // revert transfer state to correct state
-        transfer.local_ibc_endpoint.channel_id = local_channel.to_string();
+        transfer.local_channel_id = local_channel.to_string();
         let invalid_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: original_sender.to_string(),
             amount: Uint128::from(amount),
@@ -933,10 +915,7 @@ mod test {
 
         // reject case with bad channel id
         let pair = Cw20PairMsg {
-            dest_ibc_endpoint: IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: "not_registered_channel".to_string(),
-            },
+            local_channel_id: "not_registered_channel".to_string(),
             denom: denom.to_string(),
             cw20_denom: "random_cw20_denom".to_string(),
             remote_decimals: 18u8,
@@ -951,7 +930,7 @@ mod test {
         )
         .unwrap();
 
-        transfer.local_ibc_endpoint.channel_id = "not_registered_channel".to_string();
+        transfer.local_channel_id = "not_registered_channel".to_string();
         let invalid_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: original_sender.to_string(),
             amount: Uint128::from(amount),

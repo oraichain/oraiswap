@@ -46,7 +46,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct Cw20PairMsg {
-    pub dest_ibc_endpoint: IbcEndpoint,
+    pub local_channel_id: String,
     /// native denom of the remote chain. Eg: orai
     pub denom: String,
     /// cw20 denom of the local chain. Eg: cw20:orai...
@@ -74,7 +74,7 @@ pub struct TransferMsg {
 #[cw_serde]
 pub struct TransferBackMsg {
     /// the local ibc endpoint you want to send tokens back on
-    pub local_ibc_endpoint: IbcEndpoint,
+    pub local_channel_id: String,
     pub remote_address: String,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,
