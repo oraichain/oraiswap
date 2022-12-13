@@ -34,8 +34,8 @@ pub struct Ics20Packet {
     pub receiver: String,
     /// the sender address
     pub sender: String,
-    /// optional memo
-    pub memo: Option<String>,
+    // /// optional memo
+    // pub memo: Option<String>,
 }
 
 impl Ics20Packet {
@@ -44,14 +44,14 @@ impl Ics20Packet {
         denom: T,
         sender: &str,
         receiver: &str,
-        memo: Option<String>,
+        // memo: Option<String>,
     ) -> Self {
         Ics20Packet {
             denom: denom.into(),
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
-            memo,
+            // memo,
         }
     }
 
@@ -449,9 +449,9 @@ fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespon
         attr("success", "true"),
     ];
 
-    if let Some(memo) = msg.memo {
-        attributes.push(attr("memo", memo));
-    }
+    // if let Some(memo) = msg.memo {
+    //     attributes.push(attr("memo", memo));
+    // }
 
     Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
@@ -590,10 +590,10 @@ mod test {
             "ucosm",
             "cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n",
             "wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc",
-            None,
+            // None,
         );
         // Example message generated from the SDK
-        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n","memo":null}"#;
+        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
 
         let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
         assert_eq!(expected, encdoded.as_str());
@@ -641,7 +641,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-            memo: None,
+            // memo: None,
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),
@@ -702,8 +702,7 @@ mod test {
             amount: Uint128::new(987654321),
             sender: "local-sender".to_string(),
             receiver: "remote-rcpt".to_string(),
-
-            memo: None,
+            // memo: None,
         };
         let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
         assert_eq!(
@@ -854,8 +853,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-
-            memo: None,
+            // memo: None,
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),

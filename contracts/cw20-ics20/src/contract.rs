@@ -150,7 +150,7 @@ pub fn execute_transfer(
         amount.denom(),
         sender.as_ref(),
         &msg.remote_address,
-        msg.memo,
+        // msg.memo,
     );
     packet.validate()?;
 
@@ -219,7 +219,7 @@ pub fn execute_transfer_back_to_remote_chain(
         ibc_denom.clone(),
         sender.as_str(),
         &msg.remote_address,
-        msg.memo,
+        // msg.memo,
     );
     packet.validate()?;
 
@@ -787,7 +787,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-            memo: Some("memo".to_string()),
+            // memo: Some("memo".to_string()),
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),
@@ -891,7 +891,7 @@ mod test {
             );
             assert_eq!(msg.sender.as_str(), original_sender);
             assert_eq!(msg.receiver.as_str(), "foreign-address");
-            assert_eq!(msg.memo, None);
+            // assert_eq!(msg.memo, None);
         } else {
             panic!("Unexpected return message: {:?}", res.messages[0]);
         }
