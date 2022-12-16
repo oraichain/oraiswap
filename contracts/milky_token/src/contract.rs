@@ -292,7 +292,10 @@ pub fn new_query_token_info(deps: Deps) -> StdResult<NewTokenInfoResponse> {
         .api
         .human_address(&router_contract_read(deps.storage).load()?)?;
     Ok(NewTokenInfoResponse {
-        token_info_response,
+        name: token_info_response.name,
+        symbol: token_info_response.symbol,
+        decimals: token_info_response.decimals,
+        total_supply: token_info_response.total_supply,
         tax_receiver,
         router_contract,
     })

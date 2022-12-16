@@ -95,7 +95,10 @@ pub struct MinterDataMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct NewTokenInfoResponse {
-    pub token_info_response: TokenInfoResponse,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: Uint128,
     /// cap is how many more tokens can be issued by the minter
     pub tax_receiver: HumanAddr,
     pub router_contract: HumanAddr,
