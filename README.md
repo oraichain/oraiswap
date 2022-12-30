@@ -98,5 +98,5 @@ impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
 END
 
 # gen typescript code
-yarn gen-ts
+yarn gen-ts --force --react-query
 ```

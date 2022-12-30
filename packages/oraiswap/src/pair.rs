@@ -46,6 +46,16 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+pub enum PairExecuteMsgCw20 {
+    /// Swap an offer asset to the other
+    Swap {
+        belief_price: Option<Decimal>,
+        max_spread: Option<Decimal>,
+        to: Option<Addr>,
+    },
+}
+
+#[cw_serde]
 pub enum Cw20HookMsg {
     /// Sell a given amount of asset
     Swap {

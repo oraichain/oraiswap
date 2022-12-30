@@ -11,7 +11,7 @@ use crate::state::{Config, CONFIG};
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
-use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
+use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20};
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
 use oraiswap::router::{ExecuteMsg, SwapOperation};
 
@@ -30,7 +30,9 @@ pub fn execute_swap_operation(
 
     let config: Config = CONFIG.load(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
-    let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
+    let factory_addr_v2 = deps.api.addr_humanize(&config.factory_addr_v2)?;
+    let pair_config = query_pair_config(&deps.querier, factory_addr.clone())
+        .or_else(|_| query_pair_config(&deps.querier, factory_addr_v2.clone()))?;
     let oracle_contract = OracleContract(pair_config.oracle_addr.clone());
 
     let messages: Vec<CosmosMsg> = match operation {
@@ -41,8 +43,15 @@ pub fn execute_swap_operation(
             let pair_info: PairInfo = query_pair_info(
                 &deps.querier,
                 factory_addr,
-                &[offer_asset_info.clone(), ask_asset_info],
-            )?;
+                &[offer_asset_info.clone(), ask_asset_info.clone()],
+            )
+            .or_else(|_| -> StdResult<PairInfo> {
+                query_pair_info(
+                    &deps.querier,
+                    factory_addr_v2.clone(),
+                    &[offer_asset_info.clone(), ask_asset_info.clone()],
+                )
+            })?;
 
             let amount = match offer_asset_info.clone() {
                 AssetInfo::NativeToken { denom } => {
@@ -174,8 +183,7 @@ fn asset_into_swap_msg(
             msg: to_binary(&Cw20ExecuteMsg::Send {
                 contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
-                msg: to_binary(&PairExecuteMsg::Swap {
-                    offer_asset,
+                msg: to_binary(&PairExecuteMsgCw20::Swap {
                     belief_price: None,
                     max_spread,
                     to,
