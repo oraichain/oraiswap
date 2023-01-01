@@ -146,10 +146,6 @@ fn simulate_swap_operations(
     let config: Config = CONFIG.load(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
     let factory_addr_v2 = deps.api.addr_humanize(&config.factory_addr_v2)?;
-    let pair_config = query_pair_config(&deps.querier, factory_addr.clone())
-        .or_else(|_| query_pair_config(&deps.querier, factory_addr_v2.clone()))?;
-    let oracle_contract = OracleContract(pair_config.oracle_addr);
-
     let operations_len = operations.len();
     if operations_len == 0 {
         return Err(StdError::generic_err(
@@ -159,6 +155,9 @@ fn simulate_swap_operations(
 
     let mut offer_amount = offer_amount;
     for operation in operations.into_iter() {
+        let pair_config = query_pair_config(&deps.querier, factory_addr.clone())
+            .or_else(|_| query_pair_config(&deps.querier, factory_addr_v2.clone()))?;
+        let oracle_contract = OracleContract(pair_config.oracle_addr);
         match operation {
             SwapOperation::OraiSwap {
                 offer_asset_info,
