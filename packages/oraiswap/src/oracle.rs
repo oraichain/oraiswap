@@ -41,9 +41,13 @@ pub enum ExecuteMsg {
 
 /// QueryMsg is defines available query datas
 #[cw_serde]
+#[derive(QueryResponses)]
+#[query_responses(nested)]
 pub enum QueryMsg {
     Treasury(OracleTreasuryQuery),
+    #[returns(ExchangeRateResponse)]
     Exchange(OracleExchangeQuery),
+    #[returns(ContractInfoResponse)]
     Contract(OracleContractQuery),
 }
 
