@@ -271,9 +271,11 @@ const fixNestedSchema = async (packagePath: string, update: boolean) => {
     packagePath,
     "artifacts",
     "schema",
-    "oraiswap-oracle.json"
+    basename(packagePath).replace(/_/g, "-") + ".json"
   );
+
   const schemaJSON = JSON.parse((await readFile(schemaFile)).toString());
+  if (!schemaJSON.query.anyOf) return;
   const responses = {};
   schemaJSON.query.anyOf = schemaJSON.query.anyOf.map((item: any) => {
     const ref = update ? item.$ref : item.properties[item.required[0]].$ref;
@@ -334,8 +336,9 @@ const nestedMap: {
   const contracts = await Promise.all(
     packages.map(async (packagePath) => {
       const baseName = basename(packagePath);
-      if (baseName === "oraiswap_oracle") {
-        const responses = await fixNestedSchema(packagePath, force);
+      // try fix nested schema if has
+      const responses = await fixNestedSchema(packagePath, force);
+      if (responses) {
         nestedMap[
           packagePath
             .split("/")
@@ -343,6 +346,7 @@ const nestedMap: {
             .replace(/(^\w|_\w)/g, (m, g1) => g1.slice(-1).toUpperCase())
         ] = responses;
       }
+
       return {
         name: baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase()),
         dir: join(packagePath, "artifacts", "schema"),

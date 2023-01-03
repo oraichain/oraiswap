@@ -440,7 +440,7 @@ fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespon
     let msg: Ics20Packet = from_binary(&packet.data)?;
 
     // similar event messages like ibctransfer module
-    let mut attributes = vec![
+    let attributes = vec![
         attr("action", "acknowledge"),
         attr("sender", &msg.sender),
         attr("receiver", &msg.receiver),
