@@ -2,12 +2,7 @@ import codegen from "@cosmwasm/ts-codegen";
 import { exec } from "child_process";
 import { join, basename, resolve as _resolve } from "path";
 import * as fs from "fs";
-import {
-  TypescriptParser,
-  ClassDeclaration,
-  InterfaceDeclaration,
-  File,
-} from "typescript-parser";
+import { TypescriptParser, File } from "typescript-parser";
 
 const {
   existsSync,
