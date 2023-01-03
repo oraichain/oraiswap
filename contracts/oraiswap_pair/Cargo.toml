@@ -2,7 +2,7 @@
 name = "oraiswap-pair"
 version = "0.0.0"
 authors = ["Terraform Labs, PTE.", "Oraichain Labs"]
-edition = "2018"
+edition = "2021"
 description = "A Oraiswap pair contract"
 license = "MIT"
 
@@ -23,17 +23,17 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cw2 = { version = "0.16.0" }
-cw20 = { version = "0.16.0" }
-cw20-base = { version = "0.16.0" }
-cosmwasm-std = { version = "1.1.8" }
-cw-storage-plus = { version = "0.16.0" }
+cw2 = { version = "1.0.1" }
+cw20 = { version = "1.0.1" }
+cw20-base = { version = "1.0.1" }
+cosmwasm-std = { version = "1.1.9" }
+cw-storage-plus = { version = "1.0.1" }
 integer-sqrt = "0.1.5"
 thiserror = { version = "1.0.23" }
-cosmwasm-schema = "1.1.8"
+cosmwasm-schema = "1.1.9"
 oraiswap = { path = "../../packages/oraiswap", default-features = false }
 
 [dev-dependencies]
-cosmwasm-storage = { version = "1.1.8" }
+cosmwasm-storage = { version = "1.1.9" }
 oraiswap-oracle = { path = "../oraiswap_oracle" }
 oraiswap-token = { path = "../oraiswap_token" }

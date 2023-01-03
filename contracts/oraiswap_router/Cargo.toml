@@ -2,7 +2,7 @@
 name = "oraiswap-router"
 version = "0.0.0"
 authors = ["Terraform Labs, PTE.", "Oraichain Labs"]
-edition = "2018"
+edition = "2021"
 description = "A Oraiswap router contract - provides multi-step operations to facilitate single sign operation"
 license = "Apache-2.0"
 
@@ -23,15 +23,15 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cw20 = { version = "0.16.0" }
-cosmwasm-std = { version = "1.1.8" }
+cw20 = { version = "1.0.1" }
+cosmwasm-std = { version = "1.1.9" }
 oraiswap = { path = "../../packages/oraiswap" }
-cw-storage-plus = { version = "0.16.0" }
+cw-storage-plus = { version = "1.0.1" }
 integer-sqrt = "0.1.5"
-cosmwasm-schema = "1.1.8"
+cosmwasm-schema = "1.1.9"
 
 [dev-dependencies]
-cosmwasm-storage = { version = "1.1.8" }
+cosmwasm-storage = { version = "1.1.9" }
 oraiswap-oracle = { path = "../oraiswap_oracle" }
 oraiswap-token = { path = "../oraiswap_token" }
 oraiswap-pair = { path = "../oraiswap_pair" }

@@ -1,13 +1,10 @@
 #![cfg(test)]
 
-use crate::ibc::{ibc_packet_receive, reply, Ics20Packet};
+use crate::ibc::{reply, Ics20Packet};
 use crate::msg::{AllowMsg, Cw20PairMsg, InitMsg};
 use crate::test_helpers::{CONTRACT_PORT, DEFAULT_TIMEOUT, REMOTE_PORT};
-use cosmwasm_std::testing::mock_env;
-use cosmwasm_std::{
-    to_binary, Addr, Empty, IbcEndpoint, IbcPacket, IbcPacketReceiveMsg, Timestamp, Uint128,
-    WasmMsg,
-};
+
+use cosmwasm_std::{to_binary, Addr, Empty, IbcEndpoint, IbcPacket, Timestamp};
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use crate::contract::{execute, instantiate, query};
@@ -22,7 +19,7 @@ pub fn contract_cw20_ics20_latest() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
-fn mock_receive_packet(
+fn _mock_receive_packet(
     my_channel: &str,
     remote_channel: &str,
     amount: u128,

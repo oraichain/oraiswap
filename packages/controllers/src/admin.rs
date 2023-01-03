@@ -1,8 +1,7 @@
-use schemars::JsonSchema;
 use std::fmt;
 use thiserror::Error;
 
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, schemars::JsonSchema};
 use cosmwasm_std::{
     attr, Addr, CustomQuery, Deps, DepsMut, MessageInfo, Response, StdError, StdResult,
 };

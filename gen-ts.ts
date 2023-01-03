@@ -242,6 +242,7 @@ const fixTs = async (outPath, enabledReactQuery = false) => {
 };
 
 const buildSchema = async (packagePath: string) => {
+  if (!existsSync(join(packagePath, "src", "bin"))) return;
   const artifactsFolder = join(packagePath, "artifacts");
   if (!existsSync(artifactsFolder)) await mkdir(artifactsFolder);
 
@@ -262,11 +263,15 @@ const buildSchema = async (packagePath: string) => {
 };
 
 const fixNestedSchema = async (packagePath: string, update: boolean) => {
+  const cargoMatched = (await readFile(join(packagePath, "Cargo.toml")))
+    .toString()
+    .match(/name\s*=\s*"(.*?)"/);
+  if (!cargoMatched) return;
   const schemaFile = join(
     packagePath,
     "artifacts",
     "schema",
-    basename(packagePath).replace(/_/g, "-") + ".json"
+    cargoMatched[1] + ".json"
   );
 
   const schemaJSON = JSON.parse((await readFile(schemaFile)).toString());
@@ -331,6 +336,8 @@ const nestedMap: {
   const contracts = await Promise.all(
     packages.map(async (packagePath) => {
       const baseName = basename(packagePath);
+      const schemaDir = join(packagePath, "artifacts", "schema");
+      if (!existsSync(schemaDir)) return false;
       // try fix nested schema if has
       const responses = await fixNestedSchema(packagePath, force);
       if (responses) {
@@ -344,10 +351,10 @@ const nestedMap: {
 
       return {
         name: baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase()),
-        dir: join(packagePath, "artifacts", "schema"),
+        dir: schemaDir,
       };
     })
   );
-  await genTS(contracts, tsFolder, enabledReactQuery);
+  await genTS(contracts.filter(Boolean), tsFolder, enabledReactQuery);
   await fixTs(tsFolder, enabledReactQuery);
 })();

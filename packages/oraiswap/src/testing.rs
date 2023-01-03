@@ -401,7 +401,7 @@ impl MockApp {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Decimal, Decimal256, Uint128};
+    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Decimal256, Uint128};
 
     use crate::{
         asset::AssetInfo,
