@@ -1,13 +1,10 @@
 #![cfg(test)]
 
-use crate::ibc::{ibc_packet_receive, reply, Ics20Packet};
+use crate::ibc::{reply, Ics20Packet};
 use crate::msg::{AllowMsg, Cw20PairMsg, InitMsg};
 use crate::test_helpers::{CONTRACT_PORT, DEFAULT_TIMEOUT, REMOTE_PORT};
-use cosmwasm_std::testing::mock_env;
-use cosmwasm_std::{
-    to_binary, Addr, Empty, IbcEndpoint, IbcPacket, IbcPacketReceiveMsg, Timestamp, Uint128,
-    WasmMsg,
-};
+
+use cosmwasm_std::{to_binary, Addr, Empty, IbcEndpoint, IbcPacket, Timestamp};
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use crate::contract::{execute, instantiate, query};
@@ -22,7 +19,7 @@ pub fn contract_cw20_ics20_latest() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
-fn mock_receive_packet(
+fn _mock_receive_packet(
     my_channel: &str,
     remote_channel: &str,
     amount: u128,
@@ -36,7 +33,7 @@ fn mock_receive_packet(
         amount: amount.into(),
         sender: remote_sender.to_string(),
         receiver: receiver.to_string(),
-        memo: None,
+        // memo: None,
     };
     IbcPacket::new(
         to_binary(&data).unwrap(),
@@ -53,16 +50,8 @@ fn mock_receive_packet(
     )
 }
 
-fn initialize_basic_data_for_testings() -> (
-    App,
-    Addr,
-    Addr,
-    IbcEndpoint,
-    IbcEndpoint,
-    String,
-    String,
-    u8,
-) {
+fn initialize_basic_data_for_testings() -> (App, Addr, Addr, IbcEndpoint, String, String, String, u8)
+{
     let mut router = mock_app();
 
     let cw20_ics20_id = router.store_code(contract_cw20_ics20_latest());
@@ -79,10 +68,7 @@ fn initialize_basic_data_for_testings() -> (
         channel_id: "channel-0".to_string(),
     };
 
-    let dest_ibc_endpoint = IbcEndpoint {
-        port_id: CONTRACT_PORT.to_string(),
-        channel_id: "channel-0".to_string(),
-    };
+    let local_channel_id = "channel-0".to_string();
 
     let native_denom = "orai";
     let cw20_denom = "cw20:oraifoobarhelloworld";
@@ -110,7 +96,7 @@ fn initialize_basic_data_for_testings() -> (
     // update receiver contract
 
     let update_allow_msg = ExecuteMsg::UpdateCw20MappingPair(Cw20PairMsg {
-        dest_ibc_endpoint: dest_ibc_endpoint.clone(),
+        local_channel_id: local_channel_id.clone(),
         denom: native_denom.to_string(),
         cw20_denom: cw20_denom.to_string(),
         remote_decimals,
@@ -130,7 +116,7 @@ fn initialize_basic_data_for_testings() -> (
         addr1,
         gov_cw20_ics20,
         src_ibc_endpoint,
-        dest_ibc_endpoint,
+        local_channel_id,
         native_denom.to_string(),
         cw20_denom.to_string(),
         remote_decimals,

@@ -1,12 +1,9 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
     IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
-    IbcReceiveResponse, Reply, Response, StdError, Storage, SubMsg, SubMsgResult, Uint128, WasmMsg,
+    IbcReceiveResponse, Reply, Response, Storage, SubMsg, SubMsgResult, Uint128, WasmMsg,
 };
 
 use crate::error::{ContractError, Never};
@@ -24,7 +21,7 @@ pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
 /// The format for sending an ics20 packet.
 /// Proto defined here: https://github.com/cosmos/cosmos-sdk/blob/v0.42.0/proto/ibc/applications/transfer/v1/transfer.proto#L11-L20
 /// This is compatible with the JSON serialization
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct Ics20Packet {
     /// amount of tokens to transfer is encoded as a string, but limited to u64 max
     pub amount: Uint128,
@@ -34,8 +31,8 @@ pub struct Ics20Packet {
     pub receiver: String,
     /// the sender address
     pub sender: String,
-    /// optional memo
-    pub memo: Option<String>,
+    // /// optional memo
+    // pub memo: Option<String>,
 }
 
 impl Ics20Packet {
@@ -44,19 +41,19 @@ impl Ics20Packet {
         denom: T,
         sender: &str,
         receiver: &str,
-        memo: Option<String>,
+        // memo: Option<String>,
     ) -> Self {
         Ics20Packet {
             denom: denom.into(),
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
-            memo,
+            // memo,
         }
     }
 
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self.amount.u128() > (u64::MAX as u128) {
+        if self.amount.u128() > (u128::MAX as u128) {
             Err(ContractError::AmountOverflow {})
         } else {
             Ok(())
@@ -340,6 +337,7 @@ fn handle_ibc_packet_receive_native_remote_chain(
 
     // key in form transfer/channel-0/foo
     let ibc_denom = get_key_ics20_ibc_denom(&packet.dest.port_id, &packet.dest.channel_id, denom);
+    println!("ibc denom: {}", ibc_denom);
 
     let cw20_mapping = cw20_ics20_denoms()
         .load(storage, &ibc_denom)
@@ -351,12 +349,7 @@ fn handle_ibc_packet_receive_native_remote_chain(
         msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
             recipient: msg.receiver.clone(),
             amount: to_send
-                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)
-                .map_err(|_| {
-                    ContractError::Std(StdError::generic_err(
-                        "Invalid zero amount when converting from remote to cw20",
-                    ))
-                })?,
+                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)?,
         })?,
         funds: vec![],
     }
@@ -444,7 +437,7 @@ fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespon
     let msg: Ics20Packet = from_binary(&packet.data)?;
 
     // similar event messages like ibctransfer module
-    let mut attributes = vec![
+    let attributes = vec![
         attr("action", "acknowledge"),
         attr("sender", &msg.sender),
         attr("receiver", &msg.receiver),
@@ -453,9 +446,9 @@ fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespon
         attr("success", "true"),
     ];
 
-    if let Some(memo) = msg.memo {
-        attributes.push(attr("memo", memo));
-    }
+    // if let Some(memo) = msg.memo {
+    //     attributes.push(attr("memo", memo));
+    // }
 
     Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
@@ -508,12 +501,7 @@ fn on_packet_failure(
         msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
             recipient: msg.sender.clone(),
             amount: to_send
-                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)
-                .map_err(|_| {
-                    ContractError::Std(StdError::generic_err(
-                        "Invalid zero amount when converting from remote to cw20",
-                    ))
-                })?,
+                .convert_remote_to_cw20(cw20_mapping.remote_decimals, cw20_mapping.cw20_decimals)?,
         })?,
         funds: vec![],
     }
@@ -565,6 +553,10 @@ pub fn send_amount(amount: Amount, recipient: String, msg: Option<Binary>) -> Co
     }
 }
 
+pub fn parse_ibc_wasm_port_id(contract_addr: String) -> String {
+    format!("wasm.{}", contract_addr)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -595,10 +587,10 @@ mod test {
             "ucosm",
             "cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n",
             "wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc",
-            None,
+            // None,
         );
         // Example message generated from the SDK
-        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n","memo":null}"#;
+        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
 
         let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
         assert_eq!(expected, encdoded.as_str());
@@ -646,7 +638,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-            memo: None,
+            // memo: None,
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),
@@ -707,8 +699,7 @@ mod test {
             amount: Uint128::new(987654321),
             sender: "local-sender".to_string(),
             receiver: "remote-rcpt".to_string(),
-
-            memo: None,
+            // memo: None,
         };
         let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
         assert_eq!(
@@ -859,8 +850,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-
-            memo: None,
+            // memo: None,
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),
@@ -978,10 +968,7 @@ mod test {
         );
 
         let pair = Cw20PairMsg {
-            dest_ibc_endpoint: IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: send_channel.to_string(),
-            },
+            local_channel_id: send_channel.to_string(),
             denom: denom.to_string(),
             cw20_denom: cw20_denom.to_string(),
             remote_decimals: 18u8,

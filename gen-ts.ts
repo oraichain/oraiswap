@@ -2,12 +2,7 @@ import codegen from "@cosmwasm/ts-codegen";
 import { exec } from "child_process";
 import { join, basename, resolve as _resolve } from "path";
 import * as fs from "fs";
-import {
-  TypescriptParser,
-  ClassDeclaration,
-  InterfaceDeclaration,
-  File,
-} from "typescript-parser";
+import { TypescriptParser, File } from "typescript-parser";
 
 const {
   existsSync,
@@ -93,8 +88,8 @@ const fixNestedReactQuery = async (
   Object.entries(nestedResponses).forEach(([key, [name, inputType]]) => {
     clientData = clientData
       .replace(
-        `export interface Oraiswap${inputType}<TData> extends OraiswapOracleReactQuery<${key}, TData> {}`,
-        `export interface Oraiswap${inputType}<TData> extends OraiswapOracleReactQuery<${key}, TData> {input: ${inputType}}`
+        `export interface Oraiswap${inputType}<TData> extends ${clientName}ReactQuery<${key}, TData> {}`,
+        `export interface Oraiswap${inputType}<TData> extends ${clientName}ReactQuery<${key}, TData> {input: ${inputType}}`
       )
       .replace(
         `\n}: Oraiswap${inputType}<TData>) {`,
@@ -247,6 +242,7 @@ const fixTs = async (outPath, enabledReactQuery = false) => {
 };
 
 const buildSchema = async (packagePath: string) => {
+  if (!existsSync(join(packagePath, "src", "bin"))) return;
   const artifactsFolder = join(packagePath, "artifacts");
   if (!existsSync(artifactsFolder)) await mkdir(artifactsFolder);
 
@@ -267,13 +263,19 @@ const buildSchema = async (packagePath: string) => {
 };
 
 const fixNestedSchema = async (packagePath: string, update: boolean) => {
+  const cargoMatched = (await readFile(join(packagePath, "Cargo.toml")))
+    .toString()
+    .match(/name\s*=\s*"(.*?)"/);
+  if (!cargoMatched) return;
   const schemaFile = join(
     packagePath,
     "artifacts",
     "schema",
-    "oraiswap-oracle.json"
+    cargoMatched[1] + ".json"
   );
+
   const schemaJSON = JSON.parse((await readFile(schemaFile)).toString());
+  if (!schemaJSON.query.anyOf) return;
   const responses = {};
   schemaJSON.query.anyOf = schemaJSON.query.anyOf.map((item: any) => {
     const ref = update ? item.$ref : item.properties[item.required[0]].$ref;
@@ -334,8 +336,11 @@ const nestedMap: {
   const contracts = await Promise.all(
     packages.map(async (packagePath) => {
       const baseName = basename(packagePath);
-      if (baseName === "oraiswap_oracle") {
-        const responses = await fixNestedSchema(packagePath, force);
+      const schemaDir = join(packagePath, "artifacts", "schema");
+      if (!existsSync(schemaDir)) return false;
+      // try fix nested schema if has
+      const responses = await fixNestedSchema(packagePath, force);
+      if (responses) {
         nestedMap[
           packagePath
             .split("/")
@@ -343,12 +348,13 @@ const nestedMap: {
             .replace(/(^\w|_\w)/g, (m, g1) => g1.slice(-1).toUpperCase())
         ] = responses;
       }
+
       return {
         name: baseName.replace(/^.|_./g, (m) => m.slice(-1).toUpperCase()),
-        dir: join(packagePath, "artifacts", "schema"),
+        dir: schemaDir,
       };
     })
   );
-  await genTS(contracts, tsFolder, enabledReactQuery);
+  await genTS(contracts.filter(Boolean), tsFolder, enabledReactQuery);
   await fixTs(tsFolder, enabledReactQuery);
 })();

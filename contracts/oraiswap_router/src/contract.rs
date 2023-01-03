@@ -31,6 +31,7 @@ pub fn instantiate(
         deps.storage,
         &Config {
             factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
+            factory_addr_v2: deps.api.addr_canonicalize(msg.factory_addr_v2.as_str())?,
         },
     )?;
 
@@ -131,6 +132,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = CONFIG.load(deps.storage)?;
     let resp = ConfigResponse {
         factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
+        factory_addr_v2: deps.api.addr_humanize(&state.factory_addr_v2)?,
     };
 
     Ok(resp)
@@ -143,9 +145,7 @@ fn simulate_swap_operations(
 ) -> StdResult<SimulateSwapOperationsResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
-    let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
-    let oracle_contract = OracleContract(pair_config.oracle_addr);
-
+    let factory_addr_v2 = deps.api.addr_humanize(&config.factory_addr_v2)?;
     let operations_len = operations.len();
     if operations_len == 0 {
         return Err(StdError::generic_err(
@@ -155,16 +155,26 @@ fn simulate_swap_operations(
 
     let mut offer_amount = offer_amount;
     for operation in operations.into_iter() {
+        let pair_config = query_pair_config(&deps.querier, factory_addr.clone())
+            .or_else(|_| query_pair_config(&deps.querier, factory_addr_v2.clone()))?;
+        let oracle_contract = OracleContract(pair_config.oracle_addr);
         match operation {
             SwapOperation::OraiSwap {
                 offer_asset_info,
                 ask_asset_info,
             } => {
-                let pair_info: PairInfo = query_pair_info(
+                let pair_info = query_pair_info(
                     &deps.querier,
                     factory_addr.clone(),
                     &[offer_asset_info.clone(), ask_asset_info.clone()],
-                )?;
+                )
+                .or_else(|_| -> StdResult<PairInfo> {
+                    query_pair_info(
+                        &deps.querier,
+                        factory_addr_v2.clone(),
+                        &[offer_asset_info.clone(), ask_asset_info.clone()],
+                    )
+                })?;
 
                 let return_asset = Asset {
                     info: offer_asset_info.clone(),

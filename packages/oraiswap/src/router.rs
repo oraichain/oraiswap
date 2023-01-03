@@ -8,6 +8,7 @@ use crate::asset::AssetInfo;
 #[cw_serde]
 pub struct InstantiateMsg {
     pub factory_addr: Addr,
+    pub factory_addr_v2: Addr,
 }
 
 #[cw_serde]
@@ -81,6 +82,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct ConfigResponse {
     pub factory_addr: Addr,
+    pub factory_addr_v2: Addr,
 }
 
 // We define a custom struct for each query response

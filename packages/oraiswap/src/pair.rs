@@ -46,6 +46,16 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+pub enum PairExecuteMsgCw20 {
+    /// Swap an offer asset to the other
+    Swap {
+        belief_price: Option<Decimal>,
+        max_spread: Option<Decimal>,
+        to: Option<Addr>,
+    },
+}
+
+#[cw_serde]
 pub enum Cw20HookMsg {
     /// Sell a given amount of asset
     Swap {
@@ -118,17 +128,23 @@ pub fn compute_swap(
 
     // offer => ask
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
-    let cp = offer_pool * ask_pool;
+    let cp = offer_pool.checked_mul(ask_pool)?;
 
-    let return_amount = ask_pool - cp / (offer_pool + offer_amount);
+    let cp_div = cp
+        .checked_div(offer_pool.checked_add(offer_amount)?)
+        .map_err(|err| StdError::from(err))?;
+    let return_amount = ask_pool.checked_sub(cp_div)?;
 
     // calculate spread & commission
-    let spread_amount = offer_amount.multiply_ratio(ask_pool, offer_pool) - return_amount;
+    let spread_amount = offer_amount
+        .multiply_ratio(ask_pool, offer_pool)
+        .checked_sub(return_amount)
+        .unwrap_or_default();
 
     let commission_amount = return_amount * commission_rate;
 
     // commission will be absorbed to pool
-    let return_amount = return_amount - commission_amount;
+    let return_amount = return_amount.checked_sub(commission_amount)?;
     Ok((
         return_amount
             .try_into()
@@ -154,13 +170,16 @@ pub fn compute_offer_amount(
 
     // ask => offer
     // offer_amount = cp / (ask_pool - ask_amount / (1 - commission_rate)) - offer_pool
-    let cp: Uint256 = offer_pool * ask_pool;
+    let cp = offer_pool.checked_mul(ask_pool)?;
 
-    let before_commission_deduction =
-        ask_amount * (Decimal256::one() / (Decimal256::one() - commission_rate));
+    let before_commission_deduction = ask_amount
+        * (Decimal256::one()
+            .checked_div(Decimal256::one().checked_sub(commission_rate)?)
+            .map_err(|err| StdError::generic_err(err.to_string()))?);
 
-    let offer_amount: Uint256 =
-        Uint256::one().multiply_ratio(cp, ask_pool - before_commission_deduction) - offer_pool;
+    let offer_amount: Uint256 = Uint256::one()
+        .multiply_ratio(cp, ask_pool.checked_sub(before_commission_deduction)?)
+        .checked_sub(offer_pool)?;
 
     let before_spread_deduction: Uint256 =
         offer_amount * Decimal256::from_ratio(ask_pool, offer_pool);

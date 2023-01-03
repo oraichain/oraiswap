@@ -6,6 +6,7 @@ use cw_storage_plus::Item;
 #[cw_serde]
 pub struct Config {
     pub factory_addr: CanonicalAddr,
+    pub factory_addr_v2: CanonicalAddr,
 }
 
 // put the length bytes at the first for compatibility with legacy singleton store
@@ -34,6 +35,7 @@ mod test {
             &mut deps.storage,
             &Config {
                 factory_addr: deps.api.addr_canonicalize("addr0000").unwrap(),
+                factory_addr_v2: deps.api.addr_canonicalize("addr0000_v2").unwrap(),
             },
         )
         .unwrap();
