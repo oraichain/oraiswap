@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use margined_common::asset::AssetInfo;
 
 use cosmwasm_std::{Addr, Uint128};
@@ -17,14 +17,24 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
+    #[returns(OwnerResponse)]
     GetOwner {},
+    #[returns(VammResponse)]
     IsVamm { vamm: String },
+    #[returns(AllVammResponse)]
     GetAllVamm { limit: Option<u32> },
+    #[returns(AllVammStatusResponse)]
     GetAllVammStatus { limit: Option<u32> },
+    #[returns(VammStatusResponse)]
     GetVammStatus { vamm: String },
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct ConfigResponse {

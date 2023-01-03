@@ -1,8 +1,8 @@
 use cosmwasm_schema::cw_serde;
-
 use cosmwasm_std::{StdResult, Storage, Timestamp, Uint128};
 use cosmwasm_storage::singleton;
 use cw_storage_plus::Map;
+use margined_perp::margined_pricefeed::PriceData;
 
 pub static KEY_CONFIG: &[u8] = b"config";
 
@@ -13,14 +13,6 @@ pub struct Config {}
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
     singleton(storage, KEY_CONFIG).save(config)
-}
-
-#[cw_serde]
-#[derive(Default)]
-pub struct PriceData {
-    pub round_id: Uint128,
-    pub price: Uint128,
-    pub timestamp: Timestamp,
 }
 
 pub fn store_price_data(

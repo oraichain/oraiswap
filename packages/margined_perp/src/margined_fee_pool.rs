@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{Addr, Uint128};
 use margined_common::asset::AssetInfo;
@@ -24,13 +24,22 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
+    #[returns(OwnerResponse)]
     GetOwner {},
+    #[returns(TokenResponse)]
     IsToken { token: String },
+    #[returns(TokenLengthResponse)]
     GetTokenLength {},
+    #[returns(AllTokenResponse)]
     GetTokenList { limit: Option<u32> },
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct ConfigResponse {}

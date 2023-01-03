@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{Addr, Uint128};
 
@@ -11,6 +11,9 @@ pub enum Direction {
     AddToAmm,
     RemoveFromAmm,
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -63,46 +66,57 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
+    #[returns(StateResponse)]
     State {},
+    #[returns(OwnerResponse)]
     GetOwner {},
+    #[returns(Uint128)]
     InputPrice {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     OutputPrice {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     InputAmount {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     OutputAmount {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     InputTwap {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     OutputTwap {
         direction: Direction,
         amount: Uint128,
     },
+    #[returns(Uint128)]
     SpotPrice {},
-    TwapPrice {
-        interval: u64,
-    },
+    #[returns(Uint128)]
+    TwapPrice { interval: u64 },
+    #[returns(Uint128)]
     UnderlyingPrice {},
-    UnderlyingTwapPrice {
-        interval: u64,
-    },
-    CalcFee {
-        quote_asset_amount: Uint128,
-    },
+    #[returns(Uint128)]
+    UnderlyingTwapPrice { interval: u64 },
+    #[returns(CalcFeeResponse)]
+    CalcFee { quote_asset_amount: Uint128 },
+    #[returns(bool)]
     IsOverSpreadLimit {},
+    #[returns(bool)]
     IsOverFluctuationLimit {
         direction: Direction,
         base_asset_amount: Uint128,
