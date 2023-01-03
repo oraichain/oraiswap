@@ -93,8 +93,8 @@ const fixNestedReactQuery = async (
   Object.entries(nestedResponses).forEach(([key, [name, inputType]]) => {
     clientData = clientData
       .replace(
-        `export interface Oraiswap${inputType}<TData> extends OraiswapOracleReactQuery<${key}, TData> {}`,
-        `export interface Oraiswap${inputType}<TData> extends OraiswapOracleReactQuery<${key}, TData> {input: ${inputType}}`
+        `export interface Oraiswap${inputType}<TData> extends ${clientName}ReactQuery<${key}, TData> {}`,
+        `export interface Oraiswap${inputType}<TData> extends ${clientName}ReactQuery<${key}, TData> {input: ${inputType}}`
       )
       .replace(
         `\n}: Oraiswap${inputType}<TData>) {`,
