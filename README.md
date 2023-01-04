@@ -67,23 +67,14 @@ rustup target add wasm32-unknown-unknown
 
 You can run unit tests on this on each contracts directory via :
 
-```
+```bash
 cargo unit-test
 cargo integration-test
 ```
 
-Once you are happy with the content, you can compile it to wasm on each contracts directory via:
+## Gen proto definitions
 
 ```bash
-yarn build contracts/oraiswap_[package]
-```
-
-The optimized contracts are generated in the artifacts/ directory.
-
-## Gen schema and typescript definitions
-
-```bash
-yarn
 # gen protobuf response.rs
 cargo install protobuf-codegen
 protoc --rust_out . response.proto
@@ -96,7 +87,4 @@ impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
     }
 }
 END
-
-# gen typescript code
-yarn gen-ts --force --react-query
 ```
