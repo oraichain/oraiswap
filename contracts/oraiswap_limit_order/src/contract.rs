@@ -8,7 +8,7 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
+    cancel_order, execute_order, excecute_all_orders, query_last_order_id, query_order, query_orderbook,
     query_orderbooks, query_orders, submit_order,
 };
 use crate::orderbook::OrderBook;
@@ -34,7 +34,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let config = ContractInfo {
+    let config = ContractInfo { 
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
 
@@ -115,6 +115,12 @@ pub fn execute(
 
             ask_asset.assert_sent_native_token_balance(&info)?;
             execute_order(deps, offer_info, info.sender, ask_asset, order_id)
+        }
+        ExecuteMsg::ExecuteAllOrder {
+            offer_info,
+            ask_info,
+        } => {
+            excecute_all_orders(deps, info, offer_info, ask_info)
         }
     }
 }
