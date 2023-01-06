@@ -61,7 +61,7 @@ impl Order {
         self.filled_offer_amount += offer_amount;
 
         if self.filled_ask_amount == self.ask_amount {
-            // When natch amount equals ask amount, close order
+            // When match amount equals ask amount, close order
             remove_order(storage, pair_key, self)
         } else {
             // update order

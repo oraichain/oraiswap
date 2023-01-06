@@ -74,6 +74,12 @@ pub enum ExecuteMsg {
         order_id: u64,
         offer_info: AssetInfo,
     },
+
+    /// Arbitrager execute all orders with pair
+    ExecuteAllOrder {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    },
 }
 
 #[cw_serde]
