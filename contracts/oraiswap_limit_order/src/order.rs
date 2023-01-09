@@ -190,7 +190,7 @@ pub fn excecute_all_orders(
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut total_orders =  0;
-    for mut ask_order in match_sell_orders {
+    for mut ask_order in match_sell_orders.clone() {
 
         // this will try to fill all orders
         // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
@@ -251,11 +251,18 @@ pub fn excecute_all_orders(
                 ask_order.ask_amount - lef_ask_order_amount,
                 executor_receive_amount,
             )?;
-            total_orders += 1;
             let executor_receive = Asset {
                 info: offer_info.clone(),
                 amount: executor_receive_amount,
             };
+            if ask_order.offer_amount == ask_order.filled_offer_amount && ask_order.ask_amount == ask_order.filled_ask_amount {
+                let index = match_sell_orders
+                .iter()
+                .position(|x| x.order_id == ask_order.order_id)
+                .unwrap();
+                match_sell_orders.remove(index);
+                total_orders += 1;
+            }
 
             // dont use oracle for limit order
             messages.push(executor_receive.into_msg(
