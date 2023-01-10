@@ -9,10 +9,10 @@ use oraiswap::error::ContractError;
 
 use crate::order::{
     cancel_order, execute_order, excecute_all_orders, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order,
+    query_orderbooks, query_orders, submit_order, remove_pair,
 };
 use crate::orderbook::OrderBook;
-use crate::state::{init_last_order_id, read_config, store_config, store_orderbook};
+use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
 use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
@@ -122,6 +122,12 @@ pub fn execute(
         } => {
             excecute_all_orders(deps, info, offer_info, ask_info)
         }
+        ExecuteMsg::RemoveOrderBook {
+            offer_info,
+            ask_info,
+        } => {
+            remove_pair(deps, info, offer_info, ask_info)
+        }
     }
 }
 
@@ -162,6 +168,14 @@ pub fn execute_update_orderbook(
     }
 
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+
+    let ob = read_orderbook(deps.storage, &pair_key);
+    
+    // Orderbook already exists
+    if ob.is_ok() {
+        return Err(ContractError::OrderBookAlreadyExists {});
+    }
+
     let order_book = OrderBook {
         ask_info: ask_info.to_raw(deps.api)?,
         offer_info: offer_info.to_raw(deps.api)?,
