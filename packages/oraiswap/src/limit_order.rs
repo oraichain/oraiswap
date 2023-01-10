@@ -80,6 +80,12 @@ pub enum ExecuteMsg {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
     },
+
+    /// Arbitrager remove order book
+    RemoveOrderBook {
+        offer_info: AssetInfo,
+        ask_info: AssetInfo,
+    },
 }
 
 #[cw_serde]
