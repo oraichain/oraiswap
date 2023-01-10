@@ -4,7 +4,7 @@ use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
@@ -78,9 +78,16 @@ pub fn cancel_order(
     }
 
     // Compute refund asset
-    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
+    let left_offer_amount = match order.direction {
+        OrderDirection::Buy => order.offer_amount.checked_sub(order.filled_offer_amount)?,
+        OrderDirection::Sell => order.ask_amount.checked_sub(order.filled_ask_amount)?,
+    };
+
     let bidder_refund = Asset {
-        info: offer_info,
+        info: match order.direction {
+            OrderDirection::Buy => offer_info.clone(),
+            OrderDirection::Sell => ask_info.clone(),
+        },
         amount: left_offer_amount,
     };
 
@@ -279,6 +286,56 @@ pub fn excecute_all_orders(
     ]))
 }
 
+pub fn remove_pair(
+    deps: DepsMut,
+    info: MessageInfo,
+    offer_info: AssetInfo,
+    ask_info: AssetInfo,
+) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let ob = read_orderbook(deps.storage, &pair_key)?;
+
+    let all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
+    
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut total_orders =  0;
+    for order in all_orders.iter() {
+        // Compute refund asset
+        let left_offer_amount = match order.direction {
+            OrderDirection::Buy => order.offer_amount.checked_sub(order.filled_offer_amount)?,
+            OrderDirection::Sell => order.ask_amount.checked_sub(order.filled_ask_amount)?,
+        };
+
+        let bidder_refund = Asset {
+            info: match order.direction {
+                OrderDirection::Buy => offer_info.clone(),
+                OrderDirection::Sell => ask_info.clone(),
+            },
+            amount: left_offer_amount,
+        };
+
+        // Build refund msg
+        if left_offer_amount > Uint128::zero() {
+            messages.push(bidder_refund.into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?);
+        }
+
+        total_orders += remove_order(deps.storage, &pair_key, &order)?;
+    }
+
+    remove_orderbook(deps.storage, &pair_key);
+
+    Ok(Response::new().add_messages(messages).add_attributes(vec![
+        ("action", "remove_orderbook"),
+        ("total_orders", &total_orders.to_string()),
+    ]))
+}
 pub fn query_order(
     deps: Deps,
     offer_info: AssetInfo,
