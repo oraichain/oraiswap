@@ -58,4 +58,7 @@ pub enum ContractError {
 
     #[error("must provide native token")]
     MustProvideNativeToken {}, // only allowing buy token and sell token with native token
+
+    #[error("pair already exists")]
+    OrderBookAlreadyExists {},
 }
