@@ -47,7 +47,7 @@ pub enum ExecuteMsg {
         admin: Addr,
     },
 
-    UpdateOrderBook {
+    CreateOrderBook {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
         precision: Option<Decimal>,
@@ -59,13 +59,11 @@ pub enum ExecuteMsg {
     ///////////////////////
     SubmitOrder {
         direction: OrderDirection, // default is buy, with sell then it is reversed
-        offer_asset: Asset,
-        ask_asset: Asset,
+        assets: [Asset; 2],
     },
     CancelOrder {
         order_id: u64,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
 
     /// Arbitrager execute order to get profit
@@ -77,22 +75,20 @@ pub enum ExecuteMsg {
 
     /// Arbitrager execute all orders with pair
     ExecuteAllOrder {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
 
     /// Arbitrager remove order book
     RemoveOrderBook {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
 }
 
 #[cw_serde]
 pub enum Cw20HookMsg {
     SubmitOrder {
-        ask_asset: Asset,
         direction: OrderDirection,
+        assets: [Asset; 2],
     },
 
     /// Arbitrager execute order to get profit
@@ -117,8 +113,7 @@ pub enum QueryMsg {
     ContractInfo {},
     #[returns(OrderBookResponse)]
     OrderBook {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
     #[returns(OrderBooksResponse)]
     OrderBooks {
@@ -129,13 +124,11 @@ pub enum QueryMsg {
     #[returns(OrderResponse)]
     Order {
         order_id: u64,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
     #[returns(OrdersResponse)]
     Orders {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         filter: OrderFilter,
         direction: Option<OrderDirection>,
         start_after: Option<u64>,
@@ -145,14 +138,12 @@ pub enum QueryMsg {
     #[returns(TickResponse)]
     Tick {
         price: Decimal,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
     },
     #[returns(TicksResponse)]
     Ticks {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
         start_after: Option<Decimal>,
         limit: Option<u32>,
