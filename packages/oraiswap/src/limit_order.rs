@@ -47,7 +47,7 @@ pub enum ExecuteMsg {
         admin: Addr,
     },
 
-    CreateOrderBook {
+    CreateOrderBookPair {
         offer_info: AssetInfo,
         ask_info: AssetInfo,
         precision: Option<Decimal>,
@@ -73,8 +73,8 @@ pub enum ExecuteMsg {
         offer_info: AssetInfo,
     },
 
-    /// Arbitrager execute all orders with pair
-    ExecuteAllOrder {
+    /// Arbitrager execute order book pair
+    ExecuteOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
 
