@@ -67,7 +67,7 @@ fn submit_order() {
         .unwrap();
     
     // update order book for pair [orai, atom]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -85,7 +85,7 @@ fn submit_order() {
     );
 
     // Create an existed order book
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -372,7 +372,7 @@ fn submit_order() {
     );
 
     // update order book for pair [orai, token_addr]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -516,7 +516,7 @@ fn cancel_order_native_token() {
         .unwrap();
     
     // update order book for pair [orai, atom]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -717,7 +717,7 @@ fn cancel_order_token() {
         .unwrap();
 
     // update order book for pair [token_addrs[0], token_addrs[1]]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::Token {
             contract_addr: token_addrs[0].clone(),
         },
@@ -735,7 +735,7 @@ fn cancel_order_token() {
     );
 
     // update order book for pair [orai, token_addrs[1]]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -912,7 +912,7 @@ fn execute_order_native_token() {
         .unwrap();
     
     // update order book for pair [orai, atom]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -1148,7 +1148,7 @@ fn execute_order_token() {
         .unwrap();
 
     // update order book for pair [token_addrs[0]/token_addrs[1]]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::Token {
             contract_addr: token_addrs[0].clone(),
         },
@@ -1356,7 +1356,7 @@ fn execute_all_orders_native_token() {
         .unwrap();
     
     // Create pair [orai, atom] for order book
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -1686,7 +1686,7 @@ fn execute_all_orders_native_token() {
         .unwrap();
 
     // assertion; native asset balance
-    let msg = ExecuteMsg::ExecuteAllOrder {
+    let msg = ExecuteMsg::ExecuteOrderBookPair {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -1707,7 +1707,7 @@ fn execute_all_orders_native_token() {
     app.assert_fail(res);
 
     // Excecute all orders
-    let msg = ExecuteMsg::ExecuteAllOrder {
+    let msg = ExecuteMsg::ExecuteOrderBookPair {
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -1729,12 +1729,12 @@ fn execute_all_orders_native_token() {
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
             .unwrap(),
-        Uint128::from(1005800u128)
+        Uint128::from(1000800u128)
     );
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0001"), ATOM_DENOM.to_string())
             .unwrap(),
-        Uint128::from(996200u128)
+        Uint128::from(991200u128)
     );
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0002"), ATOM_DENOM.to_string())
@@ -1806,7 +1806,7 @@ fn remove_orderbook_pair() {
         .unwrap();
     
     // Create pair [orai, atom] for order book
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -2039,7 +2039,7 @@ fn orders_querier() {
         .unwrap();
 
     // update order book for pair [orai, atom]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
@@ -2057,7 +2057,7 @@ fn orders_querier() {
     );
 
     // update order book for pair [token_addrs[0], token_addrs[1]]
-    let msg = ExecuteMsg::CreateOrderBook {
+    let msg = ExecuteMsg::CreateOrderBookPair {
         offer_info: AssetInfo::Token {
             contract_addr: token_addrs[0].clone(),
         },
@@ -2206,12 +2206,6 @@ fn orders_querier() {
                         contract_addr: token_addrs[1].clone(),
                     },
                 ],
-                // offer_info: AssetInfo::Token {
-                //     contract_addr: token_addrs[0].clone(),
-                // },
-                // ask_info: AssetInfo::Token {
-                //     contract_addr: token_addrs[1].clone(),
-                // },
                 direction: None,
                 filter: OrderFilter::Bidder("addr0000".to_string()),
                 start_after: None,

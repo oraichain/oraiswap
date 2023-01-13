@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_order, excecute_all_orders, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order, remove_pair,
+    cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
@@ -63,12 +63,12 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
-        ExecuteMsg::CreateOrderBook {
+        ExecuteMsg::CreateOrderBookPair {
             offer_info,
             ask_info,
             precision,
             min_offer_amount,
-        } => execute_update_orderbook(
+        } => execute_create_pair(
             deps,
             info,
             offer_info,
@@ -114,10 +114,10 @@ pub fn execute(
             ask_asset.assert_sent_native_token_balance(&info)?;
             execute_order(deps, offer_info, info.sender, ask_asset, order_id)
         }
-        ExecuteMsg::ExecuteAllOrder {
+        ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
         } => {
-            excecute_all_orders(deps, info, asset_infos)
+            excecute_pair(deps, info, asset_infos)
         }
         ExecuteMsg::RemoveOrderBook {
             asset_infos,
@@ -147,7 +147,7 @@ pub fn execute_update_admin(
     Ok(Response::new().add_attributes(vec![("action", "execute_update_admin")]))
 }
 
-pub fn execute_update_orderbook(
+pub fn execute_create_pair(
     deps: DepsMut,
     info: MessageInfo,
     ask_info: AssetInfo,
