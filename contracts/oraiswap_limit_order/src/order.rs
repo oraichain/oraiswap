@@ -163,7 +163,7 @@ pub fn execute_order(
     ]))
 }
 
-pub fn excecute_all_orders(
+pub fn excecute_pair(
     deps: DepsMut,
     info: MessageInfo,
     asset_infos: [AssetInfo; 2],
@@ -178,9 +178,9 @@ pub fn excecute_all_orders(
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
 
-    let (best_buy_price, _) = ob.find_match_price(deps.as_ref().storage).unwrap_or_default();
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
 
-    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Sell);
+    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
     
     let mut offer_orders = ob
         .orders_at(
@@ -195,7 +195,6 @@ pub fn excecute_all_orders(
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut total_orders =  0;
     for mut ask_order in match_sell_orders.clone() {
-
         // this will try to fill all orders
         // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
         let sender = deps.api.addr_humanize(&ask_order.bidder_addr)?;
@@ -204,7 +203,6 @@ pub fn excecute_all_orders(
         let mut lef_ask_order_amount = ask_order.ask_amount;
 
         for mut order in offer_orders.clone() {
-
             // offer amount is already paid, we need ask amount to be received
             // remember that ask of buy and ask of sell are opposite sides
             // ask_amount is equal match ask amount, to make sure always matched
