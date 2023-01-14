@@ -8,11 +8,11 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_order, excecute_all_orders, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order,
+    cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
 };
 use crate::orderbook::OrderBook;
-use crate::state::{init_last_order_id, read_config, store_config, store_orderbook};
+use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
 use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
@@ -63,12 +63,12 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
-        ExecuteMsg::UpdateOrderBook {
+        ExecuteMsg::CreateOrderBookPair {
             offer_info,
             ask_info,
             precision,
             min_offer_amount,
-        } => execute_update_orderbook(
+        } => execute_create_pair(
             deps,
             info,
             offer_info,
@@ -78,16 +78,15 @@ pub fn execute(
         ),
         ExecuteMsg::SubmitOrder {
             direction,
-            offer_asset,
-            ask_asset,
+            assets,
         } => {
             // if sell then paid asset must be ask asset, this way we've just assumed that we offer usdt and ask for orai
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
             let paid_asset = match direction {
-                OrderDirection::Buy => &offer_asset,
-                OrderDirection::Sell => &ask_asset,
+                OrderDirection::Buy => &assets[0],
+                OrderDirection::Sell => &assets[1],
             };
 
             // if paid asset is cw20, we check it in Cw20HookMessage
@@ -97,13 +96,12 @@ pub fn execute(
 
             paid_asset.assert_sent_native_token_balance(&info)?;
             // then submit order
-            submit_order(deps, info.sender, direction, offer_asset, ask_asset)
+            submit_order(deps, info.sender, direction, assets)
         }
         ExecuteMsg::CancelOrder {
             order_id,
-            ask_info,
-            offer_info,
-        } => cancel_order(deps, info, offer_info, ask_info, order_id),
+            asset_infos,
+        } => cancel_order(deps, info, order_id, asset_infos),
         ExecuteMsg::ExecuteOrder {
             ask_asset,
             order_id,
@@ -116,11 +114,15 @@ pub fn execute(
             ask_asset.assert_sent_native_token_balance(&info)?;
             execute_order(deps, offer_info, info.sender, ask_asset, order_id)
         }
-        ExecuteMsg::ExecuteAllOrder {
-            offer_info,
-            ask_info,
+        ExecuteMsg::ExecuteOrderBookPair {
+            asset_infos,
         } => {
-            excecute_all_orders(deps, info, offer_info, ask_info)
+            excecute_pair(deps, info, asset_infos)
+        }
+        ExecuteMsg::RemoveOrderBook {
+            asset_infos,
+        } => {
+            remove_pair(deps, info, asset_infos)
         }
     }
 }
@@ -145,7 +147,7 @@ pub fn execute_update_admin(
     Ok(Response::new().add_attributes(vec![("action", "execute_update_admin")]))
 }
 
-pub fn execute_update_orderbook(
+pub fn execute_create_pair(
     deps: DepsMut,
     info: MessageInfo,
     ask_info: AssetInfo,
@@ -162,6 +164,14 @@ pub fn execute_update_orderbook(
     }
 
     let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+
+    let ob = read_orderbook(deps.storage, &pair_key);
+    
+    // Orderbook already exists
+    if ob.is_ok() {
+        return Err(ContractError::OrderBookAlreadyExists {});
+    }
+
     let order_book = OrderBook {
         ask_info: ask_info.to_raw(deps.api)?,
         offer_info: offer_info.to_raw(deps.api)?,
@@ -189,9 +199,9 @@ pub fn receive_cw20(
 
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::SubmitOrder {
-            ask_asset,
             direction,
-        }) => submit_order(deps, sender, direction, provided_asset, ask_asset),
+            assets,
+        }) => submit_order(deps, sender, direction, assets),
         // this is opposite to SubmitOrder, so offer asset is ask asset
         Ok(Cw20HookMsg::ExecuteOrder {
             order_id,
@@ -207,21 +217,18 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
         QueryMsg::Order {
             order_id,
-            offer_info,
-            ask_info,
-        } => to_binary(&query_order(deps, offer_info, ask_info, order_id)?),
+            asset_infos,
+        } => to_binary(&query_order(deps, asset_infos, order_id)?),
         QueryMsg::OrderBook {
-            offer_info,
-            ask_info,
-        } => to_binary(&query_orderbook(deps, offer_info, ask_info)?),
+            asset_infos,
+        } => to_binary(&query_orderbook(deps, asset_infos)?),
         QueryMsg::OrderBooks {
             start_after,
             limit,
             order_by,
         } => to_binary(&query_orderbooks(deps, start_after, limit, order_by)?),
         QueryMsg::Orders {
-            offer_info,
-            ask_info,
+            asset_infos,
             direction,
             filter,
             start_after,
@@ -229,8 +236,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             order_by,
         } => to_binary(&query_orders(
             deps,
-            offer_info,
-            ask_info,
+            asset_infos,
             direction,
             filter,
             start_after,
@@ -240,25 +246,23 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::LastOrderId {} => to_binary(&query_last_order_id(deps)?),
         QueryMsg::Tick {
             price,
-            offer_info,
-            ask_info,
+            asset_infos,
             direction,
         } => to_binary(&query_tick(
             deps.storage,
-            &pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]),
+            &pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]),
             direction,
             price,
         )?),
         QueryMsg::Ticks {
-            offer_info,
-            ask_info,
+            asset_infos,
             direction,
             start_after,
             limit,
             order_by,
         } => to_binary(&query_ticks(
             deps.storage,
-            &pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]),
+            &pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]),
             direction,
             start_after,
             limit,
