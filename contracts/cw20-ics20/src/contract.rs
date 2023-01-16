@@ -12,8 +12,9 @@ use crate::error::ContractError;
 use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, Cw20PairMsg,
-    Cw20PairQuery, ExecuteMsg, InitMsg, ListAllowedResponse, ListChannelsResponse,
-    ListCw20MappingResponse, MigrateMsg, PortResponse, QueryMsg, TransferBackMsg, TransferMsg,
+    Cw20PairQuery, DeleteCw20PairMsg, ExecuteMsg, InitMsg, ListAllowedResponse,
+    ListChannelsResponse, ListCw20MappingResponse, MigrateMsg, PortResponse, QueryMsg,
+    TransferBackMsg, TransferMsg,
 };
 use crate::state::{
     cw20_ics20_denoms, get_key_ics20_ibc_denom, increase_channel_balance, reduce_channel_balance,
@@ -70,6 +71,9 @@ pub fn execute(
         }
         ExecuteMsg::UpdateCw20MappingPair(msg) => {
             execute_update_cw20_mapping_pair(deps, env, info, msg)
+        }
+        ExecuteMsg::DeleteCw20MappingPair(msg) => {
+            execute_delete_cw20_mapping_pair(deps, env, info, msg)
         }
         ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
         ExecuteMsg::UpdateAdmin { admin } => {
@@ -150,7 +154,7 @@ pub fn execute_transfer(
         amount.denom(),
         sender.as_ref(),
         &msg.remote_address,
-        // msg.memo,
+        msg.memo,
     );
     packet.validate()?;
 
@@ -219,7 +223,7 @@ pub fn execute_transfer_back_to_remote_chain(
         ibc_denom.clone(),
         sender.as_str(),
         &msg.remote_address,
-        // msg.memo,
+        msg.memo,
     );
     packet.validate()?;
 
@@ -307,6 +311,11 @@ pub fn execute_update_cw20_mapping_pair(
         &mapping_pair_msg.denom,
     );
 
+    // if pair already exists in list, remove it and create a new one
+    if cw20_ics20_denoms().load(deps.storage, &ibc_denom).is_ok() {
+        cw20_ics20_denoms().remove(deps.storage, &ibc_denom)?;
+    }
+
     cw20_ics20_denoms().update(deps.storage, &ibc_denom, |_| -> StdResult<_> {
         Ok(Cw20MappingMetadata {
             cw20_denom: mapping_pair_msg.cw20_denom.clone(),
@@ -319,6 +328,29 @@ pub fn execute_update_cw20_mapping_pair(
         .add_attribute("action", "update_cw20_ics20_mapping_pair")
         .add_attribute("denom", mapping_pair_msg.denom)
         .add_attribute("new_cw20", mapping_pair_msg.cw20_denom.clone());
+    Ok(res)
+}
+
+pub fn execute_delete_cw20_mapping_pair(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    mapping_pair_msg: DeleteCw20PairMsg,
+) -> Result<Response, ContractError> {
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+
+    let ibc_denom = get_key_ics20_ibc_denom(
+        &parse_ibc_wasm_port_id(env.contract.address.into_string()),
+        &mapping_pair_msg.local_channel_id,
+        &mapping_pair_msg.denom,
+    );
+
+    cw20_ics20_denoms().remove(deps.storage, &ibc_denom)?;
+
+    let res = Response::new()
+        .add_attribute("action", "execute_delete_cw20_mapping_pair")
+        .add_attribute("local_channel_id", mapping_pair_msg.local_channel_id)
+        .add_attribute("original_denom", mapping_pair_msg.denom);
     Ok(res)
 }
 
@@ -575,17 +607,19 @@ mod test {
     #[test]
     fn test_update_cw20_mapping() {
         let mut deps = setup(&["channel-3", "channel-7"], &[]);
+        let cw20_denom = "cw20:foobar".to_string();
+        let cw20_denom_second = "cw20:foobar-second".to_string();
 
-        let update = Cw20PairMsg {
+        let mut update = Cw20PairMsg {
             local_channel_id: "mars-channel".to_string(),
             denom: "earth".to_string(),
-            cw20_denom: "cw20:foobar".to_string(),
+            cw20_denom: cw20_denom.clone(),
             remote_decimals: 18,
             cw20_decimals: 18,
         };
 
         // works with proper funds
-        let msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+        let mut msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
 
         // unauthorized case
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
@@ -593,7 +627,7 @@ mod test {
         assert_eq!(res_err, ContractError::Admin(AdminError::NotAdmin {}));
 
         let info = mock_info("gov", &coins(1234567, "ucosm"));
-        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
 
         // query to verify if the mapping has been updated
         let mappings = query(
@@ -626,6 +660,107 @@ mod test {
         .unwrap();
         let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
         assert_ne!(response.pairs.first().unwrap().key, "foobar".to_string());
+
+        // update existing key case must pass
+        update.cw20_denom = cw20_denom_second.clone();
+        msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // after update, cw20 denom now needs to be updated
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Cw20Mapping {
+                start_after: None,
+                limit: None,
+                order: None,
+            },
+        )
+        .unwrap();
+        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(
+            response.pairs.first().unwrap().key,
+            format!("{}/mars-channel/earth", CONTRACT_PORT)
+        );
+        assert_eq!(
+            response.pairs.first().unwrap().cw20_map.cw20_denom,
+            cw20_denom_second
+        )
+    }
+
+    #[test]
+    fn test_delete_cw20_mapping() {
+        let mut deps = setup(&["channel-3", "channel-7"], &[]);
+        let cw20_denom = "cw20:foobar".to_string();
+
+        let update = Cw20PairMsg {
+            local_channel_id: "mars-channel".to_string(),
+            denom: "earth".to_string(),
+            cw20_denom: cw20_denom.clone(),
+            remote_decimals: 18,
+            cw20_decimals: 18,
+        };
+
+        // works with proper funds
+        let msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+        execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+
+        // query to verify if the mapping has been updated
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Cw20Mapping {
+                start_after: None,
+                limit: None,
+                order: None,
+            },
+        )
+        .unwrap();
+        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(
+            response.pairs.first().unwrap().key,
+            format!("{}/mars-channel/earth", CONTRACT_PORT)
+        );
+
+        // now try deleting
+        let delete = DeleteCw20PairMsg {
+            local_channel_id: "mars-channel".to_string(),
+            denom: "earth".to_string(),
+        };
+
+        let mut msg = ExecuteMsg::DeleteCw20MappingPair(delete.clone());
+
+        // unauthorized delete case
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let delete_err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+        assert_eq!(delete_err, ContractError::Admin(AdminError::NotAdmin {}));
+
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+
+        // happy case
+        msg = ExecuteMsg::DeleteCw20MappingPair(delete.clone());
+        execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+        // after update, the list cw20 mapping should be empty
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Cw20Mapping {
+                start_after: None,
+                limit: None,
+                order: None,
+            },
+        )
+        .unwrap();
+        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(response.pairs.len(), 0)
     }
 
     #[test]
@@ -787,7 +922,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-            // memo: Some("memo".to_string()),
+            memo: Some("memo".to_string()),
         };
         IbcPacket::new(
             to_binary(&data).unwrap(),

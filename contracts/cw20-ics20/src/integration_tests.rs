@@ -33,7 +33,7 @@ fn _mock_receive_packet(
         amount: amount.into(),
         sender: remote_sender.to_string(),
         receiver: receiver.to_string(),
-        // memo: None,
+        memo: None,
     };
     IbcPacket::new(
         to_binary(&data).unwrap(),

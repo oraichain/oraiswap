@@ -36,6 +36,7 @@ pub enum ExecuteMsg {
     /// This allows us to transfer *exactly one* native token
     Transfer(TransferMsg),
     UpdateCw20MappingPair(Cw20PairMsg),
+    DeleteCw20MappingPair(DeleteCw20PairMsg),
     /// This must be called by gov_contract, will allow a new cw20 token to be sent
     Allow(AllowMsg),
     /// Change the admin (must be called by current admin)
@@ -53,6 +54,13 @@ pub struct Cw20PairMsg {
     pub cw20_denom: String,
     pub remote_decimals: u8,
     pub cw20_decimals: u8,
+}
+
+#[cw_serde]
+pub struct DeleteCw20PairMsg {
+    pub local_channel_id: String,
+    /// native denom of the remote chain. Eg: orai
+    pub denom: String,
 }
 
 /// This is the message we accept via Receive
