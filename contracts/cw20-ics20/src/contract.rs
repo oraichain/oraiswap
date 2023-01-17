@@ -1,14 +1,3 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdResult,
-};
-use cw2::set_contract_version;
-use cw20::{Cw20Coin, Cw20ReceiveMsg};
-use cw_storage_plus::Bound;
-use oraiswap::asset::AssetInfo;
-
 use crate::error::ContractError;
 use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
 use crate::msg::{
@@ -20,8 +9,18 @@ use crate::state::{
     get_key_ics20_ibc_denom, ics20_denoms, increase_channel_balance, reduce_channel_balance,
     AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG,
 };
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
+    PortIdResponse, Response, StdResult,
+};
+use cw2::set_contract_version;
+use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use cw20_ics20_msg::amount::{convert_local_to_remote, Amount};
+use cw_storage_plus::Bound;
 use cw_utils::{maybe_addr, nonpayable, one_coin};
+use oraiswap::asset::AssetInfo;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -517,11 +516,9 @@ fn list_cw20_mapping(
     order: Option<u8>,
 ) -> StdResult<ListMappingResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let mut allow_range = ics20_denoms().range(deps.storage, None, None, map_order(order));
-    if let Some(start_after) = start_after {
-        let start = Some(Bound::exclusive::<&str>(&start_after));
-        allow_range = ics20_denoms().range(deps.storage, start, None, map_order(order));
-    }
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into()));
+    let allow_range = ics20_denoms().range(deps.storage, start, None, map_order(order));
+
     let pairs = allow_range
         .take(limit)
         .map(|item| {
