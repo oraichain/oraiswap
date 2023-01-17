@@ -241,7 +241,7 @@ pub fn execute_transfer_back_to_remote_chain(
     // build ics20 packet
     let packet = Ics20Packet::new(
         amount_remote.clone(),
-        ibc_denom.clone(),
+        ibc_denom.clone(), // we use ibc denom in form <transfer>/<channel>/<denom> so that when it is sent back to remote chain, it gets parsed correctly and burned
         sender.as_str(),
         &msg.remote_address,
         msg.memo,
