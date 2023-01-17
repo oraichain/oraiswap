@@ -1,8 +1,9 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, IbcEndpoint};
 use cw20::Cw20ReceiveMsg;
+use oraiswap::asset::AssetInfo;
 
-use crate::state::{ChannelInfo, Cw20MappingMetadata};
+use crate::state::{ChannelInfo, MappingMetadata};
 use cw20_ics20_msg::amount::Amount;
 
 #[cw_serde]
@@ -35,8 +36,8 @@ pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     /// This allows us to transfer *exactly one* native token
     Transfer(TransferMsg),
-    UpdateCw20MappingPair(Cw20PairMsg),
-    DeleteCw20MappingPair(DeleteCw20PairMsg),
+    UpdateMappingPair(UpdatePairMsg),
+    DeleteMappingPair(DeletePairMsg),
     /// This must be called by gov_contract, will allow a new cw20 token to be sent
     Allow(AllowMsg),
     /// Change the admin (must be called by current admin)
@@ -46,18 +47,18 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-pub struct Cw20PairMsg {
+pub struct UpdatePairMsg {
     pub local_channel_id: String,
     /// native denom of the remote chain. Eg: orai
     pub denom: String,
-    /// cw20 denom of the local chain. Eg: cw20:orai...
-    pub cw20_denom: String,
+    /// asset info of the local chain.
+    pub asset_info: AssetInfo,
     pub remote_decimals: u8,
-    pub cw20_decimals: u8,
+    pub asset_info_decimals: u8,
 }
 
 #[cw_serde]
-pub struct DeleteCw20PairMsg {
+pub struct DeletePairMsg {
     pub local_channel_id: String,
     /// native denom of the remote chain. Eg: orai
     pub denom: String,
@@ -132,16 +133,16 @@ pub enum QueryMsg {
         order: Option<u8>,
     },
     #[returns(Addr)]
-    #[returns(ListCw20MappingResponse)]
-    Cw20Mapping {
+    #[returns(ListMappingResponse)]
+    PairMappings {
         start_after: Option<String>,
         limit: Option<u32>,
         order: Option<u8>,
     },
-    #[returns(Cw20PairQuery)]
-    Cw20MappingFromKey { key: String },
-    #[returns(Cw20PairQuery)]
-    Cw20MappingFromCw20Denom { cw20_denom: String },
+    #[returns(PairQuery)]
+    PairMapping { key: String },
+    #[returns(PairQuery)]
+    PairMappingFromAssetInfo { asset_info: AssetInfo },
 }
 
 #[cw_serde]
@@ -184,14 +185,14 @@ pub struct ListAllowedResponse {
 }
 
 #[cw_serde]
-pub struct ListCw20MappingResponse {
-    pub pairs: Vec<Cw20PairQuery>,
+pub struct ListMappingResponse {
+    pub pairs: Vec<PairQuery>,
 }
 
 #[cw_serde]
-pub struct Cw20PairQuery {
+pub struct PairQuery {
     pub key: String,
-    pub cw20_map: Cw20MappingMetadata,
+    pub pair_mapping: MappingMetadata,
 }
 
 #[cw_serde]

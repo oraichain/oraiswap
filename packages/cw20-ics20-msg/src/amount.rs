@@ -76,55 +76,57 @@ impl Amount {
     }
 }
 
-impl Amount {
-    fn mul_ratio_decimal(&self, ratio: Decimal) -> StdResult<Uint128> {
-        let result = Decimal::one()
-            .checked_mul(ratio)
-            .map_err(|err| StdError::generic_err(err.to_string()))
-            .map(|coeff| self.amount() * coeff)?;
-        if result.is_zero() {
-            return Err(StdError::generic_err(
-                "Converting decimals results in a zero amount. Revert this transaction!",
-            ));
-        }
-        Ok(result)
+fn mul_ratio_decimal(amount: Uint128, ratio: Decimal) -> StdResult<Uint128> {
+    let result = Decimal::one()
+        .checked_mul(ratio)
+        .map_err(|err| StdError::generic_err(err.to_string()))
+        .map(|coeff| amount * coeff)?;
+    if result.is_zero() {
+        return Err(StdError::generic_err(
+            "Converting decimals results in a zero amount. Revert this transaction!",
+        ));
     }
+    Ok(result)
+}
 
-    pub fn convert_remote_to_cw20(
-        &self,
-        remote_decimals: u8,
-        cw20_decimals: u8,
-    ) -> StdResult<Uint128> {
-        self.mul_ratio_decimal(Decimal::from_ratio(
-            10u128.pow(cw20_decimals as u32),
+pub fn convert_remote_to_local(
+    amount: Uint128,
+    remote_decimals: u8,
+    local_decimals: u8,
+) -> StdResult<Uint128> {
+    mul_ratio_decimal(
+        amount,
+        Decimal::from_ratio(
+            10u128.pow(local_decimals as u32),
             10u128.pow(remote_decimals as u32),
-        ))
-    }
+        ),
+    )
+}
 
-    pub fn convert_cw20_to_remote(
-        &self,
-        remote_decimals: u8,
-        cw20_decimals: u8,
-    ) -> StdResult<Uint128> {
-        self.mul_ratio_decimal(Decimal::from_ratio(
+pub fn convert_local_to_remote(
+    amount: Uint128,
+    remote_decimals: u8,
+    local_decimals: u8,
+) -> StdResult<Uint128> {
+    mul_ratio_decimal(
+        amount,
+        Decimal::from_ratio(
             10u128.pow(remote_decimals as u32),
-            10u128.pow(cw20_decimals as u32),
-        ))
-    }
+            10u128.pow(local_decimals as u32),
+        ),
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::coin;
 
     use super::*;
 
     #[test]
     pub fn test_div_ratio_decimal() {
-        let amount = Amount::Native(coin(10u128, "orai"));
-        let new_amount = amount.convert_cw20_to_remote(18, 6).unwrap();
+        let new_amount = convert_local_to_remote(Uint128::from(10u128), 18, 6).unwrap();
         assert_eq!(new_amount, Uint128::from(10000000000000u128));
-        let new_amount = amount.convert_remote_to_cw20(18, 6).unwrap();
-        assert_eq!(new_amount, Uint128::from(0u128))
+        let new_amount = convert_remote_to_local(Uint128::from(1000000000000u128), 18, 6).unwrap();
+        assert_eq!(new_amount, Uint128::from(1u128))
     }
 }

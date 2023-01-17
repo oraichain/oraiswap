@@ -2,6 +2,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, IbcEndpoint, StdResult, Storage, Uint128};
 use cw_controllers::Admin;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, UniqueIndex};
+use oraiswap::asset::AssetInfo;
 
 use crate::ContractError;
 
@@ -21,27 +22,26 @@ pub const CHANNEL_STATE: Map<(&str, &str), ChannelState> = Map::new("channel_sta
 /// Every cw20 contract we allow to be sent is stored here, possibly with a gas_limit
 pub const ALLOW_LIST: Map<&Addr, AllowInfo> = Map::new("allow_list");
 
-// Cw20MappingMetadataIndexex structs keeps a list of indexers
-pub struct Cw20MappingMetadataIndexex<'a> {
+// MappingMetadataIndexex structs keeps a list of indexers
+pub struct MappingMetadataIndexex<'a> {
     // token.identifier
-    pub cw20_denom: UniqueIndex<'a, String, Cw20MappingMetadata>,
+    pub asset_info: UniqueIndex<'a, String, MappingMetadata>,
 }
 
 // IndexList is just boilerplate code for fetching a struct's indexes
-impl<'a> IndexList<Cw20MappingMetadata> for Cw20MappingMetadataIndexex<'a> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Cw20MappingMetadata>> + '_> {
-        let v: Vec<&dyn Index<Cw20MappingMetadata>> = vec![&self.cw20_denom];
+impl<'a> IndexList<MappingMetadata> for MappingMetadataIndexex<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<MappingMetadata>> + '_> {
+        let v: Vec<&dyn Index<MappingMetadata>> = vec![&self.asset_info];
         Box::new(v.into_iter())
     }
 }
 
-// used when chain A (no cosmwasm) sends native token to chain B (has cosmwasm). key - original denom of chain A, in form of ibc no hash for destination port & channel - transfer/channel-0/uatom for example; value - mapping data including cw20 denom of chain B, in form: cw20:mars18vd8fpwxzck93qlwghaj6arh4p7c5n89plpqv0 for example
-pub fn cw20_ics20_denoms<'a>(
-) -> IndexedMap<'a, &'a str, Cw20MappingMetadata, Cw20MappingMetadataIndexex<'a>> {
-    let indexes = Cw20MappingMetadataIndexex {
-        cw20_denom: UniqueIndex::new(|d| d.cw20_denom.clone(), "cw20_denom"),
+// used when chain A (no cosmwasm) sends native token to chain B (has cosmwasm). key - original denom of chain A, in form of ibc no hash for destination port & channel - transfer/channel-0/uatom for example; value - mapping data including asset info, can be either native or cw20
+pub fn ics20_denoms<'a>() -> IndexedMap<'a, &'a str, MappingMetadata, MappingMetadataIndexex<'a>> {
+    let indexes = MappingMetadataIndexex {
+        asset_info: UniqueIndex::new(|d| d.asset_info.to_string(), "asset_info"),
     };
-    IndexedMap::new("cw20_mapping_namespace", indexes)
+    IndexedMap::new("ics20_mapping_namespace", indexes)
 }
 
 #[cw_serde]
@@ -72,11 +72,11 @@ pub struct AllowInfo {
     pub gas_limit: Option<u64>,
 }
 #[cw_serde]
-pub struct Cw20MappingMetadata {
-    /// denom should be in form: cw20:...
-    pub cw20_denom: String,
+pub struct MappingMetadata {
+    /// asset info on local chain. Can be either cw20 or native
+    pub asset_info: AssetInfo,
     pub remote_decimals: u8,
-    pub cw20_decimals: u8,
+    pub asset_info_decimals: u8,
 }
 
 #[cw_serde]

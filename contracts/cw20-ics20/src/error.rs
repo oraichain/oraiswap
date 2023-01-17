@@ -63,19 +63,14 @@ pub enum ContractError {
     #[error("Only the governance contract can do this")]
     Unauthorized,
 
-    #[error("You can only send cw20 tokens that have been explicitly allowed by governance")]
+    #[error("You can only send tokens that have been explicitly allowed by governance")]
     NotOnAllowList,
 
-    #[error(
-        "You can only send native tokens that has a map to the corresponding cw20 address denom"
-    )]
+    #[error("You can only send native tokens that has a map to the corresponding asset info")]
     NotOnMappingList,
 
     #[error("The contract address you are sending native tokens to is already revoked")]
     CustomContractRevoked,
-
-    #[error("Cw20 Receive Message format is invalid")]
-    InvalidReceiveCw20Message,
 }
 
 impl From<FromUtf8Error> for ContractError {

@@ -7,20 +7,20 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use cw_storage_plus::Bound;
+use oraiswap::asset::AssetInfo;
 
 use crate::error::ContractError;
 use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
 use crate::msg::{
-    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, Cw20PairMsg,
-    Cw20PairQuery, DeleteCw20PairMsg, ExecuteMsg, InitMsg, ListAllowedResponse,
-    ListChannelsResponse, ListCw20MappingResponse, MigrateMsg, PortResponse, QueryMsg,
-    TransferBackMsg, TransferMsg,
+    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, DeletePairMsg,
+    ExecuteMsg, InitMsg, ListAllowedResponse, ListChannelsResponse, ListMappingResponse,
+    MigrateMsg, PairQuery, PortResponse, QueryMsg, TransferBackMsg, TransferMsg, UpdatePairMsg,
 };
 use crate::state::{
-    cw20_ics20_denoms, get_key_ics20_ibc_denom, increase_channel_balance, reduce_channel_balance,
-    AllowInfo, Config, Cw20MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG,
+    get_key_ics20_ibc_denom, ics20_denoms, increase_channel_balance, reduce_channel_balance,
+    AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG,
 };
-use cw20_ics20_msg::amount::Amount;
+use cw20_ics20_msg::amount::{convert_local_to_remote, Amount};
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 // version info for migration info
@@ -69,12 +69,8 @@ pub fn execute(
             let coin = one_coin(&info)?;
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
         }
-        ExecuteMsg::UpdateCw20MappingPair(msg) => {
-            execute_update_cw20_mapping_pair(deps, env, info, msg)
-        }
-        ExecuteMsg::DeleteCw20MappingPair(msg) => {
-            execute_delete_cw20_mapping_pair(deps, env, info, msg)
-        }
+        ExecuteMsg::UpdateMappingPair(msg) => execute_update_mapping_pair(deps, env, info, msg),
+        ExecuteMsg::DeleteMappingPair(msg) => execute_delete_mapping_pair(deps, env, info, msg),
         ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
         ExecuteMsg::UpdateAdmin { admin } => {
             let admin = deps.api.addr_validate(&admin)?;
@@ -193,8 +189,16 @@ pub fn execute_transfer_back_to_remote_chain(
     }
 
     // should be in form port/channel/denom
-    let cw20_mapping = get_cw20_mapping_from_cw20_denom(deps.as_ref(), amount.denom())?;
-    let ibc_denom = cw20_mapping.key;
+    let mapping = get_mapping_from_asset_info(
+        deps.as_ref(),
+        match amount.clone() {
+            Amount::Native(coin) => AssetInfo::NativeToken { denom: coin.denom },
+            Amount::Cw20(cw20_coin) => AssetInfo::Token {
+                contract_addr: deps.api.addr_validate(cw20_coin.address.as_str())?,
+            },
+        },
+    )?;
+    let ibc_denom = mapping.key;
 
     // ensure the requested channel is registered
     if !CHANNEL_INFO.has(deps.storage, &msg.local_channel_id) {
@@ -212,9 +216,10 @@ pub fn execute_transfer_back_to_remote_chain(
     // timeout is in nanoseconds
     let timeout = env.block.time.plus_seconds(timeout_delta);
     // need to convert decimal of cw20 to remote decimal before transferring
-    let amount_remote = amount.convert_cw20_to_remote(
-        cw20_mapping.cw20_map.remote_decimals,
-        cw20_mapping.cw20_map.cw20_decimals,
+    let amount_remote = convert_local_to_remote(
+        amount.amount(),
+        mapping.pair_mapping.remote_decimals,
+        mapping.pair_mapping.asset_info_decimals,
     )?;
 
     // build ics20 packet
@@ -297,11 +302,11 @@ pub fn execute_allow(
 
 /// The gov contract can allow new contracts, or increase the gas limit on existing contracts.
 /// It cannot block or reduce the limit to avoid forcible sticking tokens in the channel.
-pub fn execute_update_cw20_mapping_pair(
+pub fn execute_update_mapping_pair(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mapping_pair_msg: Cw20PairMsg,
+    mapping_pair_msg: UpdatePairMsg,
 ) -> Result<Response, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
@@ -312,30 +317,30 @@ pub fn execute_update_cw20_mapping_pair(
     );
 
     // if pair already exists in list, remove it and create a new one
-    if cw20_ics20_denoms().load(deps.storage, &ibc_denom).is_ok() {
-        cw20_ics20_denoms().remove(deps.storage, &ibc_denom)?;
+    if ics20_denoms().load(deps.storage, &ibc_denom).is_ok() {
+        ics20_denoms().remove(deps.storage, &ibc_denom)?;
     }
 
-    cw20_ics20_denoms().update(deps.storage, &ibc_denom, |_| -> StdResult<_> {
-        Ok(Cw20MappingMetadata {
-            cw20_denom: mapping_pair_msg.cw20_denom.clone(),
+    ics20_denoms().update(deps.storage, &ibc_denom, |_| -> StdResult<_> {
+        Ok(MappingMetadata {
+            asset_info: mapping_pair_msg.asset_info.clone(),
             remote_decimals: mapping_pair_msg.remote_decimals,
-            cw20_decimals: mapping_pair_msg.cw20_decimals,
+            asset_info_decimals: mapping_pair_msg.asset_info_decimals,
         })
     })?;
 
     let res = Response::new()
-        .add_attribute("action", "update_cw20_ics20_mapping_pair")
+        .add_attribute("action", "execute_update_mapping_pair")
         .add_attribute("denom", mapping_pair_msg.denom)
-        .add_attribute("new_cw20", mapping_pair_msg.cw20_denom.clone());
+        .add_attribute("new_asset_info", mapping_pair_msg.asset_info.to_string());
     Ok(res)
 }
 
-pub fn execute_delete_cw20_mapping_pair(
+pub fn execute_delete_mapping_pair(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mapping_pair_msg: DeleteCw20PairMsg,
+    mapping_pair_msg: DeletePairMsg,
 ) -> Result<Response, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
@@ -345,10 +350,10 @@ pub fn execute_delete_cw20_mapping_pair(
         &mapping_pair_msg.denom,
     );
 
-    cw20_ics20_denoms().remove(deps.storage, &ibc_denom)?;
+    ics20_denoms().remove(deps.storage, &ibc_denom)?;
 
     let res = Response::new()
-        .add_attribute("action", "execute_delete_cw20_mapping_pair")
+        .add_attribute("action", "execute_delete_mapping_pair")
         .add_attribute("local_channel_id", mapping_pair_msg.local_channel_id)
         .add_attribute("original_denom", mapping_pair_msg.denom);
     Ok(res)
@@ -380,14 +385,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order,
         } => to_binary(&list_allowed(deps, start_after, limit, order)?),
-        QueryMsg::Cw20Mapping {
+        QueryMsg::PairMappings {
             start_after,
             limit,
             order,
         } => to_binary(&list_cw20_mapping(deps, start_after, limit, order)?),
-        QueryMsg::Cw20MappingFromKey { key } => to_binary(&get_cw20_mapping_from_key(deps, key)?),
-        QueryMsg::Cw20MappingFromCw20Denom { cw20_denom } => {
-            to_binary(&get_cw20_mapping_from_cw20_denom(deps, cw20_denom)?)
+        QueryMsg::PairMapping { key } => to_binary(&get_mapping_from_key(deps, key)?),
+        QueryMsg::PairMappingFromAssetInfo { asset_info } => {
+            to_binary(&get_mapping_from_asset_info(deps, asset_info)?)
         }
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
     }
@@ -491,47 +496,47 @@ fn list_cw20_mapping(
     start_after: Option<String>,
     limit: Option<u32>,
     order: Option<u8>,
-) -> StdResult<ListCw20MappingResponse> {
+) -> StdResult<ListMappingResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let mut allow_range = cw20_ics20_denoms().range(deps.storage, None, None, map_order(order));
+    let mut allow_range = ics20_denoms().range(deps.storage, None, None, map_order(order));
     if let Some(start_after) = start_after {
         let start = Some(Bound::exclusive::<&str>(&start_after));
-        allow_range = cw20_ics20_denoms().range(deps.storage, start, None, map_order(order));
+        allow_range = ics20_denoms().range(deps.storage, start, None, map_order(order));
     }
     let pairs = allow_range
         .take(limit)
         .map(|item| {
-            item.map(|(key, mapping)| Cw20PairQuery {
+            item.map(|(key, mapping)| PairQuery {
                 key,
-                cw20_map: mapping,
+                pair_mapping: mapping,
             })
         })
         .collect::<StdResult<_>>()?;
-    Ok(ListCw20MappingResponse { pairs })
+    Ok(ListMappingResponse { pairs })
 }
 
-fn get_cw20_mapping_from_key(deps: Deps, ibc_denom: String) -> StdResult<Cw20PairQuery> {
-    let result = cw20_ics20_denoms().load(deps.storage, &ibc_denom)?;
-    Ok(Cw20PairQuery {
+fn get_mapping_from_key(deps: Deps, ibc_denom: String) -> StdResult<PairQuery> {
+    let result = ics20_denoms().load(deps.storage, &ibc_denom)?;
+    Ok(PairQuery {
         key: ibc_denom,
-        cw20_map: result,
+        pair_mapping: result,
     })
 }
 
-fn get_cw20_mapping_from_cw20_denom(deps: Deps, cw20_denom: String) -> StdResult<Cw20PairQuery> {
-    let cw20_mapping_result = cw20_ics20_denoms()
+fn get_mapping_from_asset_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PairQuery> {
+    let cw20_mapping_result = ics20_denoms()
         .idx
-        .cw20_denom
-        .item(deps.storage, cw20_denom)?;
+        .asset_info
+        .item(deps.storage, asset_info.to_string())?;
     if cw20_mapping_result.is_none() {
         return Err(StdError::generic_err(
             "cw20 mapping pair from the given cw20 denom is not found",
         ));
     }
     let cw20_mapping = cw20_mapping_result.unwrap();
-    Ok(Cw20PairQuery {
+    Ok(PairQuery {
         key: String::from_utf8(cw20_mapping.0)?,
-        cw20_map: cw20_mapping.1,
+        pair_mapping: cw20_mapping.1,
     })
 }
 
@@ -560,6 +565,7 @@ mod test {
     use cw_controllers::AdminError;
 
     use cw_utils::PaymentError;
+    use oraiswap::asset::AssetInfo;
 
     #[test]
     fn test_split_denom() {
@@ -607,19 +613,23 @@ mod test {
     #[test]
     fn test_update_cw20_mapping() {
         let mut deps = setup(&["channel-3", "channel-7"], &[]);
-        let cw20_denom = "cw20:foobar".to_string();
-        let cw20_denom_second = "cw20:foobar-second".to_string();
+        let asset_info = AssetInfo::Token {
+            contract_addr: Addr::unchecked("cw20:foobar".to_string()),
+        };
+        let asset_info_second = AssetInfo::Token {
+            contract_addr: Addr::unchecked("cw20:foobar-second".to_string()),
+        };
 
-        let mut update = Cw20PairMsg {
+        let mut update = UpdatePairMsg {
             local_channel_id: "mars-channel".to_string(),
             denom: "earth".to_string(),
-            cw20_denom: cw20_denom.clone(),
+            asset_info: asset_info.clone(),
             remote_decimals: 18,
-            cw20_decimals: 18,
+            asset_info_decimals: 18,
         };
 
         // works with proper funds
-        let mut msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+        let mut msg = ExecuteMsg::UpdateMappingPair(update.clone());
 
         // unauthorized case
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
@@ -633,14 +643,14 @@ mod test {
         let mappings = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::Cw20Mapping {
+            QueryMsg::PairMappings {
                 start_after: None,
                 limit: None,
                 order: None,
             },
         )
         .unwrap();
-        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        let response: ListMappingResponse = from_binary(&mappings).unwrap();
         println!("response: {:?}", response);
         assert_eq!(
             response.pairs.first().unwrap().key,
@@ -651,19 +661,19 @@ mod test {
         let mappings = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::Cw20Mapping {
+            QueryMsg::PairMappings {
                 start_after: None,
                 limit: None,
                 order: None,
             },
         )
         .unwrap();
-        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        let response: ListMappingResponse = from_binary(&mappings).unwrap();
         assert_ne!(response.pairs.first().unwrap().key, "foobar".to_string());
 
         // update existing key case must pass
-        update.cw20_denom = cw20_denom_second.clone();
-        msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+        update.asset_info = asset_info_second.clone();
+        msg = ExecuteMsg::UpdateMappingPair(update.clone());
 
         let info = mock_info("gov", &coins(1234567, "ucosm"));
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -672,40 +682,42 @@ mod test {
         let mappings = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::Cw20Mapping {
+            QueryMsg::PairMappings {
                 start_after: None,
                 limit: None,
                 order: None,
             },
         )
         .unwrap();
-        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        let response: ListMappingResponse = from_binary(&mappings).unwrap();
         println!("response: {:?}", response);
         assert_eq!(
             response.pairs.first().unwrap().key,
             format!("{}/mars-channel/earth", CONTRACT_PORT)
         );
         assert_eq!(
-            response.pairs.first().unwrap().cw20_map.cw20_denom,
-            cw20_denom_second
+            response.pairs.first().unwrap().pair_mapping.asset_info,
+            asset_info_second
         )
     }
 
     #[test]
     fn test_delete_cw20_mapping() {
         let mut deps = setup(&["channel-3", "channel-7"], &[]);
-        let cw20_denom = "cw20:foobar".to_string();
+        let cw20_denom = AssetInfo::Token {
+            contract_addr: Addr::unchecked("cw20:foobar".to_string()),
+        };
 
-        let update = Cw20PairMsg {
+        let update = UpdatePairMsg {
             local_channel_id: "mars-channel".to_string(),
             denom: "earth".to_string(),
-            cw20_denom: cw20_denom.clone(),
+            asset_info: cw20_denom.clone(),
             remote_decimals: 18,
-            cw20_decimals: 18,
+            asset_info_decimals: 18,
         };
 
         // works with proper funds
-        let msg = ExecuteMsg::UpdateCw20MappingPair(update.clone());
+        let msg = ExecuteMsg::UpdateMappingPair(update.clone());
 
         let info = mock_info("gov", &coins(1234567, "ucosm"));
         execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
@@ -714,14 +726,14 @@ mod test {
         let mappings = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::Cw20Mapping {
+            QueryMsg::PairMappings {
                 start_after: None,
                 limit: None,
                 order: None,
             },
         )
         .unwrap();
-        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        let response: ListMappingResponse = from_binary(&mappings).unwrap();
         println!("response: {:?}", response);
         assert_eq!(
             response.pairs.first().unwrap().key,
@@ -729,12 +741,12 @@ mod test {
         );
 
         // now try deleting
-        let delete = DeleteCw20PairMsg {
+        let delete = DeletePairMsg {
             local_channel_id: "mars-channel".to_string(),
             denom: "earth".to_string(),
         };
 
-        let mut msg = ExecuteMsg::DeleteCw20MappingPair(delete.clone());
+        let mut msg = ExecuteMsg::DeleteMappingPair(delete.clone());
 
         // unauthorized delete case
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
@@ -744,21 +756,21 @@ mod test {
         let info = mock_info("gov", &coins(1234567, "ucosm"));
 
         // happy case
-        msg = ExecuteMsg::DeleteCw20MappingPair(delete.clone());
+        msg = ExecuteMsg::DeleteMappingPair(delete.clone());
         execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
         // after update, the list cw20 mapping should be empty
         let mappings = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::Cw20Mapping {
+            QueryMsg::PairMappings {
                 start_after: None,
                 limit: None,
                 order: None,
             },
         )
         .unwrap();
-        let response: ListCw20MappingResponse = from_binary(&mappings).unwrap();
+        let response: ListMappingResponse = from_binary(&mappings).unwrap();
         println!("response: {:?}", response);
         assert_eq!(response.pairs.len(), 0)
     }
@@ -947,24 +959,27 @@ mod test {
         let original_sender = "original_sender";
         let denom = "uatom";
         let amount = 1234567u128;
-        let cw20_denom = "cw20:token-addr";
-        let cw20_raw_denom = "token-addr";
+        let token_addr = Addr::unchecked("cw20:token-addr".to_string());
+        let asset_info = AssetInfo::Token {
+            contract_addr: token_addr.clone(),
+        };
+        let cw20_raw_denom = token_addr.as_str();
         let local_channel = "channel-1234";
         let mut deps = setup(&[remote_channel, local_channel], &[]);
 
-        let pair = Cw20PairMsg {
+        let pair = UpdatePairMsg {
             local_channel_id: local_channel.to_string(),
             denom: denom.to_string(),
-            cw20_denom: cw20_denom.to_string(),
+            asset_info: asset_info,
             remote_decimals: 18u8,
-            cw20_decimals: 18u8,
+            asset_info_decimals: 18u8,
         };
 
         let _ = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("gov", &[]),
-            ExecuteMsg::UpdateCw20MappingPair(pair),
+            ExecuteMsg::UpdateMappingPair(pair),
         )
         .unwrap();
 
@@ -1049,19 +1064,21 @@ mod test {
         );
 
         // reject case with bad channel id
-        let pair = Cw20PairMsg {
+        let pair = UpdatePairMsg {
             local_channel_id: "not_registered_channel".to_string(),
             denom: denom.to_string(),
-            cw20_denom: "random_cw20_denom".to_string(),
+            asset_info: AssetInfo::Token {
+                contract_addr: Addr::unchecked("random_cw20_denom".to_string()),
+            },
             remote_decimals: 18u8,
-            cw20_decimals: 18u8,
+            asset_info_decimals: 18u8,
         };
 
         execute(
             deps.as_mut(),
             mock_env(),
             mock_info("gov", &[]),
-            ExecuteMsg::UpdateCw20MappingPair(pair),
+            ExecuteMsg::UpdateMappingPair(pair),
         )
         .unwrap();
 
