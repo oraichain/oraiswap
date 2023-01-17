@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, IbcEndpoint, StdResult, Storage, Uint128};
 use cw_controllers::Admin;
-use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, UniqueIndex};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 use oraiswap::asset::AssetInfo;
 
 use crate::ContractError;
@@ -25,7 +25,7 @@ pub const ALLOW_LIST: Map<&Addr, AllowInfo> = Map::new("allow_list");
 // MappingMetadataIndexex structs keeps a list of indexers
 pub struct MappingMetadataIndexex<'a> {
     // token.identifier
-    pub asset_info: UniqueIndex<'a, String, MappingMetadata>,
+    pub asset_info: MultiIndex<'a, String, MappingMetadata, String>,
 }
 
 // IndexList is just boilerplate code for fetching a struct's indexes
@@ -39,7 +39,11 @@ impl<'a> IndexList<MappingMetadata> for MappingMetadataIndexex<'a> {
 // used when chain A (no cosmwasm) sends native token to chain B (has cosmwasm). key - original denom of chain A, in form of ibc no hash for destination port & channel - transfer/channel-0/uatom for example; value - mapping data including asset info, can be either native or cw20
 pub fn ics20_denoms<'a>() -> IndexedMap<'a, &'a str, MappingMetadata, MappingMetadataIndexex<'a>> {
     let indexes = MappingMetadataIndexex {
-        asset_info: UniqueIndex::new(|d| d.asset_info.to_string(), "asset_info"),
+        asset_info: MultiIndex::new(
+            |_k, d| d.asset_info.to_string(),
+            "ics20_mapping_namespace",
+            "asset__info",
+        ),
     };
     IndexedMap::new("ics20_mapping_namespace", indexes)
 }

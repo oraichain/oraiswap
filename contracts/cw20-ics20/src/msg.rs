@@ -36,6 +36,7 @@ pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     /// This allows us to transfer *exactly one* native token
     Transfer(TransferMsg),
+    TransferToRemote(TransferBackMsg),
     UpdateMappingPair(UpdatePairMsg),
     DeleteMappingPair(DeletePairMsg),
     /// This must be called by gov_contract, will allow a new cw20 token to be sent
@@ -85,6 +86,8 @@ pub struct TransferBackMsg {
     /// the local ibc endpoint you want to send tokens back on
     pub local_channel_id: String,
     pub remote_address: String,
+    /// remote denom so that we know what denom to filter when we query based on the asset info. Most likely be: oraib0x... or eth0x...
+    pub remote_denom: String,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,
     /// metadata of the transfer to suit the new fungible token transfer
@@ -141,8 +144,8 @@ pub enum QueryMsg {
     },
     #[returns(PairQuery)]
     PairMapping { key: String },
-    #[returns(PairQuery)]
-    PairMappingFromAssetInfo { asset_info: AssetInfo },
+    #[returns(Vec<PairQuery>)]
+    PairMappingsFromAssetInfo { asset_info: AssetInfo },
 }
 
 #[cw_serde]

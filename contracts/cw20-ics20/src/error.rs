@@ -71,6 +71,9 @@ pub enum ContractError {
 
     #[error("The contract address you are sending native tokens to is already revoked")]
     CustomContractRevoked,
+
+    #[error("Could not find the mapping pair")]
+    MappingPairNotFound,
 }
 
 impl From<FromUtf8Error> for ContractError {

@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdError, StdResult,
+    PortIdResponse, Response, StdResult,
 };
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
@@ -68,6 +68,11 @@ pub fn execute(
         ExecuteMsg::Transfer(msg) => {
             let coin = one_coin(&info)?;
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
+        }
+        ExecuteMsg::TransferToRemote(msg) => {
+            let coin = one_coin(&info)?;
+            let amount = Amount::from_parts(coin.denom, coin.amount);
+            execute_transfer_back_to_remote_chain(deps, env, msg, amount, info.sender)
         }
         ExecuteMsg::UpdateMappingPair(msg) => execute_update_mapping_pair(deps, env, info, msg),
         ExecuteMsg::DeleteMappingPair(msg) => execute_delete_mapping_pair(deps, env, info, msg),
@@ -189,7 +194,7 @@ pub fn execute_transfer_back_to_remote_chain(
     }
 
     // should be in form port/channel/denom
-    let mapping = get_mapping_from_asset_info(
+    let mappings = get_mappings_from_asset_info(
         deps.as_ref(),
         match amount.clone() {
             Amount::Native(coin) => AssetInfo::NativeToken { denom: coin.denom },
@@ -198,6 +203,17 @@ pub fn execute_transfer_back_to_remote_chain(
             },
         },
     )?;
+
+    let mapping_search_result = mappings
+        .into_iter()
+        .find(|pair| pair.key.contains(&msg.remote_denom));
+
+    if mapping_search_result.is_none() {
+        return Err(ContractError::MappingPairNotFound {});
+    }
+
+    let mapping = mapping_search_result.unwrap();
+
     let ibc_denom = mapping.key;
 
     // ensure the requested channel is registered
@@ -321,13 +337,15 @@ pub fn execute_update_mapping_pair(
         ics20_denoms().remove(deps.storage, &ibc_denom)?;
     }
 
-    ics20_denoms().update(deps.storage, &ibc_denom, |_| -> StdResult<_> {
-        Ok(MappingMetadata {
+    ics20_denoms().save(
+        deps.storage,
+        &ibc_denom,
+        &MappingMetadata {
             asset_info: mapping_pair_msg.asset_info.clone(),
             remote_decimals: mapping_pair_msg.remote_decimals,
             asset_info_decimals: mapping_pair_msg.asset_info_decimals,
-        })
-    })?;
+        },
+    )?;
 
     let res = Response::new()
         .add_attribute("action", "execute_update_mapping_pair")
@@ -391,8 +409,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             order,
         } => to_binary(&list_cw20_mapping(deps, start_after, limit, order)?),
         QueryMsg::PairMapping { key } => to_binary(&get_mapping_from_key(deps, key)?),
-        QueryMsg::PairMappingFromAssetInfo { asset_info } => {
-            to_binary(&get_mapping_from_asset_info(deps, asset_info)?)
+        QueryMsg::PairMappingsFromAssetInfo { asset_info } => {
+            to_binary(&get_mappings_from_asset_info(deps, asset_info)?)
         }
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
     }
@@ -420,6 +438,7 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
         .prefix(&id)
         .range(deps.storage, None, None, Order::Ascending)
         .map(|r| {
+            // this denom is
             r.map(|(denom, v)| {
                 let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
                 let total = Amount::from_parts(denom, v.total_sent);
@@ -523,21 +542,25 @@ fn get_mapping_from_key(deps: Deps, ibc_denom: String) -> StdResult<PairQuery> {
     })
 }
 
-fn get_mapping_from_asset_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PairQuery> {
-    let cw20_mapping_result = ics20_denoms()
+fn get_mappings_from_asset_info(deps: Deps, asset_info: AssetInfo) -> StdResult<Vec<PairQuery>> {
+    let pair_mapping_result: StdResult<Vec<(String, MappingMetadata)>> = ics20_denoms()
         .idx
         .asset_info
-        .item(deps.storage, asset_info.to_string())?;
-    if cw20_mapping_result.is_none() {
-        return Err(StdError::generic_err(
-            "cw20 mapping pair from the given cw20 denom is not found",
-        ));
+        .prefix(asset_info.to_string())
+        .range(deps.storage, None, None, Order::Ascending)
+        .collect();
+    if pair_mapping_result.is_err() {
+        return Err(pair_mapping_result.unwrap_err());
     }
-    let cw20_mapping = cw20_mapping_result.unwrap();
-    Ok(PairQuery {
-        key: String::from_utf8(cw20_mapping.0)?,
-        pair_mapping: cw20_mapping.1,
-    })
+    let pair_mappings = pair_mapping_result.unwrap();
+    let pair_queries: Vec<PairQuery> = pair_mappings
+        .into_iter()
+        .map(|pair| PairQuery {
+            key: pair.0,
+            pair_mapping: pair.1,
+        })
+        .collect();
+    Ok(pair_queries)
 }
 
 fn map_order(order: Option<u8>) -> Order {
@@ -608,6 +631,85 @@ mod test {
         )
         .unwrap_err();
         assert_eq!(err, StdError::not_found("cw20_ics20::state::ChannelInfo"));
+    }
+
+    #[test]
+    fn test_query_pair_mapping_by_asset_info() {
+        let mut deps = setup(&["channel-3", "channel-7"], &[]);
+        let asset_info = AssetInfo::Token {
+            contract_addr: Addr::unchecked("cw20:foobar".to_string()),
+        };
+        let mut update = UpdatePairMsg {
+            local_channel_id: "mars-channel".to_string(),
+            denom: "earth".to_string(),
+            asset_info: asset_info.clone(),
+            remote_decimals: 18,
+            asset_info_decimals: 18,
+        };
+
+        // works with proper funds
+        let mut msg = ExecuteMsg::UpdateMappingPair(update.clone());
+
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+        execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+
+        // add another pair with the same asset info to filter
+        update.denom = "jupiter".to_string();
+        msg = ExecuteMsg::UpdateMappingPair(update.clone());
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+        execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+
+        // add another pair with a different asset info
+        update.denom = "moon".to_string();
+        update.asset_info = AssetInfo::NativeToken {
+            denom: "orai".to_string(),
+        };
+        msg = ExecuteMsg::UpdateMappingPair(update.clone());
+        let info = mock_info("gov", &coins(1234567, "ucosm"));
+        execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+
+        // query based on asset info
+
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::PairMappingsFromAssetInfo {
+                asset_info: asset_info,
+            },
+        )
+        .unwrap();
+        let response: Vec<PairQuery> = from_binary(&mappings).unwrap();
+        assert_eq!(response.len(), 2);
+
+        // query native token asset info, should receive moon denom in key
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::PairMappingsFromAssetInfo {
+                asset_info: AssetInfo::NativeToken {
+                    denom: "orai".to_string(),
+                },
+            },
+        )
+        .unwrap();
+        let response: Vec<PairQuery> = from_binary(&mappings).unwrap();
+        assert_eq!(response.len(), 1);
+        assert_eq!(response.first().unwrap().key.contains("moon"), true);
+
+        // query asset info that is not in the mapping, should return empty
+        // query native token asset info, should receive moon denom
+        let mappings = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::PairMappingsFromAssetInfo {
+                asset_info: AssetInfo::NativeToken {
+                    denom: "foobar".to_string(),
+                },
+            },
+        )
+        .unwrap();
+        let response: Vec<PairQuery> = from_binary(&mappings).unwrap();
+        assert_eq!(response.len(), 0);
     }
 
     #[test]
@@ -987,6 +1089,7 @@ mod test {
         let mut transfer = TransferBackMsg {
             local_channel_id: local_channel.to_string(),
             remote_address: "foreign-address".to_string(),
+            remote_denom: denom.to_string(),
             timeout: Some(DEFAULT_TIMEOUT),
             memo: None,
         };
