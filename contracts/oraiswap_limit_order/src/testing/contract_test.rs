@@ -298,13 +298,13 @@ fn submit_order() {
         order_id: 3u64,
         bidder_addr: "addr0000".to_string(),
         offer_asset: Asset {
-            amount: Uint128::from(10000u128),
+            amount: Uint128::from(100000u128),
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
         },
         ask_asset: Asset {
-            amount: Uint128::from(100000u128),
+            amount: Uint128::from(10000u128),
             info: AssetInfo::NativeToken {
                 denom: ATOM_DENOM.to_string(),
             },
@@ -1296,7 +1296,7 @@ fn execute_order_token() {
 }
 
 #[test]
-fn execute_all_orders_native_token() {
+fn execute_pair_native_token() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -1364,7 +1364,7 @@ fn execute_all_orders_native_token() {
             denom: ATOM_DENOM.to_string(),
         },
         precision: None,
-        min_offer_amount: Uint128::zero(),
+        min_offer_amount: Uint128::from(10u128),
     };
 
     let _res = app.execute(
@@ -1435,7 +1435,7 @@ fn execute_all_orders_native_token() {
             }],
         )
         .unwrap();
-
+    
     /* <----------------------------------- order 3 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -1466,7 +1466,7 @@ fn execute_all_orders_native_token() {
             }],
         )
         .unwrap();
-   
+    
     /* <----------------------------------- order 4 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -1729,12 +1729,12 @@ fn execute_all_orders_native_token() {
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
             .unwrap(),
-        Uint128::from(1000800u128)
+        Uint128::from(1005800u128)
     );
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0001"), ATOM_DENOM.to_string())
             .unwrap(),
-        Uint128::from(991200u128)
+        Uint128::from(996200u128)
     );
     assert_eq!(
         app.query_balance(Addr::unchecked("addr0002"), ATOM_DENOM.to_string())
@@ -1969,7 +1969,7 @@ fn remove_orderbook_pair() {
     )
     .unwrap();
 
-    println!("remove order book pair _res: {:?}", res);
+    println!("remove order book pair res: {:?}", res);
 }
 
 #[test]
