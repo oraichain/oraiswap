@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::ibc::{reply, Ics20Packet};
-use crate::msg::{AllowMsg, InitMsg, UpdatePairMsg};
+use crate::msg::{AllowMsg, InstantiateMsg, UpdatePairMsg};
 use crate::test_helpers::{CONTRACT_PORT, DEFAULT_TIMEOUT, REMOTE_PORT};
 
 use cosmwasm_std::{to_binary, Addr, Empty, IbcEndpoint, IbcPacket, Timestamp};
@@ -78,7 +78,7 @@ fn initialize_basic_data_for_testings() -> (App, Addr, Addr, IbcEndpoint, String
     let remote_decimals = 18u8;
     let asset_info_decimals = 18u8;
 
-    let cw20_ics20_init_msg = InitMsg {
+    let cw20_ics20_init_msg = InstantiateMsg {
         default_gas_limit: Some(20000000u64),
         default_timeout: DEFAULT_TIMEOUT,
         gov_contract: gov_cw20_ics20.to_string(),

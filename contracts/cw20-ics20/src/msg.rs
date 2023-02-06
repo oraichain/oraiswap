@@ -7,7 +7,7 @@ use crate::state::{ChannelInfo, MappingMetadata};
 use cw20_ics20_msg::amount::Amount;
 
 #[cw_serde]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// Default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
     /// who can allow more contracts

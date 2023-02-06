@@ -2,7 +2,7 @@ use crate::error::ContractError;
 use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, DeletePairMsg,
-    ExecuteMsg, InitMsg, ListAllowedResponse, ListChannelsResponse, ListMappingResponse,
+    ExecuteMsg, InstantiateMsg, ListAllowedResponse, ListChannelsResponse, ListMappingResponse,
     MigrateMsg, PairQuery, PortResponse, QueryMsg, TransferBackMsg, TransferMsg, UpdatePairMsg,
 };
 use crate::state::{
@@ -31,7 +31,7 @@ pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {

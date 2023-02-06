@@ -1,10 +1,10 @@
 use cosmwasm_schema::write_api;
 
-use cw20_ics20::msg::{ExecuteMsg, InitMsg, MigrateMsg, QueryMsg};
+use cw20_ics20::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 fn main() {
     write_api! {
-        instantiate: InitMsg,
+        instantiate: InstantiateMsg,
         execute: ExecuteMsg,
         query: QueryMsg,
         migrate: MigrateMsg,

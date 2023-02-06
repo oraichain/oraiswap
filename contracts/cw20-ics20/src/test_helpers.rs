@@ -11,7 +11,7 @@ use cosmwasm_std::{
     DepsMut, IbcChannel, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, OwnedDeps,
 };
 
-use crate::msg::{AllowMsg, InitMsg};
+use crate::msg::{AllowMsg, InstantiateMsg};
 
 pub const DEFAULT_TIMEOUT: u64 = 3600; // 1 hour,
 pub const CONTRACT_PORT: &str = "wasm.cosmos2contract"; // wasm.MOCK_CONTRACT_ADDR
@@ -69,7 +69,7 @@ pub fn setup(
         .collect();
 
     // instantiate an empty contract
-    let instantiate_msg = InitMsg {
+    let instantiate_msg = InstantiateMsg {
         default_gas_limit: None,
         default_timeout: DEFAULT_TIMEOUT,
         gov_contract: "gov".to_string(),
