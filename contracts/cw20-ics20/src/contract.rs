@@ -1,3 +1,15 @@
+use crate::error::ContractError;
+use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
+use crate::msg::{
+    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, DeletePairMsg,
+    ExecuteMsg, InstantiateMsg, ListAllowedResponse, ListChannelsResponse, ListMappingResponse,
+    MigrateMsg, PairQuery, PortResponse, QueryMsg, TransferBackMsg, TransferMsg, UpdatePairMsg,
+};
+use crate::state::{
+    get_key_ics20_ibc_denom, ics20_denoms, increase_channel_balance, reduce_channel_balance,
+    AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_FORWARD_STATE, CHANNEL_INFO,
+    CHANNEL_REVERSE_STATE, CONFIG,
+};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -6,23 +18,10 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
-use cw_storage_plus::Bound;
-use oraiswap::asset::AssetInfo;
-
-use crate::error::ContractError;
-use crate::ibc::{parse_ibc_wasm_port_id, Ics20Packet};
-use crate::msg::{
-    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, DeletePairMsg,
-    ExecuteMsg, InitMsg, ListAllowedResponse, ListChannelsResponse, ListMappingResponse,
-    MigrateMsg, PairQuery, PortResponse, QueryMsg, TransferBackMsg, TransferMsg, UpdatePairMsg,
-};
-use crate::state::{
-    get_key_ics20_ibc_denom, ics20_denoms, increase_channel_balance, reduce_channel_balance,
-    AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_FORWARD_STATE, CHANNEL_INFO,
-    CHANNEL_REVERSE_STATE, CONFIG,
-};
 use cw20_ics20_msg::amount::{convert_local_to_remote, Amount};
+use cw_storage_plus::Bound;
 use cw_utils::{maybe_addr, nonpayable, one_coin};
+use oraiswap::asset::AssetInfo;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -33,7 +32,7 @@ pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
@@ -530,11 +529,9 @@ fn list_cw20_mapping(
     order: Option<u8>,
 ) -> StdResult<ListMappingResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let mut allow_range = ics20_denoms().range(deps.storage, None, None, map_order(order));
-    if let Some(start_after) = start_after {
-        let start = Some(Bound::exclusive::<&str>(&start_after));
-        allow_range = ics20_denoms().range(deps.storage, start, None, map_order(order));
-    }
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into()));
+    let allow_range = ics20_denoms().range(deps.storage, start, None, map_order(order));
+
     let pairs = allow_range
         .take(limit)
         .map(|item| {
