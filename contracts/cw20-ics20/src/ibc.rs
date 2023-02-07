@@ -112,6 +112,7 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contrac
                     &reply_args.channel,
                     &reply_args.denom,
                     reply_args.amount,
+                    true,
                 )?;
 
                 Ok(Response::new().set_data(ack_fail(err)))
@@ -138,6 +139,7 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contrac
                     &reply_args.channel,
                     &reply_args.denom,
                     reply_args.amount,
+                    false,
                 )?;
 
                 Ok(Response::new()
@@ -299,7 +301,7 @@ fn do_ibc_packet_receive(
     }
 
     // make sure we have enough balance for this
-    reduce_channel_balance(deps.storage, &channel, denom.0, msg.amount)?;
+    reduce_channel_balance(deps.storage, &channel, denom.0, msg.amount, true)?;
 
     // we need to save the data to update the balances in reply
     let reply_args = ReplyArgs {
@@ -358,6 +360,7 @@ fn handle_ibc_packet_receive_native_remote_chain(
         &packet.dest.channel_id,
         &ibc_denom,
         msg.amount.clone(),
+        false,
     )?;
 
     // we need to save the data to update the balances in reply
@@ -460,7 +463,13 @@ fn on_packet_failure(
     // in case that the denom is not in the mapping list, meaning that it is not transferred back, but transfer originally from this local chain
     if ics20_denoms().may_load(deps.storage, &msg.denom)?.is_none() {
         // undo the balance update on failure (as we pre-emptively added it on send)
-        reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
+        reduce_channel_balance(
+            deps.storage,
+            &packet.src.channel_id,
+            &msg.denom,
+            msg.amount,
+            true,
+        )?;
 
         let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
         let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
@@ -483,7 +492,13 @@ fn on_packet_failure(
     }
 
     // since we reduce the channel's balance optimistically when transferring back, we increase it again when receiving failed ack
-    increase_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
+    increase_channel_balance(
+        deps.storage,
+        &packet.src.channel_id,
+        &msg.denom,
+        msg.amount,
+        false,
+    )?;
 
     // get ibc denom mapping to get cw20 denom & from decimals in case of packet failure, we can refund the corresponding user & amount
     let pair_mapping = ics20_denoms().load(deps.storage, &msg.denom)?;
@@ -496,11 +511,12 @@ fn on_packet_failure(
         )?,
     );
     let cosmos_msg = send_amount(to_send, msg.sender.clone(), None);
+    let submsg = SubMsg::reply_on_error(cosmos_msg, ACK_FAILURE_ID);
 
-    // we wont be using submessage here, because the message could fail when calling the allow_contract. We cannot trust allow_contract. If fail => revert whole tx, the acknowledgement will stay there and get retried by the relayer forever until the allow_contract gets fixed.
+    // used submsg here & reply on error. This means that if the refund process fails => tokens will be locked in this IBC Wasm contract. We will manually handle that case. No retry
     // similar event messages like ibctransfer module
     let res = IbcBasicResponse::new()
-        .add_message(cosmos_msg)
+        .add_submessage(submsg)
         .add_attribute("action", "acknowledge")
         .add_attribute("sender", msg.sender)
         .add_attribute("receiver", msg.receiver)
@@ -710,7 +726,7 @@ mod test {
         );
 
         // query channel state|_|
-        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        let state = query_channel(deps.as_ref(), send_channel.to_string(), Some(true)).unwrap();
         assert_eq!(state.balances, vec![Amount::cw20(987654321, cw20_addr)]);
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
 
@@ -735,7 +751,7 @@ mod test {
         // TODO: we need to call the reply block
 
         // query channel state
-        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        let state = query_channel(deps.as_ref(), send_channel.to_string(), Some(true)).unwrap();
         assert_eq!(state.balances, vec![Amount::cw20(111111111, cw20_addr)]);
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
     }
@@ -770,7 +786,7 @@ mod test {
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // query channel state|_|
-        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        let state = query_channel(deps.as_ref(), send_channel.to_string(), Some(true)).unwrap();
         assert_eq!(state.balances, vec![Amount::native(987654321, denom)]);
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
 
@@ -795,7 +811,7 @@ mod test {
         // only need to call reply block on error case
 
         // query channel state
-        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        let state = query_channel(deps.as_ref(), send_channel.to_string(), Some(true)).unwrap();
         assert_eq!(state.balances, vec![Amount::native(111111111, denom)]);
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
     }
@@ -997,7 +1013,7 @@ mod test {
         assert!(matches!(ack, Ics20Ack::Result(_)));
 
         // query channel state|_|
-        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        let state = query_channel(deps.as_ref(), send_channel.to_string(), None).unwrap();
         assert_eq!(
             state.balances,
             vec![Amount::native(
