@@ -5,9 +5,9 @@ authors = ["Oraichain Labs","Terraform Labs, PTE."]
 edition = "2021"
 description = "Common oraiswap types"
 license = "LICENSE.txt"
-repository = "https://github.com/oraiswap/oraiswap"
-homepage = "https://oraiswap.io"
-documentation = "https://docs.oraiswap.io"
+repository = "https://github.com/oraichain/oraiswap"
+homepage = "https://orai.io"
+documentation = "https://docs.orai.io"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
