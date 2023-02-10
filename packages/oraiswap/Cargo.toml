@@ -3,11 +3,12 @@ name = "oraiswap"
 version = "1.0.0"
 authors = ["Oraichain Labs","Terraform Labs, PTE."]
 edition = "2021"
-description = "Common oraiswap types"
+description = "Common oraiswap types used in different Oraichain Labs contracts"
 license = "LICENSE.txt"
 repository = "https://github.com/oraichain/oraiswap"
 homepage = "https://orai.io"
 documentation = "https://docs.orai.io"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
