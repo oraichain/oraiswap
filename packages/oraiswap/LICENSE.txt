@@ -1,11 +1,3 @@
-The repository (this work) includes work covered by the following copyright and permission notices:
-
-Copyright (c) 2020 Terraform Labs, PTE.
-Licensed under the MIT License.
-
-NOTICE: The source code branch of Terraform Labs, PTE. under MIT license:
-https://github.com/terraswap/terraswap
- 
 MIT License
 
 Copyright 2022 Oraichain Labs JSC.
