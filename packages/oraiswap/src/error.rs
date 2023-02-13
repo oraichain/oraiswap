@@ -59,6 +59,15 @@ pub enum ContractError {
     #[error("must provide native token")]
     MustProvideNativeToken {}, // only allowing buy token and sell token with native token
 
-    #[error("pair already exists")]
+    #[error("Order book pair already exists")]
     OrderBookAlreadyExists {},
+
+    #[error("Order {order_id} already fulfilled")]
+    OrderFulfilled {order_id: u64},
+
+    #[error("Amount of {quote_coin} must be greater than {min_quote_amount}")]
+    TooSmallQuoteCoinAmount {
+        quote_coin: String,
+        min_quote_amount: Uint128,
+    },
 }
