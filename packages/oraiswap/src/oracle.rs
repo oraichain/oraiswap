@@ -1,10 +1,9 @@
 use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
-#[allow(unused_imports)]
 use cosmwasm_std::{
-    to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128,
+    WasmMsg,
 };
 
 #[cw_serde]
@@ -90,7 +89,7 @@ pub enum OracleExchangeQuery {
 pub enum OracleContractQuery {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
-    #[returns(Coin)]
+    #[returns(cosmwasm_std::Coin)]
     RewardPool { denom: String },
 }
 
