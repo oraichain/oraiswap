@@ -618,21 +618,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oraiswap-ibc"
-version = "0.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-controllers",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "cw20",
- "oraiswap",
- "thiserror",
-]
-
-[[package]]
 name = "oraiswap-limit-order"
 version = "2.2.0"
 dependencies = [

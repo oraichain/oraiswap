@@ -3,7 +3,6 @@ use cosmwasm_std::{
     to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper, Response,
     StdError, StdResult, Uint128, WasmMsg,
 };
-use cosmwasm_std::{QueryRequest, WasmQuery};
 
 use crate::state::{
     read_config, read_last_distributed, store_config, store_last_distributed, Config,
@@ -190,10 +189,10 @@ fn _read_pool_reward_per_sec(
     staking_contract: Addr,
     asset_info: AssetInfo,
 ) -> StdResult<Uint128> {
-    let res: RewardsPerSecResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: staking_contract.to_string(),
-        msg: to_binary(&StakingQueryMsg::RewardsPerSec { asset_info })?,
-    }))?;
+    let res: RewardsPerSecResponse = querier.query_wasm_smart(
+        staking_contract,
+        &StakingQueryMsg::RewardsPerSec { asset_info },
+    )?;
 
     Ok(res.assets.iter().map(|a| a.amount).sum())
 }

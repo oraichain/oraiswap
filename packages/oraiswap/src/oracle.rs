@@ -193,12 +193,7 @@ impl OracleContract {
         querier: &QuerierWrapper,
         req: QueryMsg,
     ) -> StdResult<T> {
-        let query = WasmQuery::Smart {
-            contract_addr: self.to_string(),
-            msg: to_binary(&req)?,
-        }
-        .into();
-        querier.query(&query)
+        querier.query_wasm_smart(self.to_string(), &req)
     }
 
     /*** queries ***/
