@@ -7,7 +7,8 @@ use crate::msg::{
 };
 use crate::state::{
     get_key_ics20_ibc_denom, ics20_denoms, increase_channel_balance, reduce_channel_balance,
-    AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG,
+    AllowInfo, Config, MappingMetadata, ADMIN, ALLOW_LIST, CHANNEL_FORWARD_STATE, CHANNEL_INFO,
+    CHANNEL_REVERSE_STATE, CONFIG,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -161,7 +162,13 @@ pub fn execute_transfer(
     // Update the balance now (optimistically) like ibctransfer modules.
     // In on_packet_failure (ack with error message or a timeout), we reduce the balance appropriately.
     // This means the channel works fine if success acks are not relayed.
-    increase_channel_balance(deps.storage, &msg.channel, &amount.denom(), amount.amount())?;
+    increase_channel_balance(
+        deps.storage,
+        &msg.channel,
+        &amount.denom(),
+        amount.amount(),
+        true,
+    )?;
 
     // prepare ibc message
     let msg = IbcMsg::SendPacket {
@@ -253,6 +260,7 @@ pub fn execute_transfer_back_to_remote_chain(
         &msg.local_channel_id,
         &ibc_denom,
         amount_remote,
+        false,
     )?;
 
     // prepare ibc message
@@ -394,7 +402,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
         QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
-        QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
+        QueryMsg::Channel { id, forward } => to_binary(&query_channel(deps, id, forward)?),
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::Allowed { contract } => to_binary(&query_allowed(deps, contract)?),
         QueryMsg::ListAllowed {
@@ -430,10 +438,15 @@ fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
 }
 
 // make public for ibc tests
-pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
+pub fn query_channel(deps: Deps, id: String, forward: Option<bool>) -> StdResult<ChannelResponse> {
     let info = CHANNEL_INFO.load(deps.storage, &id)?;
     // this returns Vec<(outstanding, total)>
-    let state = CHANNEL_STATE
+    let channel_state = if forward.is_some() {
+        CHANNEL_FORWARD_STATE
+    } else {
+        CHANNEL_REVERSE_STATE
+    };
+    let state = channel_state
         .prefix(&id)
         .range(deps.storage, None, None, Order::Ascending)
         .map(|r| {
@@ -611,6 +624,7 @@ mod test {
             mock_env(),
             QueryMsg::Channel {
                 id: "channel-3".to_string(),
+                forward: Some(true),
             },
         )
         .unwrap();
@@ -624,10 +638,14 @@ mod test {
             mock_env(),
             QueryMsg::Channel {
                 id: "channel-10".to_string(),
+                forward: Some(true),
             },
         )
         .unwrap_err();
-        assert_eq!(err, StdError::not_found("cw20_ics20::state::ChannelInfo"));
+        assert_eq!(
+            err,
+            StdError::not_found("cw20_ics20_latest::state::ChannelInfo")
+        );
     }
 
     #[test]
@@ -1147,7 +1165,7 @@ mod test {
         }
 
         // check new channel state after reducing balance
-        let chan = query_channel(deps.as_ref(), local_channel.into()).unwrap();
+        let chan = query_channel(deps.as_ref(), local_channel.into(), None).unwrap();
         assert_eq!(
             chan.balances,
             vec![Amount::native(
