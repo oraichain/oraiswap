@@ -64,17 +64,17 @@ pub fn execute(
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
         ExecuteMsg::CreateOrderBookPair {
-            offer_info,
-            ask_info,
+            base_coin_info,
+            quote_coin_info,
             precision,
-            min_offer_amount,
+            min_quote_coin_amount,
         } => execute_create_pair(
             deps,
             info,
-            offer_info,
-            ask_info,
+            base_coin_info,
+            quote_coin_info,
             precision,
-            min_offer_amount,
+            min_quote_coin_amount,
         ),
         ExecuteMsg::SubmitOrder {
             direction,
@@ -96,7 +96,10 @@ pub fn execute(
 
             paid_asset.assert_sent_native_token_balance(&info)?;
             // then submit order
-            submit_order(deps, info.sender, direction, assets)
+            match direction {
+                OrderDirection::Buy => submit_order(deps, info.sender, direction, [assets[0].clone(), assets[1].clone()]),
+                OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[1].clone(), assets[0].clone()]),
+            }
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -150,10 +153,10 @@ pub fn execute_update_admin(
 pub fn execute_create_pair(
     deps: DepsMut,
     info: MessageInfo,
-    ask_info: AssetInfo,
-    offer_info: AssetInfo,
+    base_coin_info: AssetInfo,
+    quote_coin_info: AssetInfo,
     precision: Option<Decimal>,
-    min_offer_amount: Uint128,
+    min_quote_coin_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -163,7 +166,7 @@ pub fn execute_create_pair(
         return Err(ContractError::Unauthorized {});
     }
 
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let pair_key = pair_key(&[base_coin_info.to_raw(deps.api)?, quote_coin_info.to_raw(deps.api)?]);
 
     let ob = read_orderbook(deps.storage, &pair_key);
     
@@ -173,10 +176,10 @@ pub fn execute_create_pair(
     }
 
     let order_book = OrderBook {
-        ask_info: ask_info.to_raw(deps.api)?,
-        offer_info: offer_info.to_raw(deps.api)?,
-        min_offer_amount,
+        base_coin_info: base_coin_info.to_raw(deps.api)?,
+        quote_coin_info: quote_coin_info.to_raw(deps.api)?,
         precision,
+        min_quote_coin_amount
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 
