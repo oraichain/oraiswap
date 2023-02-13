@@ -48,10 +48,10 @@ pub enum ExecuteMsg {
     },
 
     CreateOrderBookPair {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        base_coin_info: AssetInfo,
+        quote_coin_info: AssetInfo,
         precision: Option<Decimal>,
-        min_offer_amount: Uint128,
+        min_quote_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -175,10 +175,10 @@ pub struct OrderResponse {
 
 #[cw_serde]
 pub struct OrderBookResponse {
-    pub offer_info: AssetInfo,
-    pub ask_info: AssetInfo,
-    pub min_offer_amount: Uint128,
+    pub base_coin_info: AssetInfo,
+    pub quote_coin_info: AssetInfo,
     pub precision: Option<Decimal>,
+    pub min_quote_coin_amount: Uint128,
 }
 
 #[cw_serde]
