@@ -39,7 +39,12 @@ impl Order {
         price: Decimal,
         ask_amount: Uint128,
     ) -> Self {
-        let offer_amount = price * ask_amount;
+        let offer_amount = match direction {
+            OrderDirection::Buy => Uint128::from(ask_amount * Decimal::from_ratio(Uint128::from(1000u128), price * Uint128::from(1000u128))),
+            OrderDirection::Sell => ask_amount * price,
+        };
+
+        println!("offer_amount: {}", offer_amount);
         Order {
             direction,
             order_id,
@@ -62,7 +67,7 @@ impl Order {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_ask_amount == self.ask_amount || self.filled_offer_amount == self.offer_amount {
+        if self.filled_ask_amount >= self.ask_amount || self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
             self.is_filled = true;
             remove_order(storage, pair_key, self)
@@ -92,8 +97,12 @@ impl Order {
         ))
     }
 
+    // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
-        Decimal::from_ratio(self.offer_amount, self.ask_amount)
+        match self.direction {
+            OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
+            OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
+        }
     }
 
     pub fn set_status(&mut self, is_filled: bool) {
@@ -116,11 +125,17 @@ impl Order {
             bidder_addr: api.addr_humanize(&self.bidder_addr)?.to_string(),
             offer_asset: Asset {
                 amount: self.offer_amount,
-                info: offer_info,
+                info: match self.direction {
+                    OrderDirection::Buy => offer_info.clone(),
+                    OrderDirection::Sell => ask_info.clone(),
+                },
             },
             ask_asset: Asset {
                 amount: self.ask_amount,
-                info: ask_info,
+                info: match self.direction {
+                    OrderDirection::Buy => ask_info.clone(),
+                    OrderDirection::Sell => offer_info.clone(),
+                },
             },
             filled_offer_amount: self.filled_offer_amount,
             filled_ask_amount: self.filled_ask_amount,
@@ -131,37 +146,37 @@ impl Order {
 /// Ticks are stored in Ordered database, so we just need to process at 50 recent ticks is ok
 #[cw_serde]
 pub struct OrderBook {
-    pub ask_info: AssetInfoRaw,
-    pub offer_info: AssetInfoRaw,
+    pub base_coin_info: AssetInfoRaw,
+    pub quote_coin_info: AssetInfoRaw,
     pub precision: Option<Decimal>,
-    pub min_offer_amount: Uint128,
+    pub min_quote_coin_amount: Uint128,
 }
 
 impl OrderBook {
     pub fn new(
-        ask_info: AssetInfoRaw,
-        offer_info: AssetInfoRaw,
+        base_coin_info: AssetInfoRaw,
+        quote_coin_info: AssetInfoRaw,
         precision: Option<Decimal>,
     ) -> Self {
         OrderBook {
-            offer_info,
-            min_offer_amount: Uint128::zero(),
-            ask_info,
+            base_coin_info,
+            quote_coin_info,
             precision,
+            min_quote_coin_amount: Uint128::zero(),
         }
     }
 
     pub fn to_response(&self, api: &dyn Api) -> StdResult<OrderBookResponse> {
         Ok(OrderBookResponse {
-            offer_info: self.offer_info.to_normal(api)?,
-            ask_info: self.ask_info.to_normal(api)?,
-            min_offer_amount: self.min_offer_amount,
+            base_coin_info: self.base_coin_info.to_normal(api)?,
+            quote_coin_info: self.quote_coin_info.to_normal(api)?,
             precision: self.precision,
+            min_quote_coin_amount: self.min_quote_coin_amount,
         })
     }
 
     pub fn get_pair_key(&self) -> Vec<u8> {
-        pair_key_from_asset_keys(self.offer_info.as_bytes(), self.ask_info.as_bytes())
+        pair_key_from_asset_keys(self.base_coin_info.as_bytes(), self.quote_coin_info.as_bytes())
     }
 
     pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
@@ -340,47 +355,108 @@ impl OrderBook {
     pub fn distribute_order_to_orders(
         &self,
         deps: DepsMut,
-        ask_order: &mut Order,
-        offer_orders: &mut Vec<Order>,
+        one_price: bool,
+        buy_order: &mut Order,
+        sell_orders: &mut Vec<Order>,
     ) -> Result<Vec<CosmosMsg>, ContractError> {
+        // check if the ask order has been fulfilled
+        if buy_order.get_status() {
+            return Err(ContractError::OrderFulfilled {
+                order_id: buy_order.order_id,
+            });
+        }
+
+        let mut match_price: Decimal = buy_order.get_price();
+        let mut price_direction: OrderDirection = OrderDirection::Buy;
+
         let pair_key = &self.get_pair_key();
         // this will try to fill all orders
         // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
-        let sender = deps.api.addr_humanize(&ask_order.bidder_addr)?;
+        let sender = deps.api.addr_humanize(&buy_order.bidder_addr)?;
 
-        let ask_info = self.ask_info.to_normal(deps.api)?;
-        let offer_info = self.offer_info.to_normal(deps.api)?;
+        let quote_coin_info = self.quote_coin_info.to_normal(deps.api)?;
+        let base_coin_info = self.base_coin_info.to_normal(deps.api)?;
+
         let mut messages = vec![];
         let mut executor_receive_amount = Uint128::zero();
-        let mut lef_ask_order_amount = ask_order.ask_amount;
-        for order in offer_orders {
-            // offer amount is already paid, we need ask amount to be received
-            // remember that ask of buy and ask of sell are opposite sides
-            // ask_amount is equal match ask amount, to make sure always matched
-            let ask_amount = Uint128::min(
-                lef_ask_order_amount,
-                order.ask_amount - order.filled_ask_amount,
-            );
-            lef_ask_order_amount -= ask_amount;
-            let ask_asset = Asset {
-                info: ask_info.clone(),
-                amount: ask_amount,
-            };
 
-            let (offer_amount, _) = order.matchable_amount(ask_asset.amount)?;
+        let mut lef_buy_ask_amount = buy_order.ask_amount;
+        let mut lef_buy_offer_amount = buy_order.offer_amount;
 
-            executor_receive_amount += offer_amount;
+        for s_order in sell_orders {
+            // check if the offer order has been fulfilled
+            if s_order.get_status() {
+                return Err(ContractError::OrderFulfilled {
+                    order_id: s_order.order_id,
+                });
+            }
+            let mut lef_sell_ask_amount = s_order.ask_amount;
+            let lef_sell_offer_amount = s_order.offer_amount;
 
-            let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
-
-            // fill this order
-            order.fill_order(deps.storage, pair_key, ask_asset.amount, offer_amount)?;
-
-            if !ask_asset.amount.is_zero() {
-                messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+            // choose match price, we give priority to the order that comes first 
+            if one_price == false {
+                if s_order.order_id < buy_order.order_id {
+                    match_price = s_order.get_price();
+                    price_direction = OrderDirection::Sell;
+                    lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * match_price);
+                } else {
+                    match_price = buy_order.get_price();
+                    price_direction = OrderDirection::Buy;
+                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * Decimal::from(Decimal::one()/match_price));
+                }
             }
 
-            if lef_ask_order_amount.is_zero() {
+            // offer amount is already paid, we need ask amount to be received
+            // remember that ask of buy and ask of sell are opposite sides
+            // sell_ask_amount is equal match ask amount, to make sure always matched
+            let sell_ask_amount = Uint128::min(
+                lef_buy_ask_amount,
+                lef_sell_ask_amount - s_order.filled_ask_amount,
+            );
+            
+            lef_buy_ask_amount -= sell_ask_amount;
+
+            let mut sell_ask_asset = Asset {
+                info: quote_coin_info.clone(),
+                amount: sell_ask_amount,
+            };
+            
+            let (mut buy_offer_amount, mut sell_amount) = s_order.matchable_amount(sell_ask_asset.amount)?;
+
+            // check lef offer amount of ask order
+            // if lef offer amount less than offer_amount, choose lef_offer_ask_order_amount
+            buy_offer_amount = Uint128::min(
+                lef_buy_offer_amount,
+                match price_direction {
+                    OrderDirection::Buy => sell_ask_asset.amount * match_price,
+                    OrderDirection::Sell => buy_offer_amount,
+                },
+            );
+            sell_amount = match price_direction {
+                OrderDirection::Buy => sell_ask_asset.amount,
+                OrderDirection::Sell => sell_amount,
+            };
+
+            sell_amount = Uint128::min(
+                lef_buy_offer_amount,
+                sell_amount,
+            );
+            sell_ask_asset.amount = sell_amount;
+            lef_buy_offer_amount -= sell_amount;
+
+            buy_offer_amount = match_price * sell_amount;
+
+            executor_receive_amount += buy_offer_amount;
+            let bidder_addr = deps.api.addr_humanize(&s_order.bidder_addr)?;
+
+            // fill this order
+            s_order.fill_order(deps.storage, pair_key, sell_amount, buy_offer_amount)?;
+
+            if !sell_ask_asset.amount.is_zero() {
+                messages.push(sell_ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+            }
+
+            if lef_buy_ask_amount.is_zero() || lef_buy_offer_amount.is_zero() {
                 break;
             }
         }
@@ -389,15 +465,15 @@ impl OrderBook {
         if !executor_receive_amount.is_zero() {
             // ask is order ask asset, not depending on order direction
             // so we just make sure ask amount is equal on both sides
-            ask_order.fill_order(
+            buy_order.fill_order(
                 deps.storage,
                 pair_key,
-                ask_order.ask_amount - lef_ask_order_amount,
                 executor_receive_amount,
+                buy_order.offer_amount - lef_buy_offer_amount,
             )?;
 
             let executor_receive = Asset {
-                info: offer_info,
+                info: base_coin_info,
                 amount: executor_receive_amount,
             };
             // dont use oracle for limit order
