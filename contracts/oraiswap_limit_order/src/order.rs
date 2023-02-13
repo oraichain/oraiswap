@@ -7,7 +7,7 @@ use crate::state::{
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Decimal,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
@@ -25,26 +25,19 @@ pub fn submit_order(
 ) -> Result<Response, ContractError> {
     // check min offer amount and min ask amount
     // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
-    let offer_asset: Asset;
-    let ask_asset: Asset;
-    
-    match direction {
-        OrderDirection::Buy => {
-            offer_asset = assets[0].clone();
-            ask_asset = assets[1].clone();
-        },
-        OrderDirection::Sell => {
-            offer_asset = assets[1].clone();
-            ask_asset = assets[0].clone();
-        },
+    let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
+    let order_book = read_orderbook(deps.storage, &pair_key)?;
+    let quote_asset = match direction {
+        OrderDirection::Buy => assets[0].clone(),
+        OrderDirection::Sell => assets[1].clone(),
     };
 
-    let pair_key = pair_key(&[offer_asset.to_raw(deps.api)?.info, ask_asset.to_raw(deps.api)?.info]);
-    let order_book = read_orderbook(deps.storage, &pair_key)?;
-
     // require minimum amount for the orderbook
-    if assets[0].amount.lt(&order_book.min_offer_amount) {
-        return Err(ContractError::TooSmallOfferAmount {});
+    if quote_asset.amount.lt(&order_book.min_quote_coin_amount) {
+        return Err(ContractError::TooSmallQuoteCoinAmount {
+            quote_coin: quote_asset.info.to_string(),
+            min_quote_amount: order_book.min_quote_coin_amount,
+        });
     }
 
     let order_id = increase_last_order_id(deps.storage)?;
@@ -56,8 +49,8 @@ pub fn submit_order(
             order_id,
             direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_amount: offer_asset.to_raw(deps.api)?.amount,
-            ask_amount: ask_asset.to_raw(deps.api)?.amount,
+            offer_amount: assets[0].to_raw(deps.api)?.amount,
+            ask_amount: assets[1].to_raw(deps.api)?.amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             is_filled: false,
@@ -69,8 +62,8 @@ pub fn submit_order(
         ("action", "submit_order"),
         ("order_id", &order_id.to_string()),
         ("bidder_addr", sender.as_str()),
-        ("offer_asset", &offer_asset.to_string()),
-        ("ask_asset", &ask_asset.to_string()),
+        ("offer_asset", &assets[0].to_string()),
+        ("ask_asset", &assets[1].to_string()),
         ("total_orders", &total_orders.to_string()),
     ]))
 }
@@ -89,10 +82,7 @@ pub fn cancel_order(
     }
 
     // Compute refund asset
-    let left_offer_amount = match order.direction {
-        OrderDirection::Buy => order.ask_amount.checked_sub(order.filled_ask_amount)?,
-        OrderDirection::Sell => order.offer_amount.checked_sub(order.filled_offer_amount)?,
-    };
+    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
 
     let bidder_refund = Asset {
         info: match order.direction {
@@ -193,74 +183,114 @@ pub fn excecute_pair(
 
     let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
 
-    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
-    
-    let mut match_buy_orders = ob
-        .orders_at(
-            deps.as_ref().storage,
-            best_buy_price,
-            OrderDirection::Buy,
-            None,
-            None,
-        )
-        .unwrap();
+    let mut match_one_price = false;
+    if best_buy_price.eq(&best_sell_price) {
+        match_one_price = true;
+    }
+    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
 
+    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut total_orders =  0;
-    for sell_order in &mut match_sell_orders {
-        if sell_order.get_status() {
+
+    for buy_order in &mut match_buy_orders {
+        // check if the buy order has been fulfilled
+        if buy_order.get_status() {
             continue;
         }
 
-        // this will try to fill all orders
-        // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
-        let sender = deps.api.addr_humanize(&sell_order.bidder_addr)?;
+
+        let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
+        let mut match_price = buy_order.get_price();
+        let mut price_direction: OrderDirection = OrderDirection::Buy;
 
         let mut executor_receive_amount = Uint128::zero();
-        let mut lef_ask_sell_order_amount = sell_order.ask_amount;
-        let mut lef_offer_sell_order_amount = sell_order.offer_amount;
 
-        for buy_order in &mut match_buy_orders {
-            if buy_order.get_status() {
+        let mut lef_buy_ask_amount = buy_order.ask_amount - buy_order.filled_ask_amount;
+        let mut lef_buy_offer_amount = buy_order.offer_amount - buy_order.filled_offer_amount;
+ 
+        for sell_order in &mut match_sell_orders {
+            // check if the sell order has been fulfilled
+            if sell_order.get_status() {
                 continue;
             }
-            // offer amount is already paid, we need ask amount to be received
-            // remember that ask of buy and ask of sell are opposite sides
-            // ask_amount is equal match ask amount, to make sure always matched
-            let ask_amount = Uint128::min(
-                lef_ask_sell_order_amount,
-                buy_order.ask_amount - buy_order.filled_ask_amount,
-            );
+            let mut lef_sell_ask_amount = sell_order.ask_amount;
+            let lef_sell_offer_amount = sell_order.offer_amount;
 
-            lef_ask_sell_order_amount -= ask_amount;
-            
-            let ask_asset = Asset {
-                info: asset_infos[1].clone(),
-                amount: ask_amount,
-            };
-
-            let (mut offer_amount, _) = &buy_order.matchable_amount(ask_asset.amount)?;
-
-            offer_amount = Uint128::min(
-                lef_offer_sell_order_amount,
-                offer_amount,
-            );
-            
-            lef_offer_sell_order_amount -= offer_amount;
-            
-            let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
-
-            // fill this order
-            buy_order.fill_order(deps.storage, &pair_key, ask_asset.amount, offer_amount)?;
-
-            executor_receive_amount += offer_amount;
-            total_orders += 1;
-
-            if !ask_asset.amount.is_zero() {
-                messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+            if match_one_price == false {
+                if sell_order.order_id < buy_order.order_id {
+                    match_price = sell_order.get_price();
+                    price_direction = OrderDirection::Sell;
+                    lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * match_price);
+                } else {
+                    match_price = buy_order.get_price();
+                    price_direction = OrderDirection::Buy;
+                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * Decimal::from(Decimal::one()/match_price));
+                }
             }
 
-            if lef_ask_sell_order_amount.is_zero() || lef_offer_sell_order_amount.is_zero(){
+            // offer amount is already paid, we need ask amount to be received
+            // remember that ask of buy and ask of sell are opposite sides
+            // sell_ask_amount is equal match ask amount, to make sure always matched
+            let sell_ask_amount = Uint128::min(
+                lef_buy_ask_amount,
+                lef_sell_ask_amount - sell_order.filled_ask_amount,
+            );
+            
+            lef_buy_ask_amount -= sell_ask_amount;
+
+            let mut sell_ask_asset = Asset {
+                info: asset_infos[0].clone(),
+                amount: sell_ask_amount,
+            };
+            
+            let (mut buy_offer_amount, mut sell_amount) = sell_order.matchable_amount(sell_ask_asset.amount)?;
+
+            // check lef offer amount of ask order
+            // if lef offer amount less than offer_amount, choose lef_offer_ask_order_amount
+            buy_offer_amount = Uint128::min(
+                lef_buy_offer_amount,
+                match price_direction {
+                    OrderDirection::Buy => sell_ask_asset.amount * match_price,
+                    OrderDirection::Sell => buy_offer_amount,
+                },
+            );
+
+            sell_amount = match price_direction {
+                OrderDirection::Buy => sell_ask_asset.amount,
+                OrderDirection::Sell => sell_amount,
+            };
+
+            sell_amount = Uint128::min(
+                lef_buy_offer_amount,
+                sell_amount,
+            );
+
+            sell_ask_asset.amount = sell_amount;
+            lef_buy_offer_amount -= sell_amount;
+
+            buy_offer_amount = match_price * sell_amount;
+
+            executor_receive_amount += buy_offer_amount;
+
+            let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
+
+            // fill this order
+            sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount)?;
+
+            if buy_offer_amount.is_zero() && sell_amount.is_zero() {
+                sell_order.set_status(true);
+            }
+            
+            if !sell_ask_asset.amount.is_zero() {
+                messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
+            }
+
+            if sell_order.is_filled {
+                total_orders += 1;
+            }
+
+            if lef_buy_ask_amount.is_zero() || lef_buy_offer_amount.is_zero() {
                 break;
             }
         }
@@ -269,23 +299,27 @@ pub fn excecute_pair(
         if !executor_receive_amount.is_zero() {
             // ask is order ask asset, not depending on order direction
             // so we just make sure ask amount is equal on both sides
-            sell_order.fill_order(
+            buy_order.fill_order(
                 deps.storage,
                 &pair_key,
-                sell_order.ask_amount - lef_ask_sell_order_amount,
                 executor_receive_amount,
+                buy_order.offer_amount - buy_order.filled_offer_amount - lef_buy_offer_amount,
             )?;
+
+            if buy_order.is_filled {
+                total_orders += 1;
+            }
+
             let executor_receive = Asset {
-                info: asset_infos[0].clone(),
+                info: asset_infos[1].clone(),
                 amount: executor_receive_amount,
             };
-            total_orders += 1;
 
             // dont use oracle for limit order
             messages.push(executor_receive.into_msg(
                 None,
                 &deps.querier,
-                deps.api.addr_validate(sender.as_str())?,
+                deps.api.addr_validate(bidder_addr.as_str())?,
             )?);
         }
     }
