@@ -61,6 +61,12 @@ pub enum ExecuteMsg {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         assets: [Asset; 2],
     },
+
+    UpdateOrder {
+        order_id: u64,
+        assets: [Asset; 2],
+    },
+
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
