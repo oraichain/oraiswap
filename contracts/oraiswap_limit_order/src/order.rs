@@ -27,16 +27,16 @@ pub fn submit_order(
     // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
-    let quote_asset = match direction {
+    let base_asset = match direction {
         OrderDirection::Buy => assets[0].clone(),
         OrderDirection::Sell => assets[1].clone(),
     };
 
-    // require minimum amount for the orderbook
-    if quote_asset.amount.lt(&order_book.min_quote_coin_amount) {
-        return Err(ContractError::TooSmallQuoteCoinAmount {
-            quote_coin: quote_asset.info.to_string(),
-            min_quote_amount: order_book.min_quote_coin_amount,
+    // require minimum amount for base asset
+    if base_asset.amount.lt(&order_book.min_base_coin_amount) {
+        return Err(ContractError::TooSmallBaseCoinAmount {
+            base_coin: base_asset.info.to_string(),
+            min_base_amount: order_book.min_base_coin_amount,
         });
     }
 
@@ -64,6 +64,76 @@ pub fn submit_order(
         ("bidder_addr", sender.as_str()),
         ("offer_asset", &assets[0].to_string()),
         ("ask_asset", &assets[1].to_string()),
+        ("total_orders", &total_orders.to_string()),
+    ]))
+}
+
+pub fn update_order(
+    deps: DepsMut,
+    info: MessageInfo,
+    order_id: u64,
+    assets: [Asset; 2],
+) -> Result<Response, ContractError> {
+    // check min offer amount and min ask amount
+    // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
+    let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
+    let order_book = read_orderbook(deps.storage, &pair_key)?;
+
+    let order = read_order(deps.storage, &pair_key, order_id)?;
+
+    if order.get_status() {
+        return Err(ContractError::OrderFulfilled {
+            order_id: order.order_id,
+        });
+    }
+
+    let offer_asset = match order.direction {
+        OrderDirection::Buy => &assets[0],
+        OrderDirection::Sell => &assets[1],
+    };
+
+    let ask_asset = match order.direction {
+        OrderDirection::Buy => &assets[1],
+        OrderDirection::Sell => &assets[0],
+    };
+
+    // if paid asset is cw20, we check it in Cw20HookMessage
+    if !offer_asset.is_native_token() {
+        return Err(ContractError::MustProvideNativeToken {});
+    }
+
+    offer_asset.assert_sent_native_token_balance(&info)?;
+
+    // require minimum amount for base asset
+    if assets[0].amount.lt(&order_book.min_base_coin_amount) {
+        return Err(ContractError::TooSmallBaseCoinAmount {
+            base_coin: assets[0].info.to_string(),
+            min_base_amount: order_book.min_base_coin_amount,
+        });
+    }
+
+    let total_orders = store_order(
+        deps.storage,
+        &pair_key,
+        &Order {
+            order_id,
+            direction: order.direction,
+            bidder_addr: deps.api.addr_canonicalize(info.sender.as_str())?,
+            offer_amount: offer_asset.to_raw(deps.api)?.amount,
+            ask_amount: ask_asset.to_raw(deps.api)?.amount,
+            filled_offer_amount: Uint128::zero(),
+            filled_ask_amount: Uint128::zero(),
+            is_filled: false,
+        },
+        false,
+    )?;
+
+    Ok(Response::new().add_attributes(vec![
+        ("action", "update_order"),
+        ("order_id", &order_id.to_string()),
+        ("bidder_addr", info.sender.as_str()),
+        ("offer_asset", &offer_asset.to_string()),
+        ("ask_asset", &ask_asset.to_string()),
         ("total_orders", &total_orders.to_string()),
     ]))
 }
