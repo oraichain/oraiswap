@@ -48,10 +48,10 @@ pub enum ExecuteMsg {
     },
 
     CreateOrderBookPair {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        base_coin_info: AssetInfo,
+        quote_coin_info: AssetInfo,
         precision: Option<Decimal>,
-        min_offer_amount: Uint128,
+        min_base_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -61,6 +61,12 @@ pub enum ExecuteMsg {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         assets: [Asset; 2],
     },
+
+    UpdateOrder {
+        order_id: u64,
+        assets: [Asset; 2],
+    },
+
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
@@ -175,10 +181,10 @@ pub struct OrderResponse {
 
 #[cw_serde]
 pub struct OrderBookResponse {
-    pub offer_info: AssetInfo,
-    pub ask_info: AssetInfo,
-    pub min_offer_amount: Uint128,
+    pub base_coin_info: AssetInfo,
+    pub quote_coin_info: AssetInfo,
     pub precision: Option<Decimal>,
+    pub min_base_coin_amount: Uint128,
 }
 
 #[cw_serde]
