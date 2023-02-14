@@ -62,6 +62,9 @@ pub enum ContractError {
     #[error("Order book pair already exists")]
     OrderBookAlreadyExists {},
 
+    #[error("Order asset must not be zero")]
+    AssetMustNotBeZero {},
+
     #[error("Order {order_id} already fulfilled")]
     OrderFulfilled {order_id: u64},
 
