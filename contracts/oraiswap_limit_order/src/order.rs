@@ -23,8 +23,12 @@ pub fn submit_order(
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
-    // check min offer amount and min ask amount
-    // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
+    if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
+        return Err(ContractError::AssetMustNotBeZero {})
+    }
+    
+    // check min base coin amount
+    // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
     let base_asset = match direction {
@@ -74,11 +78,14 @@ pub fn update_order(
     order_id: u64,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
-    // check min offer amount and min ask amount
-    // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
+    if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
+        return Err(ContractError::AssetMustNotBeZero {})
+    }
+
+    // check min base coin amount
+    // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
-
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.get_status() {
