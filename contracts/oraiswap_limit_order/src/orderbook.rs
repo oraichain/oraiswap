@@ -151,7 +151,7 @@ pub struct OrderBook {
     pub base_coin_info: AssetInfoRaw,
     pub quote_coin_info: AssetInfoRaw,
     pub precision: Option<Decimal>,
-    pub min_quote_coin_amount: Uint128,
+    pub min_base_coin_amount: Uint128,
 }
 
 impl OrderBook {
@@ -164,7 +164,7 @@ impl OrderBook {
             base_coin_info,
             quote_coin_info,
             precision,
-            min_quote_coin_amount: Uint128::zero(),
+            min_base_coin_amount: Uint128::zero(),
         }
     }
 
@@ -173,7 +173,7 @@ impl OrderBook {
             base_coin_info: self.base_coin_info.to_normal(api)?,
             quote_coin_info: self.quote_coin_info.to_normal(api)?,
             precision: self.precision,
-            min_quote_coin_amount: self.min_quote_coin_amount,
+            min_base_coin_amount: self.min_base_coin_amount,
         })
     }
 

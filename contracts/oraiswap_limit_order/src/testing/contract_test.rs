@@ -76,7 +76,7 @@ fn submit_order() {
             denom: ORAI_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::from(10u128),
+        min_base_coin_amount: Uint128::from(10u128),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -94,7 +94,7 @@ fn submit_order() {
             denom: ORAI_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -412,7 +412,7 @@ fn submit_order() {
             contract_addr: token_addr.clone(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -556,7 +556,7 @@ fn cancel_order_native_token() {
             denom: ORAI_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -757,7 +757,7 @@ fn cancel_order_token() {
             contract_addr: token_addrs[1].clone(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -775,7 +775,7 @@ fn cancel_order_token() {
             contract_addr: token_addrs[1].clone(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -952,7 +952,7 @@ fn execute_order_native_token() {
             denom: ATOM_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1188,7 +1188,7 @@ fn execute_order_token() {
             contract_addr: token_addrs[1].clone(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1396,7 +1396,7 @@ fn execute_pair_native_token() {
             denom: ORAI_DENOM.to_string(),
         },
         precision: None,//Some(Decimal::percent(10)),
-        min_quote_coin_amount: Uint128::from(10u128),
+        min_base_coin_amount: Uint128::from(10u128),
     };
 
     let _res = app.execute(
@@ -1889,7 +1889,7 @@ fn remove_orderbook_pair() {
             denom: ATOM_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
 
     let _res = app.execute(
@@ -2122,7 +2122,7 @@ fn orders_querier() {
             denom: ATOM_DENOM.to_string(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -2140,7 +2140,7 @@ fn orders_querier() {
             contract_addr: token_addrs[1].clone(),
         },
         precision: None,
-        min_quote_coin_amount: Uint128::zero(),
+        min_base_coin_amount: Uint128::zero(),
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),

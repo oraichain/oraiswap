@@ -67,14 +67,14 @@ pub fn execute(
             base_coin_info,
             quote_coin_info,
             precision,
-            min_quote_coin_amount,
+            min_base_coin_amount,
         } => execute_create_pair(
             deps,
             info,
             base_coin_info,
             quote_coin_info,
             precision,
-            min_quote_coin_amount,
+            min_base_coin_amount,
         ),
         ExecuteMsg::SubmitOrder {
             direction,
@@ -160,7 +160,7 @@ pub fn execute_create_pair(
     base_coin_info: AssetInfo,
     quote_coin_info: AssetInfo,
     precision: Option<Decimal>,
-    min_quote_coin_amount: Uint128,
+    min_base_coin_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -183,7 +183,7 @@ pub fn execute_create_pair(
         base_coin_info: base_coin_info.to_raw(deps.api)?,
         quote_coin_info: quote_coin_info.to_raw(deps.api)?,
         precision,
-        min_quote_coin_amount
+        min_base_coin_amount
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 

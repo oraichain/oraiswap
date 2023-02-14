@@ -51,7 +51,7 @@ pub enum ExecuteMsg {
         base_coin_info: AssetInfo,
         quote_coin_info: AssetInfo,
         precision: Option<Decimal>,
-        min_quote_coin_amount: Uint128,
+        min_base_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -184,7 +184,7 @@ pub struct OrderBookResponse {
     pub base_coin_info: AssetInfo,
     pub quote_coin_info: AssetInfo,
     pub precision: Option<Decimal>,
-    pub min_quote_coin_amount: Uint128,
+    pub min_base_coin_amount: Uint128,
 }
 
 #[cw_serde]
