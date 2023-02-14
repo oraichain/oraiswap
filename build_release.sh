@@ -32,7 +32,7 @@ echo "Building contract in $contractdir"
 mkdir -p artifacts
 
 if [ "$build_release" == 'true' ]; then
-    RUSTFLAGS='-C link-arg=-s' $CARGO build -q --release --target-dir "$basedir/target" --target wasm32-unknown-unknown
+    RUSTFLAGS='-C link-arg=-s' $CARGO build -q --release --lib --target-dir "$basedir/target" --target wasm32-unknown-unknown
     # wasm-optimize on all results
     echo "Optimizing $name.wasm"
     if [ ! `which wasm-opt` ] 
@@ -56,7 +56,8 @@ build_schema="${2:-false}"
 if [ "$build_schema" == 'true' ]; then
     echo "Creating schema in $contractdir"
     (
-        cargo run -q --example schema --target-dir "$basedir/target"
+        cd artifacts
+        cargo run -q --bin schema --target-dir "$basedir/target"
     )
 fi
 

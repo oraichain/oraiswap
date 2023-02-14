@@ -1,13 +1,11 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 static KEY_CONFIG: &[u8] = b"config";
 static KEY_LAST_DISTRIBUTED: &[u8] = b"last_distributed";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     pub owner: CanonicalAddr,
     pub staking_contract: CanonicalAddr,

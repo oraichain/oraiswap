@@ -1,10 +1,13 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, QueryRequest, StdError, StdResult, Uint128, WasmQuery,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, QueryRequest, Response,
+    StdError, StdResult, Uint128, WasmQuery,
 };
 use oraiswap::error::ContractError;
 
-use crate::operations::{handle_swap_operation, handle_swap_operations};
+use crate::operations::{execute_swap_operation, execute_swap_operations};
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ReceiveMsg;
@@ -13,39 +16,51 @@ use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{QueryMsg as PairQueryMsg, SimulationResponse};
 use oraiswap::querier::{query_pair_config, query_pair_info};
 use oraiswap::router::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, QueryMsg, SimulateSwapOperationsResponse,
-    SwapOperation,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+    SimulateSwapOperationsResponse, SwapOperation,
 };
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
     CONFIG.save(
         deps.storage,
         &Config {
-            factory_addr: deps.api.canonical_address(&msg.factory_addr)?,
+            factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
         },
     )?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-        HandleMsg::ExecuteSwapOperations {
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
-        } => handle_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
-        HandleMsg::ExecuteSwapOperation { operation, to } => {
-            handle_swap_operation(deps, env, info, operation, to)
+        } => execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
+        ExecuteMsg::ExecuteSwapOperation { operation, to } => {
+            execute_swap_operation(deps, env, info, operation, to)
         }
 
-        HandleMsg::AssertMinimumReceive {
+        ExecuteMsg::AssertMinimumReceive {
             asset_info,
             prev_balance,
             minimum_receive,
@@ -65,21 +80,19 @@ pub fn receive_cw20(
     env: Env,
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
+    let sender = deps.api.addr_validate(&cw20_msg.sender)?;
+
     // throw empty data as well when decoding
-    match from_binary(&cw20_msg.msg.unwrap_or_default())? {
+    match from_binary(&cw20_msg.msg)? {
         Cw20HookMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
             to,
-        } => handle_swap_operations(
-            deps,
-            env,
-            cw20_msg.sender,
-            operations,
-            minimum_receive,
-            to.map(HumanAddr),
-        ),
+        } => {
+            let receiver = to.map_or(None, |addr| deps.api.addr_validate(addr.as_str()).ok());
+            execute_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
+        }
     }
 }
 
@@ -88,10 +101,10 @@ fn assert_minium_receive(
     asset_info: AssetInfo,
     prev_balance: Uint128,
     minium_receive: Uint128,
-    receiver: HumanAddr,
-) -> Result<HandleResponse, ContractError> {
+    receiver: Addr,
+) -> Result<Response, ContractError> {
     let receiver_balance = asset_info.query_pool(&deps.querier, receiver)?;
-    let swap_amount = Asset::checked_sub(receiver_balance, prev_balance)?;
+    let swap_amount = receiver_balance.checked_sub(prev_balance)?;
 
     if swap_amount < minium_receive {
         return Err(ContractError::SwapAssertionFailure {
@@ -100,9 +113,10 @@ fn assert_minium_receive(
         });
     }
 
-    Ok(HandleResponse::default())
+    Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
@@ -116,7 +130,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state = CONFIG.load(deps.storage)?;
     let resp = ConfigResponse {
-        factory_addr: deps.api.human_address(&state.factory_addr)?,
+        factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
     };
 
     Ok(resp)
@@ -128,7 +142,7 @@ fn simulate_swap_operations(
     operations: Vec<SwapOperation>,
 ) -> StdResult<SimulateSwapOperationsResponse> {
     let config: Config = CONFIG.load(deps.storage)?;
-    let factory_addr = deps.api.human_address(&config.factory_addr)?;
+    let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
     let pair_config = query_pair_config(&deps.querier, factory_addr.clone())?;
     let oracle_contract = OracleContract(pair_config.oracle_addr);
 
@@ -158,14 +172,12 @@ fn simulate_swap_operations(
                 };
 
                 // Deduct tax before querying simulation, with native token only
-                offer_amount = Asset::checked_sub(
-                    offer_amount,
-                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
-                )?;
+                offer_amount = offer_amount
+                    .checked_sub(return_asset.compute_tax(&oracle_contract, &deps.querier)?)?;
 
                 let mut res: SimulationResponse =
                     deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                        contract_addr: pair_info.contract_addr.clone(),
+                        contract_addr: pair_info.contract_addr.to_string(),
                         msg: to_binary(&PairQueryMsg::Simulation {
                             offer_asset: Asset {
                                 info: offer_asset_info,
@@ -180,10 +192,9 @@ fn simulate_swap_operations(
                 };
 
                 // Deduct tax after querying simulation, with native token only
-                res.return_amount = Asset::checked_sub(
-                    res.return_amount,
-                    return_asset.compute_tax(&oracle_contract, &deps.querier)?,
-                )?;
+                res.return_amount = res
+                    .return_amount
+                    .checked_sub(return_asset.compute_tax(&oracle_contract, &deps.querier)?)?;
 
                 offer_amount = res.return_amount;
             }

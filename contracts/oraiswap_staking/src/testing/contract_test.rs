@@ -1,43 +1,42 @@
-use crate::contract::{handle, init, query};
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{
-    attr, coin, from_binary, to_binary, Decimal, HumanAddr, Order, StdError, Uint128,
+use crate::contract::{execute, instantiate, query};
+use cosmwasm_std::testing::{
+    mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
+use cosmwasm_std::{attr, coin, from_binary, to_binary, Addr, Decimal, Order, StdError, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
-use oraiswap::mock_querier::mock_dependencies;
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, HandleMsg, InitMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg,
+    RewardInfoResponse,
 };
 
 #[test]
 fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "reward".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("reward"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config: ConfigResponse = from_binary(&res).unwrap();
     assert_eq!(
         ConfigResponse {
-            owner: "owner".into(),
-            rewarder: "reward".into(),
-            minter: "mint".into(),
-            oracle_addr: "oracle".into(),
-            factory_addr: "factory".into(),
+            owner: Addr::unchecked("owner"),
+            rewarder: Addr::unchecked("reward"),
+            oracle_addr: Addr::unchecked("oracle"),
+            factory_addr: Addr::unchecked("factory"),
             base_denom: ORAI_DENOM.to_string(),
         },
         config
@@ -46,28 +45,28 @@ fn proper_initialization() {
 
 #[test]
 fn update_config() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "reward".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("reward"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // update owner
     let info = mock_info("owner", &[]);
-    let msg = HandleMsg::UpdateConfig {
-        owner: Some("owner2".into()),
+    let msg = ExecuteMsg::UpdateConfig {
+        owner: Some(Addr::unchecked("owner2")),
         rewarder: None,
     };
 
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(0, res.messages.len());
 
     // it worked, let's query the state
@@ -75,11 +74,10 @@ fn update_config() {
     let config: ConfigResponse = from_binary(&res).unwrap();
     assert_eq!(
         ConfigResponse {
-            owner: "owner2".into(),
-            rewarder: "reward".into(),
-            minter: "mint".into(),
-            oracle_addr: "oracle".into(),
-            factory_addr: "factory".into(),
+            owner: Addr::unchecked("owner2"),
+            rewarder: Addr::unchecked("reward"),
+            oracle_addr: Addr::unchecked("oracle"),
+            factory_addr: Addr::unchecked("factory"),
             base_denom: ORAI_DENOM.to_string(),
         },
         config
@@ -87,12 +85,12 @@ fn update_config() {
 
     // unauthorized err
     let info = mock_info("owner", &[]);
-    let msg = HandleMsg::UpdateConfig {
+    let msg = ExecuteMsg::UpdateConfig {
         rewarder: None,
         owner: None,
     };
 
-    let res = handle(deps.as_mut(), mock_env(), info, msg);
+    let res = execute(deps.as_mut(), mock_env(), info, msg);
     match res {
         Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
         _ => panic!("Must return unauthorized error"),
@@ -101,39 +99,39 @@ fn update_config() {
 
 #[test]
 fn test_register() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "reward".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("reward"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        staking_token: "staking".into(),
+        staking_token: Addr::unchecked("staking"),
     };
 
     // failed with unauthorized error
     let info = mock_info("addr", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+    let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
     match res {
         StdError::GenericErr { msg, .. } => assert_eq!(msg, "unauthorized"),
         _ => panic!("DO NOT ENTER HERE"),
     }
 
     let info = mock_info("owner", &[]);
-    let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     assert_eq!(
         res.attributes,
         vec![
@@ -147,7 +145,7 @@ fn test_register() {
         mock_env(),
         QueryMsg::PoolInfo {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into(),
+                contract_addr: Addr::unchecked("asset"),
             },
         },
     )
@@ -157,9 +155,9 @@ fn test_register() {
         pool_info,
         PoolInfoResponse {
             asset_info: AssetInfo::Token {
-                contract_addr: "asset".into()
+                contract_addr: Addr::unchecked("asset")
             },
-            staking_token: "staking".into(),
+            staking_token: Addr::unchecked("staking"),
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
@@ -171,25 +169,25 @@ fn test_register() {
 
 #[test]
 fn test_query_staker_pagination() {
-    let mut deps = mock_dependencies(&[coin(10000000000u128, ORAI_DENOM)]);
+    let mut deps = mock_dependencies_with_balance(&[coin(10000000000u128, ORAI_DENOM)]);
 
-    let msg = InitMsg {
-        owner: Some("owner".into()),
-        rewarder: "rewarder".into(),
-        minter: Some("mint".into()),
-        oracle_addr: "oracle".into(),
-        factory_addr: "factory".into(),
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("reward"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
         base_denom: None,
     };
 
     let info = mock_info("addr", &[]);
-    let _res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
-    let msg = HandleMsg::UpdateRewardsPerSec {
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
         assets: vec![Asset {
             info: AssetInfo::NativeToken {
@@ -199,43 +197,43 @@ fn test_query_staker_pagination() {
         }],
     };
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let msg = HandleMsg::RegisterAsset {
+    let msg = ExecuteMsg::RegisterAsset {
         asset_info: AssetInfo::Token {
-            contract_addr: "asset".into(),
+            contract_addr: Addr::unchecked("asset"),
         },
-        staking_token: "staking".into(),
+        staking_token: Addr::unchecked("staking"),
     };
 
     let info = mock_info("owner", &[]);
-    let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // bond 100 tokens for 100 stakers
     for i in 0..100 {
-        let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: format!("addr{}", i).into(),
-            amount: Uint128(100u128),
+        let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: format!("addr{}", i),
+            amount: Uint128::from(100u128),
             msg: to_binary(&Cw20HookMsg::Bond {
                 asset_info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: Addr::unchecked("asset"),
                 },
             })
-            .ok(),
+            .unwrap(),
         });
         let info = mock_info("staking", &[]);
-        let _res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     }
 
     // query stakers by order
-    let mut start_after: Option<HumanAddr> = None;
+    let mut start_after: Option<Addr> = None;
     for _ in 0..100 / 10 {
         let data = query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::RewardInfos {
                 asset_info: AssetInfo::Token {
-                    contract_addr: "asset".into(),
+                    contract_addr: Addr::unchecked("asset"),
                 },
                 limit: Some(10),
                 order: Some(Order::Ascending.into()),
@@ -244,7 +242,7 @@ fn test_query_staker_pagination() {
         )
         .unwrap();
         let res: Vec<RewardInfoResponse> = from_binary(&data).unwrap();
-        let stakers: Vec<HumanAddr> = res.into_iter().map(|r| r.staker_addr).collect();
+        let stakers: Vec<Addr> = res.into_iter().map(|r| r.staker_addr).collect();
         let staker_addrs: Vec<String> =
             stakers.clone().into_iter().map(|s| s.to_string()).collect();
         start_after = stakers.into_iter().last();

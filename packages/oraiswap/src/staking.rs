@@ -1,40 +1,38 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Decimal, HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+#[cw_serde]
+pub struct InstantiateMsg {
     // default is sender
-    pub owner: Option<HumanAddr>,
-    pub rewarder: HumanAddr,
-    pub minter: Option<HumanAddr>,
-    pub oracle_addr: HumanAddr,
-    pub factory_addr: HumanAddr,
+    pub owner: Option<Addr>,
+    pub rewarder: Addr,
+    pub minter: Option<Addr>,
+    pub oracle_addr: Addr,
+    pub factory_addr: Addr,
     pub base_denom: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+#[cw_serde]
+pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
 
     ////////////////////////
     /// Owner operations ///
     ////////////////////////
     UpdateConfig {
-        rewarder: Option<HumanAddr>,
-        owner: Option<HumanAddr>,
+        rewarder: Option<Addr>,
+        owner: Option<Addr>,
     },
     RegisterAsset {
         asset_info: AssetInfo, // can be ow20 token or native token
-        staking_token: HumanAddr,
+        staking_token: Addr,
     },
     DeprecateStakingToken {
         asset_info: AssetInfo,
-        new_staking_token: HumanAddr,
+        new_staking_token: Addr,
     },
     // update rewards per second for an asset
     UpdateRewardsPerSec {
@@ -62,7 +60,7 @@ pub enum HandleMsg {
     // Withdraw for others in this pool, such as when rewards per second are changed for the pool
     WithdrawOthers {
         asset_info: Option<AssetInfo>,
-        staker_addrs: Vec<HumanAddr>,
+        staker_addrs: Vec<Addr>,
     },
 
     /// Provides liquidity and automatically stakes the LP tokens
@@ -73,57 +71,57 @@ pub enum HandleMsg {
     /// Hook to stake the minted LP tokens
     AutoStakeHook {
         asset_info: AssetInfo,
-        staking_token: HumanAddr,
-        staker_addr: HumanAddr,
+        staking_token: Addr,
+        staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
     UpdateListStakers {
         asset_info: AssetInfo,
-        stakers: Vec<HumanAddr>,
+        stakers: Vec<Addr>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Cw20HookMsg {
     // this call from LP token contract
     Bond { asset_info: AssetInfo },
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {
-    pub staker_addrs: Vec<HumanAddr>,
+    pub staker_addrs: Vec<Addr>,
     // pub amount_infos: Vec<AmountInfo>,
-    // pub new_staking_token: HumanAddr,
+    // pub new_staking_token: Addr,
 }
 
 /// We currently take no arguments for migrations
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AmountInfo {
     pub asset_info: AssetInfo,
     pub amount: Uint128,
-    // pub new_staking_token: HumanAddr,
+    // pub new_staking_token: Addr,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
-    PoolInfo {
-        asset_info: AssetInfo,
-    },
-    RewardsPerSec {
-        asset_info: AssetInfo,
-    },
+    #[returns(PoolInfoResponse)]
+    PoolInfo { asset_info: AssetInfo },
+    #[returns(RewardsPerSecResponse)]
+    RewardsPerSec { asset_info: AssetInfo },
+    #[returns(RewardInfoResponse)]
     RewardInfo {
-        staker_addr: HumanAddr,
+        staker_addr: Addr,
         asset_info: Option<AssetInfo>,
     },
+    #[returns(Vec<RewardInfoResponse>)]
     // Query all staker belong to the pool
     RewardInfos {
         asset_info: AssetInfo,
-        start_after: Option<HumanAddr>,
+        start_after: Option<Addr>,
         limit: Option<u32>,
         // so can convert or throw error
         order: Option<i32>,
@@ -131,45 +129,45 @@ pub enum QueryMsg {
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ConfigResponse {
-    pub owner: HumanAddr,
-    pub rewarder: HumanAddr,
-    pub minter: HumanAddr,
-    pub oracle_addr: HumanAddr,
-    pub factory_addr: HumanAddr,
+    pub owner: Addr,
+    pub rewarder: Addr,
+    pub oracle_addr: Addr,
+    pub factory_addr: Addr,
     pub base_denom: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardsPerSecResponse {
     pub assets: Vec<Asset>,
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PoolInfoResponse {
     pub asset_info: AssetInfo,
-    pub staking_token: HumanAddr,
+    pub staking_token: Addr,
     pub total_bond_amount: Uint128,
     pub reward_index: Decimal,
     pub pending_reward: Uint128,
     pub migration_index_snapshot: Option<Decimal>,
-    pub migration_deprecated_staking_token: Option<HumanAddr>,
+    pub migration_deprecated_staking_token: Option<Addr>,
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardInfoResponse {
-    pub staker_addr: HumanAddr,
+    pub staker_addr: Addr,
     pub reward_infos: Vec<RewardInfoResponseItem>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct RewardInfoResponseItem {
     pub asset_info: AssetInfo,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
+    pub pending_withdraw: Vec<Asset>,
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,

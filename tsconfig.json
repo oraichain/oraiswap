@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "strict": false,
+        "resolveJsonModule": true,
+        "useDefineForClassFields": false,
+        "moduleResolution": "node",
+        "isolatedModules": true,
+        "target": "esnext",
+    },
+    "include": [
+        "global.d.ts",
+        "build/*.ts",
+        "examples"
+    ],
+    "exclude": [
+        "node_modules"
+    ],
+    "ts-node": {
+        "transpileOnly": true
+    }
+}

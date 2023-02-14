@@ -6,7 +6,7 @@
 
 This is mainly used from oraiswap factory contract to create new oraiswap pair. It initialize all swap created parameters which can be updated later with owner key.
 
-It creates liquidity token contract as init response, and execute init hook to register created liquidity token contract to self.
+It creates liquidity token contract as init response, and execute reply on success to register created liquidity token contract to self.
 
 ```rust
 {
@@ -15,9 +15,8 @@ It creates liquidity token contract as init response, and execute init hook to r
     /// Token code ID for liqudity token creation
     pub token_code_id: u64,
     /// Oracle contract address for global parameters
-    pub oracle_addr: HumanAddr,
-    /// Hook for post initalization, such as update the instance contract address to proxy contract map
-    pub init_hook: Option<InitHook>,
+    pub oracle_addr: Addr,
+
 }
 ```
 
@@ -122,7 +121,7 @@ Any user can swap an asset by sending `swap` or invoking `send` msg to token con
           },
           "belief_price": Option<Decimal>,
           "max_spread": Option<Decimal>,
-          "to": Option<HumanAddr>
+          "to": Option<Addr>
       }
   }
   ```
@@ -134,13 +133,13 @@ Any user can swap an asset by sending `swap` or invoking `send` msg to token con
   ```json
   {
       "send": {
-          "contract": HumanAddr,
+          "contract": Addr,
           "amount": Uint128,
           "msg": Binary({
               "swap": {
                   "belief_price": Option<Decimal>,
                   "max_spread": Option<Decimal>,
-                  "to": Option<HumanAddr>
+                  "to": Option<Addr>
               }
           })
       }

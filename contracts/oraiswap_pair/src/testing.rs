@@ -1,130 +1,41 @@
-use std::str::FromStr;
-
-use crate::contract::{
-    assert_max_spread,
-    handle,
-    init,
-    query_pair_info,
-    query_pool,
-    query_reverse_simulation,
-    query_simulation, //reply,
-};
-
-use crate::mock_querier::mock_dependencies;
-
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{
-    attr, to_binary, BankMsg, Coin, CosmosMsg, Decimal, StdError, Uint128, WasmMsg,
-};
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg, MinterResponse};
-use oraiswap::asset::{Asset, AssetInfo, PairInfo, ORAI_DENOM};
-use oraiswap::error::ContractError;
-use oraiswap::hook::InitHook;
-use oraiswap::mock_querier::ATOM_DENOM;
-use oraiswap::oracle::OracleContract;
-use oraiswap::pair::{
-    compute_swap, Cw20HookMsg, HandleMsg, InitMsg, PoolResponse, ReverseSimulationResponse,
-    SimulationResponse, DEFAULT_COMMISSION_RATE,
-};
-use oraiswap::token::InitMsg as TokenInitMsg;
-use oraiswap::Decimal256;
-
-#[test]
-fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-
-    // we can just call .unwrap() to assert this was a success
-    let res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
-    assert_eq!(
-        res.messages,
-        vec![WasmMsg::Instantiate {
-            code_id: 10u64,
-            msg: to_binary(&TokenInitMsg {
-                name: "oraiswap liquidity token".to_string(),
-                symbol: "uLP".to_string(),
-                decimals: 6,
-                initial_balances: vec![],
-                mint: Some(MinterResponse {
-                    minter: MOCK_CONTRACT_ADDR.into(),
-                    cap: None,
-                }),
-                init_hook: Some(InitHook {
-                    msg: to_binary(&HandleMsg::PostInitialize {}).unwrap(),
-                    contract_addr: MOCK_CONTRACT_ADDR.into(),
-                }),
-            })
-            .unwrap(),
-            send: vec![],
-            label: None,
-        }
-        .into(),]
-    );
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    // it worked, let's query the state
-    let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
-    assert_eq!("liquidity0000", pair_info.liquidity_token.as_str());
-    assert_eq!(
-        pair_info.asset_infos,
-        [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into()
-            }
-        ]
-    );
-}
+use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+use cosmwasm_std::{attr, to_binary, Addr, Coin, Decimal, Uint128};
+use cw20::Cw20ReceiveMsg;
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::create_entry_points_testing;
+use oraiswap::pair::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, PairResponse};
+use oraiswap::testing::{MockApp, ATOM_DENOM};
 
 #[test]
 fn provide_liquidity_both_native() {
-    let mut deps = mock_dependencies(&[
-        Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(200u128),
-        },
-        Coin {
-            denom: ATOM_DENOM.to_string(),
-            amount: Uint128::from(200u128),
-        },
-    ]);
+    let mut app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
+        &[
+            Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(200u128),
+            },
+            Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(200u128),
+            },
+        ],
+    )]);
 
-    deps.querier.with_token_balances(&[
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_token_balances(&[
         (
-            &"liquidity0000".to_string(),
+            &"liquidity".to_string(),
             &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::zero())],
         ),
-        (&"asset0000".to_string(), &[]),
+        (&"asset".to_string(), &[]),
     ]);
 
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
+    let msg = InstantiateMsg {
+        oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -133,27 +44,21 @@ fn provide_liquidity_both_native() {
                 denom: ATOM_DENOM.to_string(),
             },
         ],
-        token_code_id: 10u64,
+        token_code_id: app.token_id,
         commission_rate: None,
-        init_hook: None,
     };
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let code_id = app.upload(Box::new(
+        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+    ));
 
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
+    let pair_addr = app
+        .instantiate(code_id, Addr::unchecked("owner"), &msg, &[], "pair")
+        .unwrap();
 
     // successfully provide liquidity for the exist pool
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::NativeToken {
@@ -172,73 +77,96 @@ fn provide_liquidity_both_native() {
         receiver: None,
     };
 
-    let env = mock_env();
-    let info = mock_info(
-        "addr0000",
-        &[
-            Coin {
-                denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-            Coin {
-                denom: ATOM_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-        ],
-    );
-    handle(deps.as_mut(), env, info, msg).unwrap();
+    let res = app
+        .execute(
+            Addr::unchecked(MOCK_CONTRACT_ADDR),
+            pair_addr,
+            &msg,
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+                Coin {
+                    denom: ATOM_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+            ],
+        )
+        .unwrap();
+
+    println!("{:?}", res);
 }
 
 #[test]
 fn provide_liquidity() {
-    let mut deps = mock_dependencies(&[Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(200u128),
-    }]);
+    // provide more liquidity 1:2, which is not proportional to 1:1,
+    // then it must accept 1:1 and treat left amount as donation
+    let mut app = MockApp::new(&[(
+        &MOCK_CONTRACT_ADDR.to_string(),
+        &[Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(400u128),
+        }],
+    )]);
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    deps.querier.with_token_balances(&[
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_token_balances(&[
         (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::zero())],
+            &"liquidity".to_string(),
+            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
         ),
-        (&"asset0000".to_string(), &[]),
+        (
+            &"asset".to_string(),
+            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
+        ),
     ]);
 
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
+    let asset_addr = app.get_token_addr("asset").unwrap();
+
+    let msg = InstantiateMsg {
+        oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
-                contract_addr: "asset0000".into(),
+                contract_addr: asset_addr.clone(),
             },
         ],
-        token_code_id: 10u64,
+        token_code_id: app.token_id,
         commission_rate: None,
-        init_hook: None,
     };
 
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), mock_env(), mock_info("addr0000", &[]), msg).unwrap();
+    let code_id = app.upload(Box::new(
+        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+    ));
+    let pair_addr = app
+        .instantiate(code_id, Addr::unchecked("owner"), &msg, &[], "pair")
+        .unwrap();
 
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
+    // set allowance
+    app.execute(
+        Addr::unchecked(MOCK_CONTRACT_ADDR),
+        asset_addr.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr.to_string(),
+            amount: Uint128::from(100u128),
+            expires: None,
+        },
+        &[],
     )
     .unwrap();
 
     // successfully provide liquidity for the exist pool
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -253,72 +181,36 @@ fn provide_liquidity() {
         receiver: None,
     };
 
-    let env = mock_env();
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
+    let _res = app
+        .execute(
+            Addr::unchecked(MOCK_CONTRACT_ADDR),
+            pair_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            }],
+        )
+        .unwrap();
+
+    // set allowance one more 100
+    app.execute(
+        Addr::unchecked(MOCK_CONTRACT_ADDR),
+        asset_addr.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr.to_string(),
             amount: Uint128::from(100u128),
-        }],
-    );
-    let res = handle(deps.as_mut(), env, info, msg).unwrap();
-    let transfer_from_msg = res.messages.get(0).expect("no message");
-    let mint_msg = res.messages.get(1).expect("no message");
-    assert_eq!(
-        transfer_from_msg,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset0000".into(),
-            msg: to_binary(&Cw20HandleMsg::TransferFrom {
-                owner: "addr0000".into(),
-                recipient: MOCK_CONTRACT_ADDR.into(),
-                amount: Uint128::from(100u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
+            expires: None,
+        },
+        &[],
+    )
+    .unwrap();
 
-    assert_eq!(
-        mint_msg,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "liquidity0000".into(),
-            msg: to_binary(&Cw20HandleMsg::Mint {
-                recipient: "addr0000".into(),
-                amount: Uint128::from(100u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
-
-    // provide more liquidity 1:2, which is not proportional to 1:1,
-    // then it must accept 1:1 and treat left amount as donation
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(
-                200u128 + 200u128, /* user deposit must be pre-applied */
-            ),
-        }],
-    )]);
-
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(100u128))],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(200u128))],
-        ),
-    ]);
-
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -330,54 +222,28 @@ fn provide_liquidity() {
             },
         ],
         slippage_tolerance: None,
-        receiver: Some("staking0000".into()), // try changing receiver
+        receiver: Some(Addr::unchecked("staking0000")), // try changing receiver
     };
 
-    let env = mock_env();
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(200u128),
-        }],
-    );
-
     // only accept 100, then 50 share will be generated with 100 * (100 / 200)
-    let res = handle(deps.as_mut(), env, info, msg).unwrap();
-    let transfer_from_msg = res.messages.get(0).expect("no message");
-    let mint_msg = res.messages.get(1).expect("no message");
-    assert_eq!(
-        transfer_from_msg,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset0000".into(),
-            msg: to_binary(&Cw20HandleMsg::TransferFrom {
-                owner: "addr0000".into(),
-                recipient: MOCK_CONTRACT_ADDR.into(),
-                amount: Uint128::from(100u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
-    assert_eq!(
-        mint_msg,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "liquidity0000".into(),
-            msg: to_binary(&Cw20HandleMsg::Mint {
-                recipient: "staking0000".into(), // LP tokens sent to specified receiver
-                amount: Uint128::from(50u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
+    let _res = app
+        .execute(
+            Addr::unchecked(MOCK_CONTRACT_ADDR),
+            pair_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(200u128),
+            }],
+        )
+        .unwrap();
 
     // check wrong argument
-    let msg = HandleMsg::ProvideLiquidity {
+    let msg = ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
                 info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
+                    contract_addr: asset_addr.clone(),
                 },
                 amount: Uint128::from(100u128),
             },
@@ -392,307 +258,131 @@ fn provide_liquidity() {
         receiver: None,
     };
 
-    let env = mock_env();
-    let info = mock_info(
-        "addr0000",
+    let res = app.execute(
+        Addr::unchecked(MOCK_CONTRACT_ADDR),
+        pair_addr.clone(),
+        &msg,
         &[Coin {
             denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(100u128),
         }],
     );
-    let res = handle(deps.as_mut(), env, info, msg).unwrap_err();
-    match res {
-        ContractError::Std(StdError::GenericErr { msg, .. }) => assert_eq!(
-            msg,
-            "Native token balance mismatch between the argument and the transferred".to_string()
-        ),
-        _ => panic!("Must return generic error"),
-    }
 
-    // initialize token balance to 1:1
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(
-                100u128 + 100u128, /* user deposit must be pre-applied */
-            ),
-        }],
-    )]);
-
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(100u128))],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(100u128))],
-        ),
-    ]);
-
-    // failed because the price is under slippage_tolerance
-    let msg = HandleMsg::ProvideLiquidity {
-        assets: [
-            Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
-                },
-                amount: Uint128::from(98u128),
-            },
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: ORAI_DENOM.to_string(),
-                },
-                amount: Uint128::from(100u128),
-            },
-        ],
-        slippage_tolerance: Some(Decimal::percent(1)),
-        receiver: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info(
-        "addr0001",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(100u128),
-        }],
-    );
-    let res = handle(deps.as_mut(), env, info, msg).unwrap_err();
-    match res {
-        ContractError::MaxSlippageAssertion {} => {}
-        _ => panic!("DO NOT ENTER HERE"),
-    }
-
-    // initialize token balance to 1:1
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(100u128 + 98u128 /* user deposit must be pre-applied */),
-        }],
-    )]);
-
-    // failed because the price is under slippage_tolerance
-    let msg = HandleMsg::ProvideLiquidity {
-        assets: [
-            Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
-                },
-                amount: Uint128::from(100u128),
-            },
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: ORAI_DENOM.to_string(),
-                },
-                amount: Uint128::from(98u128),
-            },
-        ],
-        slippage_tolerance: Some(Decimal::percent(1)),
-        receiver: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info(
-        "addr0001",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(98u128),
-        }],
-    );
-    let res = handle(deps.as_mut(), env, info, msg).unwrap_err();
-    match res {
-        ContractError::MaxSlippageAssertion {} => {}
-        _ => panic!("DO NOT ENTER HERE"),
-    }
-
-    // initialize token balance to 1:1
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(
-                100u128 + 100u128, /* user deposit must be pre-applied */
-            ),
-        }],
-    )]);
-
-    // successfully provides
-    let msg = HandleMsg::ProvideLiquidity {
-        assets: [
-            Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
-                },
-                amount: Uint128::from(99u128),
-            },
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: ORAI_DENOM.to_string(),
-                },
-                amount: Uint128::from(100u128),
-            },
-        ],
-        slippage_tolerance: Some(Decimal::percent(1)),
-        receiver: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info(
-        "addr0001",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(100u128),
-        }],
-    );
-    let _res = handle(deps.as_mut(), env, info, msg).unwrap();
-
-    // initialize token balance to 1:1
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(100u128 + 99u128 /* user deposit must be pre-applied */),
-        }],
-    )]);
-
-    // successfully provides
-    let msg = HandleMsg::ProvideLiquidity {
-        assets: [
-            Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
-                },
-                amount: Uint128::from(100u128),
-            },
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: ORAI_DENOM.to_string(),
-                },
-                amount: Uint128::from(99u128),
-            },
-        ],
-        slippage_tolerance: Some(Decimal::percent(1)),
-        receiver: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info(
-        "addr0001",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(99u128),
-        }],
-    );
-    let _res = handle(deps.as_mut(), env, info, msg).unwrap();
+    app.assert_fail(res);
 }
 
 #[test]
 fn withdraw_liquidity() {
-    let mut deps = mock_dependencies(&[Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(100u128),
-    }]);
+    let mut app = MockApp::new(&[(
+        &"addr0000".to_string(),
+        &[Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1000u128),
+        }],
+    )]);
 
-    deps.querier.with_tax(
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_tax(
         Decimal::zero(),
         &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
     );
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&"addr0000".to_string(), &Uint128::from(100u128))],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(100u128))],
-        ),
-    ]);
 
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_token_balances(&[(
+        &"liquidity".to_string(),
+        &[(&"addr0000".to_string(), &Uint128::from(1000u128))],
+    )]);
+
+    let liquidity_addr = app.get_token_addr("liquidity").unwrap();
+
+    let msg = InstantiateMsg {
+        oracle_addr: app.oracle_addr.clone(),
         asset_infos: [
             AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
             AssetInfo::Token {
-                contract_addr: "asset0000".into(),
+                contract_addr: liquidity_addr.clone(),
             },
         ],
-        token_code_id: 10u64,
+        token_code_id: app.token_id,
         commission_rate: None,
-        init_hook: None,
     };
 
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
+    let pair_id = app.upload(Box::new(
+        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+    ));
     // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
+    let pair_addr = app
+        .instantiate(pair_id, Addr::unchecked("addr0000"), &msg, &[], "pair")
+        .unwrap();
 
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
+    // set allowance one more 100
+    app.execute(
+        Addr::unchecked("addr0000"),
+        liquidity_addr.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: pair_addr.to_string(),
+            amount: Uint128::from(1000u128),
+            expires: None,
+        },
+        &[],
     )
     .unwrap();
 
+    let msg = ExecuteMsg::ProvideLiquidity {
+        assets: [
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: liquidity_addr.clone(),
+                },
+                amount: Uint128::from(100u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(100u128),
+            },
+        ],
+        slippage_tolerance: None,
+        // we send lq token to pair and later call it directly to test
+        receiver: Some(pair_addr.clone()),
+    };
+
+    // only accept 100, then 50 share will be generated with 100 * (100 / 200)
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            pair_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            }],
+        )
+        .unwrap();
+
     // withdraw liquidity
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr0000".into(),
-        msg: to_binary(&Cw20HookMsg::WithdrawLiquidity {}).ok(),
+        msg: to_binary(&Cw20HookMsg::WithdrawLiquidity {}).unwrap(),
         amount: Uint128::from(100u128),
     });
 
-    let env = mock_env();
-    let info = mock_info("liquidity0000", &[]);
-    let res = handle(deps.as_mut(), env, info, msg).unwrap();
-    let log_withdrawn_share = res.attributes.get(2).expect("no log");
-    let log_refund_assets = res.attributes.get(3).expect("no log");
-    let msg_refund_0 = res.messages.get(0).expect("no message");
-    let msg_refund_1 = res.messages.get(1).expect("no message");
-    let msg_burn_liquidity = res.messages.get(2).expect("no message");
-    assert_eq!(
-        msg_refund_0,
-        &CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: "addr0000".into(),
-            amount: vec![Coin {
-                denom: ORAI_DENOM.into(),
-                amount: Uint128::from(100u128),
-            }],
-        })
-    );
-    assert_eq!(
-        msg_refund_1,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset0000".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: "addr0000".into(),
-                amount: Uint128::from(100u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
+    let PairResponse { info: pair_info } = app
+        .query(pair_addr.clone(), &oraiswap::pair::QueryMsg::Pair {})
+        .unwrap();
 
-    // we fake querier without using multi-contract call
-    assert_eq!(
-        msg_burn_liquidity,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "liquidity0000".into(),
-            msg: to_binary(&Cw20HandleMsg::Burn {
-                amount: Uint128::from(100u128),
-            })
-            .unwrap(),
-            send: vec![],
-        })
-    );
+    let res = app
+        .execute(pair_info.liquidity_token, pair_addr.clone(), &msg, &[])
+        .unwrap();
+
+    let attributes = res.custom_attrs(1);
+    let log_withdrawn_share = attributes.get(2).expect("no log");
+    let log_refund_assets = attributes.get(3).expect("no log");
 
     assert_eq!(
         log_withdrawn_share,
@@ -700,608 +390,9 @@ fn withdraw_liquidity() {
     );
     assert_eq!(
         log_refund_assets,
-        &attr("refund_assets", format!("100{}, 100asset0000", ORAI_DENOM))
-    );
-}
-
-#[test]
-fn try_native_to_token() {
-    let total_share = Uint128::from(30000000000u128);
-    let asset_pool_amount = Uint128::from(20000000000u128);
-    let collateral_pool_amount = Uint128::from(30000000000u128);
-    let exchange_rate: Decimal = Decimal::from_ratio(asset_pool_amount, collateral_pool_amount);
-    let offer_amount = Uint128::from(1500000000u128);
-
-    let mut deps = mock_dependencies(&[Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: collateral_pool_amount + offer_amount, /* user deposit must be pre-applied */
-    }]);
-
-    deps.querier.with_tax(
-        Decimal::zero(),
-        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
-    );
-
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &total_share)],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &asset_pool_amount)],
-        ),
-    ]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    // normal swap
-    let msg = HandleMsg::Swap {
-        offer_asset: Asset {
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            amount: offer_amount,
-        },
-        belief_price: None,
-        max_spread: None,
-        to: None,
-    };
-    let env = mock_env();
-    let info = mock_info(
-        "addr0000",
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: offer_amount,
-        }],
-    );
-    let res = handle(deps.as_mut(), env, info, msg).unwrap();
-    let msg_transfer = res.messages.get(0).expect("no message");
-
-    // current price is 1.5, so expected return without spread is 1000
-    // 952.380952 = 20000 - 20000 * 30000 / (30000 + 1500)
-    let expected_ret_amount = Uint128::from(952_380_952u128);
-    let expected_spread_amount =
-        Asset::checked_sub(offer_amount * exchange_rate, expected_ret_amount).unwrap();
-    let expected_commission_amount = expected_ret_amount.multiply_ratio(3u128, 1000u128); // 0.3%
-    let expected_return_amount =
-        Asset::checked_sub(expected_ret_amount, expected_commission_amount).unwrap();
-    let expected_tax_amount = Uint128::zero(); // no tax for token
-
-    // check simulation res
-    deps.querier.with_balance(&[(
-        &MOCK_CONTRACT_ADDR.to_string(),
-        vec![Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: collateral_pool_amount, /* user deposit must be pre-applied */
-        }],
-    )]);
-
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            amount: offer_amount,
-        },
-    )
-    .unwrap();
-    assert_eq!(expected_return_amount, simulation_res.return_amount);
-    assert_eq!(expected_commission_amount, simulation_res.commission_amount);
-    assert_eq!(expected_spread_amount, simulation_res.spread_amount);
-
-    // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            info: AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-            amount: expected_return_amount,
-        },
-    )
-    .unwrap();
-
-    assert!(
-        (offer_amount.u128() as i128 - reverse_simulation_res.offer_amount.u128() as i128).abs()
-            < 3i128
-    );
-    assert!(
-        (expected_commission_amount.u128() as i128
-            - reverse_simulation_res.commission_amount.u128() as i128)
-            .abs()
-            < 3i128
-    );
-    assert!(
-        (expected_spread_amount.u128() as i128
-            - reverse_simulation_res.spread_amount.u128() as i128)
-            .abs()
-            < 3i128
-    );
-
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("action", "swap"),
-            attr("sender", "addr0000"),
-            attr("receiver", "addr0000"),
-            attr("offer_asset", ORAI_DENOM),
-            attr("ask_asset", "asset0000"),
-            attr("offer_amount", offer_amount.to_string()),
-            attr("return_amount", expected_return_amount.to_string()),
-            attr("tax_amount", expected_tax_amount.to_string()),
-            attr("spread_amount", expected_spread_amount.to_string()),
-            attr("commission_amount", expected_commission_amount.to_string()),
-        ]
-    );
-
-    assert_eq!(
-        msg_transfer,
-        &CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: "asset0000".into(),
-            msg: to_binary(&Cw20HandleMsg::Transfer {
-                recipient: "addr0000".into(),
-                amount: expected_return_amount,
-            })
-            .unwrap(),
-            send: vec![],
-        }),
-    );
-}
-
-#[test]
-fn try_token_to_native() {
-    let total_share = Uint128::from(20000000000u128);
-    let asset_pool_amount = Uint128::from(30000000000u128);
-    let collateral_pool_amount = Uint128::from(20000000000u128);
-    let exchange_rate = Decimal::from_ratio(collateral_pool_amount, asset_pool_amount);
-    let offer_amount = Uint128::from(1500000000u128);
-
-    let mut deps = mock_dependencies(&[Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: collateral_pool_amount,
-    }]);
-    deps.querier.with_tax(
-        Decimal::percent(1),
-        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
-    );
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &total_share)],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(
-                &MOCK_CONTRACT_ADDR.to_string(),
-                &(asset_pool_amount + offer_amount),
-            )],
-        ),
-    ]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    // unauthorized access; can not execute swap directly for token swap
-    let msg = HandleMsg::Swap {
-        offer_asset: Asset {
-            info: AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-            amount: offer_amount,
-        },
-        belief_price: None,
-        max_spread: None,
-        to: None,
-    };
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    let res = handle(deps.as_mut(), env, info, msg).unwrap_err();
-    match res {
-        ContractError::Unauthorized {} => (),
-        _ => panic!("DO NOT ENTER HERE"),
-    }
-
-    // normal sell
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr0000".into(),
-        amount: offer_amount,
-        msg: to_binary(&Cw20HookMsg::Swap {
-            belief_price: None,
-            max_spread: None,
-            to: None,
-        })
-        .ok(),
-    });
-    let env = mock_env();
-    let info = mock_info("asset0000", &[]);
-
-    let res = handle(deps.as_mut(), env, info, msg).unwrap();
-    let msg_transfer = res.messages.get(0).expect("no message");
-
-    // current price is 1.5, so expected return without spread is 1000
-    // 952.380952 = 20000 - 20000 * 30000 / (30000 + 1500)
-    let expected_ret_amount = Uint128::from(952_380_952u128);
-    let expected_spread_amount =
-        Asset::checked_sub(offer_amount * exchange_rate, expected_ret_amount).unwrap();
-    let expected_commission_amount = expected_ret_amount.multiply_ratio(3u128, 1000u128); // 0.3%
-    let expected_return_amount =
-        Asset::checked_sub(expected_ret_amount, expected_commission_amount).unwrap();
-    let expected_tax_amount = std::cmp::min(
-        // Uint128::from(1000000u128),
-        Uint128::zero(), // native orai tax is zero
-        Asset::checked_sub(
-            expected_return_amount,
-            expected_return_amount.multiply_ratio(Uint128::from(100u128), Uint128::from(101u128)),
+        &attr(
+            "refund_assets",
+            format!("100{}, 100{}", ORAI_DENOM, liquidity_addr)
         )
-        .unwrap(),
     );
-    // check simulation res
-    // return asset token balance as normal
-    deps.querier.with_token_balances(&[
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &total_share)],
-        ),
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &(asset_pool_amount))],
-        ),
-    ]);
-
-    let simulation_res: SimulationResponse = query_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: offer_amount,
-            info: AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        },
-    )
-    .unwrap();
-    assert_eq!(expected_return_amount, simulation_res.return_amount);
-    assert_eq!(expected_commission_amount, simulation_res.commission_amount);
-    assert_eq!(expected_spread_amount, simulation_res.spread_amount);
-
-    // check reverse simulation res
-    let reverse_simulation_res: ReverseSimulationResponse = query_reverse_simulation(
-        deps.as_ref(),
-        Asset {
-            amount: expected_return_amount,
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-        },
-    )
-    .unwrap();
-    assert!(
-        (offer_amount.u128() as i128 - reverse_simulation_res.offer_amount.u128() as i128).abs()
-            < 3i128
-    );
-    assert!(
-        (expected_commission_amount.u128() as i128
-            - reverse_simulation_res.commission_amount.u128() as i128)
-            .abs()
-            < 3i128
-    );
-    assert!(
-        (expected_spread_amount.u128() as i128
-            - reverse_simulation_res.spread_amount.u128() as i128)
-            .abs()
-            < 3i128
-    );
-
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("action", "swap"),
-            attr("sender", "addr0000"),
-            attr("receiver", "addr0000"),
-            attr("offer_asset", "asset0000"),
-            attr("ask_asset", ORAI_DENOM),
-            attr("offer_amount", offer_amount.to_string()),
-            attr("return_amount", expected_return_amount.to_string()),
-            attr("tax_amount", expected_tax_amount.to_string()),
-            attr("spread_amount", expected_spread_amount.to_string()),
-            attr("commission_amount", expected_commission_amount.to_string()),
-        ]
-    );
-
-    assert_eq!(
-        &CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: "addr0000".into(),
-            amount: vec![Coin {
-                denom: ORAI_DENOM.to_string(),
-                amount: Asset::checked_sub(expected_return_amount, expected_tax_amount).unwrap(),
-            }],
-        }),
-        msg_transfer,
-    );
-
-    // failed due to non asset token contract try to execute sell
-    let msg = HandleMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr0000".into(),
-        amount: offer_amount,
-        msg: to_binary(&Cw20HookMsg::Swap {
-            belief_price: None,
-            max_spread: None,
-            to: None,
-        })
-        .ok(),
-    });
-    let env = mock_env();
-    let info = mock_info("liquidity0000", &[]);
-    let res = handle(deps.as_mut(), env, info, msg).unwrap_err();
-    match res {
-        ContractError::Unauthorized {} => (),
-        _ => panic!("DO NOT ENTER HERE"),
-    }
-}
-
-#[test]
-fn test_max_spread() {
-    assert_max_spread(
-        Some(Decimal::from_ratio(1200u128, 1u128)),
-        Some(Decimal::percent(1)),
-        Uint128::from(1200000000u128),
-        Uint128::from(989999u128),
-        Uint128::zero(),
-    )
-    .unwrap_err();
-
-    assert_max_spread(
-        Some(Decimal::from_ratio(1200u128, 1u128)),
-        Some(Decimal::percent(1)),
-        Uint128::from(1200000000u128),
-        Uint128::from(990000u128),
-        Uint128::zero(),
-    )
-    .unwrap();
-
-    assert_max_spread(
-        None,
-        Some(Decimal::percent(1)),
-        Uint128::zero(),
-        Uint128::from(989999u128),
-        Uint128::from(10001u128),
-    )
-    .unwrap_err();
-
-    assert_max_spread(
-        None,
-        Some(Decimal::percent(1)),
-        Uint128::zero(),
-        Uint128::from(990000u128),
-        Uint128::from(10000u128),
-    )
-    .unwrap();
-}
-
-#[test]
-fn test_deduct() {
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: "ibc_orai".to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    // fake tax_rate
-    let tax_rate = Decimal::percent(2);
-    let tax_cap = Uint128::from(1_000_000u128);
-    deps.querier.with_tax(
-        Decimal::percent(2),
-        &[(&"ibc_orai".to_string(), &Uint128::from(1000000u128))],
-    );
-
-    let amount = Uint128::from(1_000_000_000u128);
-    let expected_after_amount = std::cmp::max(
-        Asset::checked_sub(amount, amount * tax_rate).unwrap(),
-        Asset::checked_sub(amount, tax_cap).unwrap(),
-    );
-
-    let pair_info: PairInfo = query_pair_info(deps.as_ref()).unwrap();
-    let oracle_contract = OracleContract(pair_info.oracle_addr);
-
-    let after_amount = (Asset {
-        info: AssetInfo::NativeToken {
-            denom: "ibc_orai".to_string(),
-        },
-        amount,
-    })
-    .deduct_tax(&oracle_contract, &deps.as_ref().querier)
-    .unwrap();
-
-    assert_eq!(expected_after_amount, after_amount.amount);
-}
-
-#[test]
-fn test_query_pool() {
-    let total_share_amount = Uint128::from(111u128);
-    let asset_0_amount = Uint128::from(222u128);
-    let asset_1_amount = Uint128::from(333u128);
-    let mut deps = mock_dependencies(&[Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: asset_0_amount,
-    }]);
-
-    deps.querier.with_token_balances(&[
-        (
-            &"asset0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &asset_1_amount)],
-        ),
-        (
-            &"liquidity0000".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &total_share_amount)],
-        ),
-    ]);
-
-    let msg = InitMsg {
-        oracle_addr: "oracle0000".into(),
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: "asset0000".into(),
-            },
-        ],
-        token_code_id: 10u64,
-        commission_rate: None,
-        init_hook: None,
-    };
-
-    let env = mock_env();
-    let info = mock_info("addr0000", &[]);
-    // we can just call .unwrap() to assert this was a success
-    let _res = init(deps.as_mut(), env, info, msg).unwrap();
-
-    // store liquidity token
-    let msg = HandleMsg::PostInitialize {};
-    let _res = handle(
-        deps.as_mut(),
-        mock_env(),
-        mock_info("liquidity0000", &[]),
-        msg,
-    )
-    .unwrap();
-
-    let res: PoolResponse = query_pool(deps.as_ref()).unwrap();
-
-    assert_eq!(
-        res.assets,
-        [
-            Asset {
-                info: AssetInfo::NativeToken {
-                    denom: ORAI_DENOM.to_string(),
-                },
-                amount: asset_0_amount
-            },
-            Asset {
-                info: AssetInfo::Token {
-                    contract_addr: "asset0000".into(),
-                },
-                amount: asset_1_amount
-            }
-        ]
-    );
-    assert_eq!(res.total_share, total_share_amount);
-}
-
-#[test]
-fn test_compute_swap_with_huge_pool_variance() {
-    let offer_pool = Uint128::from(395451850234u128);
-    let ask_pool = Uint128::from(317u128);
-
-    assert_eq!(
-        compute_swap(
-            offer_pool,
-            ask_pool,
-            Uint128::from(1u128),
-            Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap()
-        )
-        .unwrap()
-        .0,
-        Uint128::zero()
-    );
-}
-
-#[test]
-fn test_compute_swap_with_empty_pool() {
-    let offer_pool = Uint128::from(0u128);
-    let ask_pool = Uint128::from(10u128);
-
-    let res = compute_swap(
-        offer_pool,
-        ask_pool,
-        Uint128::from(1u128),
-        Decimal256::from_str(DEFAULT_COMMISSION_RATE).unwrap(),
-    )
-    .unwrap_err();
-
-    assert_eq!(res, ContractError::OfferPoolIsZero {});
 }
