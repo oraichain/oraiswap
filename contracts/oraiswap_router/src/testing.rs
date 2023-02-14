@@ -99,6 +99,7 @@ fn simulate_swap_operations_test() {
 
     let msg = InstantiateMsg {
         factory_addr: app.factory_addr.clone(),
+        factory_addr_v2: Addr::unchecked("addr0000_v2"),
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -282,6 +283,7 @@ fn execute_swap_operations() {
 
     let msg = InstantiateMsg {
         factory_addr: app.factory_addr.clone(),
+        factory_addr_v2: Addr::unchecked("addr0000_v2"),
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));

@@ -4,7 +4,7 @@ use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
@@ -21,18 +21,29 @@ pub fn submit_order(
     deps: DepsMut,
     sender: Addr,
     direction: OrderDirection,
-    offer_asset: Asset,
-    ask_asset: Asset,
+    assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
     // check min offer amount and min ask amount
     // need to setup min offer_amount and ask_amount for a specific pair so that no one can spam
-    let offer_asset_raw = offer_asset.to_raw(deps.api)?;
-    let ask_asset_raw = ask_asset.to_raw(deps.api)?;
-    let pair_key = pair_key(&[offer_asset_raw.info, ask_asset_raw.info]);
+    let offer_asset: Asset;
+    let ask_asset: Asset;
+    
+    match direction {
+        OrderDirection::Buy => {
+            offer_asset = assets[0].clone();
+            ask_asset = assets[1].clone();
+        },
+        OrderDirection::Sell => {
+            offer_asset = assets[1].clone();
+            ask_asset = assets[0].clone();
+        },
+    };
+
+    let pair_key = pair_key(&[offer_asset.to_raw(deps.api)?.info, ask_asset.to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
 
     // require minimum amount for the orderbook
-    if offer_asset.amount.lt(&order_book.min_offer_amount) {
+    if assets[0].amount.lt(&order_book.min_offer_amount) {
         return Err(ContractError::TooSmallOfferAmount {});
     }
 
@@ -45,10 +56,11 @@ pub fn submit_order(
             order_id,
             direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_amount: offer_asset_raw.amount,
-            ask_amount: ask_asset_raw.amount,
+            offer_amount: offer_asset.to_raw(deps.api)?.amount,
+            ask_amount: ask_asset.to_raw(deps.api)?.amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
+            is_filled: false,
         },
         true,
     )?;
@@ -66,11 +78,10 @@ pub fn submit_order(
 pub fn cancel_order(
     deps: DepsMut,
     info: MessageInfo,
-    offer_info: AssetInfo,
-    ask_info: AssetInfo,
     order_id: u64,
+    asset_infos: [AssetInfo; 2],
 ) -> Result<Response, ContractError> {
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -78,9 +89,16 @@ pub fn cancel_order(
     }
 
     // Compute refund asset
-    let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
+    let left_offer_amount = match order.direction {
+        OrderDirection::Buy => order.ask_amount.checked_sub(order.filled_ask_amount)?,
+        OrderDirection::Sell => order.offer_amount.checked_sub(order.filled_offer_amount)?,
+    };
+
     let bidder_refund = Asset {
-        info: offer_info,
+        info: match order.direction {
+            OrderDirection::Buy => asset_infos[0].clone(),
+            OrderDirection::Sell => asset_infos[1].clone(),
+        },
         amount: left_offer_amount,
     };
 
@@ -125,7 +143,7 @@ pub fn execute_order(
 
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
-    // When natch amount equals ask amount, close order
+    // When match amount equals ask amount, close order
     let total_orders = if match_ask_amount == ask_asset.amount {
         remove_order(deps.storage, &pair_key, &order)?
     } else {
@@ -158,21 +176,189 @@ pub fn execute_order(
     ]))
 }
 
+pub fn excecute_pair(
+    deps: DepsMut,
+    info: MessageInfo,
+    asset_infos: [AssetInfo; 2],
+) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let ob = read_orderbook(deps.storage, &pair_key)?;
+
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
+
+    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
+    
+    let mut match_buy_orders = ob
+        .orders_at(
+            deps.as_ref().storage,
+            best_buy_price,
+            OrderDirection::Buy,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut total_orders =  0;
+    for sell_order in &mut match_sell_orders {
+        if sell_order.get_status() {
+            continue;
+        }
+
+        // this will try to fill all orders
+        // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
+        let sender = deps.api.addr_humanize(&sell_order.bidder_addr)?;
+
+        let mut executor_receive_amount = Uint128::zero();
+        let mut lef_ask_sell_order_amount = sell_order.ask_amount;
+        let mut lef_offer_sell_order_amount = sell_order.offer_amount;
+
+        for buy_order in &mut match_buy_orders {
+            if buy_order.get_status() {
+                continue;
+            }
+            // offer amount is already paid, we need ask amount to be received
+            // remember that ask of buy and ask of sell are opposite sides
+            // ask_amount is equal match ask amount, to make sure always matched
+            let ask_amount = Uint128::min(
+                lef_ask_sell_order_amount,
+                buy_order.ask_amount - buy_order.filled_ask_amount,
+            );
+
+            lef_ask_sell_order_amount -= ask_amount;
+            
+            let ask_asset = Asset {
+                info: asset_infos[1].clone(),
+                amount: ask_amount,
+            };
+
+            let (mut offer_amount, _) = &buy_order.matchable_amount(ask_asset.amount)?;
+
+            offer_amount = Uint128::min(
+                lef_offer_sell_order_amount,
+                offer_amount,
+            );
+            
+            lef_offer_sell_order_amount -= offer_amount;
+            
+            let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
+
+            // fill this order
+            buy_order.fill_order(deps.storage, &pair_key, ask_asset.amount, offer_amount)?;
+
+            executor_receive_amount += offer_amount;
+            total_orders += 1;
+
+            if !ask_asset.amount.is_zero() {
+                messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+            }
+
+            if lef_ask_sell_order_amount.is_zero() || lef_offer_sell_order_amount.is_zero(){
+                break;
+            }
+        }
+
+        // there is match
+        if !executor_receive_amount.is_zero() {
+            // ask is order ask asset, not depending on order direction
+            // so we just make sure ask amount is equal on both sides
+            sell_order.fill_order(
+                deps.storage,
+                &pair_key,
+                sell_order.ask_amount - lef_ask_sell_order_amount,
+                executor_receive_amount,
+            )?;
+            let executor_receive = Asset {
+                info: asset_infos[0].clone(),
+                amount: executor_receive_amount,
+            };
+            total_orders += 1;
+
+            // dont use oracle for limit order
+            messages.push(executor_receive.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(sender.as_str())?,
+            )?);
+        }
+    }
+
+    Ok(Response::new().add_messages(messages).add_attributes(vec![
+        ("action", "execute_all_orders"),
+        ("total_orders", &total_orders.to_string()),
+    ]))
+}
+
+pub fn remove_pair(
+    deps: DepsMut,
+    info: MessageInfo,
+    asset_infos: [AssetInfo; 2],
+) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let ob = read_orderbook(deps.storage, &pair_key)?;
+
+    let all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
+    
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut total_orders =  0;
+    for order in all_orders.iter() {
+        // Compute refund asset
+        let left_offer_amount = match order.direction {
+            OrderDirection::Buy => order.offer_amount.checked_sub(order.filled_offer_amount)?,
+            OrderDirection::Sell => order.ask_amount.checked_sub(order.filled_ask_amount)?,
+        };
+
+        let bidder_refund = Asset {
+            info: match order.direction {
+                OrderDirection::Buy => asset_infos[0].clone(),
+                OrderDirection::Sell => asset_infos[1].clone(),
+            },
+            amount: left_offer_amount,
+        };
+
+        // Build refund msg
+        if left_offer_amount > Uint128::zero() {
+            messages.push(bidder_refund.into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?);
+        }
+
+        total_orders += remove_order(deps.storage, &pair_key, &order)?;
+    }
+
+    remove_orderbook(deps.storage, &pair_key);
+
+    Ok(Response::new().add_messages(messages).add_attributes(vec![
+        ("action", "remove_orderbook"),
+        ("total_orders", &total_orders.to_string()),
+    ]))
+}
+
 pub fn query_order(
     deps: Deps,
-    offer_info: AssetInfo,
-    ask_info: AssetInfo,
+    asset_infos: [AssetInfo; 2],
     order_id: u64,
 ) -> StdResult<OrderResponse> {
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let order = read_order(deps.storage, &pair_key, order_id)?;
-    order.to_response(deps.api, offer_info, ask_info)
+    order.to_response(deps.api, asset_infos[0].clone(), asset_infos[1].clone())
 }
 
 pub fn query_orders(
     deps: Deps,
-    offer_info: AssetInfo,
-    ask_info: AssetInfo,
+    asset_infos: [AssetInfo; 2],
     direction: Option<OrderDirection>,
     filter: OrderFilter,
     start_after: Option<u64>,
@@ -180,7 +366,7 @@ pub fn query_orders(
     order_by: Option<i32>,
 ) -> StdResult<OrdersResponse> {
     let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
 
     let (direction_filter, direction_key): (Box<dyn Fn(&OrderDirection) -> bool>, Vec<u8>) =
         match direction {
@@ -230,7 +416,7 @@ pub fn query_orders(
     let resp = OrdersResponse {
         orders: orders
             .iter()
-            .map(|order| order.to_response(deps.api, offer_info.clone(), ask_info.clone()))
+            .map(|order| order.to_response(deps.api, asset_infos[0].clone(), asset_infos[1].clone()))
             .collect::<StdResult<Vec<OrderResponse>>>()?,
     };
 
@@ -261,10 +447,9 @@ pub fn query_orderbooks(
 
 pub fn query_orderbook(
     deps: Deps,
-    offer_info: AssetInfo,
-    ask_info: AssetInfo,
+    asset_infos: [AssetInfo; 2],
 ) -> StdResult<OrderBookResponse> {
-    let pair_key = pair_key(&[offer_info.to_raw(deps.api)?, ask_info.to_raw(deps.api)?]);
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
     ob.to_response(deps.api)
 }

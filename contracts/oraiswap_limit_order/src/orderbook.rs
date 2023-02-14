@@ -27,6 +27,7 @@ pub struct Order {
     pub ask_amount: Uint128,
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
+    pub is_filled: bool,
 }
 
 impl Order {
@@ -47,6 +48,7 @@ impl Order {
             ask_amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
+            is_filled: false,
         }
     }
 
@@ -60,8 +62,9 @@ impl Order {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_ask_amount == self.ask_amount {
-            // When natch amount equals ask amount, close order
+        if self.filled_ask_amount == self.ask_amount || self.filled_offer_amount == self.offer_amount {
+            // When match amount equals ask amount, close order
+            self.is_filled = true;
             remove_order(storage, pair_key, self)
         } else {
             // update order
@@ -91,6 +94,14 @@ impl Order {
 
     pub fn get_price(&self) -> Decimal {
         Decimal::from_ratio(self.offer_amount, self.ask_amount)
+    }
+
+    pub fn set_status(&mut self, is_filled: bool) {
+        self.is_filled = is_filled;
+    }
+
+    pub fn get_status(&self) -> bool {
+        self.is_filled
     }
 
     pub fn to_response(

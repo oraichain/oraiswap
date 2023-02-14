@@ -1,10 +1,9 @@
 use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
-#[allow(unused_imports)]
 use cosmwasm_std::{
-    to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, QuerierWrapper, StdResult,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128,
+    WasmMsg,
 };
 
 #[cw_serde]
@@ -40,9 +39,20 @@ pub enum ExecuteMsg {
 }
 
 /// QueryMsg is defines available query datas
+#[cfg(not(target_arch = "wasm32"))]
 #[cw_serde]
 #[derive(QueryResponses)]
 #[serde(untagged)]
+#[query_responses(nested)]
+pub enum QueryMsg {
+    Treasury(OracleTreasuryQuery),
+    Exchange(OracleExchangeQuery),
+    Contract(OracleContractQuery),
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cw_serde]
+#[derive(QueryResponses)]
 #[query_responses(nested)]
 pub enum QueryMsg {
     Treasury(OracleTreasuryQuery),
@@ -79,7 +89,7 @@ pub enum OracleExchangeQuery {
 pub enum OracleContractQuery {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
-    #[returns(Coin)]
+    #[returns(cosmwasm_std::Coin)]
     RewardPool { denom: String },
 }
 
@@ -182,12 +192,7 @@ impl OracleContract {
         querier: &QuerierWrapper,
         req: QueryMsg,
     ) -> StdResult<T> {
-        let query = WasmQuery::Smart {
-            contract_addr: self.to_string(),
-            msg: to_binary(&req)?,
-        }
-        .into();
-        querier.query(&query)
+        querier.query_wasm_smart(self.to_string(), &req)
     }
 
     /*** queries ***/
