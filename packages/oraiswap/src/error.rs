@@ -65,9 +65,9 @@ pub enum ContractError {
     #[error("Order {order_id} already fulfilled")]
     OrderFulfilled {order_id: u64},
 
-    #[error("Amount of {quote_coin} must be greater than {min_quote_amount}")]
-    TooSmallQuoteCoinAmount {
-        quote_coin: String,
-        min_quote_amount: Uint128,
+    #[error("Amount of {base_coin} must be greater than {min_base_amount}")]
+    TooSmallBaseCoinAmount {
+        base_coin: String,
+        min_base_amount: Uint128,
     },
 }
