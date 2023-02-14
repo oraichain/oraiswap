@@ -99,10 +99,12 @@ impl Order {
 
     // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
-        match self.direction {
+        let mut price = match self.direction {
             OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
             OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
-        }
+        };
+        price = Decimal::from_ratio(price * Uint128::from(1000u128), Uint128::from(1000u128));
+        return price;
     }
 
     pub fn set_status(&mut self, is_filled: bool) {
