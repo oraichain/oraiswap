@@ -9,7 +9,7 @@ use oraiswap::error::ContractError;
 
 use crate::order::{
     cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair, update_order,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
@@ -101,6 +101,10 @@ pub fn execute(
                 OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[1].clone(), assets[0].clone()]),
             }
         }
+        ExecuteMsg::UpdateOrder {
+            order_id,
+            assets,
+        } => update_order(deps, info, order_id, assets),
         ExecuteMsg::CancelOrder {
             order_id,
             asset_infos,
