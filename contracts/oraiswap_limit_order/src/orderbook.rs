@@ -5,7 +5,7 @@ use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
     error::ContractError,
-    limit_order::{OrderBookResponse, OrderDirection, OrderResponse},
+    limit_order::{OrderBookResponse, OrderDirection, OrderStatus, OrderResponse},
 };
 
 use cosmwasm_std::{
@@ -27,7 +27,7 @@ pub struct Order {
     pub ask_amount: Uint128,
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
-    pub is_filled: bool,
+    pub status: OrderStatus,
 }
 
 impl Order {
@@ -40,7 +40,7 @@ impl Order {
         ask_amount: Uint128,
     ) -> Self {
         let offer_amount = match direction {
-            OrderDirection::Buy => Uint128::from(ask_amount * Decimal::from_ratio(Uint128::from(1000u128), price * Uint128::from(1000u128))),
+            OrderDirection::Buy => Uint128::from(ask_amount * Decimal::from(Decimal::one()/price)),
             OrderDirection::Sell => ask_amount * price,
         };
 
@@ -53,7 +53,7 @@ impl Order {
             ask_amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
-            is_filled: false,
+            status: OrderStatus::Open,
         }
     }
 
@@ -66,10 +66,11 @@ impl Order {
     ) -> StdResult<u64> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
+        self.status = OrderStatus::PartialFilled;
 
         if self.filled_ask_amount >= self.ask_amount || self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
-            self.is_filled = true;
+            self.status = OrderStatus::Fulfilled;
             remove_order(storage, pair_key, self)
         } else {
             // update order
@@ -105,14 +106,6 @@ impl Order {
         };
         price = Decimal::from_ratio(price * Uint128::from(1000u128), Uint128::from(1000u128));
         return price;
-    }
-
-    pub fn set_status(&mut self, is_filled: bool) {
-        self.is_filled = is_filled;
-    }
-
-    pub fn get_status(&self) -> bool {
-        self.is_filled
     }
 
     pub fn to_response(
@@ -228,7 +221,6 @@ impl OrderBook {
     pub fn lowest_price(
         &self,
         storage: &dyn Storage,
-
         direction: OrderDirection,
     ) -> (Decimal, bool, u64) {
         self.best_price(storage, direction, OrderBy::Ascending)
@@ -362,7 +354,7 @@ impl OrderBook {
         sell_orders: &mut Vec<Order>,
     ) -> Result<Vec<CosmosMsg>, ContractError> {
         // check if the ask order has been fulfilled
-        if buy_order.get_status() {
+        if buy_order.status == OrderStatus::Fulfilled {
             return Err(ContractError::OrderFulfilled {
                 order_id: buy_order.order_id,
             });
@@ -387,7 +379,7 @@ impl OrderBook {
 
         for s_order in sell_orders {
             // check if the offer order has been fulfilled
-            if s_order.get_status() {
+            if s_order.status == OrderStatus::Fulfilled {
                 return Err(ContractError::OrderFulfilled {
                     order_id: s_order.order_id,
                 });

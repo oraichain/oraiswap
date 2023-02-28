@@ -14,7 +14,7 @@ use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
     LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrdersResponse,
+    OrderResponse, OrdersResponse, OrderStatus,
 };
 
 pub fn submit_order(
@@ -57,7 +57,7 @@ pub fn submit_order(
             ask_amount: assets[1].to_raw(deps.api)?.amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
-            is_filled: false,
+            status: OrderStatus::Open,
         },
         true,
     )?;
@@ -66,8 +66,8 @@ pub fn submit_order(
         ("action", "submit_order"),
         ("order_id", &order_id.to_string()),
         ("bidder_addr", sender.as_str()),
-        ("offer_asset", &assets[0].to_string()),
-        ("ask_asset", &assets[1].to_string()),
+        ("offer_asset", &format!("{} {}", &assets[0].amount, &assets[0].info)),
+        ("ask_asset", &format!("{} {}", &assets[1].amount, &assets[1].info)),
         ("total_orders", &total_orders.to_string()),
     ]))
 }
@@ -81,15 +81,21 @@ pub fn update_order(
     if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
         return Err(ContractError::AssetMustNotBeZero {})
     }
-
+    
     // check min base coin amount
     // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
-    if order.get_status() {
+    if order.status == OrderStatus::Fulfilled {
         return Err(ContractError::OrderFulfilled {
+            order_id: order.order_id,
+        });
+    }
+
+    if order.status == OrderStatus::Filling {
+        return Err(ContractError::OrderIsFilling {
             order_id: order.order_id,
         });
     }
@@ -130,7 +136,7 @@ pub fn update_order(
             ask_amount: ask_asset.to_raw(deps.api)?.amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
-            is_filled: false,
+            status: order.status,
         },
         false,
     )?;
@@ -139,8 +145,8 @@ pub fn update_order(
         ("action", "update_order"),
         ("order_id", &order_id.to_string()),
         ("bidder_addr", info.sender.as_str()),
-        ("offer_asset", &offer_asset.to_string()),
-        ("ask_asset", &ask_asset.to_string()),
+        ("offer_asset", &format!("{} {}", &offer_asset.amount, &offer_asset.info)),
+        ("ask_asset", &format!("{} {}", &ask_asset.amount, &ask_asset.info)),
         ("total_orders", &total_orders.to_string()),
     ]))
 }
@@ -153,6 +159,18 @@ pub fn cancel_order(
 ) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let order = read_order(deps.storage, &pair_key, order_id)?;
+
+    if order.status == OrderStatus::Fulfilled {
+        return Err(ContractError::OrderFulfilled {
+            order_id: order.order_id,
+        });
+    }
+
+    if order.status == OrderStatus::Filling {
+        return Err(ContractError::OrderIsFilling {
+            order_id: order.order_id,
+        });
+    }
 
     if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
@@ -272,10 +290,10 @@ pub fn excecute_pair(
 
     for buy_order in &mut match_buy_orders {
         // check if the buy order has been fulfilled
-        if buy_order.get_status() {
+        if buy_order.status == OrderStatus::Fulfilled {
             continue;
         }
-
+        buy_order.status = OrderStatus::Filling;
 
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
@@ -288,9 +306,10 @@ pub fn excecute_pair(
  
         for sell_order in &mut match_sell_orders {
             // check if the sell order has been fulfilled
-            if sell_order.get_status() {
+            if sell_order.status == OrderStatus::Fulfilled {
                 continue;
             }
+            sell_order.status = OrderStatus::Filling;
             let mut lef_sell_ask_amount = sell_order.ask_amount;
             let lef_sell_offer_amount = sell_order.offer_amount;
 
@@ -356,14 +375,14 @@ pub fn excecute_pair(
             sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount)?;
 
             if buy_offer_amount.is_zero() && sell_amount.is_zero() {
-                sell_order.set_status(true);
+                sell_order.status = OrderStatus::Fulfilled;
             }
             
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
             }
 
-            if sell_order.is_filled {
+            if sell_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
             }
 
@@ -383,7 +402,7 @@ pub fn excecute_pair(
                 buy_order.offer_amount - buy_order.filled_offer_amount - lef_buy_offer_amount,
             )?;
 
-            if buy_order.is_filled {
+            if buy_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
             }
 

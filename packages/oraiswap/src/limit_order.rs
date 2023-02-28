@@ -27,6 +27,28 @@ impl OrderDirection {
     }
 }
 
+#[cw_serde]
+#[derive(Copy)]
+pub enum OrderStatus {
+    Open,
+    Filling,
+    PartialFilled,
+    Fulfilled,
+    Cancel,
+}
+
+impl OrderStatus {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            OrderStatus::Open => &[0u8],
+            OrderStatus::Filling => &[1u8],
+            OrderStatus::PartialFilled => &[2u8],
+            OrderStatus::Fulfilled => &[3u8],
+            OrderStatus::Cancel => &[4u8],
+        }
+    }
+}
+
 impl Default for OrderDirection {
     fn default() -> Self {
         OrderDirection::Buy
