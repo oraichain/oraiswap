@@ -187,7 +187,10 @@ pub fn execute_create_pair(
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 
-    Ok(Response::new().add_attributes(vec![("action", "execute_update_orderbook")]))
+    Ok(Response::new().add_attributes(vec![
+        ("action", "execute_create_orderbook_pair"),
+        ("pair", &format!("{}/{}", quote_coin_info, base_coin_info)),
+    ]))
 }
 
 pub fn receive_cw20(
