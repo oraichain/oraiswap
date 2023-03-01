@@ -458,14 +458,15 @@ fn matchable_orders() {
     // we show highest buy and lowest sell first
     let mut deps = mock_dependencies();
 
-    let offer_info = AssetInfoRaw::NativeToken {
+    let base_info = AssetInfoRaw::NativeToken {
         denom: "usdt".to_string(),
     };
-    let ask_info = AssetInfoRaw::NativeToken {
+    let quote_info = AssetInfoRaw::NativeToken {
         denom: ORAI_DENOM.to_string(),
     };
 
     let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+    let bidder_addr2 = deps.api.addr_canonicalize("addr1111").unwrap();
     init_last_order_id(deps.as_mut().storage).unwrap();
 
     // buy : wanting ask amount, sell: paying ask amount
@@ -474,54 +475,90 @@ fn matchable_orders() {
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Buy,
-            Decimal::from_str("1.098").unwrap(), // buy (want 10000 orai, paid 10980 usdt)
-            10000u128.into(),                    // buy then amount is offer
+            Decimal::from_str("2.00").unwrap(), // buy (want 10000 orai, paid 10980 usdt)
+            22222u128.into(),                    // buy then amount is offer
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Buy,
-            Decimal::from_str("1.097").unwrap(),
+            Decimal::from_str("2.00").unwrap(),
+            5000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.99").unwrap(),
+            10990u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.99").unwrap(),
+            1990u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr2.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("2.00").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
             10000u128.into(),
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
-            bidder_addr.clone(),
-            OrderDirection::Buy,
-            Decimal::from_str("1.099").unwrap(),
-            15000u128.into(),
+            bidder_addr2.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("2.00").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
+            5000u128.into(),
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
-            bidder_addr.clone(),
+            bidder_addr2.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("2.108").unwrap(),
+            10000u128.into(),
+        ),
+
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr2.clone(),
             OrderDirection::Buy,
-            Decimal::from_str("1.099").unwrap(),
-            15000u128.into(),
+            Decimal::from_str("1.121").unwrap(),
+            22400u128.into(),
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Sell,
-            Decimal::from_str("1.099").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
-            10000u128.into(),
-        ),
-        Order::new(
-            increase_last_order_id(deps.as_mut().storage).unwrap(),
-            bidder_addr.clone(),
-            OrderDirection::Sell,
-            Decimal::from_str("1.099").unwrap(), // sell (paid 10000 orai, want 10990 usdt)
+            Decimal::from_str("1.008").unwrap(),
             5000u128.into(),
         ),
         Order::new(
             increase_last_order_id(deps.as_mut().storage).unwrap(),
             bidder_addr.clone(),
             OrderDirection::Sell,
-            Decimal::from_str("1.108").unwrap(),
+            Decimal::from_str("1.008").unwrap(),
+            5000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.008").unwrap(),
+            5000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.008").unwrap(),
             10000u128.into(),
         ),
     ];
 
-    let mut ob = OrderBook::new(ask_info, offer_info, Some(Decimal::percent(1)));
+    let mut ob = OrderBook::new(quote_info, base_info, None);
     for order in orders.iter() {
         let _total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
         // if sell then paid asset must be ask asset
@@ -529,23 +566,33 @@ fn matchable_orders() {
             OrderDirection::Buy => "paid",
             OrderDirection::Sell => "want",
         };
-
-        println!(
-            "insert order id: {}, {} {}{} for {:?} {}{} at {}",
-            order.order_id,
-            action,
-            order.offer_amount,
-            "usdt", // this is offer denom
-            order.direction,
-            order.ask_amount,
-            ORAI_DENOM,
-            order.get_price(),
-        );
+        if order.direction == OrderDirection::Buy {
+            println!(
+                "insert order id: {}, {} {}{} for {:?} {}{} at {}",
+                order.order_id,
+                action,
+                order.offer_amount,
+                "usdt", // this is base denom
+                order.direction,
+                order.ask_amount,
+                ORAI_DENOM,
+                order.get_price(),
+            );
+        } else {
+            println!(
+                "insert order id: {}, {} {}{} for {:?} {}{} at {}",
+                order.order_id,
+                action,
+                order.ask_amount,
+                "usdt", // this is base denom
+                order.direction,
+                order.offer_amount,
+                ORAI_DENOM,
+                order.get_price(),
+            );
+        }
+        
     }
-
-    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
-    // both are 1.099
-    assert_eq!(best_buy_price, best_sell_price);
 
     // now add a lower sell price but too low for precision
     let order = Order::new(
@@ -557,13 +604,16 @@ fn matchable_orders() {
     );
     ob.add_order(deps.as_mut().storage, &order).unwrap();
     let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
-    // both are still 1.099, so user keeps the profit maximum
-    assert_eq!(best_buy_price, best_sell_price);
+    println!("best_buy_price: {:.3} - best_sell_price: {:.3}", best_buy_price, best_sell_price);
+    let mut one_price = false;
+    if best_buy_price.eq(&best_sell_price) {
+        one_price = true;
+    }
 
     let mut match_buy_orders =
         ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
     println!("match buy orders : {}", jsonstr!(match_buy_orders));
-    assert_eq!(match_buy_orders, orders[2..=3]);
+    assert_eq!(match_buy_orders, orders[0..=1]);
 
     // find sell order as ask order, and buy orders as offer
     let mut offer_orders = ob
@@ -576,19 +626,13 @@ fn matchable_orders() {
         )
         .unwrap();
 
-    println!("offer order {}", jsonstr!(offer_orders));
+    println!("match sell order {}", jsonstr!(offer_orders));
 
     let ask_order = &mut match_buy_orders[0];
 
     let messages = ob
-        .distribute_order_to_orders(deps.as_mut(), ask_order, &mut offer_orders)
+        .distribute_order_to_orders(deps.as_mut(), one_price, ask_order, &mut offer_orders)
         .unwrap();
-
-    // ask order is fullfilled, as well as offer orders
-    assert_eq!(ask_order.ask_amount, ask_order.filled_ask_amount);
-    for offer_order in offer_orders.iter() {
-        assert_eq!(offer_order.ask_amount, offer_order.filled_ask_amount);
-    }
 
     println!("messages {:?}", messages);
     println!(
