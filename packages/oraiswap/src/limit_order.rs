@@ -27,6 +27,28 @@ impl OrderDirection {
     }
 }
 
+#[cw_serde]
+#[derive(Copy)]
+pub enum OrderStatus {
+    Open,
+    Filling,
+    PartialFilled,
+    Fulfilled,
+    Cancel,
+}
+
+impl OrderStatus {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            OrderStatus::Open => &[0u8],
+            OrderStatus::Filling => &[1u8],
+            OrderStatus::PartialFilled => &[2u8],
+            OrderStatus::Fulfilled => &[3u8],
+            OrderStatus::Cancel => &[4u8],
+        }
+    }
+}
+
 impl Default for OrderDirection {
     fn default() -> Self {
         OrderDirection::Buy
@@ -47,11 +69,11 @@ pub enum ExecuteMsg {
         admin: Addr,
     },
 
-    UpdateOrderBook {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+    CreateOrderBookPair {
+        base_coin_info: AssetInfo,
+        quote_coin_info: AssetInfo,
         precision: Option<Decimal>,
-        min_offer_amount: Uint128,
+        min_base_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -59,13 +81,17 @@ pub enum ExecuteMsg {
     ///////////////////////
     SubmitOrder {
         direction: OrderDirection, // default is buy, with sell then it is reversed
-        offer_asset: Asset,
-        ask_asset: Asset,
+        assets: [Asset; 2],
     },
+
+    UpdateOrder {
+        order_id: u64,
+        assets: [Asset; 2],
+    },
+
     CancelOrder {
         order_id: u64,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
 
     /// Arbitrager execute order to get profit
@@ -74,13 +100,23 @@ pub enum ExecuteMsg {
         order_id: u64,
         offer_info: AssetInfo,
     },
+
+    /// Arbitrager execute order book pair
+    ExecuteOrderBookPair {
+        asset_infos: [AssetInfo; 2],
+    },
+
+    /// Arbitrager remove order book
+    RemoveOrderBook {
+        asset_infos: [AssetInfo; 2],
+    },
 }
 
 #[cw_serde]
 pub enum Cw20HookMsg {
     SubmitOrder {
-        ask_asset: Asset,
         direction: OrderDirection,
+        assets: [Asset; 2],
     },
 
     /// Arbitrager execute order to get profit
@@ -105,8 +141,7 @@ pub enum QueryMsg {
     ContractInfo {},
     #[returns(OrderBookResponse)]
     OrderBook {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
     #[returns(OrderBooksResponse)]
     OrderBooks {
@@ -117,13 +152,11 @@ pub enum QueryMsg {
     #[returns(OrderResponse)]
     Order {
         order_id: u64,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
     },
     #[returns(OrdersResponse)]
     Orders {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         filter: OrderFilter,
         direction: Option<OrderDirection>,
         start_after: Option<u64>,
@@ -133,14 +166,12 @@ pub enum QueryMsg {
     #[returns(TickResponse)]
     Tick {
         price: Decimal,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
     },
     #[returns(TicksResponse)]
     Ticks {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
         start_after: Option<Decimal>,
         limit: Option<u32>,
@@ -172,10 +203,10 @@ pub struct OrderResponse {
 
 #[cw_serde]
 pub struct OrderBookResponse {
-    pub offer_info: AssetInfo,
-    pub ask_info: AssetInfo,
-    pub min_offer_amount: Uint128,
+    pub base_coin_info: AssetInfo,
+    pub quote_coin_info: AssetInfo,
     pub precision: Option<Decimal>,
+    pub min_base_coin_amount: Uint128,
 }
 
 #[cw_serde]

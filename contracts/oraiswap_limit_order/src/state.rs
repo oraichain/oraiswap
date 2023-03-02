@@ -61,6 +61,13 @@ pub fn read_orderbooks(
         .collect()
 }
 
+pub fn remove_orderbook<'a>(
+    storage: &'a mut dyn Storage,
+    pair_key: &[u8],
+) {
+    Bucket::<'a, OrderBook>::new(storage, PREFIX_ORDER_BOOK).remove(pair_key)
+}
+
 pub fn store_order(
     storage: &mut dyn Storage,
     pair_key: &[u8],

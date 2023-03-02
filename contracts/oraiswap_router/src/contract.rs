@@ -2,8 +2,8 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, QueryRequest, Response,
-    StdError, StdResult, Uint128, WasmQuery,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 use oraiswap::error::ContractError;
 
@@ -185,16 +185,15 @@ fn simulate_swap_operations(
                 offer_amount = offer_amount
                     .checked_sub(return_asset.compute_tax(&oracle_contract, &deps.querier)?)?;
 
-                let mut res: SimulationResponse =
-                    deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                        contract_addr: pair_info.contract_addr.to_string(),
-                        msg: to_binary(&PairQueryMsg::Simulation {
-                            offer_asset: Asset {
-                                info: offer_asset_info,
-                                amount: offer_amount,
-                            },
-                        })?,
-                    }))?;
+                let mut res: SimulationResponse = deps.querier.query_wasm_smart(
+                    pair_info.contract_addr,
+                    &PairQueryMsg::Simulation {
+                        offer_asset: Asset {
+                            info: offer_asset_info,
+                            amount: offer_amount,
+                        },
+                    },
+                )?;
 
                 let return_asset = Asset {
                     info: ask_asset_info,
