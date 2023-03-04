@@ -189,6 +189,7 @@ impl MockApp {
                     self.factory_addr.clone(),
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
+                        pair_admin: Some("admin".to_string()),
                     },
                     &[],
                 )
@@ -198,6 +199,29 @@ impl MockApp {
                 for attr in event.attributes {
                     if attr.key.eq("pair_contract_address") {
                         return Some(Addr::unchecked(attr.value));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn add_pair(&mut self, pair_info: PairInfo) -> Option<String> {
+        if !self.factory_addr.as_str().is_empty() {
+            let res = self
+                .execute(
+                    Addr::unchecked(APP_OWNER),
+                    self.factory_addr.clone(),
+                    &crate::factory::ExecuteMsg::AddPair { pair_info },
+                    &[],
+                )
+                .unwrap();
+
+            for event in res.events {
+                for attr in event.attributes {
+                    if attr.value.eq("add_pair") {
+                        return Some(attr.value);
                     }
                 }
             }

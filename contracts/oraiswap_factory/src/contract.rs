@@ -56,7 +56,11 @@ pub fn execute(
             token_code_id,
             pair_code_id,
         } => execute_update_config(deps, env, info, owner, token_code_id, pair_code_id),
-        ExecuteMsg::CreatePair { asset_infos } => execute_create_pair(deps, env, info, asset_infos),
+        ExecuteMsg::CreatePair {
+            asset_infos,
+            pair_admin,
+        } => execute_create_pair(deps, env, info, asset_infos, pair_admin),
+        ExecuteMsg::AddPair { pair_info } => execute_add_pair_manually(deps, env, info, pair_info),
     }
 }
 
@@ -99,6 +103,7 @@ pub fn execute_create_pair(
     env: Env,
     _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
+    pair_admin: Option<String>,
 ) -> Result<Response, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
@@ -130,7 +135,7 @@ pub fn execute_create_pair(
             WasmMsg::Instantiate {
                 code_id: config.pair_code_id,
                 funds: vec![],
-                admin: Some(env.contract.address.to_string()),
+                admin: Some(pair_admin.unwrap_or(env.contract.address.to_string())),
                 label: "pair".to_string(),
                 msg: to_binary(&PairInstantiateMsg {
                     oracle_addr: deps.api.addr_humanize(&config.oracle_addr)?,
@@ -145,6 +150,56 @@ pub fn execute_create_pair(
             ("action", "create_pair"),
             ("pair", &format!("{}-{}", asset_infos[0], asset_infos[1])),
         ]))
+}
+
+// Anyone can execute it to create swap pair
+pub fn execute_add_pair_manually(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    pair_info: PairInfo,
+) -> Result<Response, ContractError> {
+    let config: Config = CONFIG.load(deps.storage)?;
+    // permission check
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let raw_infos = [
+        pair_info.asset_infos[0].to_raw(deps.api)?,
+        pair_info.asset_infos[1].to_raw(deps.api)?,
+    ];
+
+    let pair_key = pair_key(&raw_infos);
+
+    // can not update pair once updated
+    if let Ok(Some(_)) = PAIRS.may_load(deps.storage, &pair_key) {
+        return Err(ContractError::PairExisted {});
+    }
+
+    PAIRS.save(
+        deps.storage,
+        &pair_key,
+        &PairInfoRaw {
+            oracle_addr: deps.api.addr_canonicalize(pair_info.oracle_addr.as_str())?,
+            liquidity_token: deps
+                .api
+                .addr_canonicalize(pair_info.liquidity_token.as_str())?,
+            contract_addr: deps
+                .api
+                .addr_canonicalize(pair_info.contract_addr.as_str())?,
+            asset_infos: raw_infos,
+            commission_rate: pair_info.commission_rate.clone(),
+        },
+    )?;
+
+    Ok(Response::new().add_attributes(vec![
+        ("action", "add_pair"),
+        (
+            "pair",
+            &format!("{}-{}", pair_info.asset_infos[0], pair_info.asset_infos[1]),
+        ),
+    ]))
 }
 
 /// This just stores the result for future query
