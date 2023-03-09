@@ -44,7 +44,6 @@ impl Order {
             OrderDirection::Sell => ask_amount * price,
         };
 
-        println!("offer_amount: {}", offer_amount);
         Order {
             direction,
             order_id,
@@ -63,7 +62,7 @@ impl Order {
         pair_key: &[u8],
         ask_amount: Uint128,
         offer_amount: Uint128,
-    ) -> Result<Response, u64> { //Result<Response, u64> // StdResult<u64>
+    ) -> Result<Response, u64> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
