@@ -10,7 +10,7 @@ use oraiswap::{
 
 use cosmwasm_std::{
     Api, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Order as OrderBy, StdError, StdResult,
-    Storage, Uint128,
+    Storage, Uint128, Response,
 };
 
 use crate::state::{
@@ -63,18 +63,25 @@ impl Order {
         pair_key: &[u8],
         ask_amount: Uint128,
         offer_amount: Uint128,
-    ) -> StdResult<u64> {
+    ) -> Result<Response, u64> { //Result<Response, u64> // StdResult<u64>
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
-        self.status = OrderStatus::PartialFilled;
 
-        if self.filled_ask_amount >= self.ask_amount || self.filled_offer_amount == self.offer_amount {
+        if self.filled_ask_amount == self.ask_amount || self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
             self.status = OrderStatus::Fulfilled;
-            remove_order(storage, pair_key, self)
+            remove_order(storage, pair_key, self).unwrap();
+            Ok(Response::new().add_attributes(vec![
+                ("action", "order_is_matched"),
+                ("order_id", &self.order_id.to_string()),
+            ]))
         } else {
             // update order
-            store_order(storage, pair_key, self, false)
+            store_order(storage, pair_key, self, false).unwrap();
+            Ok(Response::new().add_attributes(vec![
+                ("action", "order_is_updated"),
+                ("order_id", &self.order_id.to_string()),
+            ]))
         }
     }
 
@@ -415,17 +422,8 @@ impl OrderBook {
                 amount: sell_ask_amount,
             };
             
-            let (mut buy_offer_amount, mut sell_amount) = s_order.matchable_amount(sell_ask_asset.amount)?;
+            let (_, mut sell_amount) = s_order.matchable_amount(sell_ask_asset.amount)?;
 
-            // check lef offer amount of ask order
-            // if lef offer amount less than offer_amount, choose lef_offer_ask_order_amount
-            buy_offer_amount = Uint128::min(
-                lef_buy_offer_amount,
-                match price_direction {
-                    OrderDirection::Buy => sell_ask_asset.amount * match_price,
-                    OrderDirection::Sell => buy_offer_amount,
-                },
-            );
             sell_amount = match price_direction {
                 OrderDirection::Buy => sell_ask_asset.amount,
                 OrderDirection::Sell => sell_amount,
@@ -438,13 +436,13 @@ impl OrderBook {
             sell_ask_asset.amount = sell_amount;
             lef_buy_offer_amount -= sell_amount;
 
-            buy_offer_amount = match_price * sell_amount;
+            let buy_offer_amount = match_price * sell_amount;
 
             executor_receive_amount += buy_offer_amount;
             let bidder_addr = deps.api.addr_humanize(&s_order.bidder_addr)?;
 
             // fill this order
-            s_order.fill_order(deps.storage, pair_key, sell_amount, buy_offer_amount)?;
+            s_order.fill_order(deps.storage, pair_key, sell_amount, buy_offer_amount).unwrap();
 
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
@@ -464,7 +462,7 @@ impl OrderBook {
                 pair_key,
                 executor_receive_amount,
                 buy_order.offer_amount - lef_buy_offer_amount,
-            )?;
+            ).unwrap();
 
             let executor_receive = Asset {
                 info: base_coin_info,
