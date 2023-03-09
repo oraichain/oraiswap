@@ -7,9 +7,10 @@ use crate::state::{
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Decimal,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
 };
 
+use oraiswap::math::Converter128;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
@@ -282,9 +283,10 @@ pub fn excecute_pair(
     if best_buy_price.eq(&best_sell_price) {
         match_one_price = true;
     }
-    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
 
+    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
     let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
+
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut total_orders =  0;
 
@@ -294,7 +296,6 @@ pub fn excecute_pair(
             continue;
         }
         buy_order.status = OrderStatus::Filling;
-
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
         let mut price_direction: OrderDirection = OrderDirection::Buy;
@@ -310,8 +311,8 @@ pub fn excecute_pair(
                 continue;
             }
             sell_order.status = OrderStatus::Filling;
-            let mut lef_sell_ask_amount = sell_order.ask_amount;
-            let lef_sell_offer_amount = sell_order.offer_amount;
+            let mut lef_sell_ask_amount = sell_order.ask_amount - sell_order.filled_ask_amount;
+            let lef_sell_offer_amount = sell_order.offer_amount - sell_order.filled_offer_amount;
 
             if match_one_price == false {
                 if sell_order.order_id < buy_order.order_id {
@@ -321,7 +322,7 @@ pub fn excecute_pair(
                 } else {
                     match_price = buy_order.get_price();
                     price_direction = OrderDirection::Buy;
-                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * Decimal::from(Decimal::one()/match_price));
+                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount).checked_div_decimal(match_price).unwrap();
                 }
             }
 
@@ -329,11 +330,15 @@ pub fn excecute_pair(
             // remember that ask of buy and ask of sell are opposite sides
             // sell_ask_amount is equal match ask amount, to make sure always matched
             let sell_ask_amount = Uint128::min(
-                lef_buy_ask_amount,
-                lef_sell_ask_amount - sell_order.filled_ask_amount,
+                lef_buy_offer_amount,
+                lef_sell_ask_amount,
             );
-            
-            lef_buy_ask_amount -= sell_ask_amount;
+
+            if sell_ask_amount.is_zero() {
+                sell_order.status = OrderStatus::Fulfilled;
+                _ = remove_order(deps.storage, &pair_key, sell_order);
+                continue;
+            }
 
             let mut sell_ask_asset = Asset {
                 info: asset_infos[0].clone(),
