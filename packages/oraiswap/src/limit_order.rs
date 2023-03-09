@@ -32,7 +32,6 @@ impl OrderDirection {
 pub enum OrderStatus {
     Open,
     Filling,
-    PartialFilled,
     Fulfilled,
     Cancel,
 }
@@ -42,9 +41,8 @@ impl OrderStatus {
         match self {
             OrderStatus::Open => &[0u8],
             OrderStatus::Filling => &[1u8],
-            OrderStatus::PartialFilled => &[2u8],
-            OrderStatus::Fulfilled => &[3u8],
-            OrderStatus::Cancel => &[4u8],
+            OrderStatus::Fulfilled => &[2u8],
+            OrderStatus::Cancel => &[3u8],
         }
     }
 }
