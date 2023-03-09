@@ -291,10 +291,11 @@ pub fn excecute_pair(
     let mut total_orders =  0;
 
     for buy_order in &mut match_buy_orders {
-        // check if the buy order has been fulfilled
+        // check status of buy_order
         if buy_order.status == OrderStatus::Fulfilled {
             continue;
         }
+
         buy_order.status = OrderStatus::Filling;
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
@@ -306,10 +307,11 @@ pub fn excecute_pair(
         let mut lef_buy_offer_amount = buy_order.offer_amount - buy_order.filled_offer_amount;
  
         for sell_order in &mut match_sell_orders {
-            // check if the sell order has been fulfilled
+            // check status of sell_order
             if sell_order.status == OrderStatus::Fulfilled {
                 continue;
             }
+
             sell_order.status = OrderStatus::Filling;
             let mut lef_sell_ask_amount = sell_order.ask_amount - sell_order.filled_ask_amount;
             let lef_sell_offer_amount = sell_order.offer_amount - sell_order.filled_offer_amount;
@@ -336,7 +338,7 @@ pub fn excecute_pair(
 
             if sell_ask_amount.is_zero() {
                 sell_order.status = OrderStatus::Fulfilled;
-                _ = remove_order(deps.storage, &pair_key, sell_order);
+                remove_order(deps.storage, &pair_key, sell_order).unwrap();
                 continue;
             }
 
@@ -345,17 +347,7 @@ pub fn excecute_pair(
                 amount: sell_ask_amount,
             };
             
-            let (mut buy_offer_amount, mut sell_amount) = sell_order.matchable_amount(sell_ask_asset.amount)?;
-
-            // check lef offer amount of ask order
-            // if lef offer amount less than offer_amount, choose lef_offer_ask_order_amount
-            buy_offer_amount = Uint128::min(
-                lef_buy_offer_amount,
-                match price_direction {
-                    OrderDirection::Buy => sell_ask_asset.amount * match_price,
-                    OrderDirection::Sell => buy_offer_amount,
-                },
-            );
+            let (_, mut sell_amount) = sell_order.matchable_amount(sell_ask_asset.amount)?;
 
             sell_amount = match price_direction {
                 OrderDirection::Buy => sell_ask_asset.amount,
@@ -368,16 +360,16 @@ pub fn excecute_pair(
             );
 
             sell_ask_asset.amount = sell_amount;
-            lef_buy_offer_amount -= sell_amount;
+            lef_buy_offer_amount -= sell_ask_asset.amount;
 
-            buy_offer_amount = match_price * sell_amount;
+            let buy_offer_amount = match_price * sell_ask_asset.amount;
 
             executor_receive_amount += buy_offer_amount;
 
             let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
             // fill this order
-            sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount)?;
+            sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount).unwrap();
 
             if buy_offer_amount.is_zero() && sell_amount.is_zero() {
                 sell_order.status = OrderStatus::Fulfilled;
@@ -405,7 +397,7 @@ pub fn excecute_pair(
                 &pair_key,
                 executor_receive_amount,
                 buy_order.offer_amount - buy_order.filled_offer_amount - lef_buy_offer_amount,
-            )?;
+            ).unwrap();
 
             if buy_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
