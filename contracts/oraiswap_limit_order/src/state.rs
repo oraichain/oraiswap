@@ -1,4 +1,4 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Order as OrderBy, StdResult, Storage, Response};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
 use serde::{de::DeserializeOwned, Serialize};
@@ -113,9 +113,16 @@ pub fn store_order(
     Ok(total_tick_orders)
 }
 
-pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -> StdResult<u64> {
+pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -> Result<Response, u64> {
     let order_id_key = &order.order_id.to_be_bytes();
     let price_key = order.get_price().atomics().to_be_bytes();
+
+    let mut action: String = "".to_string();
+    if order.status == oraiswap::limit_order::OrderStatus::Fulfilled {
+        action = "order_is_matched".to_string();
+    } else if order.status == oraiswap::limit_order::OrderStatus::Cancel {
+        action = "order_is_cancel".to_string();
+    }
 
     Bucket::<Order>::multilevel(storage, &[PREFIX_ORDER, pair_key]).remove(order_id_key);
 
@@ -130,7 +137,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
         total_tick_orders -= 1;
         if total_tick_orders > 0 {
             // save total orders for a tick
-            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders)?;
+            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders).unwrap();
         } else {
             Bucket::<u64>::multilevel(storage, tick_namespaces).remove(&price_key);
         }
@@ -150,8 +157,16 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     )
     .remove(order_id_key);
 
-    // return total orders belong to the tick
-    Ok(total_tick_orders)
+    // Add new attribute
+    Ok(Response::new().add_attributes(vec![
+        ("action", &action),
+        ("order_id", &order.order_id.to_string()),
+        ("direction", &format!("{:?}", order.direction)),
+        ("offer_amount", &order.offer_amount.to_string()),
+        ("filled_offer_amount", &order.filled_offer_amount.to_string()),
+        ("ask_amount", &order.ask_amount.to_string()),
+        ("filled_ask_amount", &order.filled_ask_amount.to_string()),
+    ]))
 }
 
 pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdResult<Order> {

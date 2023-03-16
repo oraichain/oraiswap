@@ -47,7 +47,7 @@ pub fn submit_order(
 
     let order_id = increase_last_order_id(deps.storage)?;
 
-    let total_orders = store_order(
+    store_order(
         deps.storage,
         &pair_key,
         &Order {
@@ -66,10 +66,10 @@ pub fn submit_order(
     Ok(Response::new().add_attributes(vec![
         ("action", "submit_order"),
         ("order_id", &order_id.to_string()),
+        ("direction", &format!("{:?}", direction)),
         ("bidder_addr", sender.as_str()),
         ("offer_asset", &format!("{} {}", &assets[0].amount, &assets[0].info)),
         ("ask_asset", &format!("{} {}", &assets[1].amount, &assets[1].info)),
-        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -126,7 +126,7 @@ pub fn update_order(
         });
     }
 
-    let total_orders = store_order(
+    store_order(
         deps.storage,
         &pair_key,
         &Order {
@@ -145,10 +145,10 @@ pub fn update_order(
     Ok(Response::new().add_attributes(vec![
         ("action", "update_order"),
         ("order_id", &order_id.to_string()),
+        ("direction", &format!("{:?}", order.direction)),
         ("bidder_addr", info.sender.as_str()),
         ("offer_asset", &format!("{} {}", &offer_asset.amount, &offer_asset.info)),
         ("ask_asset", &format!("{} {}", &ask_asset.amount, &ask_asset.info)),
-        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -159,7 +159,7 @@ pub fn cancel_order(
     asset_infos: [AssetInfo; 2],
 ) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
-    let order = read_order(deps.storage, &pair_key, order_id)?;
+    let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.status == OrderStatus::Fulfilled {
         return Err(ContractError::OrderFulfilled {
@@ -196,14 +196,13 @@ pub fn cancel_order(
     } else {
         vec![]
     };
-
-    let total_orders = remove_order(deps.storage, &pair_key, &order)?;
+    order.status = OrderStatus::Cancel;
+    remove_order(deps.storage, &pair_key, &order).unwrap();
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "cancel_order"),
         ("order_id", &order_id.to_string()),
         ("bidder_refund", &bidder_refund.to_string()),
-        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -230,13 +229,14 @@ pub fn execute_order(
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
     // When match amount equals ask amount, close order
-    let total_orders = if match_ask_amount == ask_asset.amount {
-        remove_order(deps.storage, &pair_key, &order)?
+    if match_ask_amount == ask_asset.amount {
+        order.status = OrderStatus::Fulfilled;
+        remove_order(deps.storage, &pair_key, &order).unwrap();
     } else {
         order.filled_ask_amount += ask_asset.amount;
         order.filled_offer_amount += executor_receive.amount;
         // update order
-        store_order(deps.storage, &pair_key, &order, false)?
+        store_order(deps.storage, &pair_key, &order, false)?;
     };
 
     let mut messages: Vec<CosmosMsg> = vec![];
@@ -258,7 +258,6 @@ pub fn execute_order(
         ("order_id", &order_id.to_string()),
         ("executor_receive", &executor_receive.to_string()),
         ("bidder_receive", &ask_asset.to_string()),
-        ("total_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -419,7 +418,8 @@ pub fn excecute_pair(
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "execute_all_orders"),
-        ("total_orders", &total_orders.to_string()),
+        ("pair", &format!("{}/{}", &asset_infos[0], &asset_infos[1])),
+        ("total_matched_orders", &total_orders.to_string()),
     ]))
 }
 
@@ -438,11 +438,11 @@ pub fn remove_pair(
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
 
-    let all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
+    let mut all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
     
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut total_orders =  0;
-    for order in all_orders.iter() {
+    for order in &mut all_orders {
         // Compute refund asset
         let left_offer_amount = match order.direction {
             OrderDirection::Buy => order.offer_amount.checked_sub(order.filled_offer_amount)?,
@@ -461,15 +461,17 @@ pub fn remove_pair(
         if left_offer_amount > Uint128::zero() {
             messages.push(bidder_refund.into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?);
         }
-
-        total_orders += remove_order(deps.storage, &pair_key, &order)?;
+        total_orders += 1;
+        order.status = OrderStatus::Cancel;
+        remove_order(deps.storage, &pair_key, &order).unwrap();
     }
 
     remove_orderbook(deps.storage, &pair_key);
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "remove_orderbook"),
-        ("total_orders", &total_orders.to_string()),
+        ("pair", &format!("{}/{}", &asset_infos[0], &asset_infos[1])),
+        ("total_removed_orders", &total_orders.to_string()),
     ]))
 }
 

@@ -69,11 +69,7 @@ impl Order {
         if self.filled_ask_amount == self.ask_amount || self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
             self.status = OrderStatus::Fulfilled;
-            remove_order(storage, pair_key, self).unwrap();
-            Ok(Response::new().add_attributes(vec![
-                ("action", "order_is_matched"),
-                ("order_id", &self.order_id.to_string()),
-            ]))
+            remove_order(storage, pair_key, self)
         } else {
             // update order
             store_order(storage, pair_key, self, false).unwrap();
