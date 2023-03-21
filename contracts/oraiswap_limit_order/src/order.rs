@@ -87,7 +87,7 @@ pub fn update_order(
     // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
-    let order = read_order(deps.storage, &pair_key, order_id)?;
+    let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.status == OrderStatus::Fulfilled {
         return Err(ContractError::OrderFulfilled {
@@ -101,15 +101,22 @@ pub fn update_order(
         });
     }
 
+    // check bidder address
+    if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let offer_asset = match order.direction {
         OrderDirection::Buy => &assets[0],
         OrderDirection::Sell => &assets[1],
     };
+    order.offer_amount = offer_asset.amount;
 
     let ask_asset = match order.direction {
         OrderDirection::Buy => &assets[1],
         OrderDirection::Sell => &assets[0],
     };
+    order.ask_amount = ask_asset.amount;
 
     // if paid asset is cw20, we check it in Cw20HookMessage
     if !offer_asset.is_native_token() {
@@ -126,21 +133,7 @@ pub fn update_order(
         });
     }
 
-    store_order(
-        deps.storage,
-        &pair_key,
-        &Order {
-            order_id,
-            direction: order.direction,
-            bidder_addr: deps.api.addr_canonicalize(info.sender.as_str())?,
-            offer_amount: offer_asset.to_raw(deps.api)?.amount,
-            ask_amount: ask_asset.to_raw(deps.api)?.amount,
-            filled_offer_amount: Uint128::zero(),
-            filled_ask_amount: Uint128::zero(),
-            status: order.status,
-        },
-        false,
-    )?;
+    store_order(deps.storage, &pair_key, &order, false)?;
 
     Ok(Response::new().add_attributes(vec![
         ("action", "update_order"),
@@ -296,14 +289,16 @@ pub fn excecute_pair(
         }
 
         buy_order.status = OrderStatus::Filling;
+        store_order(deps.storage, &pair_key, &buy_order, false)?;
+
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
         let mut price_direction: OrderDirection = OrderDirection::Buy;
 
         let mut executor_receive_amount = Uint128::zero();
 
-        let mut lef_buy_ask_amount = buy_order.ask_amount - buy_order.filled_ask_amount;
-        let mut lef_buy_offer_amount = buy_order.offer_amount - buy_order.filled_offer_amount;
+        let mut lef_buy_ask_amount = buy_order.ask_amount.checked_sub(buy_order.filled_ask_amount)?;
+        let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
  
         for sell_order in &mut match_sell_orders {
             // check status of sell_order
@@ -312,8 +307,10 @@ pub fn excecute_pair(
             }
 
             sell_order.status = OrderStatus::Filling;
-            let mut lef_sell_ask_amount = sell_order.ask_amount - sell_order.filled_ask_amount;
-            let lef_sell_offer_amount = sell_order.offer_amount - sell_order.filled_offer_amount;
+            store_order(deps.storage, &pair_key, &sell_order, false)?;
+
+            let mut lef_sell_ask_amount = sell_order.ask_amount.checked_sub(sell_order.filled_ask_amount)?;
+            let lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
 
             if match_one_price == false {
                 if sell_order.order_id < buy_order.order_id {
@@ -335,7 +332,35 @@ pub fn excecute_pair(
                 lef_sell_ask_amount,
             );
 
+            if lef_buy_ask_amount.is_zero() {
+                let buyer_return = Asset {
+                    info: asset_infos[0].clone(),
+                    amount: lef_buy_offer_amount,
+                };
+    
+                // dont use oracle for limit order
+                messages.push(buyer_return.into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api.addr_humanize(&buy_order.bidder_addr)?,
+                )?);
+                buy_order.status = OrderStatus::Fulfilled;
+                remove_order(deps.storage, &pair_key, buy_order).unwrap();
+                continue;
+            }
+
             if sell_ask_amount.is_zero() {
+                let seller_return = Asset {
+                    info: asset_infos[1].clone(),
+                    amount: lef_sell_offer_amount,
+                };
+    
+                // dont use oracle for limit order
+                messages.push(seller_return.into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api.addr_humanize(&sell_order.bidder_addr)?,
+                )?);
                 sell_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, sell_order).unwrap();
                 continue;
@@ -359,8 +384,7 @@ pub fn excecute_pair(
             );
 
             sell_ask_asset.amount = sell_amount;
-            lef_buy_offer_amount -= sell_ask_asset.amount;
-
+            lef_buy_offer_amount = lef_buy_offer_amount.checked_sub(sell_ask_asset.amount)?;
             let buy_offer_amount = match_price * sell_ask_asset.amount;
 
             executor_receive_amount += buy_offer_amount;
@@ -370,7 +394,7 @@ pub fn excecute_pair(
             // fill this order
             sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount).unwrap();
 
-            if buy_offer_amount.is_zero() && sell_amount.is_zero() {
+            if buy_offer_amount.is_zero() || sell_amount.is_zero() {
                 sell_order.status = OrderStatus::Fulfilled;
             }
             
@@ -395,7 +419,7 @@ pub fn excecute_pair(
                 deps.storage,
                 &pair_key,
                 executor_receive_amount,
-                buy_order.offer_amount - buy_order.filled_offer_amount - lef_buy_offer_amount,
+                buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.checked_sub(lef_buy_offer_amount)?,
             ).unwrap();
 
             if buy_order.status == OrderStatus::Fulfilled {
