@@ -4,12 +4,11 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
-    error::ContractError,
     limit_order::{OrderBookResponse, OrderDirection, OrderStatus, OrderResponse},
 };
 
 use cosmwasm_std::{
-    Api, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Order as OrderBy, StdError, StdResult,
+    Api, CanonicalAddr, Decimal, Order as OrderBy, StdError, StdResult,
     Storage, Uint128, Response,
 };
 
@@ -344,132 +343,5 @@ impl OrderBook {
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
         .unwrap_or_default() // default is empty list
-    }
-
-    /// distribute the given order to the orders, must call from matching logic
-    /// base on the ask amount of order, we will fillup all offer orders
-    pub fn distribute_order_to_orders(
-        &self,
-        deps: DepsMut,
-        one_price: bool,
-        buy_order: &mut Order,
-        sell_orders: &mut Vec<Order>,
-    ) -> Result<Vec<CosmosMsg>, ContractError> {
-        // check if the ask order has been fulfilled
-        if buy_order.status == OrderStatus::Fulfilled {
-            return Err(ContractError::OrderFulfilled {
-                order_id: buy_order.order_id,
-            });
-        }
-
-        let mut match_price: Decimal = buy_order.get_price();
-        let mut price_direction: OrderDirection = OrderDirection::Buy;
-
-        let pair_key = &self.get_pair_key();
-        // this will try to fill all orders
-        // for loop orders, to create a vector of (offer_amount and match_ask_amount), then execute the order list
-        let sender = deps.api.addr_humanize(&buy_order.bidder_addr)?;
-
-        let quote_coin_info = self.quote_coin_info.to_normal(deps.api)?;
-        let base_coin_info = self.base_coin_info.to_normal(deps.api)?;
-
-        let mut messages = vec![];
-        let mut executor_receive_amount = Uint128::zero();
-
-        let mut lef_buy_ask_amount = buy_order.ask_amount;
-        let mut lef_buy_offer_amount = buy_order.offer_amount;
-
-        for s_order in sell_orders {
-            // check if the offer order has been fulfilled
-            if s_order.status == OrderStatus::Fulfilled {
-                return Err(ContractError::OrderFulfilled {
-                    order_id: s_order.order_id,
-                });
-            }
-            let mut lef_sell_ask_amount = s_order.ask_amount;
-            let lef_sell_offer_amount = s_order.offer_amount;
-
-            // choose match price, we give priority to the order that comes first 
-            if one_price == false {
-                if s_order.order_id < buy_order.order_id {
-                    match_price = s_order.get_price();
-                    price_direction = OrderDirection::Sell;
-                    lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * match_price);
-                } else {
-                    match_price = buy_order.get_price();
-                    price_direction = OrderDirection::Buy;
-                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * Decimal::from(Decimal::one()/match_price));
-                }
-            }
-
-            // offer amount is already paid, we need ask amount to be received
-            // remember that ask of buy and ask of sell are opposite sides
-            // sell_ask_amount is equal match ask amount, to make sure always matched
-            let sell_ask_amount = Uint128::min(
-                lef_buy_ask_amount,
-                lef_sell_ask_amount - s_order.filled_ask_amount,
-            );
-            
-            lef_buy_ask_amount -= sell_ask_amount;
-
-            let mut sell_ask_asset = Asset {
-                info: quote_coin_info.clone(),
-                amount: sell_ask_amount,
-            };
-            
-            let (_, mut sell_amount) = s_order.matchable_amount(sell_ask_asset.amount)?;
-
-            sell_amount = match price_direction {
-                OrderDirection::Buy => sell_ask_asset.amount,
-                OrderDirection::Sell => sell_amount,
-            };
-
-            sell_amount = Uint128::min(
-                lef_buy_offer_amount,
-                sell_amount,
-            );
-            sell_ask_asset.amount = sell_amount;
-            lef_buy_offer_amount -= sell_amount;
-
-            let buy_offer_amount = match_price * sell_amount;
-
-            executor_receive_amount += buy_offer_amount;
-            let bidder_addr = deps.api.addr_humanize(&s_order.bidder_addr)?;
-
-            // fill this order
-            s_order.fill_order(deps.storage, pair_key, sell_amount, buy_offer_amount).unwrap();
-
-            if !sell_ask_asset.amount.is_zero() {
-                messages.push(sell_ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
-            }
-
-            if lef_buy_ask_amount.is_zero() || lef_buy_offer_amount.is_zero() {
-                break;
-            }
-        }
-
-        // there is match
-        if !executor_receive_amount.is_zero() {
-            // ask is order ask asset, not depending on order direction
-            // so we just make sure ask amount is equal on both sides
-            buy_order.fill_order(
-                deps.storage,
-                pair_key,
-                executor_receive_amount,
-                buy_order.offer_amount - lef_buy_offer_amount,
-            ).unwrap();
-
-            let executor_receive = Asset {
-                info: base_coin_info,
-                amount: executor_receive_amount,
-            };
-            // dont use oracle for limit order
-            messages.push(executor_receive.into_msg(
-                None,
-                &deps.querier,
-                deps.api.addr_validate(sender.as_str())?,
-            )?);
-        }
-        Ok(messages)
     }
 }
