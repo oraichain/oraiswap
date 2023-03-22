@@ -65,7 +65,7 @@ impl Order {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_ask_amount == self.ask_amount || self.filled_offer_amount == self.offer_amount {
+        if self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
             self.status = OrderStatus::Fulfilled;
             remove_order(storage, pair_key, self)
