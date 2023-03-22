@@ -283,11 +283,6 @@ pub fn excecute_pair(
     let mut total_orders =  0;
 
     for buy_order in &mut match_buy_orders {
-        // check status of buy_order
-        if buy_order.status == OrderStatus::Fulfilled {
-            continue;
-        }
-
         buy_order.status = OrderStatus::Filling;
         store_order(deps.storage, &pair_key, &buy_order, false)?;
 
@@ -295,12 +290,9 @@ pub fn excecute_pair(
         let mut match_price = buy_order.get_price();
         let mut price_direction: OrderDirection = OrderDirection::Buy;
 
-        let mut lef_buy_ask_amount = buy_order.ask_amount.checked_sub(buy_order.filled_ask_amount)?;
-        let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
- 
         for sell_order in &mut match_sell_orders {
-            // check status of sell_order
-            if sell_order.status == OrderStatus::Fulfilled {
+            // check status of sell_order and buy_order
+            if sell_order.status == OrderStatus::Fulfilled || buy_order.status == OrderStatus::Fulfilled {
                 continue;
             }
 
@@ -309,7 +301,9 @@ pub fn excecute_pair(
 
             let mut lef_sell_ask_amount = sell_order.ask_amount.checked_sub(sell_order.filled_ask_amount)?;
             let lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
-
+            let mut lef_buy_ask_amount = buy_order.ask_amount.checked_sub(buy_order.filled_ask_amount)?;
+            let lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
+            
             if match_one_price == false {
                 if sell_order.order_id < buy_order.order_id {
                     match_price = sell_order.get_price();
@@ -330,6 +324,34 @@ pub fn excecute_pair(
                 lef_sell_ask_amount,
             );
 
+            let mut sell_ask_asset = Asset {
+                info: asset_infos[0].clone(),
+                amount: sell_ask_amount,
+            };
+            
+            let (_, mut sell_amount) = sell_order.matchable_amount(sell_ask_asset.amount)?;
+
+            sell_amount = match price_direction {
+                OrderDirection::Buy => sell_ask_asset.amount,
+                OrderDirection::Sell => sell_amount,
+            };
+
+            sell_amount = Uint128::min(
+                lef_buy_offer_amount,
+                sell_amount,
+            );
+            sell_ask_asset.amount = sell_amount;
+
+            let mut sell_offer_amount = match_price * sell_ask_asset.amount;
+            if lef_sell_offer_amount <= sell_offer_amount {
+                sell_offer_amount = lef_sell_offer_amount;
+                sell_ask_asset.amount = Uint128::from(sell_offer_amount).checked_div_decimal(match_price).unwrap();
+            }
+
+            if sell_offer_amount.is_zero() {
+                sell_order.status = OrderStatus::Fulfilled;
+            }
+
             if lef_buy_ask_amount.is_zero() {
                 let buyer_return = Asset {
                     info: asset_infos[0].clone(),
@@ -347,7 +369,7 @@ pub fn excecute_pair(
                 continue;
             }
 
-            if sell_ask_amount.is_zero() {
+            if lef_sell_ask_amount.is_zero() || sell_ask_asset.amount.is_zero() {
                 let seller_return = Asset {
                     info: asset_infos[1].clone(),
                     amount: lef_sell_offer_amount,
@@ -364,47 +386,22 @@ pub fn excecute_pair(
                 continue;
             }
 
-            let mut sell_ask_asset = Asset {
-                info: asset_infos[0].clone(),
-                amount: sell_ask_amount,
-            };
-            
-            let (_, mut sell_amount) = sell_order.matchable_amount(sell_ask_asset.amount)?;
-
-            sell_amount = match price_direction {
-                OrderDirection::Buy => sell_ask_asset.amount,
-                OrderDirection::Sell => sell_amount,
-            };
-
-            sell_amount = Uint128::min(
-                lef_buy_offer_amount,
-                sell_amount,
-            );
-
-            sell_ask_asset.amount = sell_amount;
-            lef_buy_offer_amount = lef_buy_offer_amount.checked_sub(sell_ask_asset.amount)?;
-
-            let buy_offer_amount = match_price * sell_ask_asset.amount;
             let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
             // fill this order
-            sell_order.fill_order(deps.storage, &pair_key, sell_amount, buy_offer_amount).unwrap();
+            sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount).unwrap();
 
-            if buy_offer_amount.is_zero() || sell_amount.is_zero() {
-                sell_order.status = OrderStatus::Fulfilled;
-            }
-            
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
             }
 
             // Match with buy order
-            if !buy_offer_amount.is_zero() {
+            if !sell_offer_amount.is_zero() {
                 buy_order.fill_order(
                     deps.storage,
                     &pair_key,
-                    buy_offer_amount,
-                    buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.checked_sub(lef_buy_offer_amount)?,
+                    sell_offer_amount,
+                    sell_ask_asset.amount,
                 ).unwrap();
 
                 if buy_order.status == OrderStatus::Fulfilled {
@@ -413,7 +410,7 @@ pub fn excecute_pair(
 
                 let executor_receive = Asset {
                     info: asset_infos[1].clone(),
-                    amount: buy_offer_amount,
+                    amount: sell_offer_amount,
                 };
 
                 // dont use oracle for limit order
