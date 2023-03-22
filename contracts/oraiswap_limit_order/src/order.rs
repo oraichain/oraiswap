@@ -295,8 +295,6 @@ pub fn excecute_pair(
         let mut match_price = buy_order.get_price();
         let mut price_direction: OrderDirection = OrderDirection::Buy;
 
-        let mut executor_receive_amount = Uint128::zero();
-
         let mut lef_buy_ask_amount = buy_order.ask_amount.checked_sub(buy_order.filled_ask_amount)?;
         let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
  
@@ -385,10 +383,8 @@ pub fn excecute_pair(
 
             sell_ask_asset.amount = sell_amount;
             lef_buy_offer_amount = lef_buy_offer_amount.checked_sub(sell_ask_asset.amount)?;
+
             let buy_offer_amount = match_price * sell_ask_asset.amount;
-
-            executor_receive_amount += buy_offer_amount;
-
             let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
             // fill this order
@@ -402,41 +398,39 @@ pub fn excecute_pair(
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
             }
 
+            // Match with buy order
+            if !buy_offer_amount.is_zero() {
+                buy_order.fill_order(
+                    deps.storage,
+                    &pair_key,
+                    buy_offer_amount,
+                    buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.checked_sub(lef_buy_offer_amount)?,
+                ).unwrap();
+
+                if buy_order.status == OrderStatus::Fulfilled {
+                    total_orders += 1;
+                }
+
+                let executor_receive = Asset {
+                    info: asset_infos[1].clone(),
+                    amount: buy_offer_amount,
+                };
+
+                // dont use oracle for limit order
+                messages.push(executor_receive.into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api.addr_validate(bidder_addr.as_str())?,
+                )?);
+            }
+            
             if sell_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
             }
 
-            if lef_buy_ask_amount.is_zero() || lef_buy_offer_amount.is_zero() {
+            if lef_buy_offer_amount.is_zero() {
                 break;
             }
-        }
-
-        // there is match
-        if !executor_receive_amount.is_zero() {
-            // ask is order ask asset, not depending on order direction
-            // so we just make sure ask amount is equal on both sides
-            buy_order.fill_order(
-                deps.storage,
-                &pair_key,
-                executor_receive_amount,
-                buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.checked_sub(lef_buy_offer_amount)?,
-            ).unwrap();
-
-            if buy_order.status == OrderStatus::Fulfilled {
-                total_orders += 1;
-            }
-
-            let executor_receive = Asset {
-                info: asset_infos[1].clone(),
-                amount: executor_receive_amount,
-            };
-
-            // dont use oracle for limit order
-            messages.push(executor_receive.into_msg(
-                None,
-                &deps.querier,
-                deps.api.addr_validate(bidder_addr.as_str())?,
-            )?);
         }
     }
 
