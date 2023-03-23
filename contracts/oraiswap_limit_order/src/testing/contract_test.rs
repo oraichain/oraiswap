@@ -3892,7 +3892,7 @@ fn orders_querier() {
             },
         )
         .unwrap();
-    println!("[HIEU_LOG]: ticks res: {:?}\n\n\n", res);
+
     for tick in res.ticks {
         let res = app
             .query::<OrdersResponse, _>(
