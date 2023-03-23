@@ -201,32 +201,44 @@ pub fn cancel_order(
 
 pub fn execute_order(
     deps: DepsMut,
-    offer_info: AssetInfo,
+    ask_info: AssetInfo,
     sender: Addr,
-    ask_asset: Asset,
+    offer_asset: Asset,
     order_id: u64,
 ) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[
-        offer_info.to_raw(deps.api)?,
-        ask_asset.info.to_raw(deps.api)?,
+        ask_info.to_raw(deps.api)?,
+        offer_asset.info.to_raw(deps.api)?,
     ]);
     let mut order = read_order(deps.storage, &pair_key, order_id)?;
+    
+    if order.status == OrderStatus::Fulfilled {
+        return Err(ContractError::OrderFulfilled {
+            order_id: order.order_id,
+        });
+    }
+
+    if order.status == OrderStatus::Filling {
+        return Err(ContractError::OrderIsFilling {
+            order_id: order.order_id,
+        });
+    }
 
     // Compute offer amount & match ask amount
-    let (offer_amount, match_ask_amount) = order.matchable_amount(ask_asset.amount)?;
+    let (executor_offer_amount, bidder_ask_amount) = order.matchable_amount(offer_asset.amount)?;
     let executor_receive = Asset {
-        info: offer_info,
-        amount: offer_amount,
+        info: ask_info,
+        amount: executor_offer_amount,
     };
 
     let bidder_addr = deps.api.addr_humanize(&order.bidder_addr)?;
 
     // When match amount equals ask amount, close order
-    if match_ask_amount == ask_asset.amount {
+    if bidder_ask_amount == offer_asset.amount {
         order.status = OrderStatus::Fulfilled;
         remove_order(deps.storage, &pair_key, &order).unwrap();
     } else {
-        order.filled_ask_amount += ask_asset.amount;
+        order.filled_ask_amount += offer_asset.amount;
         order.filled_offer_amount += executor_receive.amount;
         // update order
         store_order(deps.storage, &pair_key, &order, false)?;
@@ -242,15 +254,15 @@ pub fn execute_order(
         )?);
     }
 
-    if !ask_asset.amount.is_zero() {
-        messages.push(ask_asset.into_msg(None, &deps.querier, bidder_addr)?);
+    if !offer_asset.amount.is_zero() {
+        messages.push(offer_asset.into_msg(None, &deps.querier, bidder_addr)?);
     }
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "execute_order"),
         ("order_id", &order_id.to_string()),
         ("executor_receive", &executor_receive.to_string()),
-        ("bidder_receive", &ask_asset.to_string()),
+        ("bidder_receive", &offer_asset.to_string()),
     ]))
 }
 
@@ -459,10 +471,7 @@ pub fn remove_pair(
     let mut total_orders =  0;
     for order in &mut all_orders {
         // Compute refund asset
-        let left_offer_amount = match order.direction {
-            OrderDirection::Buy => order.offer_amount.checked_sub(order.filled_offer_amount)?,
-            OrderDirection::Sell => order.ask_amount.checked_sub(order.filled_ask_amount)?,
-        };
+        let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
 
         let bidder_refund = Asset {
             info: match order.direction {
