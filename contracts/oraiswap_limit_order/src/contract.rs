@@ -110,16 +110,16 @@ pub fn execute(
             asset_infos,
         } => cancel_order(deps, info, order_id, asset_infos),
         ExecuteMsg::ExecuteOrder {
-            ask_asset,
             order_id,
-            offer_info,
+            offer_asset,
+            ask_info,
         } => {
-            if !ask_asset.is_native_token() {
+            if !offer_asset.is_native_token() {
                 return Err(ContractError::MustProvideNativeToken {});
             }
 
-            ask_asset.assert_sent_native_token_balance(&info)?;
-            execute_order(deps, offer_info, info.sender, ask_asset, order_id)
+            offer_asset.assert_sent_native_token_balance(&info)?;
+            execute_order(deps, ask_info, info.sender, offer_asset, order_id)
         }
         ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
