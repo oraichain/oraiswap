@@ -94,9 +94,9 @@ pub enum ExecuteMsg {
 
     /// Arbitrager execute order to get profit
     ExecuteOrder {
-        ask_asset: Asset,
         order_id: u64,
-        offer_info: AssetInfo,
+        offer_asset: Asset,
+        ask_info: AssetInfo,
     },
 
     /// Arbitrager execute order book pair
