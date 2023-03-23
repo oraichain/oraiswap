@@ -308,14 +308,18 @@ pub fn excecute_pair(
                 continue;
             }
 
-            sell_order.status = OrderStatus::Filling;
-            store_order(deps.storage, &pair_key, &sell_order, false)?;
-
             let mut lef_sell_ask_amount = sell_order.ask_amount.checked_sub(sell_order.filled_ask_amount)?;
             let lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
             let mut lef_buy_ask_amount = buy_order.ask_amount.checked_sub(buy_order.filled_ask_amount)?;
             let lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
             
+            if lef_buy_offer_amount.is_zero() || lef_sell_offer_amount.is_zero() {
+                continue;
+            }
+
+            sell_order.status = OrderStatus::Filling;
+            store_order(deps.storage, &pair_key, &sell_order, false)?;
+
             if match_one_price == false {
                 if sell_order.order_id < buy_order.order_id {
                     match_price = sell_order.get_price();
@@ -407,6 +411,13 @@ pub fn excecute_pair(
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
             }
 
+            if sell_order.status == OrderStatus::Fulfilled {
+                total_orders += 1;
+            } else {
+                sell_order.status = OrderStatus::Open;
+                store_order(deps.storage, &pair_key, &sell_order, false)?;
+            }
+
             // Match with buy order
             if !sell_offer_amount.is_zero() {
                 buy_order.fill_order(
@@ -415,10 +426,6 @@ pub fn excecute_pair(
                     sell_offer_amount,
                     sell_ask_asset.amount,
                 ).unwrap();
-
-                if buy_order.status == OrderStatus::Fulfilled {
-                    total_orders += 1;
-                }
 
                 let executor_receive = Asset {
                     info: asset_infos[1].clone(),
@@ -432,14 +439,13 @@ pub fn excecute_pair(
                     deps.api.addr_validate(bidder_addr.as_str())?,
                 )?);
             }
-            
-            if sell_order.status == OrderStatus::Fulfilled {
-                total_orders += 1;
-            }
+        }
 
-            if lef_buy_offer_amount.is_zero() {
-                break;
-            }
+        if buy_order.status == OrderStatus::Fulfilled {
+            total_orders += 1;
+        } else {
+            buy_order.status = OrderStatus::Open;
+            store_order(deps.storage, &pair_key, &buy_order, false)?;
         }
     }
 
