@@ -66,15 +66,15 @@ pub fn execute(
         ExecuteMsg::CreateOrderBookPair {
             base_coin_info,
             quote_coin_info,
-            precision,
-            min_base_coin_amount,
+            spread,
+            min_quote_coin_amount,
         } => execute_create_pair(
             deps,
             info,
             base_coin_info,
             quote_coin_info,
-            precision,
-            min_base_coin_amount,
+            spread,
+            min_quote_coin_amount,
         ),
         ExecuteMsg::SubmitOrder {
             direction,
@@ -85,8 +85,8 @@ pub fn execute(
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
             let paid_asset = match direction {
-                OrderDirection::Buy => &assets[0],
-                OrderDirection::Sell => &assets[1],
+                OrderDirection::Buy => &assets[1],
+                OrderDirection::Sell => &assets[0],
             };
 
             // if paid asset is cw20, we check it in Cw20HookMessage
@@ -97,8 +97,8 @@ pub fn execute(
             paid_asset.assert_sent_native_token_balance(&info)?;
             // then submit order
             match direction {
-                OrderDirection::Buy => submit_order(deps, info.sender, direction, [assets[0].clone(), assets[1].clone()]),
-                OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[1].clone(), assets[0].clone()]),
+                OrderDirection::Buy => submit_order(deps, info.sender, direction, [assets[1].clone(), assets[0].clone()]),
+                OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[0].clone(), assets[1].clone()]),
             }
         }
         ExecuteMsg::UpdateOrder {
@@ -159,8 +159,8 @@ pub fn execute_create_pair(
     info: MessageInfo,
     base_coin_info: AssetInfo,
     quote_coin_info: AssetInfo,
-    precision: Option<Decimal>,
-    min_base_coin_amount: Uint128,
+    spread: Option<Decimal>,
+    min_quote_coin_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -182,14 +182,16 @@ pub fn execute_create_pair(
     let order_book = OrderBook {
         base_coin_info: base_coin_info.to_raw(deps.api)?,
         quote_coin_info: quote_coin_info.to_raw(deps.api)?,
-        precision,
-        min_base_coin_amount
+        spread,
+        min_quote_coin_amount
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 
     Ok(Response::new().add_attributes(vec![
-        ("action", "execute_create_orderbook_pair"),
-        ("pair", &format!("{}/{}", quote_coin_info, base_coin_info)),
+        ("action", "create_orderbook_pair"),
+        ("pair", &format!("{}/{}", base_coin_info, quote_coin_info)),
+        ("spread", &format!("{:?}", spread)),
+        ("min_quote_coin_amount", &min_quote_coin_amount.to_string()),
     ]))
 }
 
