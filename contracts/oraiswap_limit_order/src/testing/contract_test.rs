@@ -12,7 +12,7 @@ use crate::jsonstr;
 const USDT_DENOM: &str = "usdt";
 
 #[test]
-fn  submit_order() {
+fn submit_order() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -3208,6 +3208,56 @@ fn execute_pair_native_token() {
             }],
         )
         .unwrap();
+    
+    let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 0 - address0's balances: {:?}", address0_balances);
+    println!("round 0 - address1's balances: {:?}", address1_balances);
+    println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
+    
+    let mut expected_balances: Vec<Coin> = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(960000u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(971200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address0_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(973800u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(960000u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1000000u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
+    );
 
     // assertion; native asset balance
     let msg = ExecuteMsg::ExecuteOrderBookPair {
@@ -3250,20 +3300,54 @@ fn execute_pair_native_token() {
         &[],
     );
 
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 1 - address0's balances: {:?}", address0_balances);
+    println!("round 1 - address1's balances: {:?}", address1_balances);
+    println!("round 1 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(960000u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(989200u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(978000u128)
+        address0_balances,
+        expected_balances,
     );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(987200u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(960000u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0001"), USDT_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(973400u128)
+        address1_balances,
+        expected_balances,
     );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1012600u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0002"), USDT_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(993800u128)
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3273,15 +3357,54 @@ fn execute_pair_native_token() {
         &[],
     );
 
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 2 - address0's balances: {:?}", address0_balances);
+    println!("round 2 - address1's balances: {:?}", address1_balances);
+    println!("round 2 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(960000u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(989200u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(978000u128)
+        address0_balances,
+        expected_balances,
     );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(994410u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(974800u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0001"), USDT_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(980610u128)
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3291,15 +3414,54 @@ fn execute_pair_native_token() {
         &[],
     );
 
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 3 - address0's balances: {:?}", address0_balances);
+    println!("round 3 - address1's balances: {:?}", address1_balances);
+    println!("round 3 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(962630u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(989200u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(978000u128)
+        address0_balances,
+        expected_balances,
     );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(994419u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(976800u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0001"), USDT_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(980619u128)
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3309,15 +3471,54 @@ fn execute_pair_native_token() {
         &[],
     );
     
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 4 - address0's balances: {:?}", address0_balances);
+    println!("round 4 - address1's balances: {:?}", address1_balances);
+    println!("round 4 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(964747u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(989200u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(978000u128)
+        address0_balances,
+        expected_balances,
     );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(994419u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(978399u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0001"), USDT_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(980619u128)
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3327,10 +3528,54 @@ fn execute_pair_native_token() {
         &[],
     );
     
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 5 - address0's balances: {:?}", address0_balances);
+    println!("round 5 - address1's balances: {:?}", address1_balances);
+    println!("round 5 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(965160u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(989601u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(978401u128)
+        address0_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(994419u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(978399u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3340,10 +3585,54 @@ fn execute_pair_native_token() {
         &[],
     );
     
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 6 - address0's balances: {:?}", address0_balances);
+    println!("round 6 - address1's balances: {:?}", address1_balances);
+    println!("round 6 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(970371u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(994401u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(983201u128)
+        address0_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(994419u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(978399u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 
     let _ = app.execute(
@@ -3353,10 +3642,54 @@ fn execute_pair_native_token() {
         &[],
     );
     
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 7 - address0's balances: {:?}", address0_balances);
+    println!("round 7 - address1's balances: {:?}", address1_balances);
+    println!("round 7 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(970373u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(1002184u128),
+        }
+    ].to_vec();
     assert_eq!(
-        app.query_balance(Addr::unchecked("addr0000"), ORAI_DENOM.to_string())
-            .unwrap(),
-        Uint128::from(990984u128)
+        address0_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1002793u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(978399u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address1_balances,
+        expected_balances,
+    );
+    expected_balances = [
+        Coin{
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(1020634u128)
+        },
+        Coin{
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(981200u128),
+        }
+    ].to_vec();
+    assert_eq!(
+        address2_balances,
+        expected_balances,
     );
 }
 
