@@ -160,6 +160,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     // Add new attribute
     Ok(Response::new().add_attributes(vec![
         ("action", &action),
+        ("bidder_addr", &order.bidder_addr.to_string()),
         ("order_id", &order.order_id.to_string()),
         ("direction", &format!("{:?}", order.direction)),
         ("offer_amount", &order.offer_amount.to_string()),

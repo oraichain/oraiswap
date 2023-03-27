@@ -74,7 +74,13 @@ impl Order {
             store_order(storage, pair_key, self, false).unwrap();
             Ok(Response::new().add_attributes(vec![
                 ("action", "order_is_updated"),
+                ("bidder_addr", &self.bidder_addr.to_string()),
                 ("order_id", &self.order_id.to_string()),
+                ("direction", &format!("{:?}", self.direction)),
+                ("offer_amount", &self.offer_amount.to_string()),
+                ("filled_offer_amount", &self.filled_offer_amount.to_string()),
+                ("ask_amount", &self.ask_amount.to_string()),
+                ("filled_ask_amount", &self.filled_ask_amount.to_string()),
             ]))
         }
     }
