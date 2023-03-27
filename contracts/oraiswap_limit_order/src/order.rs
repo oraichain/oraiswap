@@ -341,7 +341,7 @@ pub fn excecute_pair(
             );
 
             let mut sell_ask_asset = Asset {
-                info: asset_infos[0].clone(),
+                info: asset_infos[1].clone(),
                 amount: sell_ask_amount,
             };
             
@@ -370,7 +370,7 @@ pub fn excecute_pair(
 
             if lef_buy_ask_amount.is_zero() {
                 let buyer_return = Asset {
-                    info: asset_infos[0].clone(),
+                    info: asset_infos[1].clone(),
                     amount: lef_buy_offer_amount,
                 };
     
@@ -387,7 +387,7 @@ pub fn excecute_pair(
 
             if lef_sell_ask_amount.is_zero() || sell_ask_asset.amount.is_zero() {
                 let seller_return = Asset {
-                    info: asset_infos[1].clone(),
+                    info: asset_infos[0].clone(),
                     amount: lef_sell_offer_amount,
                 };
     
@@ -428,7 +428,7 @@ pub fn excecute_pair(
                 ).unwrap();
 
                 let executor_receive = Asset {
-                    info: asset_infos[1].clone(),
+                    info: asset_infos[0].clone(),
                     amount: sell_offer_amount,
                 };
 
