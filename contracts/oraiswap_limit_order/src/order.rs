@@ -32,16 +32,16 @@ pub fn submit_order(
     // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
-    let base_asset = match direction {
+    let quote_asset = match direction {
         OrderDirection::Buy => assets[0].clone(),
         OrderDirection::Sell => assets[1].clone(),
     };
 
-    // require minimum amount for base asset
-    if base_asset.amount.lt(&order_book.min_base_coin_amount) {
-        return Err(ContractError::TooSmallBaseCoinAmount {
-            base_coin: base_asset.info.to_string(),
-            min_base_amount: order_book.min_base_coin_amount,
+    // require minimum amount for quote asset
+    if quote_asset.amount.lt(&order_book.min_quote_coin_amount) {
+        return Err(ContractError::TooSmallQuoteAsset {
+            quote_coin: quote_asset.info.to_string(),
+            min_quote_amount: order_book.min_quote_coin_amount,
         });
     }
 
@@ -107,14 +107,14 @@ pub fn update_order(
     }
 
     let offer_asset = match order.direction {
-        OrderDirection::Buy => &assets[0],
-        OrderDirection::Sell => &assets[1],
+        OrderDirection::Buy => &assets[1],
+        OrderDirection::Sell => &assets[0],
     };
     order.offer_amount = offer_asset.amount;
 
     let ask_asset = match order.direction {
-        OrderDirection::Buy => &assets[1],
-        OrderDirection::Sell => &assets[0],
+        OrderDirection::Buy => &assets[0],
+        OrderDirection::Sell => &assets[1],
     };
     order.ask_amount = ask_asset.amount;
 
@@ -126,10 +126,10 @@ pub fn update_order(
     offer_asset.assert_sent_native_token_balance(&info)?;
 
     // require minimum amount for base asset
-    if assets[0].amount.lt(&order_book.min_base_coin_amount) {
-        return Err(ContractError::TooSmallBaseCoinAmount {
-            base_coin: assets[0].info.to_string(),
-            min_base_amount: order_book.min_base_coin_amount,
+    if assets[1].amount.lt(&order_book.min_quote_coin_amount) {
+        return Err(ContractError::TooSmallQuoteAsset {
+            quote_coin: assets[1].info.to_string(),
+            min_quote_amount: order_book.min_quote_coin_amount,
         });
     }
 
@@ -175,8 +175,8 @@ pub fn cancel_order(
 
     let bidder_refund = Asset {
         info: match order.direction {
-            OrderDirection::Buy => asset_infos[0].clone(),
-            OrderDirection::Sell => asset_infos[1].clone(),
+            OrderDirection::Buy => asset_infos[1].clone(),
+            OrderDirection::Sell => asset_infos[0].clone(),
         },
         amount: left_offer_amount,
     };
@@ -481,8 +481,8 @@ pub fn remove_pair(
 
         let bidder_refund = Asset {
             info: match order.direction {
-                OrderDirection::Buy => asset_infos[0].clone(),
-                OrderDirection::Sell => asset_infos[1].clone(),
+                OrderDirection::Buy => asset_infos[1].clone(),
+                OrderDirection::Sell => asset_infos[0].clone(),
             },
             amount: left_offer_amount,
         };
