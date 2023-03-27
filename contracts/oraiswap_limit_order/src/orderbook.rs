@@ -144,21 +144,21 @@ impl Order {
 pub struct OrderBook {
     pub base_coin_info: AssetInfoRaw,
     pub quote_coin_info: AssetInfoRaw,
-    pub precision: Option<Decimal>,
-    pub min_base_coin_amount: Uint128,
+    pub spread: Option<Decimal>,
+    pub min_quote_coin_amount: Uint128,
 }
 
 impl OrderBook {
     pub fn new(
         base_coin_info: AssetInfoRaw,
         quote_coin_info: AssetInfoRaw,
-        precision: Option<Decimal>,
+        spread: Option<Decimal>,
     ) -> Self {
         OrderBook {
             base_coin_info,
             quote_coin_info,
-            precision,
-            min_base_coin_amount: Uint128::zero(),
+            spread,
+            min_quote_coin_amount: Uint128::zero(),
         }
     }
 
@@ -166,8 +166,8 @@ impl OrderBook {
         Ok(OrderBookResponse {
             base_coin_info: self.base_coin_info.to_normal(api)?,
             quote_coin_info: self.quote_coin_info.to_normal(api)?,
-            precision: self.precision,
-            min_base_coin_amount: self.min_base_coin_amount,
+            spread: self.spread,
+            min_quote_coin_amount: self.min_quote_coin_amount,
         })
     }
 
@@ -262,7 +262,7 @@ impl OrderBook {
         read_orders(storage, pair_key, start_after, limit, order_by)
     }
 
-    /// find best buy price and best sell price that matched a precision, currently no precision is set
+    /// find best buy price and best sell price that matched a spread, currently no spread is set
     pub fn find_match_price(&self, storage: &dyn Storage) -> Option<(Decimal, Decimal)> {
         let pair_key = &self.get_pair_key();
         let (highest_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
@@ -270,12 +270,12 @@ impl OrderBook {
             return None;
         }
 
-        // if there is precision, find the best sell price closest to best buy price
-        if let Some(precision) = self.precision {
-            let precision_factor = Decimal::one() + precision;
+        // if there is spread, find the best sell price closest to best buy price
+        if let Some(spread) = self.spread {
+            let spread_factor = Decimal::one() + spread;
             let tick_namespaces = &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()];
 
-            // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + precision)
+            // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + spread)
             if let Some(sell_price) = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
                 .range(None, None, OrderBy::Ascending)
                 .find_map(|item| {
@@ -283,7 +283,7 @@ impl OrderBook {
                         let sell_price =
                             Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
                         if highest_buy_price.ge(&sell_price)
-                            && highest_buy_price.le(&(sell_price * precision_factor))
+                            && highest_buy_price.le(&(sell_price * spread_factor))
                         {
                             return Some(sell_price);
                         }
@@ -295,8 +295,8 @@ impl OrderBook {
             }
         } else {
             let (lowest_sell_price, found, _) = self.lowest_price(storage, OrderDirection::Sell);
-            // there is a match, we will find the best price with precision to prevent market fluctuation
-            // we can use precision to convert price to index as well
+            // there is a match, we will find the best price with spread to prevent market fluctuation
+            // we can use spread to convert price to index as well
             if found && highest_buy_price.ge(&lowest_sell_price) {
                 return Some((highest_buy_price, lowest_sell_price));
             }
