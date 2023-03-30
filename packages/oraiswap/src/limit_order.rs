@@ -82,21 +82,9 @@ pub enum ExecuteMsg {
         assets: [Asset; 2],
     },
 
-    UpdateOrder {
-        order_id: u64,
-        assets: [Asset; 2],
-    },
-
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
-    },
-
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        order_id: u64,
-        offer_asset: Asset,
-        ask_info: AssetInfo,
     },
 
     /// Arbitrager execute order book pair
@@ -105,7 +93,7 @@ pub enum ExecuteMsg {
     },
 
     /// Arbitrager remove order book
-    RemoveOrderBook {
+    RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
 }
@@ -115,12 +103,6 @@ pub enum Cw20HookMsg {
     SubmitOrder {
         direction: OrderDirection,
         assets: [Asset; 2],
-    },
-
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        order_id: u64,
-        offer_info: AssetInfo,
     },
 }
 

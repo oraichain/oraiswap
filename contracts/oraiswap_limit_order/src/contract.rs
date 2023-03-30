@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_order, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair, update_order,
+    cancel_order, query_last_order_id, query_order, query_orderbook,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
@@ -101,32 +101,16 @@ pub fn execute(
                 OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[0].clone(), assets[1].clone()]),
             }
         }
-        ExecuteMsg::UpdateOrder {
-            order_id,
-            assets,
-        } => update_order(deps, info, order_id, assets),
         ExecuteMsg::CancelOrder {
             order_id,
             asset_infos,
         } => cancel_order(deps, info, order_id, asset_infos),
-        ExecuteMsg::ExecuteOrder {
-            order_id,
-            offer_asset,
-            ask_info,
-        } => {
-            if !offer_asset.is_native_token() {
-                return Err(ContractError::MustProvideNativeToken {});
-            }
-
-            offer_asset.assert_sent_native_token_balance(&info)?;
-            execute_order(deps, ask_info, info.sender, offer_asset, order_id)
-        }
         ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
         } => {
             excecute_pair(deps, info, asset_infos)
         }
-        ExecuteMsg::RemoveOrderBook {
+        ExecuteMsg::RemoveOrderBookPair {
             asset_infos,
         } => {
             remove_pair(deps, info, asset_infos)
@@ -228,11 +212,6 @@ pub fn receive_cw20(
                 OrderDirection::Sell => submit_order(deps, sender, direction, [assets[0].clone(), assets[1].clone()]),
             }
         },
-        // this is opposite to SubmitOrder, so offer asset is ask asset
-        Ok(Cw20HookMsg::ExecuteOrder {
-            order_id,
-            offer_info,
-        }) => execute_order(deps, offer_info, sender, provided_asset, order_id),
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }
 }
