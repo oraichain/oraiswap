@@ -190,7 +190,7 @@ pub fn execute_create_pair(
     Ok(Response::new().add_attributes(vec![
         ("action", "create_orderbook_pair"),
         ("pair", &format!("{}/{}", base_coin_info, quote_coin_info)),
-        ("spread", &format!("{:?}", spread)),
+        ("spread", &format!("{:.5}", spread.unwrap_or_default())),
         ("min_quote_coin_amount", &min_quote_coin_amount.to_string()),
     ]))
 }
@@ -213,7 +213,21 @@ pub fn receive_cw20(
         Ok(Cw20HookMsg::SubmitOrder {
             direction,
             assets,
-        }) => submit_order(deps, sender, direction, assets),
+        }) => {
+            let paid_asset = match direction {
+                OrderDirection::Buy => &assets[1],
+                OrderDirection::Sell => &assets[0],
+            };
+
+            if paid_asset.amount != provided_asset.amount {
+                return Err(ContractError::AssetMismatch {});
+            }
+
+            match direction {
+                OrderDirection::Buy => submit_order(deps, sender, direction, [assets[1].clone(), assets[0].clone()]),
+                OrderDirection::Sell => submit_order(deps, sender, direction, [assets[0].clone(), assets[1].clone()]),
+            }
+        },
         // this is opposite to SubmitOrder, so offer asset is ask asset
         Ok(Cw20HookMsg::ExecuteOrder {
             order_id,
