@@ -1517,7 +1517,7 @@ fn cancel_order_token() {
         )
         .unwrap();
 
-    // create order book for pair [token_addrs[0], token_addrs[1]]
+    // create order book for pair [token_addrs[1], token_addrs[0]]
     let msg = ExecuteMsg::CreateOrderBookPair {
         base_coin_info: AssetInfo::Token {
             contract_addr: token_addrs[1].clone(),
@@ -1540,8 +1540,7 @@ fn cancel_order_token() {
         base_coin_info: AssetInfo::Token {
             contract_addr: token_addrs[1].clone(),
         },
-        quote_coin_info: 
-        AssetInfo::NativeToken {
+        quote_coin_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
         spread: None,
@@ -1556,7 +1555,7 @@ fn cancel_order_token() {
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
-        amount: Uint128::new(100000u128 ), // Fund must be equal to offer amount
+        amount: Uint128::new(1234567u128), // Fund must be equal to offer amount
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
@@ -1564,13 +1563,59 @@ fn cancel_order_token() {
                     info: AssetInfo::Token {
                         contract_addr: token_addrs[1].clone(),
                     },
-                    amount: Uint128::from(100000u128),
+                    amount: Uint128::from(4567890u128),
                 },
                 Asset {
                     info: AssetInfo::Token {
                         contract_addr: token_addrs[0].clone(),
                     },
-                    amount: Uint128::from(100000u128),
+                    amount: Uint128::from(1234567u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    let msg2 = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(3333335u128), // Fund must be equal to offer amount
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Sell,
+            assets: [
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(3333335u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(1212121u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    let msg3 = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(3333336u128), // Fund must be equal to offer amount
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Sell,
+            assets: [
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(3333335u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(1212121u128),
                 },
             ],
         })
@@ -1585,23 +1630,40 @@ fn cancel_order_token() {
     )
     .unwrap();
 
+    let _ = app.execute(
+        Addr::unchecked("addr0000"), 
+        token_addrs[1].clone(), 
+        &msg2, 
+        &[],
+    )
+    .unwrap();
+
+    // provided and paid asset are different
+    let res = app.execute(
+        Addr::unchecked("addr0001"), 
+        token_addrs[1].clone(), 
+        &msg3, 
+        &[],
+    );
+    app.assert_fail(res);
+
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
-        amount: Uint128::new(100000u128 ),
+        amount: Uint128::new(1223344u128 ),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
-            direction: OrderDirection::Buy,
+            direction: OrderDirection::Sell,
             assets: [
                 Asset {
                     info: AssetInfo::Token {
                         contract_addr: token_addrs[1].clone(),
                     },
-                    amount: Uint128::from(100000u128),
+                    amount: Uint128::from(1223344u128),
                 },
                 Asset {
                     info: AssetInfo::NativeToken {
                         denom: ORAI_DENOM.to_string(),
                     },
-                    amount: Uint128::from(100000u128),
+                    amount: Uint128::from(2334455u128),
                 },
             ],
         })
@@ -1651,7 +1713,37 @@ fn cancel_order_token() {
         vec![
             ("action", "cancel_order"),
             ("order_id", "1"),
-            ("bidder_refund", &format!("100000{}", token_addrs[0])),
+            ("bidder_refund", &format!("1234567{}", token_addrs[0])),
+        ]
+    );
+
+    let msg = ExecuteMsg::CancelOrder {
+        order_id: 2,
+        asset_infos: [
+            AssetInfo::Token {
+                contract_addr: token_addrs[1].clone()
+            },
+            AssetInfo::Token {
+                contract_addr: token_addrs[0].clone(),
+            },
+        ],
+    };
+
+    let res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+
+    assert_eq!(
+        res.get_attributes(1),
+        vec![
+            ("action", "cancel_order"),
+            ("order_id", "2"),
+            ("bidder_refund", &format!("3333335{}", token_addrs[1])),
         ]
     );
 
