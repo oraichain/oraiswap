@@ -2651,7 +2651,7 @@ fn execute_pair_native_token() {
 }
 
 #[test]
-fn qremove_orderbook_pair() {
+fn remove_orderbook_pair() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -2908,7 +2908,7 @@ fn qremove_orderbook_pair() {
 }
 
 #[test]
-fn qorders_querier() {
+fn orders_querier() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
