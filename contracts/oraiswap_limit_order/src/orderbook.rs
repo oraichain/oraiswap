@@ -39,8 +39,8 @@ impl Order {
         ask_amount: Uint128,
     ) -> Self {
         let offer_amount = match direction {
-            OrderDirection::Buy => Uint128::from(ask_amount * Decimal::from(Decimal::one()/price)),
-            OrderDirection::Sell => ask_amount * price,
+            OrderDirection::Buy => ask_amount * price,
+            OrderDirection::Sell => Uint128::from(ask_amount * Uint128::from(1000000u128)).checked_div(price * Uint128::from(1000000u128)).unwrap(),
         };
 
         Order {
@@ -107,12 +107,10 @@ impl Order {
 
     // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
-        let mut price = match self.direction {
-            OrderDirection::Buy => Decimal::from_ratio(self.ask_amount, self.offer_amount),
-            OrderDirection::Sell => Decimal::from_ratio(self.offer_amount, self.ask_amount),
-        };
-        price = Decimal::from_ratio(price * Uint128::from(1000u128), Uint128::from(1000u128));
-        return price;
+        match self.direction {
+            OrderDirection::Buy => Decimal::from_ratio(self.offer_amount, self.ask_amount),
+            OrderDirection::Sell => Decimal::from_ratio(self.ask_amount, self.offer_amount),
+        }
     }
 
     pub fn to_response(
