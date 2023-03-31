@@ -8,7 +8,7 @@ use oraiswap::{
 };
 
 use cosmwasm_std::{
-    Api, CanonicalAddr, Decimal, Order as OrderBy, StdError, StdResult,
+    Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult,
     Storage, Uint128, Response,
 };
 
@@ -83,26 +83,6 @@ impl Order {
                 ("filled_ask_amount", &self.filled_ask_amount.to_string()),
             ]))
         }
-    }
-
-    // return matchable offer amount from ask amount, can differ between Sell and Buy
-    pub fn matchable_amount(&self, ask_amount: Uint128) -> StdResult<(Uint128, Uint128)> {
-        // Compute match offer & ask amount
-        let match_offer_amount = self.offer_amount.checked_sub(self.filled_offer_amount)?;
-        let match_ask_amount = self.ask_amount.checked_sub(self.filled_ask_amount)?;
-        if match_ask_amount < ask_amount || match_offer_amount.is_zero() {
-            return Err(StdError::generic_err("insufficient order amount left"));
-        }
-
-        // Cap the send amount to match_offer_amount
-        Ok((
-            if match_ask_amount == ask_amount {
-                match_offer_amount
-            } else {
-                std::cmp::min(match_offer_amount, ask_amount * self.get_price())
-            },
-            match_ask_amount,
-        ))
     }
 
     // The price will be calculated by the number of base coins divided by the number of quote coins
