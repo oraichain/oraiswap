@@ -2267,11 +2267,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(960000u128)
+            amount: Uint128::from(963200u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(989200u128),
+            amount: Uint128::from(971200u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2281,11 +2281,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(987200u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(960000u128),
+            amount: Uint128::from(962000u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2295,7 +2295,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1012600u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2324,11 +2324,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(960000u128)
+            amount: Uint128::from(966199u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(989200u128),
+            amount: Uint128::from(971200u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2338,11 +2338,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(994410u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(974800u128),
+            amount: Uint128::from(964003u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2352,7 +2352,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2381,11 +2381,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(962630u128)
+            amount: Uint128::from(966199u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(989200u128),
+            amount: Uint128::from(971200u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2395,11 +2395,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(994419u128)
+            amount: Uint128::from(973801u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(976800u128),
+            amount: Uint128::from(964003u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2409,7 +2409,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2438,11 +2438,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(964747u128)
+            amount: Uint128::from(980197u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(989200u128),
+            amount: Uint128::from(985614u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2452,11 +2452,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(994419u128)
+            amount: Uint128::from(973801u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(978399u128),
+            amount: Uint128::from(964003u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2466,7 +2466,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2495,11 +2495,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(965160u128)
+            amount: Uint128::from(980198u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(989601u128),
+            amount: Uint128::from(985615u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2509,11 +2509,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(994419u128)
+            amount: Uint128::from(973801u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(978399u128),
+            amount: Uint128::from(964003u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2523,7 +2523,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2552,11 +2552,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(970371u128)
+            amount: Uint128::from(980199u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(994401u128),
+            amount: Uint128::from(985615u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2566,11 +2566,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(994419u128)
+            amount: Uint128::from(973801u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(978399u128),
+            amount: Uint128::from(964003u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2580,7 +2580,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2609,11 +2609,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(970373u128)
+            amount: Uint128::from(980990u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1002184u128),
+            amount: Uint128::from(985615u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2623,11 +2623,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1002793u128)
+            amount: Uint128::from(973801u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(978399u128),
+            amount: Uint128::from(965585u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2637,7 +2637,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1020634u128)
+            amount: Uint128::from(1000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
