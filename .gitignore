@@ -9,7 +9,6 @@ target/
 build/
 
 # IDEs
-.vscode/
 .idea/
 *.iml
 
