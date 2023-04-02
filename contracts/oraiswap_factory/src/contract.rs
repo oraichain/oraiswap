@@ -232,10 +232,7 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
 
     Ok(Response::new().add_attributes(vec![
         ("pair_contract_address", pair_contract.as_str()),
-        (
-            "liquidity_token_address",
-            pair_info.liquidity_token.as_str(),
-        ),
+        ("liquidity_token_addr", pair_info.liquidity_token.as_str()),
     ]))
 }
 
