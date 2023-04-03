@@ -9,7 +9,7 @@ use oraiswap::{
 
 use cosmwasm_std::{
     Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult,
-    Storage, Uint128, Response,
+    Storage, Uint128,
 };
 
 use crate::state::{
@@ -61,7 +61,7 @@ impl Order {
         pair_key: &[u8],
         ask_amount: Uint128,
         offer_amount: Uint128,
-    ) -> Result<Response, u64> {
+    ) -> StdResult<u64> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
@@ -71,17 +71,8 @@ impl Order {
             remove_order(storage, pair_key, self)
         } else {
             // update order
-            store_order(storage, pair_key, self, false).unwrap();
-            Ok(Response::new().add_attributes(vec![
-                ("action", "order_is_updated"),
-                ("bidder_addr", &self.bidder_addr.to_string()),
-                ("order_id", &self.order_id.to_string()),
-                ("direction", &format!("{:?}", self.direction)),
-                ("offer_amount", &self.offer_amount.to_string()),
-                ("filled_offer_amount", &self.filled_offer_amount.to_string()),
-                ("ask_amount", &self.ask_amount.to_string()),
-                ("filled_ask_amount", &self.filled_ask_amount.to_string()),
-            ]))
+            self.status = OrderStatus::PartialFilled;
+            store_order(storage, pair_key, self, false)
         }
     }
 
