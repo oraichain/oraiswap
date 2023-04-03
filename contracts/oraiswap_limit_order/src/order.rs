@@ -152,6 +152,7 @@ pub fn excecute_pair(
     let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
 
     let mut messages: Vec<CosmosMsg> = vec![];
+    let mut ret_attributes = vec![];
     let mut total_orders =  0;
 
     for buy_order in &mut match_buy_orders {
@@ -213,7 +214,7 @@ pub fn excecute_pair(
                     deps.api.addr_humanize(&buy_order.bidder_addr)?,
                 )?);
                 buy_order.status = OrderStatus::Fulfilled;
-                remove_order(deps.storage, &pair_key, buy_order).unwrap();
+                ret_attributes.push(remove_order(deps.storage, &pair_key, buy_order).unwrap().attributes);
                 continue;
             }
 
@@ -230,14 +231,14 @@ pub fn excecute_pair(
                     deps.api.addr_humanize(&sell_order.bidder_addr)?,
                 )?);
                 sell_order.status = OrderStatus::Fulfilled;
-                remove_order(deps.storage, &pair_key, sell_order).unwrap();
+                ret_attributes.push(remove_order(deps.storage, &pair_key, sell_order).unwrap().attributes);
                 continue;
             }
 
             let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
             // fill this order
-            sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount).unwrap();
+            ret_attributes.push(sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount).unwrap().attributes);
 
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
@@ -252,12 +253,12 @@ pub fn excecute_pair(
 
             // Match with buy order
             if !sell_offer_amount.is_zero() {
-                buy_order.fill_order(
+                ret_attributes.push(buy_order.fill_order(
                     deps.storage,
                     &pair_key,
                     sell_offer_amount,
                     sell_ask_asset.amount,
-                ).unwrap();
+                ).unwrap().attributes);
 
                 let executor_receive = Asset {
                     info: asset_infos[0].clone(),
@@ -284,6 +285,7 @@ pub fn excecute_pair(
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "execute_all_orders"),
         ("pair", &format!("{}/{}", &asset_infos[0], &asset_infos[1])),
+        ("list_order_matched", &format!("{:?}", &ret_attributes)),
         ("total_matched_orders", &total_orders.to_string()),
     ]))
 }
