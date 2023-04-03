@@ -7,7 +7,7 @@ use crate::state::{
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
@@ -64,6 +64,7 @@ pub fn submit_order(
 
     Ok(Response::new().add_attributes(vec![
         ("action", "submit_order"),
+        ("pair", &format!("{} - {}", &assets[0].info, &assets[1].info)),
         ("order_id", &order_id.to_string()),
         ("direction", &format!("{:?}", direction)),
         ("bidder_addr", sender.as_str()),
@@ -117,11 +118,13 @@ pub fn cancel_order(
         vec![]
     };
     order.status = OrderStatus::Cancel;
-    remove_order(deps.storage, &pair_key, &order).unwrap();
+    remove_order(deps.storage, &pair_key, &order)?;
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "cancel_order"),
+        ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
         ("order_id", &order_id.to_string()),
+        ("bidder_addr", &deps.api.addr_humanize(&order.bidder_addr)?.to_string()),
         ("bidder_refund", &bidder_refund.to_string()),
     ]))
 }
@@ -152,7 +155,7 @@ pub fn excecute_pair(
     let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
 
     let mut messages: Vec<CosmosMsg> = vec![];
-    let mut ret_attributes = vec![];
+    let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_orders =  0;
 
     for buy_order in &mut match_buy_orders {
@@ -214,7 +217,17 @@ pub fn excecute_pair(
                     deps.api.addr_humanize(&buy_order.bidder_addr)?,
                 )?);
                 buy_order.status = OrderStatus::Fulfilled;
-                ret_attributes.push(remove_order(deps.storage, &pair_key, buy_order).unwrap().attributes);
+                remove_order(deps.storage, &pair_key, buy_order)?;
+                ret_attributes.push([
+                    Attribute { key: "action".to_string(), value: "order_is_matched".to_string() },
+                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
+                    Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
+                    Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
+                    Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
+                    Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                ].to_vec());
                 continue;
             }
 
@@ -231,34 +244,56 @@ pub fn excecute_pair(
                     deps.api.addr_humanize(&sell_order.bidder_addr)?,
                 )?);
                 sell_order.status = OrderStatus::Fulfilled;
-                ret_attributes.push(remove_order(deps.storage, &pair_key, sell_order).unwrap().attributes);
+                remove_order(deps.storage, &pair_key, sell_order)?;
+                ret_attributes.push([
+                    Attribute { key: "action".to_string(), value: "order_is_matched".to_string() },
+                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
+                    Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
+                    Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
+                    Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
+                    Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                ].to_vec());
                 continue;
             }
 
             let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
             // fill this order
-            ret_attributes.push(sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount).unwrap().attributes);
+            sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
 
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
             }
 
-            if sell_order.status == OrderStatus::Fulfilled {
+            let status = if sell_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
+                "order_is_matched"
             } else {
                 sell_order.status = OrderStatus::Open;
                 store_order(deps.storage, &pair_key, &sell_order, false)?;
-            }
+                "order_is_updated"
+            };
+            ret_attributes.push([
+                Attribute { key: "action".to_string(), value: status.to_string() },
+                Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
+                Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
+                Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
+                Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
+                Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
+                Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                Attribute { key: "filled_ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+            ].to_vec());
 
             // Match with buy order
             if !sell_offer_amount.is_zero() {
-                ret_attributes.push(buy_order.fill_order(
+                buy_order.fill_order(
                     deps.storage,
                     &pair_key,
                     sell_offer_amount,
                     sell_ask_asset.amount,
-                ).unwrap().attributes);
+                )?;
 
                 let executor_receive = Asset {
                     info: asset_infos[0].clone(),
@@ -274,20 +309,34 @@ pub fn excecute_pair(
             }
         }
 
-        if buy_order.status == OrderStatus::Fulfilled {
+        let status = if buy_order.status == OrderStatus::Fulfilled {
             total_orders += 1;
+            "order_is_matched"
         } else {
             buy_order.status = OrderStatus::Open;
             store_order(deps.storage, &pair_key, &buy_order, false)?;
-        }
+            "order_is_updated"
+        };
+        ret_attributes.push([
+            Attribute { key: "action".to_string(), value: status.to_string() },
+            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
+            Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
+            Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
+            Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
+            Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
+            Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+        ].to_vec());
     }
 
-    Ok(Response::new().add_messages(messages).add_attributes(vec![
-        ("action", "execute_all_orders"),
-        ("pair", &format!("{}/{}", &asset_infos[0], &asset_infos[1])),
-        ("list_order_matched", &format!("{:?}", &ret_attributes)),
-        ("total_matched_orders", &total_orders.to_string()),
-    ]))
+    Ok(Response::new().add_messages(messages)
+        .add_attributes(vec![
+            ("action", "execute_orderbook_pair"),
+            ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
+            ("list_order_matched", &format!("{:?}", &ret_attributes)),
+            ("total_matched_orders", &total_orders.to_string()),
+        ])
+    )  
 }
 
 pub fn remove_pair(
@@ -308,6 +357,7 @@ pub fn remove_pair(
     let mut all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
     
     let mut messages: Vec<CosmosMsg> = vec![];
+    let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_orders =  0;
     for order in &mut all_orders {
         // Compute refund asset
@@ -327,14 +377,25 @@ pub fn remove_pair(
         }
         total_orders += 1;
         order.status = OrderStatus::Cancel;
-        remove_order(deps.storage, &pair_key, &order).unwrap();
+        remove_order(deps.storage, &pair_key, &order)?;
+        ret_attributes.push([
+            Attribute { key: "action".to_string(), value: "order_is_removed".to_string() },
+            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&order.bidder_addr)?.to_string() },
+            Attribute { key: "order_id".to_string(), value: order.order_id.to_string() },
+            Attribute { key: "direction".to_string(), value: format!("{:?}", order.direction)},
+            Attribute { key: "offer_amount".to_string(), value: order.offer_amount.to_string() },
+            Attribute { key: "filled_offer_amount".to_string(), value: order.filled_offer_amount.to_string() },
+            Attribute { key: "ask_amount".to_string(), value: order.ask_amount.to_string() },
+            Attribute { key: "filled_ask_amount".to_string(), value: order.ask_amount.to_string() },
+        ].to_vec());
     }
 
     remove_orderbook(deps.storage, &pair_key);
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        ("action", "remove_orderbook"),
-        ("pair", &format!("{}/{}", &asset_infos[0], &asset_infos[1])),
+        ("action", "remove_orderbook_pair"),
+        ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
+        ("list_order_removed", &format!("{:?}", &ret_attributes)),
         ("total_removed_orders", &total_orders.to_string()),
     ]))
 }
