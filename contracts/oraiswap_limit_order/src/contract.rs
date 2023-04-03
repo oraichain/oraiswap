@@ -173,7 +173,7 @@ pub fn execute_create_pair(
 
     Ok(Response::new().add_attributes(vec![
         ("action", "create_orderbook_pair"),
-        ("pair", &format!("{}/{}", base_coin_info, quote_coin_info)),
+        ("pair", &format!("{} - {}", base_coin_info, quote_coin_info)),
         ("spread", &format!("{:.5}", spread.unwrap_or_default())),
         ("min_quote_coin_amount", &min_quote_coin_amount.to_string()),
     ]))
