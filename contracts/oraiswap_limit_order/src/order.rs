@@ -226,7 +226,7 @@ pub fn excecute_pair(
                     Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
                 ].to_vec());
                 continue;
             }
@@ -253,7 +253,7 @@ pub fn excecute_pair(
                     Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
                 ].to_vec());
                 continue;
             }
@@ -283,7 +283,7 @@ pub fn excecute_pair(
                 Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
                 Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
                 Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
-                Attribute { key: "filled_ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
             ].to_vec());
 
             // Match with buy order
@@ -325,7 +325,7 @@ pub fn excecute_pair(
             Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
             Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
             Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
-            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
         ].to_vec());
     }
 
