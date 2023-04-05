@@ -66,6 +66,7 @@ pub fn submit_order(
         ("action", "submit_order"),
         ("pair", &format!("{} - {}", &assets[0].info, &assets[1].info)),
         ("order_id", &order_id.to_string()),
+        ("status", &format!("{:?}", OrderStatus::Open)),
         ("direction", &format!("{:?}", direction)),
         ("bidder_addr", sender.as_str()),
         ("offer_asset", &format!("{} {}", &assets[0].amount, &assets[0].info)),
@@ -124,6 +125,7 @@ pub fn cancel_order(
         ("action", "cancel_order"),
         ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
         ("order_id", &order_id.to_string()),
+        ("status", &format!("{:?}", OrderStatus::Cancel)),
         ("bidder_addr", &deps.api.addr_humanize(&order.bidder_addr)?.to_string()),
         ("bidder_refund", &bidder_refund.to_string()),
     ]))
@@ -211,15 +213,18 @@ pub fn excecute_pair(
                 };
     
                 // dont use oracle for limit order
-                messages.push(buyer_return.into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_humanize(&buy_order.bidder_addr)?,
-                )?);
+                if buyer_return.amount > Uint128::zero() {
+                    messages.push(buyer_return.into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api.addr_humanize(&buy_order.bidder_addr)?,
+                    )?);
+                }
                 buy_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, buy_order)?;
+
                 ret_attributes.push([
-                    Attribute { key: "action".to_string(), value: "order_is_matched".to_string() },
+                    Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
                     Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
@@ -238,15 +243,18 @@ pub fn excecute_pair(
                 };
     
                 // dont use oracle for limit order
-                messages.push(seller_return.into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_humanize(&sell_order.bidder_addr)?,
-                )?);
+                if seller_return.amount > Uint128::zero() {
+                    messages.push(seller_return.into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api.addr_humanize(&sell_order.bidder_addr)?,
+                    )?);
+                }
+
                 sell_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, sell_order)?;
                 ret_attributes.push([
-                    Attribute { key: "action".to_string(), value: "order_is_matched".to_string() },
+                    Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
                     Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
@@ -265,26 +273,25 @@ pub fn excecute_pair(
 
             if !sell_ask_asset.amount.is_zero() {
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
+
+                ret_attributes.push([
+                    Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
+                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
+                    Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
+                    Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
+                    Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
+                    Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
+                ].to_vec());
             }
 
-            let status = if sell_order.status == OrderStatus::Fulfilled {
+            if sell_order.status == OrderStatus::Fulfilled {
                 total_orders += 1;
-                "order_is_matched"
             } else {
                 sell_order.status = OrderStatus::Open;
                 store_order(deps.storage, &pair_key, &sell_order, false)?;
-                "order_is_updated"
-            };
-            ret_attributes.push([
-                Attribute { key: "action".to_string(), value: status.to_string() },
-                Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
-                Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
-                Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
-                Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
-                Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
-                Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
-                Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
-            ].to_vec());
+            }
 
             // Match with buy order
             if !sell_offer_amount.is_zero() {
@@ -306,27 +313,26 @@ pub fn excecute_pair(
                     &deps.querier,
                     deps.api.addr_validate(bidder_addr.as_str())?,
                 )?);
+
+                ret_attributes.push([
+                    Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
+                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
+                    Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
+                    Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
+                    Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
+                    Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
+                ].to_vec());
             }
         }
 
-        let status = if buy_order.status == OrderStatus::Fulfilled {
+        if buy_order.status == OrderStatus::Fulfilled {
             total_orders += 1;
-            "order_is_matched"
         } else {
             buy_order.status = OrderStatus::Open;
             store_order(deps.storage, &pair_key, &buy_order, false)?;
-            "order_is_updated"
-        };
-        ret_attributes.push([
-            Attribute { key: "action".to_string(), value: status.to_string() },
-            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
-            Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
-            Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
-            Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
-            Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
-            Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
-            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
-        ].to_vec());
+        }
     }
 
     Ok(Response::new().add_messages(messages)
@@ -379,7 +385,7 @@ pub fn remove_pair(
         order.status = OrderStatus::Cancel;
         remove_order(deps.storage, &pair_key, &order)?;
         ret_attributes.push([
-            Attribute { key: "action".to_string(), value: "order_is_removed".to_string() },
+            Attribute { key: "status".to_string(), value: format!("{:?}", order.status) },
             Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&order.bidder_addr)?.to_string() },
             Attribute { key: "order_id".to_string(), value: order.order_id.to_string() },
             Attribute { key: "direction".to_string(), value: format!("{:?}", order.direction)},
