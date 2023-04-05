@@ -662,6 +662,7 @@ fn cancel_order_native_token() {
             ("action", "cancel_order"),
             ("pair", "orai - usdt"),
             ("order_id", "1"),
+            ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
             ("bidder_refund", &format!("6666666{}", USDT_DENOM)),
         ]
@@ -820,6 +821,7 @@ fn cancel_order_native_token() {
             ("action", "cancel_order"),
             ("pair", "orai - usdt"),
             ("order_id", "3"),
+            ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
             ("bidder_refund", &format!("1234560{}", ORAI_DENOM)),
         ]
@@ -1083,6 +1085,7 @@ fn cancel_order_token() {
             ("action", "cancel_order"),
             ("pair", "contract1 - contract0"),
             ("order_id", "1"),
+            ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
             ("bidder_refund", &format!("1234567{}", token_addrs[0])),
         ]
@@ -1115,6 +1118,7 @@ fn cancel_order_token() {
             ("action", "cancel_order"),
             ("pair", "contract1 - contract0"),
             ("order_id", "2"),
+            ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
             ("bidder_refund", &format!("3333335{}", token_addrs[1])),
         ]
