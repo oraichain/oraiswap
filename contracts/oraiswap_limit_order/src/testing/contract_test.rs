@@ -4394,11 +4394,11 @@ fn orders_querier() {
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
             ],
         ),
@@ -4407,11 +4407,11 @@ fn orders_querier() {
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
             ],
         ),
@@ -4583,6 +4583,70 @@ fn orders_querier() {
         )
         .unwrap();
 
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::from(12345678u128),
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Sell,
+            assets: [
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(12345678u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(11223344u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[0].clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::from(22334455u128),
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Sell,
+            assets: [
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(22334455u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(22000000u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[0].clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+
     let order_1 = OrderResponse {
         order_id: 1u64,
         bidder_addr: "addr0000".to_string(),
@@ -4623,6 +4687,68 @@ fn orders_querier() {
         direction: OrderDirection::Buy,
     };
 
+    let all_order = OrdersResponse {
+        orders: [
+            OrderResponse{
+                order_id: 4u64,
+                direction: OrderDirection::Sell,
+                bidder_addr: "addr0001".to_string(),
+                offer_asset: Asset{
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(22334455u128)
+                },
+                ask_asset: Asset{
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(22000000u128)
+                },
+                filled_offer_amount: Uint128::zero(),
+                filled_ask_amount: Uint128::zero()
+            },
+            OrderResponse{
+                order_id: 3u64,
+                direction: OrderDirection::Sell,
+                bidder_addr: "addr0001".to_string(),
+                offer_asset: Asset{
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                    amount: Uint128::from(12345678u128)
+                },
+                ask_asset: Asset{
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(11223344u128)
+                },
+                filled_offer_amount: Uint128::zero(),
+                filled_ask_amount: Uint128::zero()
+            },
+            OrderResponse{
+                order_id: 2u64,
+                direction: OrderDirection::Buy,
+                bidder_addr: "addr0000".to_string(),
+                offer_asset: Asset {
+                    amount: Uint128::from(1000000u128),
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                },
+                ask_asset: Asset {
+                    amount: Uint128::from(1000000u128),
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[1].clone(),
+                    },
+                },
+                filled_offer_amount: Uint128::zero(),
+                filled_ask_amount: Uint128::zero()
+            }
+        ].to_vec(),
+    };
+
     assert_eq!(
         OrdersResponse {
             orders: vec![order_2.clone(),],
@@ -4647,6 +4773,69 @@ fn orders_querier() {
         )
         .unwrap()
     );
+
+    let test = app.query::<OrdersResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Orders {
+            asset_infos: [
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+            ],
+            direction: Some(OrderDirection::Buy),
+            filter: OrderFilter::None,
+            start_after: None,
+            limit: None,
+            order_by: None,
+        }
+    )
+    .unwrap();
+    println!("[LOG] [1] - query all buy order: {}", jsonstr!(test));
+
+    let test = app.query::<OrdersResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Orders {
+            asset_infos: [
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+            ],
+            direction: Some(OrderDirection::Sell), //None
+            filter: OrderFilter::None,
+            start_after: None,
+            limit: None,
+            order_by: None,
+        }
+    )
+    .unwrap();
+    println!("[LOG] [2] - query all sell order: {}", jsonstr!(test));
+
+    let test = app.query::<OrdersResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Orders {
+            asset_infos: [
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+            ],
+            direction: None,
+            filter: OrderFilter::None,
+            start_after: None,
+            limit: None,
+            order_by: None,
+        }
+    )
+    .unwrap();
+    println!("[LOG] [3] - query all order: {}", jsonstr!(test));
 
     assert_eq!(
         OrdersResponse {
@@ -4675,9 +4864,7 @@ fn orders_querier() {
 
     // DESC test
     assert_eq!(
-        OrdersResponse {
-            orders: vec![order_2.clone()],
-        },
+        all_order.clone(),
         app.query::<OrdersResponse, _>(
             limit_order_addr.clone(),
             &QueryMsg::Orders {
