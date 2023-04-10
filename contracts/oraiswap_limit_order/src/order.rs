@@ -4,7 +4,7 @@ use crate::orderbook::Order;
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, read_config, remove_orderbook,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute,
@@ -227,12 +227,15 @@ pub fn excecute_pair(
                     Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
                     Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
                     Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
                 ].to_vec());
+
+                sell_order.status = OrderStatus::Open;
+                store_order(deps.storage, &pair_key, &sell_order, false)?;
                 continue;
             }
 
@@ -257,12 +260,15 @@ pub fn excecute_pair(
                     Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
                     Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
                     Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
                 ].to_vec());
+
+                buy_order.status = OrderStatus::Open;
+                store_order(deps.storage, &pair_key, &buy_order, false)?;
                 continue;
             }
 
@@ -278,7 +284,7 @@ pub fn excecute_pair(
                     Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction)},
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
                     Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
@@ -318,7 +324,7 @@ pub fn excecute_pair(
                     Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
                     Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
                     Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction)},
+                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
                     Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
                     Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
                     Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
@@ -470,7 +476,21 @@ pub fn query_orders(
                 order_by,
             )?
         }
-        OrderFilter::None => read_orders(deps.storage, &pair_key, start_after, limit, order_by)?,
+        OrderFilter::None => {
+            match direction {
+                Some(_) => {
+                    read_orders_with_indexer::<OrderDirection>(
+                        deps.storage,
+                        &[PREFIX_ORDER_BY_DIRECTION, &pair_key, &direction_key],
+                        direction_filter,
+                        start_after,
+                        limit,
+                        order_by,
+                    )?
+                },
+                None => read_orders(deps.storage, &pair_key, start_after, limit, order_by)?,
+            }
+        },
     };
 
     let resp = OrdersResponse {
