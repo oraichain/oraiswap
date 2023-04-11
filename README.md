@@ -58,19 +58,3 @@ You can run unit tests on this on each contracts directory via :
 cargo unit-test
 cargo integration-test
 ```
-
-Once you are happy with the content, you can compile it to wasm on each contracts directory via:
-
-```bash
-yarn build contracts/oraiswap_[package]
-```
-
-The optimized contracts are generated in the artifacts/ directory.
-
-## Gen schema and typescript definitions
-
-```bash
-yarn
-# gen oraiswap_pair typescript and schema
-yarn gen-ts contracts/oraiswap_[package]
-```
