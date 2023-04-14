@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::orderbook::{Order, OrderBook};
 
 // settings for pagination
-pub const MAX_LIMIT: u32 = 30;
+pub const MAX_LIMIT: u32 = 100;
 pub const DEFAULT_LIMIT: u32 = 10;
 
 pub fn init_last_order_id(storage: &mut dyn Storage) -> StdResult<()> {
