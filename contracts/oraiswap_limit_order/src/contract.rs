@@ -108,7 +108,7 @@ pub fn execute(
         ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
         } => {
-            excecute_pair(deps, info, asset_infos)
+            excecute_pair(deps, asset_infos)
         }
         ExecuteMsg::RemoveOrderBookPair {
             asset_infos,
