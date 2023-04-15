@@ -133,16 +133,8 @@ pub fn cancel_order(
 
 pub fn excecute_pair(
     deps: DepsMut,
-    info: MessageInfo,
     asset_infos: [AssetInfo; 2],
 ) -> Result<Response, ContractError> {
-    let contract_info = read_config(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-
-    if contract_info.admin.ne(&sender_addr) {
-        return Err(ContractError::Unauthorized {});
-    }
-
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
 
