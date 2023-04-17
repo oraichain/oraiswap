@@ -41,6 +41,18 @@ pub fn read_last_executor_id(storage: &dyn Storage) -> StdResult<u32> {
     singleton_read(storage, KEY_LAST_EXECUTOR).load()
 }
 
+pub fn store_last_distributed(
+    storage: &mut dyn Storage,
+    pair_key: &[u8],
+    last_distributed: u64,
+) -> StdResult<()> {
+    Bucket::new(storage, KEY_LAST_DISTRIBUTED).save(pair_key, &last_distributed)
+}
+
+pub fn read_last_distributed(storage: &dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
+    ReadonlyBucket::new(storage, KEY_LAST_DISTRIBUTED).load(pair_key)
+}
+
 pub fn store_executor(
     storage: &mut dyn Storage,
     pair_key: &[u8],
@@ -273,6 +285,7 @@ static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
 static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
 static KEY_LAST_EXECUTOR: &[u8] = b"last_executor"; // store last executor
+static KEY_LAST_DISTRIBUTED: &[u8] = b"last_distributed_to_executor"; // store last distributed to executor
 static PREFIX_EXECUTOR: &[u8] = b"executor"; // executor that running matching engine for orderbook pair
 
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
