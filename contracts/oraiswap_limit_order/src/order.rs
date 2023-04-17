@@ -384,7 +384,7 @@ pub fn distribute_reward(
         let pair_key = pair_key(&[asset_info[0].to_raw(deps.api)?, asset_info[1].to_raw(deps.api)?]);
         let num_executor = read_last_executor_id(deps.storage).unwrap_or_default();
         let list_executor = read_excecutors(deps.storage, &pair_key, None, Some(num_executor), None)?;
-        for executor in list_executor {
+        for mut executor in list_executor {
             reward_assets = [
                 Asset {
                     info: asset_info[0].clone(),
@@ -405,6 +405,9 @@ pub fn distribute_reward(
                 &deps.querier,
                 deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
             )?);
+            executor.reward_assets[0].amount = Uint128::zero();
+            executor.reward_assets[1].amount = Uint128::zero();
+            store_executor(deps.storage, &pair_key, &executor)?;
         }
     }
 
