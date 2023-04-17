@@ -55,6 +55,8 @@ fn submit_order() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -537,6 +539,8 @@ fn cancel_order_native_token() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -876,6 +880,8 @@ fn cancel_order_token() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1182,6 +1188,8 @@ fn execute_pair_native_token() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2279,7 +2287,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(963200u128)
+            amount: Uint128::from(963192u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2297,7 +2305,7 @@ fn execute_pair_native_token() {
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(962000u128),
+            amount: Uint128::from(961994u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2336,7 +2344,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966199u128)
+            amount: Uint128::from(966183u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2354,7 +2362,7 @@ fn execute_pair_native_token() {
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964003u128),
+            amount: Uint128::from(963993u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2393,7 +2401,7 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966199u128)
+            amount: Uint128::from(966183u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -2407,11 +2415,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964003u128),
+            amount: Uint128::from(963993u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2450,11 +2458,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980197u128)
+            amount: Uint128::from(980141u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985614u128),
+            amount: Uint128::from(985572u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2464,11 +2472,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964003u128),
+            amount: Uint128::from(963993u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2507,11 +2515,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980198u128)
+            amount: Uint128::from(980142u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985615u128),
+            amount: Uint128::from(985573u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2521,11 +2529,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964003u128),
+            amount: Uint128::from(963993u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2564,11 +2572,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980199u128)
+            amount: Uint128::from(980142u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985615u128),
+            amount: Uint128::from(985573u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2578,11 +2586,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964003u128),
+            amount: Uint128::from(963993u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2621,11 +2629,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980990u128)
+            amount: Uint128::from(980931u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985615u128),
+            amount: Uint128::from(985573u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2635,11 +2643,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(965585u128),
+            amount: Uint128::from(965571u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2660,6 +2668,28 @@ fn execute_pair_native_token() {
         address2_balances,
         expected_balances,
     );
+    
+    // Distribute to the executor
+    let msg = ExecuteMsg::DistributeReward {
+        asset_infos: [
+            [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ],
+        ].into()
+    };
+
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+    println!("distribute rewards res: {:?}", res);
 }
 
 #[test]
@@ -2711,6 +2741,8 @@ fn execute_pair_cw20_token() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -3830,7 +3862,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(963200u128)
+            amount: Uint128::from(963192u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3875,7 +3907,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966199u128)
+            amount: Uint128::from(966183u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3920,7 +3952,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966199u128)
+            amount: Uint128::from(966183u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3930,7 +3962,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3965,7 +3997,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980197u128)
+            amount: Uint128::from(980141u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3975,7 +4007,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4010,7 +4042,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980198u128)
+            amount: Uint128::from(980142u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4020,7 +4052,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4055,7 +4087,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980199u128)
+            amount: Uint128::from(980142u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4065,7 +4097,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4100,7 +4132,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980990u128)
+            amount: Uint128::from(980931u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4110,7 +4142,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973801u128)
+            amount: Uint128::from(973800u128)
         }
     ].to_vec();
     assert_eq!(
@@ -4127,6 +4159,28 @@ fn execute_pair_cw20_token() {
         address2_balances,
         expected_balances,
     );
+
+    // Distribute to the executor
+    let msg = ExecuteMsg::DistributeReward {
+        asset_infos: [
+            [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+            ],
+        ].into()
+    };
+
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+    println!("distribute rewards res: {:?}", res);
 }
 
 #[test]
@@ -4177,6 +4231,8 @@ fn remove_orderbook_pair() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -4440,6 +4496,8 @@ fn orders_querier() {
         name: None,
         version: None,
         admin: None,
+        commission_rate: None,
+        distribution_interval: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
