@@ -6,13 +6,14 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 use oraiswap::error::ContractError;
+use oraiswap::pair::DEFAULT_COMMISSION_RATE;
 
 use crate::order::{
     cancel_order, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair, distribute_reward
 };
 use crate::orderbook::OrderBook;
-use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
+use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook, init_last_executor_id};
 use crate::tick::{query_tick, query_ticks};
 
 use cw20::Cw20ReceiveMsg;
@@ -26,15 +27,18 @@ use oraiswap::limit_order::{
 const CONTRACT_NAME: &str = "crates.io:oraiswap_limit_order";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// 600 seconds default
+const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let config = ContractInfo { 
+    let config = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
 
@@ -44,11 +48,20 @@ pub fn instantiate(
         } else {
             creator
         },
+        init_time: env.block.time.seconds(),
+        commission_rate: msg
+            .commission_rate
+            .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
+        distribution_interval: msg
+            .distribution_interval
+            .unwrap_or(DEFAULT_DISTRIBUTION_INTERVAL),
     };
 
     store_config(deps.storage, &config)?;
 
     init_last_order_id(deps.storage)?;
+
+    init_last_executor_id(deps.storage)?;
 
     Ok(Response::default())
 }
@@ -56,7 +69,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -108,7 +121,12 @@ pub fn execute(
         ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
         } => {
-            excecute_pair(deps, asset_infos)
+            excecute_pair(deps, info, asset_infos)
+        }
+        ExecuteMsg::DistributeReward {
+            asset_infos 
+        } => {
+            distribute_reward(deps, env, info, asset_infos)
         }
         ExecuteMsg::RemoveOrderBookPair {
             asset_infos,

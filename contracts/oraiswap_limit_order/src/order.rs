@@ -1,13 +1,14 @@
+use std::str::FromStr;
 use std::convert::TryFrom;
 
-use crate::orderbook::Order;
+use crate::orderbook::{Order, Executor};
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook, read_excecutor, read_excecutors, increase_last_executor_id, store_executor, read_last_executor_id,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal, Env,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
@@ -27,8 +28,6 @@ pub fn submit_order(
         return Err(ContractError::AssetMustNotBeZero {})
     }
     
-    // check min base coin amount
-    // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
     let order_book = read_orderbook(deps.storage, &pair_key)?;
     let quote_asset = match direction {
@@ -133,10 +132,37 @@ pub fn cancel_order(
 
 pub fn excecute_pair(
     deps: DepsMut,
+    info: MessageInfo,
     asset_infos: [AssetInfo; 2],
 ) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let executor_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
+
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
+
+    let executor_res = read_excecutor(deps.storage, &pair_key, &executor_addr);
+    
+    let mut executor = match executor_res {
+        Ok(r_executor) => r_executor,
+        Err(_err) => {
+            increase_last_executor_id(deps.storage)?;
+            Executor::new(
+                executor_addr, 
+                [
+                    Asset {
+                        info: asset_infos[0].clone(),
+                        amount: Uint128::zero(),
+                    },
+                    Asset {
+                        info: asset_infos[1].clone(),
+                        amount: Uint128::zero(),
+                    }
+                ]
+            )
+        }
+    };
 
     let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
 
@@ -151,6 +177,8 @@ pub fn excecute_pair(
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_orders =  0;
+
+    let mut reward_amount ;
 
     for buy_order in &mut match_buy_orders {
         buy_order.status = OrderStatus::Filling;
@@ -185,7 +213,7 @@ pub fn excecute_pair(
             let lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
             let lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap();
 
-            let sell_ask_asset = Asset {
+            let mut sell_ask_asset = Asset {
                 info: asset_infos[1].clone(),
                 amount: Uint128::min(
                     lef_buy_offer_amount,
@@ -199,19 +227,11 @@ pub fn excecute_pair(
             );
 
             if lef_buy_ask_amount.is_zero() {
-                let buyer_return = Asset {
-                    info: asset_infos[1].clone(),
-                    amount: lef_buy_offer_amount,
-                };
-    
-                // dont use oracle for limit order
-                if buyer_return.amount > Uint128::zero() {
-                    messages.push(buyer_return.into_msg(
-                        None,
-                        &deps.querier,
-                        deps.api.addr_humanize(&buy_order.bidder_addr)?,
-                    )?);
+                if lef_buy_offer_amount > Uint128::zero() {
+                    executor.reward_assets[1].amount += lef_buy_offer_amount;
+                    executor.reward_assets[1].info = asset_infos[1].clone();
                 }
+
                 buy_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, buy_order)?;
 
@@ -228,22 +248,13 @@ pub fn excecute_pair(
 
                 sell_order.status = OrderStatus::Open;
                 store_order(deps.storage, &pair_key, &sell_order, false)?;
-                continue;
+                continue;                
             }
 
             if lef_sell_ask_amount.is_zero() || sell_offer_amount.is_zero() {
-                let seller_return = Asset {
-                    info: asset_infos[0].clone(),
-                    amount: lef_sell_offer_amount,
-                };
-    
-                // dont use oracle for limit order
-                if seller_return.amount > Uint128::zero() {
-                    messages.push(seller_return.into_msg(
-                        None,
-                        &deps.querier,
-                        deps.api.addr_humanize(&sell_order.bidder_addr)?,
-                    )?);
+                if lef_sell_offer_amount > Uint128::zero() {
+                    executor.reward_assets[0].amount += lef_sell_offer_amount;
+                    executor.reward_assets[0].info = asset_infos[0].clone();
                 }
 
                 sell_order.status = OrderStatus::Fulfilled;
@@ -270,6 +281,11 @@ pub fn excecute_pair(
             sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
 
             if !sell_ask_asset.amount.is_zero() {
+                reward_amount = sell_ask_asset.amount * commission_rate;
+                executor.reward_assets[1].amount += reward_amount;
+                executor.reward_assets[1].info = asset_infos[1].clone();
+                sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(reward_amount)?;
+
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
 
                 ret_attributes.push([
@@ -300,13 +316,17 @@ pub fn excecute_pair(
                     sell_ask_asset.amount,
                 )?;
 
-                let executor_receive = Asset {
+                let mut buy_ask_asset = Asset {
                     info: asset_infos[0].clone(),
                     amount: sell_offer_amount,
                 };
+                reward_amount = buy_ask_asset.amount * commission_rate;
+                executor.reward_assets[0].amount += reward_amount;
+                executor.reward_assets[0].info = asset_infos[0].clone();
+                buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(reward_amount)?;
 
                 // dont use oracle for limit order
-                messages.push(executor_receive.into_msg(
+                messages.push(buy_ask_asset.into_msg(
                     None,
                     &deps.querier,
                     deps.api.addr_validate(bidder_addr.as_str())?,
@@ -332,6 +352,7 @@ pub fn excecute_pair(
             store_order(deps.storage, &pair_key, &buy_order, false)?;
         }
     }
+    store_executor(deps.storage, &pair_key, &executor)?;
 
     Ok(Response::new().add_messages(messages)
         .add_attributes(vec![
@@ -341,6 +362,55 @@ pub fn excecute_pair(
             ("total_matched_orders", &total_orders.to_string()),
         ])
     )  
+}
+
+pub fn distribute_reward(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    asset_infos: Vec<[AssetInfo; 2]>,
+) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let _now = env.block.time.seconds();
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut reward_assets: [Asset; 2];
+    for asset_info in asset_infos {
+        let pair_key = pair_key(&[asset_info[0].to_raw(deps.api)?, asset_info[1].to_raw(deps.api)?]);
+        let num_executor = read_last_executor_id(deps.storage).unwrap_or_default();
+        let list_executor = read_excecutors(deps.storage, &pair_key, None, Some(num_executor), None)?;
+        for executor in list_executor {
+            reward_assets = [
+                Asset {
+                    info: asset_info[0].clone(),
+                    amount: executor.reward_assets[0].amount,
+                },
+                Asset {
+                    info: asset_info[1].clone(),
+                    amount: executor.reward_assets[1].amount,
+                }
+            ];
+            messages.push(reward_assets[0].into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+            )?);
+            messages.push(reward_assets[1].into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+            )?);
+        }
+    }
+
+    Ok(Response::new().add_messages(messages).add_attributes(vec![
+        ("action", "distribute_rewards"),
+    ]))
 }
 
 pub fn remove_pair(

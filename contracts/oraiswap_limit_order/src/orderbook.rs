@@ -29,6 +29,12 @@ pub struct Order {
     pub status: OrderStatus,
 }
 
+#[cw_serde]
+pub struct Executor {
+    pub address: CanonicalAddr,
+    pub reward_assets: [Asset; 2],
+}
+
 impl Order {
     // create new order given a price and an offer amount
     pub fn new(
@@ -318,5 +324,17 @@ impl OrderBook {
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
         .unwrap_or_default() // default is empty list
+    }
+}
+
+impl Executor {
+    pub fn new(
+        address: CanonicalAddr,
+        reward_assets: [Asset; 2],
+    ) -> Self {
+        Executor {
+            address,
+            reward_assets,
+        }
     }
 }

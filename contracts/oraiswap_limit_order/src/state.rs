@@ -1,9 +1,9 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Order as OrderBy, StdResult, Storage, CanonicalAddr};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
+use oraiswap::{limit_order::{ContractInfo}, querier::calc_range_start};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::orderbook::{Order, OrderBook};
+use crate::orderbook::{Order, OrderBook, Executor};
 
 // settings for pagination
 pub const MAX_LIMIT: u32 = 100;
@@ -27,6 +27,55 @@ pub fn store_config(storage: &mut dyn Storage, config: &ContractInfo) -> StdResu
 
 pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
     singleton_read(storage, CONTRACT_INFO).load()
+}
+
+pub fn init_last_executor_id(storage: &mut dyn Storage) -> StdResult<()> {
+    singleton(storage, KEY_LAST_EXECUTOR).save(&0u64)
+}
+
+pub fn increase_last_executor_id(storage: &mut dyn Storage) -> StdResult<u64> {
+    singleton(storage, KEY_LAST_EXECUTOR).update(|v| Ok(v + 1))
+}
+
+pub fn read_last_executor_id(storage: &dyn Storage) -> StdResult<u32> {
+    singleton_read(storage, KEY_LAST_EXECUTOR).load()
+}
+
+pub fn store_executor(
+    storage: &mut dyn Storage,
+    pair_key: &[u8],
+    executor: &Executor
+) -> StdResult<()> {
+    let executor_address_key = &executor.address;
+    Bucket::multilevel(storage, &[PREFIX_EXECUTOR, pair_key]).save(executor_address_key, executor)
+}
+
+pub fn read_excecutor(storage: &dyn Storage, pair_key: &[u8], address: &CanonicalAddr) -> StdResult<Executor> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_EXECUTOR, pair_key]).load(address)
+}
+
+pub fn read_excecutors(
+    storage: &mut dyn Storage,
+    pair_key: &[u8],
+    start_after: Option<u64>,
+    limit: Option<u32>,
+    order_by: Option<OrderBy>,
+) -> StdResult<Vec<Executor>> {
+    let position_bucket: ReadonlyBucket<Executor> =
+        ReadonlyBucket::multilevel(storage, &[PREFIX_EXECUTOR, pair_key]);
+
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
+    let (start, end, order_by) = match order_by {
+        Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
+        _ => (None, start_after, OrderBy::Descending),
+    };
+
+    position_bucket
+        .range(start.as_deref(), end.as_deref(), order_by)
+        .take(limit)
+        .map(|item| item.map(|item| item.1))
+        .collect()
 }
 
 pub fn store_orderbook(
@@ -223,6 +272,8 @@ static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess
 static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
 static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
+static KEY_LAST_EXECUTOR: &[u8] = b"last_executor"; // store last executor
+static PREFIX_EXECUTOR: &[u8] = b"executor"; // executor that running matching engine for orderbook pair
 
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick

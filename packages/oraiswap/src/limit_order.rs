@@ -9,6 +9,9 @@ pub struct ContractInfo {
     pub version: String,
     // admin can update the parameter, may be multisig
     pub admin: CanonicalAddr,
+    pub init_time: u64,
+    pub commission_rate: String,
+    pub distribution_interval: u64,
 }
 
 #[cw_serde]
@@ -59,6 +62,8 @@ pub struct InstantiateMsg {
     pub name: Option<String>,
     pub version: Option<String>,
     pub admin: Option<Addr>,
+    pub commission_rate: Option<String>,
+    pub distribution_interval: Option<u64>,
 }
 
 #[cw_serde]
@@ -92,6 +97,11 @@ pub enum ExecuteMsg {
     /// Arbitrager execute order book pair
     ExecuteOrderBookPair {
         asset_infos: [AssetInfo; 2],
+    },
+
+    /// Distribute reward to executor who run the matching engine
+    DistributeReward {
+        asset_infos: Vec<[AssetInfo; 2]>,
     },
 
     /// Arbitrager remove order book
