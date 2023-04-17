@@ -178,7 +178,7 @@ pub fn excecute_pair(
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_orders =  0;
 
-    let mut reward_amount ;
+    let mut reward_amount;
 
     for buy_order in &mut match_buy_orders {
         buy_order.status = OrderStatus::Filling;
@@ -186,6 +186,7 @@ pub fn excecute_pair(
 
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
+        let mut sell_ask_amount = Uint128::zero();
 
         for sell_order in &mut match_sell_orders {
             // check status of sell_order and buy_order
@@ -248,7 +249,7 @@ pub fn excecute_pair(
 
                 sell_order.status = OrderStatus::Open;
                 store_order(deps.storage, &pair_key, &sell_order, false)?;
-                continue;                
+                continue;
             }
 
             if lef_sell_ask_amount.is_zero() || sell_offer_amount.is_zero() {
@@ -281,6 +282,7 @@ pub fn excecute_pair(
             sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
 
             if !sell_ask_asset.amount.is_zero() {
+                sell_ask_amount = sell_ask_asset.amount;
                 reward_amount = sell_ask_asset.amount * commission_rate;
                 executor.reward_assets[1].amount += reward_amount;
                 executor.reward_assets[1].info = asset_infos[1].clone();
@@ -313,7 +315,7 @@ pub fn excecute_pair(
                     deps.storage,
                     &pair_key,
                     sell_offer_amount,
-                    sell_ask_asset.amount,
+                    sell_ask_amount,
                 )?;
 
                 let mut buy_ask_asset = Asset {
