@@ -5,7 +5,7 @@ use crate::orderbook::{Order, Executor};
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook, read_excecutor, read_excecutors, increase_last_executor_id, store_executor, read_last_executor_id,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook, read_excecutor, read_excecutors, increase_last_executor_id, store_executor, read_last_executor_id, read_last_distributed, store_last_distributed,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal, Env,
@@ -377,13 +377,27 @@ pub fn distribute_reward(
         return Err(ContractError::Unauthorized {});
     }
 
-    let _now = env.block.time.seconds();
+    let now = env.block.time.seconds();
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut reward_assets: [Asset; 2];
     for asset_info in asset_infos {
         let pair_key = pair_key(&[asset_info[0].to_raw(deps.api)?, asset_info[1].to_raw(deps.api)?]);
         let num_executor = read_last_executor_id(deps.storage).unwrap_or_default();
         let list_executor = read_excecutors(deps.storage, &pair_key, None, Some(num_executor), None)?;
+        // default is init time
+        let last_distributed = read_last_distributed(deps.storage, &pair_key)
+            .unwrap_or(now - contract_info.distribution_interval - 1);
+
+        let last_time_elapsed = now - last_distributed;
+
+        if last_time_elapsed < contract_info.distribution_interval {
+            // Cannot distribute reward tokens before interval, process next one
+            continue;
+        }
+
+        // store last distributed
+        store_last_distributed(deps.storage, &&pair_key, now)?;
+
         for mut executor in list_executor {
             reward_assets = [
                 Asset {
