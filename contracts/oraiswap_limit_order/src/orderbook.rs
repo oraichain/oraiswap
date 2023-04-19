@@ -240,7 +240,7 @@ impl OrderBook {
     /// find best buy price and best sell price that matched a spread, currently no spread is set
     pub fn find_match_price(&self, storage: &dyn Storage) -> Option<(Decimal, Decimal)> {
         let pair_key = &self.get_pair_key();
-        let (highest_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
+        let (mut best_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
         if !found {
             return None;
         }
@@ -248,6 +248,16 @@ impl OrderBook {
         // if there is spread, find the best sell price closest to best buy price
         if let Some(spread) = self.spread {
             let spread_factor = Decimal::one() + spread;
+            let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
+                .range(None, None, OrderBy::Descending)
+                .filter_map(|item| {
+                    if let Ok((price_key, _)) = item {
+                        let buy_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                        return Some(buy_price);
+                    }
+                    None
+                }).collect::<Vec<Decimal>>();
+
             let tick_namespaces = &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()];
 
             // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + spread)
@@ -255,25 +265,28 @@ impl OrderBook {
                 .range(None, None, OrderBy::Ascending)
                 .find_map(|item| {
                     if let Ok((price_key, _)) = item {
-                        let sell_price =
-                            Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                        if highest_buy_price.ge(&sell_price)
-                            && highest_buy_price.le(&(sell_price * spread_factor))
-                        {
-                            return Some(sell_price);
+                        let sell_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+
+                        for buy_price in &buy_price_list {
+                            if buy_price.ge(&sell_price)
+                            && buy_price.le(&(sell_price * spread_factor))
+                            {
+                                best_buy_price = *buy_price;
+                                return Some(sell_price);
+                            }
                         }
                     }
                     None
                 })
             {
-                return Some((highest_buy_price, sell_price));
+                return Some((best_buy_price, sell_price));
             }
         } else {
             let (lowest_sell_price, found, _) = self.lowest_price(storage, OrderDirection::Sell);
             // there is a match, we will find the best price with spread to prevent market fluctuation
             // we can use spread to convert price to index as well
-            if found && highest_buy_price.ge(&lowest_sell_price) {
-                return Some((highest_buy_price, lowest_sell_price));
+            if found && best_buy_price.ge(&lowest_sell_price) {
+                return Some((best_buy_price, lowest_sell_price));
             }
         }
         None
