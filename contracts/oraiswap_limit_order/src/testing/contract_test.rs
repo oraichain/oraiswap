@@ -5,7 +5,7 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::limit_order::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderBooksResponse,
-    OrderDirection, OrderFilter, OrderResponse, OrdersResponse, QueryMsg, TicksResponse, OrderBookResponse,
+    OrderDirection, OrderFilter, OrderResponse, OrdersResponse, QueryMsg, TicksResponse, OrderBookResponse, OrderBookMatchableResponse,
 };
 
 use crate::jsonstr;
@@ -2238,6 +2238,7 @@ fn execute_pair_native_token() {
                 denom: ORAI_DENOM.to_string(),
             },
         ],
+        limit: None
     };
 
     // Native token balance mismatch between the argument and the transferred
@@ -2259,6 +2260,7 @@ fn execute_pair_native_token() {
                 denom: USDT_DENOM.to_string(),
             },
         ],
+        limit: Some(10)
     };
 
     let _res = app.execute(
@@ -3790,6 +3792,7 @@ fn execute_pair_cw20_token() {
                 denom: ORAI_DENOM.to_string(),
             },
         ],
+        limit: None
     };
 
     // Native token balance mismatch between the argument and the transferred
@@ -3811,6 +3814,7 @@ fn execute_pair_cw20_token() {
                 contract_addr: token_addrs[0].clone(),
             },
         ],
+        limit: None
     };
 
     let _ = app.execute(
@@ -4135,7 +4139,7 @@ fn execute_pair_cw20_token() {
 /// Therefore, we need to find the highest suitable buy price and lowest suitable sell price
 /// Not the Highest and Lowest price in orderbook
 #[test]
-fn test_for_spread() {
+fn spread_test() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -4523,6 +4527,7 @@ fn test_for_spread() {
                 denom: ORAI_DENOM.to_string(),
             },
         ],
+        limit: None
     };
 
     // Native token balance mismatch between the argument and the transferred
@@ -4544,6 +4549,7 @@ fn test_for_spread() {
                 denom: USDT_DENOM.to_string(),
             },
         ],
+        limit: None
     };
 
     let _res = app.execute(
@@ -4603,6 +4609,279 @@ fn test_for_spread() {
         address2_balances,
         expected_balances,
     );
+}
+
+#[test]
+fn query_matchable() {
+    let mut app = MockApp::new(&[
+        (
+            &"addr0000".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0001".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0002".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000u128),
+                },
+            ],
+        ),
+    ]);
+
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+    };
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+    let limit_order_addr = app
+        .instantiate(
+            code_id,
+            Addr::unchecked("addr0000"),
+            &msg,
+            &[],
+            "limit order",
+        )
+        .unwrap();
+    
+    // Create pair [orai, usdt] for order book
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+        spread: Some(Decimal::percent(10)),
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+    
+    /* <----------------------------------- order 1 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(20000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+    
+    /* <----------------------------------- order 2 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(30000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    let res = app
+    .query::<OrderBookMatchableResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::OrderBookMatchable {
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ]
+        },
+    )
+    .unwrap();
+
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
+    assert_eq!(res, expected_res);
+    println!("[LOG] [1] orderbook matchable: {}", jsonstr!(res));
+
+    /* <----------------------------------- order 3 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(44800u128),
+            },
+        ],
+    };
+
+    // offer usdt, ask for orai
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0002"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(44800u128),
+            }],
+        )
+        .unwrap();
+    
+    let res = app
+    .query::<OrderBookMatchableResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::OrderBookMatchable {
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ]
+        },
+    )
+    .unwrap();
+
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
+    assert_eq!(res, expected_res);
+    println!("[LOG] [2] orderbook matchable: {}", jsonstr!(res));
+
+    /* <----------------------------------- order 4 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(22000u128),
+            },
+        ],
+    };
+
+    // offer usdt, ask for orai
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0002"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(22000u128),
+            }],
+        )
+        .unwrap();
+    
+    let res = app
+    .query::<OrderBookMatchableResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::OrderBookMatchable {
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ]
+        },
+    )
+    .unwrap();
+
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: true,
+    };
+    assert_eq!(res, expected_res);
+    println!("[LOG] [3] orderbook matchable: {}", jsonstr!(res));
+
 }
 
 #[test]
