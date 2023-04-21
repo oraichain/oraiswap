@@ -300,7 +300,7 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Uint128 {
-        let orders = self.find_match_orders(storage, price, direction);
+        let orders = self.find_match_orders(storage, price, direction, None);
         // in Order, ask amount is alway paid amount
         // in Orderbook, buy order is opposite to sell order
         orders
@@ -317,6 +317,7 @@ impl OrderBook {
         storage: &dyn Storage,
         price: Decimal,
         direction: OrderDirection,
+        limit: Option<u32>
     ) -> Vec<Order> {
         let pair_key = &self.get_pair_key();
         let price_key = price.atomics().to_be_bytes();
@@ -327,7 +328,7 @@ impl OrderBook {
             &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key],
             Box::new(move |x| direction.eq(x)),
             None,
-            None,
+            limit,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
         .unwrap_or_default() // default is empty list

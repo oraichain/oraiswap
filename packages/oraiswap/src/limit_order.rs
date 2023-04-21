@@ -92,6 +92,7 @@ pub enum ExecuteMsg {
     /// Arbitrager execute order book pair
     ExecuteOrderBookPair {
         asset_infos: [AssetInfo; 2],
+        limit: Option<u32>,
     },
 
     /// Arbitrager remove order book
@@ -161,6 +162,10 @@ pub enum QueryMsg {
     },
     #[returns(LastOrderIdResponse)]
     LastOrderId {},
+    #[returns(OrderBookMatchableResponse)]
+    OrderBookMatchable {
+        asset_infos: [AssetInfo; 2],
+    },
 }
 
 #[cw_serde]
@@ -215,6 +220,12 @@ pub struct TicksResponse {
 #[cw_serde]
 pub struct LastOrderIdResponse {
     pub last_order_id: u64,
+}
+
+
+#[cw_serde]
+pub struct OrderBookMatchableResponse {
+    pub is_matchable: bool,
 }
 
 /// We currently take no arguments for migrations
