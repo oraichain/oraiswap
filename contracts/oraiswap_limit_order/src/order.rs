@@ -143,7 +143,7 @@ pub fn excecute_pair(
     if contract_info.admin.ne(&sender_addr) {
         return Err(ContractError::Unauthorized {});
     }
-    
+
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
 
@@ -541,7 +541,7 @@ pub fn query_orderbook_is_matchable(
 ) -> StdResult<OrderBookMatchableResponse> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.storage).unwrap_or_default(); //unwrap_or_else(|| (Decimal::zero(), Decimal::zero()));
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.storage).unwrap_or_default();
 
     let mut resp = OrderBookMatchableResponse {
         is_matchable: true
