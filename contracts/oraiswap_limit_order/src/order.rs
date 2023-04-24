@@ -7,14 +7,14 @@ use crate::state::{
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute,
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal,
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
     LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrdersResponse, OrderStatus,
+    OrderResponse, OrdersResponse, OrderStatus, OrderBookMatchableResponse,
 };
 
 pub fn submit_order(
@@ -133,8 +133,17 @@ pub fn cancel_order(
 
 pub fn excecute_pair(
     deps: DepsMut,
+    info: MessageInfo,
     asset_infos: [AssetInfo; 2],
+    limit: Option<u32>,
 ) -> Result<Response, ContractError> {
+    let contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
 
@@ -145,8 +154,8 @@ pub fn excecute_pair(
         match_one_price = true;
     }
 
-    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy);
-    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell);
+    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy, limit);
+    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell, limit);
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
@@ -524,4 +533,25 @@ pub fn query_orderbook(
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
     ob.to_response(deps.api)
+}
+
+pub fn query_orderbook_is_matchable(
+    deps: Deps,
+    asset_infos: [AssetInfo; 2],
+) -> StdResult<OrderBookMatchableResponse> {
+    let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let ob = read_orderbook(deps.storage, &pair_key)?;
+    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.storage).unwrap_or_default();
+
+    let mut resp = OrderBookMatchableResponse {
+        is_matchable: true
+    };
+
+    if best_buy_price.eq(&Decimal::zero()) || best_sell_price.eq(&Decimal::zero()) {
+        resp = OrderBookMatchableResponse {
+            is_matchable: false
+        };
+    };
+    
+    Ok(resp)
 }

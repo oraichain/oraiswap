@@ -9,7 +9,7 @@ use oraiswap::error::ContractError;
 
 use crate::order::{
     cancel_order, query_last_order_id, query_order, query_orderbook,
-    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair,
+    query_orderbooks, query_orders, submit_order, remove_pair, excecute_pair, query_orderbook_is_matchable,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{init_last_order_id, read_config, store_config, store_orderbook, read_orderbook};
@@ -107,8 +107,9 @@ pub fn execute(
         } => cancel_order(deps, info, order_id, asset_infos),
         ExecuteMsg::ExecuteOrderBookPair {
             asset_infos,
+            limit,
         } => {
-            excecute_pair(deps, asset_infos)
+            excecute_pair(deps, info, asset_infos, limit)
         }
         ExecuteMsg::RemoveOrderBookPair {
             asset_infos,
@@ -273,6 +274,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order_by,
         )?),
+        QueryMsg::OrderBookMatchable {
+            asset_infos
+        } => to_binary(&query_orderbook_is_matchable(deps, asset_infos)?),
     }
 }
 
