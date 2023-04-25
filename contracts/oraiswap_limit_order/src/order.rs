@@ -346,51 +346,12 @@ pub fn remove_pair(
     }
 
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
-
-    let mut all_orders = ob.get_orders(deps.storage, None, None, Some(OrderBy::Ascending))?;
-    
-    let mut messages: Vec<CosmosMsg> = vec![];
-    let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
-    let mut total_orders =  0;
-    for order in &mut all_orders {
-        // Compute refund asset
-        let left_offer_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
-
-        let bidder_refund = Asset {
-            info: match order.direction {
-                OrderDirection::Buy => asset_infos[1].clone(),
-                OrderDirection::Sell => asset_infos[0].clone(),
-            },
-            amount: left_offer_amount,
-        };
-
-        // Build refund msg
-        if left_offer_amount > Uint128::zero() {
-            messages.push(bidder_refund.into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?);
-        }
-        total_orders += 1;
-        order.status = OrderStatus::Cancel;
-        remove_order(deps.storage, &pair_key, &order)?;
-        ret_attributes.push([
-            Attribute { key: "status".to_string(), value: format!("{:?}", order.status) },
-            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&order.bidder_addr)?.to_string() },
-            Attribute { key: "order_id".to_string(), value: order.order_id.to_string() },
-            Attribute { key: "direction".to_string(), value: format!("{:?}", order.direction)},
-            Attribute { key: "offer_amount".to_string(), value: order.offer_amount.to_string() },
-            Attribute { key: "filled_offer_amount".to_string(), value: order.filled_offer_amount.to_string() },
-            Attribute { key: "ask_amount".to_string(), value: order.ask_amount.to_string() },
-            Attribute { key: "filled_ask_amount".to_string(), value: order.ask_amount.to_string() },
-        ].to_vec());
-    }
 
     remove_orderbook(deps.storage, &pair_key);
 
-    Ok(Response::new().add_messages(messages).add_attributes(vec![
+    Ok(Response::new().add_attributes(vec![
         ("action", "remove_orderbook_pair"),
         ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
-        ("list_order_removed", &format!("{:?}", &ret_attributes)),
-        ("total_removed_orders", &total_orders.to_string()),
     ]))
 }
 
