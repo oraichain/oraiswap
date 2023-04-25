@@ -24,6 +24,10 @@ pub enum ExecuteMsg {
     CreatePair {
         /// Asset infos
         asset_infos: [AssetInfo; 2],
+        pair_admin: Option<String>,
+    },
+    AddPair {
+        pair_info: PairInfo,
     },
 }
 

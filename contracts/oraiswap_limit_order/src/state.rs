@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::orderbook::{Order, OrderBook};
 
 // settings for pagination
-pub const MAX_LIMIT: u32 = 30;
+pub const MAX_LIMIT: u32 = 100;
 pub const DEFAULT_LIMIT: u32 = 10;
 
 pub fn init_last_order_id(storage: &mut dyn Storage) -> StdResult<()> {
@@ -110,6 +110,9 @@ pub fn store_order(
     )
     .save(order_id_key, &order.direction)?;
 
+    Bucket::multilevel(storage, &[PREFIX_ORDER_BY_DIRECTION, pair_key, &order.direction.as_bytes()])
+        .save(order_id_key, &order.direction)?;
+    
     Ok(total_tick_orders)
 }
 
@@ -130,7 +133,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
         total_tick_orders -= 1;
         if total_tick_orders > 0 {
             // save total orders for a tick
-            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders)?;
+            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders).unwrap();
         } else {
             Bucket::<u64>::multilevel(storage, tick_namespaces).remove(&price_key);
         }
@@ -149,6 +152,9 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
         ],
     )
     .remove(order_id_key);
+
+    Bucket::<bool>::multilevel(storage, &[PREFIX_ORDER_BY_DIRECTION, pair_key, &order.direction.as_bytes()])
+        .remove(order_id_key);
 
     // return total orders belong to the tick
     Ok(total_tick_orders)
@@ -220,4 +226,5 @@ static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
 
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick
+pub static PREFIX_ORDER_BY_DIRECTION: &[u8] = b"order_by_direction"; // order from the direction
 pub static PREFIX_TICK: &[u8] = b"tick"; // this is tick with value is the total orders

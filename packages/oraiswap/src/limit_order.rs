@@ -27,6 +27,28 @@ impl OrderDirection {
     }
 }
 
+#[cw_serde]
+#[derive(Copy)]
+pub enum OrderStatus {
+    Open,
+    Filling,
+    PartialFilled,
+    Fulfilled,
+    Cancel,
+}
+
+impl OrderStatus {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            OrderStatus::Open => &[0u8],
+            OrderStatus::Filling => &[1u8],
+            OrderStatus::PartialFilled => &[2u8],
+            OrderStatus::Fulfilled => &[3u8],
+            OrderStatus::Cancel => &[4u8],
+        }
+    }
+}
+
 impl Default for OrderDirection {
     fn default() -> Self {
         OrderDirection::Buy
@@ -48,10 +70,10 @@ pub enum ExecuteMsg {
     },
 
     CreateOrderBookPair {
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
-        precision: Option<Decimal>,
-        min_offer_amount: Uint128,
+        base_coin_info: AssetInfo,
+        quote_coin_info: AssetInfo,
+        spread: Option<Decimal>,
+        min_quote_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -61,25 +83,20 @@ pub enum ExecuteMsg {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         assets: [Asset; 2],
     },
+
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
     },
 
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        ask_asset: Asset,
-        order_id: u64,
-        offer_info: AssetInfo,
-    },
-
     /// Arbitrager execute order book pair
     ExecuteOrderBookPair {
         asset_infos: [AssetInfo; 2],
+        limit: Option<u32>,
     },
 
     /// Arbitrager remove order book
-    RemoveOrderBook {
+    RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
 }
@@ -89,12 +106,6 @@ pub enum Cw20HookMsg {
     SubmitOrder {
         direction: OrderDirection,
         assets: [Asset; 2],
-    },
-
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        order_id: u64,
-        offer_info: AssetInfo,
     },
 }
 
@@ -151,6 +162,10 @@ pub enum QueryMsg {
     },
     #[returns(LastOrderIdResponse)]
     LastOrderId {},
+    #[returns(OrderBookMatchableResponse)]
+    OrderBookMatchable {
+        asset_infos: [AssetInfo; 2],
+    },
 }
 
 #[cw_serde]
@@ -175,10 +190,10 @@ pub struct OrderResponse {
 
 #[cw_serde]
 pub struct OrderBookResponse {
-    pub offer_info: AssetInfo,
-    pub ask_info: AssetInfo,
-    pub min_offer_amount: Uint128,
-    pub precision: Option<Decimal>,
+    pub base_coin_info: AssetInfo,
+    pub quote_coin_info: AssetInfo,
+    pub spread: Option<Decimal>,
+    pub min_quote_coin_amount: Uint128,
 }
 
 #[cw_serde]
@@ -205,6 +220,12 @@ pub struct TicksResponse {
 #[cw_serde]
 pub struct LastOrderIdResponse {
     pub last_order_id: u64,
+}
+
+
+#[cw_serde]
+pub struct OrderBookMatchableResponse {
+    pub is_matchable: bool,
 }
 
 /// We currently take no arguments for migrations

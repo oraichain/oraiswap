@@ -128,23 +128,17 @@ pub fn compute_swap(
 
     // offer => ask
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
-    let cp = offer_pool.checked_mul(ask_pool)?;
+    let cp = offer_pool * ask_pool;
 
-    let cp_div = cp
-        .checked_div(offer_pool.checked_add(offer_amount)?)
-        .map_err(|err| StdError::from(err))?;
-    let return_amount = ask_pool.checked_sub(cp_div)?;
+    let return_amount = ask_pool - cp / (offer_pool + offer_amount);
 
     // calculate spread & commission
-    let spread_amount = offer_amount
-        .multiply_ratio(ask_pool, offer_pool)
-        .checked_sub(return_amount)
-        .unwrap_or_default();
+    let spread_amount = offer_amount.multiply_ratio(ask_pool, offer_pool) - return_amount;
 
     let commission_amount = return_amount * commission_rate;
 
     // commission will be absorbed to pool
-    let return_amount = return_amount.checked_sub(commission_amount)?;
+    let return_amount = return_amount - commission_amount;
     Ok((
         return_amount
             .try_into()
