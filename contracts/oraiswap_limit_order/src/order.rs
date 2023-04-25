@@ -20,28 +20,12 @@ use oraiswap::limit_order::{
 pub fn submit_order(
     deps: DepsMut,
     sender: Addr,
+    pair_key: &[u8],
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
     if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
         return Err(ContractError::AssetMustNotBeZero {})
-    }
-    
-    // check min base coin amount
-    // need to setup min base coin amount for a specific pair so that no one can spam
-    let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
-    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-    let quote_asset = match direction {
-        OrderDirection::Buy => assets[0].clone(),
-        OrderDirection::Sell => assets[1].clone(),
-    };
-
-    // require minimum amount for quote asset
-    if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
-        return Err(ContractError::TooSmallQuoteAsset {
-            quote_coin: quote_asset.info.to_string(),
-            min_quote_amount: orderbook_pair.min_quote_coin_amount,
-        });
     }
 
     let order_id = increase_last_order_id(deps.storage)?;
@@ -81,6 +65,7 @@ pub fn cancel_order(
     asset_infos: [AssetInfo; 2],
 ) -> Result<Response, ContractError> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.status == OrderStatus::Fulfilled {
@@ -104,8 +89,8 @@ pub fn cancel_order(
 
     let bidder_refund = Asset {
         info: match order.direction {
-            OrderDirection::Buy => asset_infos[1].clone(),
-            OrderDirection::Sell => asset_infos[0].clone(),
+            OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+            OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
         },
         amount: left_offer_amount,
     };
@@ -123,7 +108,7 @@ pub fn cancel_order(
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "cancel_order"),
-        ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
+        ("pair", &format!("{} - {}", &orderbook_pair.base_coin_info.to_normal(deps.api)?, &orderbook_pair.quote_coin_info.to_normal(deps.api)?)),
         ("order_id", &order_id.to_string()),
         ("status", &format!("{:?}", OrderStatus::Cancel)),
         ("bidder_addr", &deps.api.addr_humanize(&order.bidder_addr)?.to_string()),
@@ -419,8 +404,10 @@ pub fn query_order(
     order_id: u64,
 ) -> StdResult<OrderResponse> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     let order = read_order(deps.storage, &pair_key, order_id)?;
-    order.to_response(deps.api, asset_infos[0].clone(), asset_infos[1].clone())
+
+    order.to_response(deps.api, orderbook_pair.base_coin_info.to_normal(deps.api)?, orderbook_pair.quote_coin_info.to_normal(deps.api)?)
 }
 
 pub fn query_orders(
@@ -434,6 +421,7 @@ pub fn query_orders(
 ) -> StdResult<OrdersResponse> {
     let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
     let (direction_filter, direction_key): (Box<dyn Fn(&OrderDirection) -> bool>, Vec<u8>) =
         match direction {
@@ -497,7 +485,7 @@ pub fn query_orders(
     let resp = OrdersResponse {
         orders: orders
             .iter()
-            .map(|order| order.to_response(deps.api, asset_infos[0].clone(), asset_infos[1].clone()))
+            .map(|order| order.to_response(deps.api, orderbook_pair.base_coin_info.to_normal(deps.api)?, orderbook_pair.quote_coin_info.to_normal(deps.api)?))
             .collect::<StdResult<Vec<OrderResponse>>>()?,
     };
 

@@ -87,8 +87,8 @@ impl Order {
     pub fn to_response(
         &self,
         api: &dyn Api,
-        offer_info: AssetInfo,
-        ask_info: AssetInfo,
+        base_info: AssetInfo,
+        quote_info: AssetInfo,
     ) -> StdResult<OrderResponse> {
         Ok(OrderResponse {
             order_id: self.order_id,
@@ -97,15 +97,15 @@ impl Order {
             offer_asset: Asset {
                 amount: self.offer_amount,
                 info: match self.direction {
-                    OrderDirection::Buy => offer_info.clone(),
-                    OrderDirection::Sell => ask_info.clone(),
+                    OrderDirection::Buy => quote_info.clone(),
+                    OrderDirection::Sell => base_info.clone(),
                 },
             },
             ask_asset: Asset {
                 amount: self.ask_amount,
                 info: match self.direction {
-                    OrderDirection::Buy => ask_info.clone(),
-                    OrderDirection::Sell => offer_info.clone(),
+                    OrderDirection::Buy => base_info.clone(),
+                    OrderDirection::Sell => quote_info.clone(),
                 },
             },
             filled_offer_amount: self.filled_offer_amount,
