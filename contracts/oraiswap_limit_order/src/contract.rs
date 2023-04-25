@@ -80,14 +80,29 @@ pub fn execute(
             direction,
             assets,
         } => {
+            let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
             // if sell then paid asset must be ask asset, this way we've just assumed that we offer usdt and ask for orai
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
-            let paid_asset = match direction {
-                OrderDirection::Buy => &assets[1],
-                OrderDirection::Sell => &assets[0],
-            };
+            let paid_asset: &Asset;
+            let quote_asset: &Asset;
+
+            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
+                paid_asset = match direction {
+                    OrderDirection::Buy => &assets[1],
+                    OrderDirection::Sell => &assets[0],
+                };
+                quote_asset = &assets[1];
+            } else {
+                paid_asset = match direction {
+                    OrderDirection::Buy => &assets[0],
+                    OrderDirection::Sell => &assets[1],
+                };
+                quote_asset = &assets[0];
+            }
 
             // if paid asset is cw20, we check it in Cw20HookMessage
             if !paid_asset.is_native_token() {
@@ -95,10 +110,26 @@ pub fn execute(
             }
 
             paid_asset.assert_sent_native_token_balance(&info)?;
+
+            // require minimum amount for quote asset
+            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
+                return Err(ContractError::TooSmallQuoteAsset {
+                    quote_coin: quote_asset.info.to_string(),
+                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
+                });
+            }
+
             // then submit order
-            match direction {
-                OrderDirection::Buy => submit_order(deps, info.sender, direction, [assets[1].clone(), assets[0].clone()]),
-                OrderDirection::Sell => submit_order(deps, info.sender, direction, [assets[0].clone(), assets[1].clone()]),
+            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
+                match direction {
+                    OrderDirection::Buy => submit_order(deps, info.sender, &pair_key, direction, [assets[1].clone(), assets[0].clone()]),
+                    OrderDirection::Sell => submit_order(deps, info.sender, &pair_key, direction, [assets[0].clone(), assets[1].clone()]),
+                }
+            } else {
+                match direction {
+                    OrderDirection::Buy => submit_order(deps, info.sender, &pair_key, direction, [assets[0].clone(), assets[1].clone()]),
+                    OrderDirection::Sell => submit_order(deps, info.sender, &pair_key, direction, [assets[1].clone(), assets[0].clone()]),
+                }
             }
         }
         ExecuteMsg::CancelOrder {
@@ -199,18 +230,48 @@ pub fn receive_cw20(
             direction,
             assets,
         }) => {
-            let paid_asset = match direction {
-                OrderDirection::Buy => &assets[1],
-                OrderDirection::Sell => &assets[0],
-            };
+            let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+            let paid_asset: &Asset;
+            let quote_asset: &Asset;
+
+            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
+                paid_asset = match direction {
+                    OrderDirection::Buy => &assets[1],
+                    OrderDirection::Sell => &assets[0],
+                };
+                quote_asset = &assets[1];
+            } else {
+                paid_asset = match direction {
+                    OrderDirection::Buy => &assets[0],
+                    OrderDirection::Sell => &assets[1],
+                };
+                quote_asset = &assets[0];
+            }
 
             if paid_asset.amount != provided_asset.amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
-            match direction {
-                OrderDirection::Buy => submit_order(deps, sender, direction, [assets[1].clone(), assets[0].clone()]),
-                OrderDirection::Sell => submit_order(deps, sender, direction, [assets[0].clone(), assets[1].clone()]),
+            // require minimum amount for quote asset
+            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
+                return Err(ContractError::TooSmallQuoteAsset {
+                    quote_coin: quote_asset.info.to_string(),
+                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
+                });
+            }
+
+            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
+                match direction {
+                    OrderDirection::Buy => submit_order(deps, sender, &pair_key, direction, [assets[1].clone(), assets[0].clone()]),
+                    OrderDirection::Sell => submit_order(deps, sender, &pair_key, direction, [assets[0].clone(), assets[1].clone()]),
+                }
+            } else {
+                match direction {
+                    OrderDirection::Buy => submit_order(deps, sender, &pair_key, direction, [assets[0].clone(), assets[1].clone()]),
+                    OrderDirection::Sell => submit_order(deps, sender, &pair_key, direction, [assets[1].clone(), assets[0].clone()]),
+                }
             }
         },
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
