@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_binary, Addr, Coin, Uint128, Decimal};
+use cosmwasm_std::{to_binary, Addr, Coin, Uint128, Decimal, StdError};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -4850,7 +4850,45 @@ fn remove_orderbook_pair() {
         )
         .unwrap();
 
-    // remove order book for pair [orai, token_addr]
+    let order_3= OrderResponse {
+        order_id: 3u64,
+        bidder_addr: "addr0001".to_string(),
+        offer_asset: Asset {
+            amount: Uint128::from(13000u128),
+            info: AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+        },
+        ask_asset: Asset {
+            amount: Uint128::from(14000u128),
+            info: AssetInfo::NativeToken {
+                denom: ATOM_DENOM.to_string(),
+            },
+        },
+        filled_offer_amount: Uint128::zero(),
+        filled_ask_amount: Uint128::zero(),
+        direction: OrderDirection::Buy,
+    };
+
+    assert_eq!(
+        order_3,
+        app.query::<OrderResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Order {
+                order_id: 3,
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ATOM_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                ],
+            }
+        ).unwrap()
+    );
+
+    // remove order book for pair [orai, atom]
     let msg = ExecuteMsg::RemoveOrderBookPair {
         asset_infos: [
             AssetInfo::NativeToken {
@@ -4871,35 +4909,41 @@ fn remove_orderbook_pair() {
     .unwrap();
 
     println!("remove order book pair res: {:?}", res);
-    let address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    let address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    let address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("address0_balances: {:?}", address0_balances);
-    println!("address1_balances: {:?}", address1_balances);
-    println!("address2_balances: {:?}", address2_balances);
 
-    let expected_balances: Vec<Coin> = [
-        Coin{
-            denom: ATOM_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        },
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128),
+    let res = app.query::<OrdersResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Orders {
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+            ],
+            direction: None,
+            filter: OrderFilter::None,
+            start_after: None,
+            limit: None,
+            order_by: None,
         }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
+    ).unwrap_err();
+    assert_eq!(res, StdError::GenericErr {msg: "Querier contract error: oraiswap_limit_order::orderbook::OrderBook not found".to_string()});
+    let res = app.query::<OrderResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Order {
+            order_id: 3,
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+            ],
+        }
+    ).unwrap_err();
+    assert_eq!(res, StdError::GenericErr {msg: "Querier contract error: oraiswap_limit_order::orderbook::OrderBook not found".to_string()});
 }
 
 #[test]
