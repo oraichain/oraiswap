@@ -30,17 +30,17 @@ pub fn submit_order(
     // check min base coin amount
     // need to setup min base coin amount for a specific pair so that no one can spam
     let pair_key = pair_key(&[assets[0].to_raw(deps.api)?.info, assets[1].to_raw(deps.api)?.info]);
-    let order_book = read_orderbook(deps.storage, &pair_key)?;
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     let quote_asset = match direction {
         OrderDirection::Buy => assets[0].clone(),
         OrderDirection::Sell => assets[1].clone(),
     };
 
     // require minimum amount for quote asset
-    if quote_asset.amount.lt(&order_book.min_quote_coin_amount) {
+    if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
         return Err(ContractError::TooSmallQuoteAsset {
             quote_coin: quote_asset.info.to_string(),
-            min_quote_amount: order_book.min_quote_coin_amount,
+            min_quote_amount: orderbook_pair.min_quote_coin_amount,
         });
     }
 
@@ -145,17 +145,17 @@ pub fn excecute_pair(
     }
 
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.as_ref().storage).unwrap();
+    let (best_buy_price, best_sell_price) = orderbook_pair.find_match_price(deps.as_ref().storage).unwrap();
 
     let mut match_one_price = false;
     if best_buy_price.eq(&best_sell_price) {
         match_one_price = true;
     }
 
-    let mut match_buy_orders = ob.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy, limit);
-    let mut match_sell_orders = ob.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell, limit);
+    let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy, limit);
+    let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell, limit);
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
@@ -195,7 +195,7 @@ pub fn excecute_pair(
             let lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap();
 
             let sell_ask_asset = Asset {
-                info: asset_infos[1].clone(),
+                info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
                 amount: Uint128::min(
                     lef_buy_offer_amount,
                     lef_sell_ask_amount,
@@ -209,7 +209,7 @@ pub fn excecute_pair(
 
             if lef_buy_ask_amount.is_zero() {
                 let buyer_return = Asset {
-                    info: asset_infos[1].clone(),
+                    info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
                     amount: lef_buy_offer_amount,
                 };
     
@@ -242,7 +242,7 @@ pub fn excecute_pair(
 
             if lef_sell_ask_amount.is_zero() || sell_offer_amount.is_zero() {
                 let seller_return = Asset {
-                    info: asset_infos[0].clone(),
+                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
                     amount: lef_sell_offer_amount,
                 };
     
@@ -310,7 +310,7 @@ pub fn excecute_pair(
                 )?;
 
                 let executor_receive = Asset {
-                    info: asset_infos[0].clone(),
+                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
                     amount: sell_offer_amount,
                 };
 

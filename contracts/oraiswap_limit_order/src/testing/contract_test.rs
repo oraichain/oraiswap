@@ -2254,10 +2254,10 @@ fn execute_pair_native_token() {
     let msg = ExecuteMsg::ExecuteOrderBookPair {
         asset_infos: [
             AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
+                denom: USDT_DENOM.to_string(),
             },
             AssetInfo::NativeToken {
-                denom: USDT_DENOM.to_string(),
+                denom: ORAI_DENOM.to_string(),
             },
         ],
         limit: Some(10)
