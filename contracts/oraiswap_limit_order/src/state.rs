@@ -61,10 +61,7 @@ pub fn read_orderbooks(
         .collect()
 }
 
-pub fn remove_orderbook<'a>(
-    storage: &'a mut dyn Storage,
-    pair_key: &[u8],
-) {
+pub fn remove_orderbook<'a>(storage: &'a mut dyn Storage, pair_key: &[u8]) {
     Bucket::<'a, OrderBook>::new(storage, PREFIX_ORDER_BOOK).remove(pair_key)
 }
 
@@ -110,9 +107,16 @@ pub fn store_order(
     )
     .save(order_id_key, &order.direction)?;
 
-    Bucket::multilevel(storage, &[PREFIX_ORDER_BY_DIRECTION, pair_key, &order.direction.as_bytes()])
-        .save(order_id_key, &order.direction)?;
-    
+    Bucket::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_DIRECTION,
+            pair_key,
+            &order.direction.as_bytes(),
+        ],
+    )
+    .save(order_id_key, &order.direction)?;
+
     Ok(total_tick_orders)
 }
 
@@ -133,7 +137,9 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
         total_tick_orders -= 1;
         if total_tick_orders > 0 {
             // save total orders for a tick
-            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders).unwrap();
+            Bucket::multilevel(storage, tick_namespaces)
+                .save(&price_key, &total_tick_orders)
+                .unwrap();
         } else {
             Bucket::<u64>::multilevel(storage, tick_namespaces).remove(&price_key);
         }
@@ -153,8 +159,15 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     )
     .remove(order_id_key);
 
-    Bucket::<bool>::multilevel(storage, &[PREFIX_ORDER_BY_DIRECTION, pair_key, &order.direction.as_bytes()])
-        .remove(order_id_key);
+    Bucket::<bool>::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_DIRECTION,
+            pair_key,
+            &order.direction.as_bytes(),
+        ],
+    )
+    .remove(order_id_key);
 
     // return total orders belong to the tick
     Ok(total_tick_orders)
@@ -165,17 +178,14 @@ pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdR
 }
 
 /// read_orders_with_indexer: namespace is PREFIX + PAIR_KEY + INDEXER
-pub fn read_orders_with_indexer<T>(
+pub fn read_orders_with_indexer<T: Serialize + DeserializeOwned>(
     storage: &dyn Storage,
     namespaces: &[&[u8]],
     filter: Box<dyn Fn(&T) -> bool>,
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
-) -> StdResult<Vec<Order>>
-where
-    T: Serialize + DeserializeOwned,
-{
+) -> StdResult<Vec<Order>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {

@@ -1,13 +1,14 @@
 [package]
 name = "oraiswap"
-version = "1.0.0"
-authors = ["Oraichain Labs","Terraform Labs, PTE."]
-edition = "2021"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
 description = "Common oraiswap types used in different Oraichain Labs contracts like oraiDEX, IBC Wasm"
-license = "MIT"
-repository = "https://github.com/oraichain/oraiswap"
-homepage = "https://orai.io"
-documentation = "https://docs.orai.io"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,19 +19,20 @@ readme = "README.md"
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cw20 = { version = "1.0.1" }
-cosmwasm-storage = { version = "1.1.9" }
-cosmwasm-std = { version = "1.1.9" }
-thiserror = { version = "1.0.23" }
+cosmwasm-schema = { workspace = true }
+cosmwasm-storage = { workspace = true }
+cosmwasm-std = { workspace = true }
+thiserror = { workspace = true }
 # using cw20-base contract as library
-cw20-base = { version = "1.0.1", features = ["library"] }
-cosmwasm-schema = "1.1.9"
+cw20 = { workspace = true }
+cw20-base = { workspace = true, features = ["library"] }
+
 schemars = "0.8.3"
 protobuf = { version = "3.2.0", features = ["with-bytes"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # this import is for testing library
-cw-multi-test = "0.16.2"
+cw-multi-test = { workspace = true }
 
 
 
