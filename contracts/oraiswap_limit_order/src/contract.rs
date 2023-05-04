@@ -26,6 +26,9 @@ use oraiswap::limit_order::{
 const CONTRACT_NAME: &str = "crates.io:oraiswap_limit_order";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// default commission rate = 0.1 %
+const DEFAULT_COMMISSION_RATE: &str = "0.001";
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -44,6 +47,9 @@ pub fn instantiate(
         } else {
             creator
         },
+        commission_rate: msg
+            .commission_rate
+            .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
     };
 
     store_config(deps.storage, &config)?;
