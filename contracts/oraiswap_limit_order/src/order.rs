@@ -1,10 +1,11 @@
 use std::convert::TryFrom;
+use std::str::FromStr;
 
-use crate::orderbook::Order;
+use crate::orderbook::{Order, Executor};
 use crate::state::{
     increase_last_order_id, read_last_order_id, read_order, read_orderbook, read_orderbooks,
     read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook, store_executor, read_excecutor,
 };
 use cosmwasm_std::{
     Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal,
@@ -123,14 +124,32 @@ pub fn excecute_pair(
     limit: Option<u32>,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-
-    if contract_info.admin.ne(&sender_addr) {
-        return Err(ContractError::Unauthorized {});
-    }
+    let executor_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
 
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+    let executor_res = read_excecutor(deps.storage, &pair_key, &executor_addr);
+    let mut executor = match executor_res {
+        Ok(r_executor) => r_executor,
+        Err(_err) => {
+            // increase_last_executor_id(deps.storage)?;
+            Executor::new(
+                executor_addr, 
+                [
+                    Asset {
+                        info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                        amount: Uint128::zero(),
+                    },
+                    Asset {
+                        info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                        amount: Uint128::zero(),
+                    }
+                ]
+            )
+        }
+    };
 
     let (best_buy_price, best_sell_price) = orderbook_pair.find_match_price(deps.as_ref().storage).unwrap();
 
@@ -145,6 +164,7 @@ pub fn excecute_pair(
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_orders =  0;
+    let mut reward_amount;
 
     for buy_order in &mut match_buy_orders {
         buy_order.status = OrderStatus::Filling;
@@ -152,6 +172,7 @@ pub fn excecute_pair(
 
         let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
         let mut match_price = buy_order.get_price();
+        let mut sell_ask_amount = Uint128::zero();
 
         for sell_order in &mut match_sell_orders {
             // check status of sell_order and buy_order
@@ -178,7 +199,7 @@ pub fn excecute_pair(
             }
             let mut lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
 
-            let sell_ask_asset = Asset {
+            let mut sell_ask_asset = Asset {
                 info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
                 amount: Uint128::min(
                     lef_buy_offer_amount,
@@ -197,6 +218,11 @@ pub fn excecute_pair(
             sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
 
             if !sell_ask_asset.amount.is_zero() {
+                sell_ask_amount = sell_ask_asset.amount;
+                reward_amount = sell_ask_asset.amount * commission_rate;
+                executor.reward_assets[1].amount += reward_amount;
+                executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
+                sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(reward_amount)?;
                 messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
 
                 ret_attributes.push([
@@ -224,16 +250,21 @@ pub fn excecute_pair(
                     deps.storage,
                     &pair_key,
                     sell_offer_amount,
-                    sell_ask_asset.amount,
+                    sell_ask_amount,
                 )?;
 
-                let executor_receive = Asset {
+                let mut buy_ask_asset = Asset {
                     info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
                     amount: sell_offer_amount,
                 };
 
+                reward_amount = buy_ask_asset.amount * commission_rate;
+                executor.reward_assets[0].amount += reward_amount;
+                executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
+                buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(reward_amount)?;
+
                 // dont use oracle for limit order
-                messages.push(executor_receive.into_msg(
+                messages.push(buy_ask_asset.into_msg(
                     None,
                     &deps.querier,
                     deps.api.addr_validate(bidder_addr.as_str())?,
@@ -256,18 +287,10 @@ pub fn excecute_pair(
             lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
             let lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap();
 
-            if lef_sell_offer_amount > Uint128::zero() && (lef_sell_offer_amount < Uint128::from(orderbook_pair.min_quote_coin_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap() || lef_sell_ask_amount.is_zero()) {
-                let seller_return = Asset {
-                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                    amount: lef_sell_offer_amount,
-                };
+            if lef_sell_offer_amount > Uint128::zero() && (lef_sell_ask_amount < orderbook_pair.min_quote_coin_amount || lef_sell_ask_amount.is_zero()) {
+                executor.reward_assets[0].amount += lef_sell_offer_amount;
+                executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
 
-                messages.push(seller_return.into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_humanize(&sell_order.bidder_addr)?,
-                )?);
-                
                 sell_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, sell_order)?;
                 ret_attributes.push([
@@ -283,16 +306,8 @@ pub fn excecute_pair(
             }
 
             if lef_buy_offer_amount > Uint128::zero() && (lef_buy_offer_amount < orderbook_pair.min_quote_coin_amount || lef_buy_ask_amount.is_zero()) {
-                let buyer_return = Asset {
-                    info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                    amount: lef_buy_offer_amount,
-                };
-
-                messages.push(buyer_return.into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_humanize(&buy_order.bidder_addr)?,
-                )?);
+                executor.reward_assets[1].amount += lef_buy_offer_amount;
+                executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
 
                 buy_order.status = OrderStatus::Fulfilled;
                 remove_order(deps.storage, &pair_key, buy_order)?;
@@ -316,6 +331,24 @@ pub fn excecute_pair(
             buy_order.status = OrderStatus::Open;
             store_order(deps.storage, &pair_key, &buy_order, false)?;
         }
+
+        if Uint128::from(executor.reward_assets[0].amount * match_price) >= orderbook_pair.min_quote_coin_amount {
+            messages.push(executor.reward_assets[0].into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+            )?);
+        }
+
+        if executor.reward_assets[1].amount >= orderbook_pair.min_quote_coin_amount {
+            messages.push(executor.reward_assets[1].into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+            )?);
+        }
+
+        store_executor(deps.storage, &pair_key, &executor)?;
     }
 
     Ok(Response::new().add_messages(messages)
