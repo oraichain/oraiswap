@@ -9,6 +9,7 @@ pub struct ContractInfo {
     pub version: String,
     // admin can update the parameter, may be multisig
     pub admin: CanonicalAddr,
+    pub commission_rate: String
 }
 
 #[cw_serde]
@@ -59,6 +60,7 @@ pub struct InstantiateMsg {
     pub name: Option<String>,
     pub version: Option<String>,
     pub admin: Option<Addr>,
+    pub commission_rate: Option<String>,
 }
 
 #[cw_serde]
