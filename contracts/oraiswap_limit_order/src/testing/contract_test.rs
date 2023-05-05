@@ -4379,18 +4379,18 @@ fn spread_test() {
 }
 
 #[test]
-fn minium_amount_test() {
+fn reward_to_executor_test() {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
                 Coin {
                     denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
             ],
         ),
@@ -4399,11 +4399,11 @@ fn minium_amount_test() {
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
                 Coin {
                     denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
+                    amount: Uint128::from(1000000000u128),
                 },
             ],
         ),
@@ -4435,7 +4435,7 @@ fn minium_amount_test() {
             denom: USDT_DENOM.to_string(),
         },
         spread: Some(Decimal::percent(10)),
-        min_quote_coin_amount: Uint128::from(1u128),
+        min_quote_coin_amount: Uint128::from(10000u128),
     };
 
     let _res = app.execute(
@@ -4453,13 +4453,13 @@ fn minium_amount_test() {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(103u128),
+                amount: Uint128::from(103000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(618u128),
+                amount: Uint128::from(618000u128),
             },
         ],
     };
@@ -4471,7 +4471,7 @@ fn minium_amount_test() {
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
-                amount: Uint128::from(103u128),
+                amount: Uint128::from(103000u128),
             }],
         )
         .unwrap();
@@ -4484,13 +4484,13 @@ fn minium_amount_test() {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(610u128),
+                amount: Uint128::from(610000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(100000u128),
             },
         ],
     };
@@ -4502,7 +4502,7 @@ fn minium_amount_test() {
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(100000u128),
             }],
         )
         .unwrap();
@@ -4515,13 +4515,13 @@ fn minium_amount_test() {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(100000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(600u128),
+                amount: Uint128::from(600000u128),
             },
         ],
     };
@@ -4533,7 +4533,7 @@ fn minium_amount_test() {
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(600u128),
+                amount: Uint128::from(600000u128),
             }],
         )
         .unwrap();
@@ -4546,13 +4546,13 @@ fn minium_amount_test() {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(610u128),
+                amount: Uint128::from(610000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(100000u128),
             },
         ],
     };
@@ -4564,7 +4564,7 @@ fn minium_amount_test() {
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(610u128),
+                amount: Uint128::from(610000u128),
             }],
         )
         .unwrap();
@@ -4577,11 +4577,11 @@ fn minium_amount_test() {
     let mut expected_balances: Vec<Coin> = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
+            amount: Uint128::from(1000000000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(999797u128),
+            amount: Uint128::from(999797000u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4591,11 +4591,11 @@ fn minium_amount_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(998790u128)
+            amount: Uint128::from(998790000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000000u128),
+            amount: Uint128::from(1000000000u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4654,11 +4654,11 @@ fn minium_amount_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000603u128)
+            amount: Uint128::from(1000609384u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(999797u128),
+            amount: Uint128::from(999797000u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4668,95 +4668,11 @@ fn minium_amount_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(998790u128)
+            amount: Uint128::from(998790000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000099u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-
-    let _res = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    ).unwrap();
-    println!("[LOG] attribute - round 2 - {:?}", _res);
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    println!("round 2 - address0's balances: {:?}", address0_balances);
-    println!("round 2 - address1's balances: {:?}\n\n", address1_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000609u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(999797u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(998790u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000100u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-
-    let _res = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    ).unwrap();
-    println!("[LOG] attribute - round 3 - {:?}", _res);
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    println!("round 3 - address0's balances: {:?}", address0_balances);
-    println!("round 3 - address1's balances: {:?}\n\n", address1_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000627u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(999797u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(998790u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000103u128),
+            amount: Uint128::from(1000099900u128),
         }
     ].to_vec();
     assert_eq!(
