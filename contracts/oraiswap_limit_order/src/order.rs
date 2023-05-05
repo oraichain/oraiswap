@@ -134,7 +134,6 @@ pub fn excecute_pair(
     let mut executor = match executor_res {
         Ok(r_executor) => r_executor,
         Err(_err) => {
-            // increase_last_executor_id(deps.storage)?;
             Executor::new(
                 executor_addr, 
                 [
