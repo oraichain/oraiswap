@@ -162,6 +162,8 @@ pub fn excecute_pair(
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
+    let mut total_reward: Vec<String> = Vec::new();
+
     let mut total_orders =  0;
     let mut reward_amount;
 
@@ -337,6 +339,7 @@ pub fn excecute_pair(
                 &deps.querier,
                 deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
             )?);
+            total_reward.push(executor.reward_assets[0].to_string())
         }
 
         if executor.reward_assets[1].amount >= orderbook_pair.min_quote_coin_amount {
@@ -345,6 +348,7 @@ pub fn excecute_pair(
                 &deps.querier,
                 deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
             )?);
+            total_reward.push(executor.reward_assets[1].to_string())
         }
 
         store_executor(deps.storage, &pair_key, &executor)?;
@@ -356,6 +360,7 @@ pub fn excecute_pair(
             ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
             ("list_order_matched", &format!("{:?}", &ret_attributes)),
             ("total_matched_orders", &total_orders.to_string()),
+            ("executor_reward", &format!("{:?}", &total_reward)),
         ])
     )  
 }
