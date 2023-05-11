@@ -339,8 +339,8 @@ pub fn excecute_pair(
                 &deps.querier,
                 deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
             )?);
-            executor.reward_assets[0].amount = Uint128::zero();
             total_reward.push(executor.reward_assets[0].to_string());
+            executor.reward_assets[0].amount = Uint128::zero();
         }
 
         if executor.reward_assets[1].amount >= orderbook_pair.min_quote_coin_amount {
@@ -349,8 +349,8 @@ pub fn excecute_pair(
                 &deps.querier,
                 deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
             )?);
-            executor.reward_assets[1].amount = Uint128::zero();
             total_reward.push(executor.reward_assets[1].to_string());
+            executor.reward_assets[1].amount = Uint128::zero();
         }
 
         store_executor(deps.storage, &pair_key, &executor)?;
