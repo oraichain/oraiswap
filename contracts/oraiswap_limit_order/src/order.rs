@@ -69,12 +69,6 @@ pub fn cancel_order(
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
-    if order.status == OrderStatus::Fulfilled {
-        return Err(ContractError::OrderFulfilled {
-            order_id: order.order_id,
-        });
-    }
-
     if order.status == OrderStatus::Filling {
         return Err(ContractError::OrderIsFilling {
             order_id: order.order_id,
@@ -149,211 +143,216 @@ pub fn excecute_pair(
             )
         }
     };
-
-    let (best_buy_price, best_sell_price) = orderbook_pair.find_match_price(deps.as_ref().storage).unwrap();
-
-    let mut match_one_price = false;
-    if best_buy_price.eq(&best_sell_price) {
-        match_one_price = true;
-    }
-
-    let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, best_buy_price, OrderDirection::Buy, limit);
-    let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, best_sell_price, OrderDirection::Sell, limit);
-
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
 
     let mut total_orders =  0;
     let mut reward_amount;
+    let (best_buy_price_list, best_sell_price_list) = orderbook_pair.find_list_match_price(deps.as_ref().storage).unwrap();
 
-    for buy_order in &mut match_buy_orders {
-        buy_order.status = OrderStatus::Filling;
-        store_order(deps.storage, &pair_key, &buy_order, false)?;
-
-        let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
-        let mut match_price = buy_order.get_price();
-        let mut sell_ask_amount = Uint128::zero();
-
-        for sell_order in &mut match_sell_orders {
-            // check status of sell_order and buy_order
-            if sell_order.status == OrderStatus::Fulfilled || buy_order.status == OrderStatus::Fulfilled {
+    for buy_price in &best_buy_price_list {
+        for sell_price in &best_sell_price_list {
+            if buy_price.lt(sell_price) {
                 continue;
             }
-
-            let mut lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
-            let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
-
-            if lef_buy_offer_amount.is_zero() || lef_sell_offer_amount.is_zero() {
-                continue;
+            let mut match_one_price = false;
+            if buy_price.eq(&sell_price) {
+                match_one_price = true;
             }
 
-            sell_order.status = OrderStatus::Filling;
-            store_order(deps.storage, &pair_key, &sell_order, false)?;
+            let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *buy_price, OrderDirection::Buy, limit);
+            let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit);
 
-            if match_one_price == false {
-                if sell_order.order_id < buy_order.order_id {
-                    match_price = buy_order.get_price();
-                } else {
-                    match_price = sell_order.get_price();
+            for buy_order in &mut match_buy_orders {
+                buy_order.status = OrderStatus::Filling;
+                store_order(deps.storage, &pair_key, &buy_order, false)?;
+
+                let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
+                let mut match_price = buy_order.get_price();
+                let mut sell_ask_amount = Uint128::zero();
+
+                for sell_order in &mut match_sell_orders {
+                    // check status of sell_order and buy_order
+                    if sell_order.status == OrderStatus::Fulfilled || buy_order.status == OrderStatus::Fulfilled {
+                        continue;
+                    }
+
+                    let mut lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
+                    let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
+
+                    if lef_buy_offer_amount.is_zero() || lef_sell_offer_amount.is_zero() {
+                        continue;
+                    }
+
+                    sell_order.status = OrderStatus::Filling;
+                    store_order(deps.storage, &pair_key, &sell_order, false)?;
+
+                    if match_one_price == false {
+                        if sell_order.order_id < buy_order.order_id {
+                            match_price = buy_order.get_price();
+                        } else {
+                            match_price = sell_order.get_price();
+                        }
+                    }
+                    let mut lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
+
+                    let mut sell_ask_asset = Asset {
+                        info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                        amount: Uint128::min(
+                            lef_buy_offer_amount,
+                            lef_sell_ask_amount,
+                        ),
+                    };
+
+                    let sell_offer_amount = Uint128::min(
+                        Uint128::from(sell_ask_asset.amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap(),
+                        lef_sell_offer_amount,
+                    );
+
+                    let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
+
+                    // fill this order
+                    sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
+
+                    if !sell_ask_asset.amount.is_zero() {
+                        sell_ask_amount = sell_ask_asset.amount;
+                        reward_amount = sell_ask_asset.amount * commission_rate;
+                        executor.reward_assets[1].amount += reward_amount;
+                        executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
+                        sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(reward_amount)?;
+                        messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
+
+                        ret_attributes.push([
+                            Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
+                            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
+                            Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
+                            Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
+                            Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
+                            Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
+                            Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                            Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
+                        ].to_vec());
+                    }
+
+                    if sell_order.status == OrderStatus::Fulfilled {
+                        total_orders += 1;
+                    } else {
+                        sell_order.status = OrderStatus::Open;
+                        store_order(deps.storage, &pair_key, &sell_order, false)?;
+                    }
+
+                    // Match with buy order
+                    if !sell_offer_amount.is_zero() {
+                        buy_order.fill_order(
+                            deps.storage,
+                            &pair_key,
+                            sell_offer_amount,
+                            sell_ask_amount,
+                        )?;
+
+                        let mut buy_ask_asset = Asset {
+                            info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                            amount: sell_offer_amount,
+                        };
+
+                        reward_amount = buy_ask_asset.amount * commission_rate;
+                        executor.reward_assets[0].amount += reward_amount;
+                        executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
+                        buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(reward_amount)?;
+
+                        // dont use oracle for limit order
+                        messages.push(buy_ask_asset.into_msg(
+                            None,
+                            &deps.querier,
+                            deps.api.addr_validate(bidder_addr.as_str())?,
+                        )?);
+
+                        ret_attributes.push([
+                            Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
+                            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
+                            Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
+                            Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
+                            Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
+                            Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
+                            Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
+                        ].to_vec());
+                    }
+
+                    lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
+                    lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
+                    lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
+                    let lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap();
+
+                    if lef_sell_offer_amount > Uint128::zero() && (lef_sell_ask_amount < orderbook_pair.min_quote_coin_amount || lef_sell_ask_amount.is_zero()) {
+                        executor.reward_assets[0].amount += lef_sell_offer_amount;
+                        executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
+
+                        sell_order.status = OrderStatus::Fulfilled;
+                        remove_order(deps.storage, &pair_key, sell_order)?;
+                        ret_attributes.push([
+                            Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
+                            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
+                            Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
+                            Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
+                            Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
+                            Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
+                            Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
+                            Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
+                        ].to_vec());
+                    }
+
+                    if lef_buy_offer_amount > Uint128::zero() && (lef_buy_offer_amount < orderbook_pair.min_quote_coin_amount || lef_buy_ask_amount.is_zero()) {
+                        executor.reward_assets[1].amount += lef_buy_offer_amount;
+                        executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
+
+                        buy_order.status = OrderStatus::Fulfilled;
+                        remove_order(deps.storage, &pair_key, buy_order)?;
+
+                        ret_attributes.push([
+                            Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
+                            Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
+                            Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
+                            Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
+                            Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
+                            Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
+                            Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
+                            Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
+                        ].to_vec());
+                    }
                 }
-            }
-            let mut lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
 
-            let mut sell_ask_asset = Asset {
-                info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                amount: Uint128::min(
-                    lef_buy_offer_amount,
-                    lef_sell_ask_amount,
-                ),
-            };
+                if buy_order.status == OrderStatus::Fulfilled {
+                    total_orders += 1;
+                } else {
+                    buy_order.status = OrderStatus::Open;
+                    store_order(deps.storage, &pair_key, &buy_order, false)?;
+                }
 
-            let sell_offer_amount = Uint128::min(
-                Uint128::from(sell_ask_asset.amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap(),
-                lef_sell_offer_amount,
-            );
+                if Uint128::from(executor.reward_assets[0].amount * match_price) >= orderbook_pair.min_quote_coin_amount {
+                    messages.push(executor.reward_assets[0].into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+                    )?);
+                    total_reward.push(executor.reward_assets[0].to_string());
+                    executor.reward_assets[0].amount = Uint128::zero();
+                }
 
-            let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
+                if executor.reward_assets[1].amount >= orderbook_pair.min_quote_coin_amount {
+                    messages.push(executor.reward_assets[1].into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
+                    )?);
+                    total_reward.push(executor.reward_assets[1].to_string());
+                    executor.reward_assets[1].amount = Uint128::zero();
+                }
 
-            // fill this order
-            sell_order.fill_order(deps.storage, &pair_key, sell_ask_asset.amount, sell_offer_amount)?;
-
-            if !sell_ask_asset.amount.is_zero() {
-                sell_ask_amount = sell_ask_asset.amount;
-                reward_amount = sell_ask_asset.amount * commission_rate;
-                executor.reward_assets[1].amount += reward_amount;
-                executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
-                sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(reward_amount)?;
-                messages.push(sell_ask_asset.into_msg(None, &deps.querier, asker_addr)?);
-
-                ret_attributes.push([
-                    Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
-                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
-                    Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
-                    Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
-                    Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
-                    Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
-                ].to_vec());
-            }
-
-            if sell_order.status == OrderStatus::Fulfilled {
-                total_orders += 1;
-            } else {
-                sell_order.status = OrderStatus::Open;
-                store_order(deps.storage, &pair_key, &sell_order, false)?;
-            }
-
-            // Match with buy order
-            if !sell_offer_amount.is_zero() {
-                buy_order.fill_order(
-                    deps.storage,
-                    &pair_key,
-                    sell_offer_amount,
-                    sell_ask_amount,
-                )?;
-
-                let mut buy_ask_asset = Asset {
-                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                    amount: sell_offer_amount,
-                };
-
-                reward_amount = buy_ask_asset.amount * commission_rate;
-                executor.reward_assets[0].amount += reward_amount;
-                executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
-                buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(reward_amount)?;
-
-                // dont use oracle for limit order
-                messages.push(buy_ask_asset.into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_validate(bidder_addr.as_str())?,
-                )?);
-
-                ret_attributes.push([
-                    Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
-                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
-                    Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
-                    Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
-                    Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
-                    Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
-                ].to_vec());
-            }
-
-            lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
-            lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
-            lef_sell_ask_amount = Uint128::from(lef_sell_offer_amount * match_price);
-            let lef_buy_ask_amount = Uint128::from(lef_buy_offer_amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap();
-
-            if lef_sell_offer_amount > Uint128::zero() && (lef_sell_ask_amount < orderbook_pair.min_quote_coin_amount || lef_sell_ask_amount.is_zero()) {
-                executor.reward_assets[0].amount += lef_sell_offer_amount;
-                executor.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
-
-                sell_order.status = OrderStatus::Fulfilled;
-                remove_order(deps.storage, &pair_key, sell_order)?;
-                ret_attributes.push([
-                    Attribute { key: "status".to_string(), value: format!("{:?}", sell_order.status) },
-                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string() },
-                    Attribute { key: "order_id".to_string(), value: sell_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", sell_order.direction) },
-                    Attribute { key: "offer_amount".to_string(), value: sell_order.offer_amount.to_string() },
-                    Attribute { key: "filled_offer_amount".to_string(), value: sell_order.filled_offer_amount.to_string() },
-                    Attribute { key: "ask_amount".to_string(), value: sell_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: sell_order.filled_ask_amount.to_string() },
-                ].to_vec());
-            }
-
-            if lef_buy_offer_amount > Uint128::zero() && (lef_buy_offer_amount < orderbook_pair.min_quote_coin_amount || lef_buy_ask_amount.is_zero()) {
-                executor.reward_assets[1].amount += lef_buy_offer_amount;
-                executor.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
-
-                buy_order.status = OrderStatus::Fulfilled;
-                remove_order(deps.storage, &pair_key, buy_order)?;
-
-                ret_attributes.push([
-                    Attribute { key: "status".to_string(), value: format!("{:?}", buy_order.status) },
-                    Attribute { key: "bidder_addr".to_string(), value: deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string() },
-                    Attribute { key: "order_id".to_string(), value: buy_order.order_id.to_string() },
-                    Attribute { key: "direction".to_string(), value: format!("{:?}", buy_order.direction) },
-                    Attribute { key: "offer_amount".to_string(), value: buy_order.offer_amount.to_string() },
-                    Attribute { key: "filled_offer_amount".to_string(), value: buy_order.filled_offer_amount.to_string() },
-                    Attribute { key: "ask_amount".to_string(), value: buy_order.ask_amount.to_string() },
-                    Attribute { key: "filled_ask_amount".to_string(), value: buy_order.filled_ask_amount.to_string() },
-                ].to_vec());
+                store_executor(deps.storage, &pair_key, &executor)?;
             }
         }
-
-        if buy_order.status == OrderStatus::Fulfilled {
-            total_orders += 1;
-        } else {
-            buy_order.status = OrderStatus::Open;
-            store_order(deps.storage, &pair_key, &buy_order, false)?;
-        }
-
-        if Uint128::from(executor.reward_assets[0].amount * match_price) >= orderbook_pair.min_quote_coin_amount {
-            messages.push(executor.reward_assets[0].into_msg(
-                None,
-                &deps.querier,
-                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
-            )?);
-            total_reward.push(executor.reward_assets[0].to_string());
-            executor.reward_assets[0].amount = Uint128::zero();
-        }
-
-        if executor.reward_assets[1].amount >= orderbook_pair.min_quote_coin_amount {
-            messages.push(executor.reward_assets[1].into_msg(
-                None,
-                &deps.querier,
-                deps.api.addr_validate(deps.api.addr_humanize(&executor.address)?.as_str())?,
-            )?);
-            total_reward.push(executor.reward_assets[1].to_string());
-            executor.reward_assets[1].amount = Uint128::zero();
-        }
-
-        store_executor(deps.storage, &pair_key, &executor)?;
     }
 
     Ok(Response::new().add_messages(messages)
