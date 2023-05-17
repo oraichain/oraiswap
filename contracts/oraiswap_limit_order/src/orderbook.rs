@@ -301,8 +301,10 @@ impl OrderBook {
     /// find list best buy / sell prices
     pub fn find_list_match_price(&self, storage: &dyn Storage) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
         let pair_key = &self.get_pair_key();
+        let limit = 4;
         let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
                 .range(None, None, OrderBy::Descending)
+                .take(limit)
                 .filter_map(|item| {
                     if let Ok((price_key, _)) = item {
                         let buy_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
@@ -313,6 +315,7 @@ impl OrderBook {
 
         let sell_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()])
                 .range(None, None, OrderBy::Ascending)
+                .take(limit)
                 .filter_map(|item| {
                     if let Ok((price_key, _)) = item {
                         let sell_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
@@ -323,7 +326,7 @@ impl OrderBook {
 
         let mut best_buy_price_list: Vec<Decimal> = Vec::new();
         let mut best_sell_price_list: Vec<Decimal> = Vec::new();
-        let limit = 4;
+
         // if there is spread, find the best list sell price
         if let Some(spread) = self.spread {
             let spread_factor = Decimal::one() + spread;
@@ -339,9 +342,6 @@ impl OrderBook {
                 if is_greater {
                     best_buy_price_list.push(*buy_price);
                 }
-                if best_buy_price_list.len().eq(&limit) {
-                    break;
-                }
             }
         
             for sell_price in &sell_price_list {
@@ -354,9 +354,6 @@ impl OrderBook {
                 }
                 if is_less {
                     best_sell_price_list.push(*sell_price);
-                }
-                if best_sell_price_list.len().eq(&limit) {
-                    break;
                 }
             }
         } else {
