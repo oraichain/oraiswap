@@ -298,6 +298,95 @@ impl OrderBook {
         None
     }
 
+    /// find list best buy / sell prices
+    pub fn find_list_match_price(&self, storage: &dyn Storage) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
+        let pair_key = &self.get_pair_key();
+        let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
+                .range(None, None, OrderBy::Descending)
+                .filter_map(|item| {
+                    if let Ok((price_key, _)) = item {
+                        let buy_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                        return Some(buy_price);
+                    }
+                    None
+                }).collect::<Vec<Decimal>>();
+
+        let sell_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()])
+                .range(None, None, OrderBy::Ascending)
+                .filter_map(|item| {
+                    if let Ok((price_key, _)) = item {
+                        let sell_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                        return Some(sell_price);
+                    }
+                    None
+                }).collect::<Vec<Decimal>>();
+
+        let mut best_buy_price_list: Vec<Decimal> = Vec::new();
+        let mut best_sell_price_list: Vec<Decimal> = Vec::new();
+        let limit = 4;
+        // if there is spread, find the best list sell price
+        if let Some(spread) = self.spread {
+            let spread_factor = Decimal::one() + spread;
+
+            for buy_price in &buy_price_list {
+                let mut is_greater: bool = false;
+                for sell_price in &sell_price_list {
+                    if buy_price.ge(&sell_price)
+                    && buy_price.le(&(sell_price * spread_factor)) {
+                        is_greater = true;
+                    }
+                }
+                if is_greater {
+                    best_buy_price_list.push(*buy_price);
+                }
+                if best_buy_price_list.len().eq(&limit) {
+                    break;
+                }
+            }
+        
+            for sell_price in &sell_price_list {
+                let mut is_less: bool = false;
+                for buy_price in &buy_price_list {
+                    if buy_price.ge(&sell_price)
+                    && buy_price.le(&(sell_price * spread_factor)) {
+                        is_less = true;
+                    }
+                }
+                if is_less {
+                    best_sell_price_list.push(*sell_price);
+                }
+                if best_sell_price_list.len().eq(&limit) {
+                    break;
+                }
+            }
+        } else {
+            for buy_price in &buy_price_list {
+                let mut is_greater: bool = false;
+                for sell_price in &sell_price_list {
+                    if buy_price.ge(&sell_price) {
+                        is_greater = true;
+                    }
+                }
+                if is_greater {
+                    best_buy_price_list.push(*buy_price);
+                }
+            }
+        
+            for sell_price in &sell_price_list {
+                let mut is_less: bool = false;
+                for buy_price in &buy_price_list {
+                    if buy_price.ge(&sell_price) {
+                        is_less = true;
+                    }
+                }
+                if is_less {
+                    best_sell_price_list.push(*sell_price);
+                }
+            }
+        }
+        return Some((best_buy_price_list, best_sell_price_list));
+    }
+
     /// return the largest matchable amount of orders when matching orders at single price, that is total buy volume to sell at that price
     /// based on best buy price and best sell price, do the filling
     pub fn find_match_amount_at_price(
