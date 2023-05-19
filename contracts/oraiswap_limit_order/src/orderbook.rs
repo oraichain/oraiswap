@@ -98,6 +98,7 @@ impl Order {
     ) -> StdResult<OrderResponse> {
         Ok(OrderResponse {
             order_id: self.order_id,
+            status: self.status,
             direction: self.direction.clone(),
             bidder_addr: api.addr_humanize(&self.bidder_addr)?.to_string(),
             offer_asset: Asset {
