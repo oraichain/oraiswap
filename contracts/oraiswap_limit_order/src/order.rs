@@ -152,6 +152,7 @@ pub fn excecute_pair(
     let (best_buy_price_list, best_sell_price_list) = orderbook_pair.find_list_match_price(deps.as_ref().storage).unwrap();
 
     for buy_price in &best_buy_price_list {
+        let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *buy_price, OrderDirection::Buy, limit).unwrap();
         for sell_price in &best_sell_price_list {
             if buy_price.lt(sell_price) {
                 continue;
@@ -161,8 +162,7 @@ pub fn excecute_pair(
                 match_one_price = true;
             }
 
-            let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *buy_price, OrderDirection::Buy, limit);
-            let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit);
+            let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit).unwrap();
 
             for buy_order in &mut match_buy_orders {
                 buy_order.status = OrderStatus::Filling;
