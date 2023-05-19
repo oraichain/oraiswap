@@ -65,9 +65,6 @@ pub enum ContractError {
     #[error("Order asset must not be zero")]
     AssetMustNotBeZero {},
 
-    #[error("Order {order_id} is filling")]
-    OrderIsFilling {order_id: u64},
-
     #[error("Order {order_id} has already fulfilled")]
     OrderFulfilled {order_id: u64},
 

@@ -182,6 +182,7 @@ pub struct ContractInfoResponse {
 #[cw_serde]
 pub struct OrderResponse {
     pub order_id: u64,
+    pub status: OrderStatus,
     pub direction: OrderDirection,
     pub bidder_addr: String,
     pub offer_asset: Asset,
