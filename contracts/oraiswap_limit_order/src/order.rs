@@ -69,8 +69,8 @@ pub fn cancel_order(
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     let mut order = read_order(deps.storage, &pair_key, order_id)?;
 
-    if order.status == OrderStatus::Filling {
-        return Err(ContractError::OrderIsFilling {
+    if order.status == OrderStatus::Fulfilled {
+        return Err(ContractError::OrderFulfilled {
             order_id: order.order_id,
         });
     }
@@ -122,7 +122,6 @@ fn to_attrs (order: &Order, human_bidder: String) -> Vec<Attribute> {
         attr("ask_amount", order.ask_amount.to_string() ),
         attr("filled_ask_amount", order.filled_ask_amount.to_string() ),
     ].to_vec();
-
     return attrs;
 }
 
@@ -180,8 +179,10 @@ pub fn excecute_pair(
             let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit).unwrap();
 
             for buy_order in &mut match_buy_orders {
-                buy_order.status = OrderStatus::Filling;
-                store_order(deps.storage, &pair_key, &buy_order, false)?;
+                if buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.is_zero() || buy_order.status == OrderStatus::Fulfilled {
+                    remove_order(deps.storage, &pair_key, buy_order)?;
+                    continue;
+                }
 
                 let bidder_addr = deps.api.addr_humanize(&buy_order.bidder_addr)?;
                 let mut match_price = buy_order.get_price();
@@ -189,19 +190,13 @@ pub fn excecute_pair(
 
                 for sell_order in &mut match_sell_orders {
                     // check status of sell_order and buy_order
-                    if sell_order.status == OrderStatus::Fulfilled || buy_order.status == OrderStatus::Fulfilled {
-                        continue;
-                    }
-
                     let mut lef_sell_offer_amount = sell_order.offer_amount.checked_sub(sell_order.filled_offer_amount)?;
                     let mut lef_buy_offer_amount = buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?;
 
-                    if lef_buy_offer_amount.is_zero() || lef_sell_offer_amount.is_zero() {
+                    if lef_sell_offer_amount.is_zero() || sell_order.status == OrderStatus::Fulfilled  {
+                        remove_order(deps.storage, &pair_key, sell_order)?;
                         continue;
                     }
-
-                    sell_order.status = OrderStatus::Filling;
-                    store_order(deps.storage, &pair_key, &sell_order, false)?;
 
                     if match_one_price == false {
                         if sell_order.order_id < buy_order.order_id {
@@ -241,11 +236,8 @@ pub fn excecute_pair(
                         ret_attributes.push(to_attrs(&sell_order,  deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string()));
                     }
 
-                    if sell_order.status == OrderStatus::Fulfilled {
+                    if sell_order.status == OrderStatus::Fulfilled || sell_order.offer_amount == sell_order.filled_offer_amount {
                         total_orders += 1;
-                    } else {
-                        sell_order.status = OrderStatus::Open;
-                        store_order(deps.storage, &pair_key, &sell_order, false)?;
                     }
 
                     // Match with buy order
@@ -302,11 +294,8 @@ pub fn excecute_pair(
                     }
                 }
 
-                if buy_order.status == OrderStatus::Fulfilled {
+                if buy_order.status == OrderStatus::Fulfilled || buy_order.offer_amount == buy_order.filled_offer_amount {
                     total_orders += 1;
-                } else {
-                    buy_order.status = OrderStatus::Open;
-                    store_order(deps.storage, &pair_key, &buy_order, false)?;
                 }
 
                 if Uint128::from(executor.reward_assets[0].amount * match_price) >= orderbook_pair.min_quote_coin_amount {
@@ -328,7 +317,6 @@ pub fn excecute_pair(
                     total_reward.push(executor.reward_assets[1].to_string());
                     executor.reward_assets[1].amount = Uint128::zero();
                 }
-
                 store_executor(deps.storage, &pair_key, &executor)?;
             }
         }
@@ -498,13 +486,13 @@ pub fn query_orderbook_is_matchable(
 ) -> StdResult<OrderBookMatchableResponse> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price, best_sell_price) = ob.find_match_price(deps.storage).unwrap_or_default();
+    let (best_buy_price_list, best_sell_price_list) = ob.find_list_match_price(deps.storage).unwrap();
 
     let mut resp = OrderBookMatchableResponse {
         is_matchable: true
     };
 
-    if best_buy_price.eq(&Decimal::zero()) || best_sell_price.eq(&Decimal::zero()) {
+    if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
         resp = OrderBookMatchableResponse {
             is_matchable: false
         };
