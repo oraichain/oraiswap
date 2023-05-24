@@ -300,9 +300,9 @@ impl OrderBook {
     }
 
     /// find list best buy / sell prices
-    pub fn find_list_match_price(&self, storage: &dyn Storage) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
+    pub fn find_list_match_price(&self, storage: &dyn Storage, limit: Option<u32>) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
         let pair_key = &self.get_pair_key();
-        let limit = 4;
+        let limit = limit.unwrap_or(20) as usize;
         let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
                 .range(None, None, OrderBy::Descending)
                 .take(limit)

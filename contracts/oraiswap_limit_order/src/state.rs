@@ -29,17 +29,17 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
     singleton_read(storage, CONTRACT_INFO).load()
 }
 
-pub fn store_executor(
+pub fn store_reward(
     storage: &mut dyn Storage,
     pair_key: &[u8],
-    executor: &Executor
+    reward_wallet: &Executor
 ) -> StdResult<()> {
-    let executor_address_key = &executor.address;
-    Bucket::multilevel(storage, &[PREFIX_EXECUTOR, pair_key]).save(executor_address_key, executor)
+    let reward_address_key = &reward_wallet.address;
+    Bucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).save(reward_address_key, reward_wallet)
 }
 
-pub fn read_excecutor(storage: &dyn Storage, pair_key: &[u8], address: &CanonicalAddr) -> StdResult<Executor> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_EXECUTOR, pair_key]).load(address)
+pub fn read_reward(storage: &dyn Storage, pair_key: &[u8], address: &CanonicalAddr) -> StdResult<Executor> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).load(address)
 }
 
 pub fn store_orderbook(
@@ -246,7 +246,7 @@ static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess
 static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
 static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
-static PREFIX_EXECUTOR: &[u8] = b"executor"; // executor that running matching engine for orderbook pair
+static PREFIX_REWARD: &[u8] = b"reward_wallet"; // executor that running matching engine for orderbook pair
 
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick
