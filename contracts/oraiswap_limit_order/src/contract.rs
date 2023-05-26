@@ -28,6 +28,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
+const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -37,6 +38,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let default_reward_address = deps.api.addr_canonicalize(REWARD_WALLET)?;
     let config = ContractInfo { 
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
@@ -50,6 +52,11 @@ pub fn instantiate(
         commission_rate: msg
             .commission_rate
             .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
+        reward_address: if let Some(reward_address) = msg.reward_address {
+            deps.api.addr_canonicalize(reward_address.as_str())?
+        } else {
+            default_reward_address
+        },
     };
 
     store_config(deps.storage, &config)?;
@@ -69,6 +76,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
+        ExecuteMsg::UpdateConfig { reward_address, commission_rate } => execute_update_config(deps, info, reward_address, commission_rate),
         ExecuteMsg::CreateOrderBookPair {
             base_coin_info,
             quote_coin_info,
@@ -174,6 +182,35 @@ pub fn execute_update_admin(
     store_config(deps.storage, &contract_info)?;
 
     Ok(Response::new().add_attributes(vec![("action", "execute_update_admin")]))
+}
+
+pub fn execute_update_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    reward_address: Option<Addr>,
+    commission_rate: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut contract_info = read_config(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    // check authorized
+    if contract_info.admin.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // update new reward address
+    if let Some(reward_address) = reward_address {
+        contract_info.reward_address = deps.api.addr_canonicalize(reward_address.as_str())?;
+    }
+
+    // update new commission rate
+    if let Some(commission_rate) = commission_rate {
+        contract_info.commission_rate = commission_rate;
+    }
+
+    store_config(deps.storage, &contract_info)?;
+
+    Ok(Response::new().add_attributes(vec![("action", "execute_update_config")]))
 }
 
 pub fn execute_create_pair(
