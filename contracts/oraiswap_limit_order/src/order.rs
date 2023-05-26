@@ -18,7 +18,7 @@ use oraiswap::limit_order::{
     OrderResponse, OrdersResponse, OrderStatus, OrderBookMatchableResponse,
 };
 
-const RELAY_FEE: u128 = 1000u128;
+const RELAY_FEE: u128 = 300u128;
 
 pub fn submit_order(
     deps: DepsMut,
@@ -252,17 +252,26 @@ pub fn excecute_pair(
 
                     if !sell_ask_asset.amount.is_zero() {
                         sell_ask_amount = sell_ask_asset.amount;
-                        reward_fee = sell_ask_asset.amount * commission_rate;
+
+                        reward_fee = Uint128::min(
+                            sell_ask_asset.amount * commission_rate,
+                            sell_ask_asset.amount,
+                        );
+
                         reward.reward_assets[1].amount += reward_fee;
                         reward.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
                         sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(reward_fee)?;
 
-                        relayer_fee = Uint128::from(RELAY_FEE) * match_price;
-                        if sell_ask_asset.amount > relayer_fee {
-                            relayer.reward_assets[1].amount += relayer_fee;
-                            relayer.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
-                            sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(relayer_fee)?;
+                        relayer_fee = Uint128::min(
+                            Uint128::from(RELAY_FEE) * match_price,
+                            sell_ask_asset.amount,
+                        );
 
+                        relayer.reward_assets[1].amount += relayer_fee;
+                        relayer.reward_assets[1].info = orderbook_pair.quote_coin_info.to_normal(deps.api)?;
+                        sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(relayer_fee)?;
+
+                        if !sell_ask_asset.amount.is_zero() {
                             messages.push(sell_ask_asset.into_msg(
                                 None,
                                 &deps.querier,
@@ -290,17 +299,25 @@ pub fn excecute_pair(
                             amount: sell_offer_amount,
                         };
 
-                        reward_fee = buy_ask_asset.amount * commission_rate;
+                        reward_fee = Uint128::min(
+                            buy_ask_asset.amount * commission_rate,
+                            buy_ask_asset.amount,
+                        );
+
                         reward.reward_assets[0].amount += reward_fee;
                         reward.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
                         buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(reward_fee)?;
 
-                        relayer_fee = Uint128::from(RELAY_FEE);
-                        if buy_ask_asset.amount > relayer_fee {
-                            relayer.reward_assets[0].amount += relayer_fee;
-                            relayer.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
-                            buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(relayer_fee)?;
+                        relayer_fee = Uint128::min(
+                            Uint128::from(RELAY_FEE),
+                            buy_ask_asset.amount,
+                        );
 
+                        relayer.reward_assets[0].amount += relayer_fee;
+                        relayer.reward_assets[0].info = orderbook_pair.base_coin_info.to_normal(deps.api)?;
+                        buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(relayer_fee)?;
+
+                        if !buy_ask_asset.amount.is_zero() {
                             messages.push(buy_ask_asset.into_msg(
                                 None,
                                 &deps.querier,
