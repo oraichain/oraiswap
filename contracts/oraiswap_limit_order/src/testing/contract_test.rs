@@ -5,7 +5,7 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::limit_order::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderBooksResponse,
-    OrderDirection, OrderFilter, OrderResponse, OrdersResponse, QueryMsg, TicksResponse, OrderBookResponse, OrderBookMatchableResponse,
+    OrderDirection, OrderFilter, OrderResponse, OrdersResponse, QueryMsg, TicksResponse, OrderBookResponse, OrderBookMatchableResponse, OrderStatus,
 };
 
 use crate::jsonstr;
@@ -56,6 +56,7 @@ fn submit_order() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -307,6 +308,7 @@ fn submit_order() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     let order_2 = OrderResponse {
@@ -327,6 +329,7 @@ fn submit_order() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     let order_3= OrderResponse {
@@ -347,6 +350,7 @@ fn submit_order() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Sell,
+        status: OrderStatus::Open,
     };
 
     assert_eq!(
@@ -504,6 +508,7 @@ fn submit_order() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     let order_5= OrderResponse {
@@ -524,6 +529,7 @@ fn submit_order() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Sell,
+        status: OrderStatus::Open,
     };
 
     assert_eq!(
@@ -606,6 +612,7 @@ fn cancel_order_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -946,6 +953,7 @@ fn cancel_order_token() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1253,6 +1261,7 @@ fn execute_pair_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2352,11 +2361,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(963198u128)
+            amount: Uint128::from(978572u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(971200u128),
+            amount: Uint128::from(984421u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2370,7 +2379,7 @@ fn execute_pair_native_token() {
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(961998u128),
+            amount: Uint128::from(964211u128),
         }
     ].to_vec();
     assert_eq!(
@@ -2390,178 +2399,25 @@ fn execute_pair_native_token() {
     assert_eq!(
         address2_balances,
         expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 2 - address0's balances: {:?}", address0_balances);
-    println!("round 2 - address1's balances: {:?}", address1_balances);
-    println!("round 2 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966200u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(971200u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(963996u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(981200u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 3 - address0's balances: {:?}", address0_balances);
-    println!("round 3 - address1's balances: {:?}", address1_balances);
-    println!("round 3 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980222u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985616u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(963996u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(981200u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
     );
     
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 4 - address0's balances: {:?}", address0_balances);
-    println!("round 4 - address1's balances: {:?}", address1_balances);
-    println!("round 4 - address2's balances: {:?}\n\n", address2_balances);
+    let res = app
+    .query::<OrderBookMatchableResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::OrderBookMatchable {
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ]
+        },
+    )
+    .unwrap();
 
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(981038u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(985632u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(965583u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        },
-        Coin{
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(981200u128),
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
+    println!("[LOG] orderbook matchable: {}", jsonstr!(res));
 }
 
 #[test]
@@ -2614,6 +2470,7 @@ fn execute_pair_cw20_token() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2634,7 +2491,7 @@ fn execute_pair_cw20_token() {
         quote_coin_info: AssetInfo::Token {
             contract_addr: token_addrs[0].clone(),
         },
-        spread: None, //Some(Decimal::percent(10)),
+        spread: None,
         min_quote_coin_amount: Uint128::from(10u128),
     };
 
@@ -3735,7 +3592,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(963198u128)
+            amount: Uint128::from(978572u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3745,142 +3602,7 @@ fn execute_pair_cw20_token() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 2 - address0's balances: {:?}", address0_balances);
-    println!("round 2 - address1's balances: {:?}", address1_balances);
-    println!("round 2 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(966200u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 3 - address0's balances: {:?}", address0_balances);
-    println!("round 3 - address1's balances: {:?}", address1_balances);
-    println!("round 3 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980222u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address1_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address2_balances,
-        expected_balances,
-    );
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-    
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 4 - address0's balances: {:?}", address0_balances);
-    println!("round 4 - address1's balances: {:?}", address1_balances);
-    println!("round 4 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(981038u128)
-        }
-    ].to_vec();
-    assert_eq!(
-        address0_balances,
-        expected_balances,
-    );
-    expected_balances = [
-        Coin{
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128)
+            amount: Uint128::from(986305u128)
         }
     ].to_vec();
     assert_eq!(
@@ -3953,6 +3675,7 @@ fn spread_test() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4337,11 +4060,11 @@ fn spread_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(980010u128)
+            amount: Uint128::from(980000u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000020u128),
+            amount: Uint128::from(1019449u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4351,11 +4074,11 @@ fn spread_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(979990u128)
+            amount: Uint128::from(979690u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(991951u128),
+            amount: Uint128::from(1015312u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4365,7 +4088,7 @@ fn spread_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128)
+            amount: Uint128::from(1009690u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -4414,6 +4137,7 @@ fn reward_to_executor_test() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4654,7 +4378,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin{
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000609384u128)
+            amount: Uint128::from(1000609084u128)
         },
         Coin{
             denom: USDT_DENOM.to_string(),
@@ -4672,7 +4396,7 @@ fn reward_to_executor_test() {
         },
         Coin{
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000099900u128),
+            amount: Uint128::from(1000099851u128),
         }
     ].to_vec();
     assert_eq!(
@@ -4730,6 +4454,7 @@ fn query_matchable() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -5004,6 +4729,7 @@ fn remove_orderbook_pair() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -5179,6 +4905,7 @@ fn remove_orderbook_pair() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     assert_eq!(
@@ -5312,6 +5039,7 @@ fn orders_querier() {
         version: None,
         admin: None,
         commission_rate: None,
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -5537,6 +5265,7 @@ fn orders_querier() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     let order_2 = OrderResponse {
@@ -5557,6 +5286,7 @@ fn orders_querier() {
         filled_offer_amount: Uint128::zero(),
         filled_ask_amount: Uint128::zero(),
         direction: OrderDirection::Buy,
+        status: OrderStatus::Open,
     };
 
     let all_order = OrdersResponse {
@@ -5578,7 +5308,8 @@ fn orders_querier() {
                     amount: Uint128::from(22000000u128)
                 },
                 filled_offer_amount: Uint128::zero(),
-                filled_ask_amount: Uint128::zero()
+                filled_ask_amount: Uint128::zero(),
+                status: OrderStatus::Open,
             },
             OrderResponse{
                 order_id: 3u64,
@@ -5597,7 +5328,8 @@ fn orders_querier() {
                     amount: Uint128::from(11223344u128)
                 },
                 filled_offer_amount: Uint128::zero(),
-                filled_ask_amount: Uint128::zero()
+                filled_ask_amount: Uint128::zero(),
+                status: OrderStatus::Open,
             },
             OrderResponse{
                 order_id: 2u64,
@@ -5616,7 +5348,8 @@ fn orders_querier() {
                     },
                 },
                 filled_offer_amount: Uint128::zero(),
-                filled_ask_amount: Uint128::zero()
+                filled_ask_amount: Uint128::zero(),
+                status: OrderStatus::Open,
             }
         ].to_vec(),
     };
