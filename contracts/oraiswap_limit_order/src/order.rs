@@ -20,6 +20,11 @@ use oraiswap::limit_order::{
 
 const RELAY_FEE: u128 = 300u128;
 
+struct Payment {
+    address: Addr,
+    asset: Asset,
+}
+
 pub fn submit_order(
     deps: DepsMut,
     sender: Addr,
@@ -182,6 +187,10 @@ pub fn excecute_pair(
         }
     };
     let mut messages: Vec<CosmosMsg> = vec![];
+
+    let mut list_bidder: Vec<Payment> = vec![];
+    let mut list_asker: Vec<Payment> = vec![];
+
     let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
 
@@ -272,10 +281,14 @@ pub fn excecute_pair(
                         sell_ask_asset.amount = sell_ask_asset.amount.checked_sub(relayer_fee)?;
 
                         if !sell_ask_asset.amount.is_zero() {
-                            messages.push(sell_ask_asset.into_msg(
-                                None,
-                                &deps.querier,
-                                deps.api.addr_validate(asker_addr.as_str())?)?);
+                            let asker_payment: Payment = Payment {
+                                address: asker_addr.clone(),
+                                asset: Asset {
+                                    info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                                    amount: sell_ask_asset.amount,
+                                }
+                            };
+                            list_asker.push(asker_payment);
                         }
 
                         ret_attributes.push(to_attrs(
@@ -318,11 +331,14 @@ pub fn excecute_pair(
                         buy_ask_asset.amount = buy_ask_asset.amount.checked_sub(relayer_fee)?;
 
                         if !buy_ask_asset.amount.is_zero() {
-                            messages.push(buy_ask_asset.into_msg(
-                                None,
-                                &deps.querier,
-                                deps.api.addr_validate(bidder_addr.as_str())?
-                            )?);
+                            let bidder_payment: Payment = Payment {
+                                address: bidder_addr.clone(),
+                                asset: Asset {
+                                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                                    amount: buy_ask_asset.amount,
+                                }
+                            };
+                            list_bidder.push(bidder_payment);
                         }
 
                         ret_attributes.push(to_attrs(
@@ -374,6 +390,39 @@ pub fn excecute_pair(
                 }
             }
         }
+    }
+
+    let mut minimalist_asker: Vec<Payment> = vec![];
+    let mut minimalist_bidder: Vec<Payment> = vec![];
+
+    for asker in list_asker {
+        if let Some(existing_payment) = minimalist_asker.iter_mut().find(|p| p.address == asker.address) {
+            existing_payment.asset.amount += asker.asset.amount;
+        } else {
+            minimalist_asker.push(asker);
+        }
+    }
+    for bidder in list_bidder {
+        if let Some(existing_payment) = minimalist_bidder.iter_mut().find(|p| p.address == bidder.address) {
+            existing_payment.asset.amount += bidder.asset.amount;
+        } else {
+            minimalist_bidder.push(bidder);
+        }
+    }
+
+    for asker in minimalist_asker {
+        messages.push(asker.asset.into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(asker.address.as_str())?)?
+        );
+    }
+    for bidder in minimalist_bidder {
+        messages.push(bidder.asset.into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(bidder.address.as_str())?)?
+        );
     }
 
     for i in 0..=1 {
