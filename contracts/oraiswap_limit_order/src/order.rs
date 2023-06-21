@@ -8,7 +8,7 @@ use crate::state::{
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_DIRECTION, read_config, remove_orderbook, store_reward, read_reward,
 };
 use cosmwasm_std::{
-    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal, attr
+    Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Order as OrderBy, Response, StdResult, Uint128, Attribute, Decimal, attr, Event
 };
 
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
@@ -118,7 +118,7 @@ pub fn cancel_order(
     ]))
 }
 
-fn to_attrs (order: &Order, human_bidder: String, fee: String) -> Vec<Attribute> {
+fn to_events (order: &Order, human_bidder: String, fee: String) -> Event {
     let attrs: Vec<Attribute> = [
         attr( "status", format!("{:?}", order.status) ),
         attr( "bidder_addr", human_bidder ),
@@ -130,7 +130,7 @@ fn to_attrs (order: &Order, human_bidder: String, fee: String) -> Vec<Attribute>
         attr( "filled_ask_amount", order.filled_ask_amount.to_string() ),
         attr( "fee", fee ),
     ].to_vec();
-    return attrs;
+    Event::new("bidder_address").add_attributes(attrs)
 }
 
 pub fn excecute_pair(
@@ -191,7 +191,7 @@ pub fn excecute_pair(
     let mut list_bidder: Vec<Payment> = vec![];
     let mut list_asker: Vec<Payment> = vec![];
 
-    let mut ret_attributes: Vec<Vec<Attribute>> = vec![];
+    let mut ret_events: Vec<Event> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
 
     let mut total_orders =  0;
@@ -200,7 +200,7 @@ pub fn excecute_pair(
     let (best_buy_price_list, best_sell_price_list) = orderbook_pair.find_list_match_price(deps.as_ref().storage, limit).unwrap();
 
     for buy_price in &best_buy_price_list {
-        let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *buy_price, OrderDirection::Buy, limit).unwrap();
+        let mut match_buy_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *buy_price, OrderDirection::Buy, limit);
         for sell_price in &best_sell_price_list {
             if buy_price.lt(sell_price) {
                 continue;
@@ -210,7 +210,7 @@ pub fn excecute_pair(
                 match_one_price = true;
             }
 
-            let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit).unwrap();
+            let mut match_sell_orders = orderbook_pair.find_match_orders(deps.as_ref().storage, *sell_price, OrderDirection::Sell, limit);
 
             for buy_order in &mut match_buy_orders {
                 if buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.is_zero() || buy_order.status == OrderStatus::Fulfilled {
@@ -253,6 +253,9 @@ pub fn excecute_pair(
                         Uint128::from(sell_ask_asset.amount * Uint128::from(1000000000000000000u128)).checked_div(match_price * Uint128::from(1000000000000000000u128)).unwrap(),
                         lef_sell_offer_amount,
                     );
+                    if sell_ask_asset.amount.is_zero() || sell_offer_amount.is_zero() {
+                        continue;
+                    }
 
                     let asker_addr = deps.api.addr_humanize(&sell_order.bidder_addr)?;
 
@@ -291,7 +294,7 @@ pub fn excecute_pair(
                             list_asker.push(asker_payment);
                         }
 
-                        ret_attributes.push(to_attrs(
+                        ret_events.push(to_events(
                             &sell_order,
                             deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
                             format!("{} {}", reward_fee + relayer_fee, &reward.reward_assets[1].info)
@@ -341,7 +344,7 @@ pub fn excecute_pair(
                             list_bidder.push(bidder_payment);
                         }
 
-                        ret_attributes.push(to_attrs(
+                        ret_events.push(to_events(
                             &buy_order,
                             deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
                             format!("{} {}", reward_fee + relayer_fee, &reward.reward_assets[0].info)
@@ -360,7 +363,7 @@ pub fn excecute_pair(
                         sell_order.status = OrderStatus::Fulfilled;
                         remove_order(deps.storage, &pair_key, sell_order)?;
 
-                        ret_attributes.push(to_attrs(
+                        ret_events.push(to_events(
                             &sell_order,
                             deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
                             format!("{} {}", lef_sell_offer_amount, &reward.reward_assets[0].info)
@@ -374,7 +377,7 @@ pub fn excecute_pair(
                         buy_order.status = OrderStatus::Fulfilled;
                         remove_order(deps.storage, &pair_key, buy_order)?;
 
-                        ret_attributes.push(to_attrs(
+                        ret_events.push(to_events(
                             &buy_order,
                             deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
                             format!("{} {}", lef_buy_offer_amount, &reward.reward_assets[1].info)
@@ -453,10 +456,10 @@ pub fn excecute_pair(
         .add_attributes(vec![
             ("action", "execute_orderbook_pair"),
             ("pair", &format!("{} - {}", &asset_infos[0], &asset_infos[1])),
-            ("list_order_matched", &format!("{:?}", &ret_attributes)),
             ("total_matched_orders", &total_orders.to_string()),
             ("executor_reward", &format!("{:?}", &total_reward)),
         ])
+        .add_events(ret_events)
     )  
 }
 
@@ -613,7 +616,7 @@ pub fn query_orderbook_is_matchable(
 ) -> StdResult<OrderBookMatchableResponse> {
     let pair_key = pair_key(&[asset_infos[0].to_raw(deps.api)?, asset_infos[1].to_raw(deps.api)?]);
     let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price_list, best_sell_price_list) = ob.find_list_match_price(deps.storage, Some(30)).unwrap();
+    let (best_buy_price_list, best_sell_price_list) = ob.find_list_match_price(deps.storage, Some(30)).unwrap_or_default();
 
     let mut resp = OrderBookMatchableResponse {
         is_matchable: true

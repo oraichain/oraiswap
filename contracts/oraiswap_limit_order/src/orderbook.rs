@@ -382,6 +382,10 @@ impl OrderBook {
                 }
             }
         }
+
+        if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
+            return None;
+        }
         return Some((best_buy_price_list, best_sell_price_list));
     }
 
@@ -393,7 +397,7 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Uint128 {
-        let orders = self.find_match_orders(storage, price, direction, None).unwrap();
+        let orders = self.find_match_orders(storage, price, direction, None);
         // in Order, ask amount is alway paid amount
         // in Orderbook, buy order is opposite to sell order
         orders
@@ -411,12 +415,12 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
         limit: Option<u32>
-    ) -> Option<Vec<Order>> {
+    ) -> Vec<Order> {
         let pair_key = &self.get_pair_key();
         let price_key = price.atomics().to_be_bytes();
 
         // there is a limit, and we just match a batch with maximum orders reach the limit step by step
-        Some(read_orders_with_indexer::<OrderDirection>(
+        read_orders_with_indexer::<OrderDirection>(
             storage,
             &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key],
             Box::new(move |x| direction.eq(x)),
@@ -424,7 +428,7 @@ impl OrderBook {
             limit,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
-        .unwrap_or_default()) // default is empty list
+        .unwrap()
     }
 }
 
