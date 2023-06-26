@@ -130,7 +130,7 @@ fn to_events (order: &Order, human_bidder: String, fee: String) -> Event {
         attr( "filled_ask_amount", order.filled_ask_amount.to_string() ),
         attr( "fee", fee ),
     ].to_vec();
-    Event::new("bidder_address").add_attributes(attrs)
+    Event::new("matched_order").add_attributes(attrs)
 }
 
 pub fn excecute_pair(
@@ -191,7 +191,7 @@ pub fn excecute_pair(
     let mut list_bidder: Vec<Payment> = vec![];
     let mut list_asker: Vec<Payment> = vec![];
 
-    let mut ret_events: Vec<Event> = vec![];
+    let mut ret_events:Vec<Event> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
 
     let mut total_orders =  0;
@@ -215,6 +215,11 @@ pub fn excecute_pair(
             for buy_order in &mut match_buy_orders {
                 if buy_order.offer_amount.checked_sub(buy_order.filled_offer_amount)?.is_zero() || buy_order.status == OrderStatus::Fulfilled {
                     remove_order(deps.storage, &pair_key, buy_order)?;
+                    ret_events.push(to_events(
+                        &buy_order,
+                        deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
+                        format!("remove stuff order")
+                    ));
                     continue;
                 }
 
@@ -229,6 +234,11 @@ pub fn excecute_pair(
 
                     if lef_sell_offer_amount.is_zero() || sell_order.status == OrderStatus::Fulfilled  {
                         remove_order(deps.storage, &pair_key, sell_order)?;
+                        ret_events.push(to_events(
+                            &sell_order,
+                            deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
+                            format!("remove stuff order")
+                        ));
                         continue;
                     }
 
