@@ -5409,15 +5409,15 @@ fn orders_querier() {
                         contract_addr: token_addrs[0].clone(),
                     },
                 ],
-                direction: Some(OrderDirection::Buy),
-                filter: OrderFilter::Status(OrderStatus::PartialFilled),
+                direction: None,
+                filter: OrderFilter::Status(OrderStatus::Open),
                 start_after: None,
                 limit: None,
                 order_by: None,
             },
         )
         .unwrap();
-    println!("[LOG] [4] - query open buy orders: {}", jsonstr!(test1));
+    println!("[LOG] [4] - query all open orders: {}", jsonstr!(test1));
 
     assert_eq!(
         OrdersResponse {

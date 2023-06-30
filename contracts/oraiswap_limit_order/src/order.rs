@@ -676,14 +676,25 @@ pub fn query_orders(
         }
         OrderFilter::Status(status) => {
             let status_key = status.as_bytes();
-            read_orders_with_indexer::<OrderDirection>(
-                deps.storage,
-                &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                direction_filter,
-                start_after,
-                limit,
-                order_by,
-            )?
+            match direction {
+                Some(_) => read_orders_with_indexer::<OrderDirection>(
+                        deps.storage,
+                        &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
+                        direction_filter,
+                        start_after,
+                        limit,
+                        order_by,
+                    )?,
+                None => read_orders_with_indexer::<OrderDirection>(
+                            deps.storage,
+                            &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
+                            Box::new(|_| true),
+                            start_after,
+                            limit,
+                            order_by,
+                        )?,
+            }
+            
         }
         OrderFilter::None => match direction {
             Some(_) => read_orders_with_indexer::<OrderDirection>(
