@@ -159,18 +159,18 @@ fn to_events(order: &Order, human_bidder: String, fee: String) -> Event {
     Event::new("matched_order").add_attributes(attrs)
 }
 
-// pub fn process_reward(
-//     storage: &dyn Storage,
-//     pair_key: &[u8],
-//     address: CanonicalAddr,
-//     reward_assets: [Asset; 2],
-// ) -> Executor {
-//     let executor = read_reward(storage, &pair_key, &address);
-//     return match executor {
-//         Ok(r_reward) => r_reward,
-//         Err(_err) => Executor::new(address, reward_assets),
-//     };
-// }
+pub fn process_reward(
+    storage: &dyn Storage,
+    pair_key: &[u8],
+    address: CanonicalAddr,
+    reward_assets: [Asset; 2],
+) -> Executor {
+    let executor = read_reward(storage, &pair_key, &address);
+    return match executor {
+        Ok(r_reward) => r_reward,
+        Err(_err) => Executor::new(address, reward_assets),
+    };
+}
 
 pub fn excecute_pair(
     deps: DepsMut,
@@ -189,41 +189,24 @@ pub fn excecute_pair(
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
     let reward_wallet = contract_info.reward_address;
-    let reward_res = read_reward(deps.storage, &pair_key, &reward_wallet);
-    let mut reward = match reward_res {
-        Ok(r_reward) => r_reward,
-        Err(_err) => Executor::new(
-            reward_wallet,
-            [
-                Asset {
-                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                    amount: Uint128::zero(),
-                },
-                Asset {
-                    info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                    amount: Uint128::zero(),
-                },
-            ],
-        ),
-    };
+    let reward_assets = [
+        Asset {
+            info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
+            amount: Uint128::zero(),
+        },
+        Asset {
+            info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+            amount: Uint128::zero(),
+        },
+    ];
+    let mut reward = process_reward(
+        deps.storage,
+        &pair_key,
+        reward_wallet,
+        reward_assets.clone(),
+    );
 
-    let relayer_res = read_reward(deps.storage, &pair_key, &relayer_addr);
-    let mut relayer = match relayer_res {
-        Ok(r_executor) => r_executor,
-        Err(_err) => Executor::new(
-            relayer_addr,
-            [
-                Asset {
-                    info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                    amount: Uint128::zero(),
-                },
-                Asset {
-                    info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                    amount: Uint128::zero(),
-                },
-            ],
-        ),
-    };
+    let mut relayer = process_reward(deps.storage, &pair_key, relayer_addr, reward_assets);
     let mut messages: Vec<CosmosMsg> = vec![];
 
     let mut list_bidder: Vec<Payment> = vec![];
@@ -326,6 +309,12 @@ pub fn excecute_pair(
                         .unwrap(),
                         lef_sell_offer_amount,
                     );
+                    // let sell_offer_amount = Uint128::min(
+                    //     Uint128::from(sell_ask_asset.amount * Decimal::one())
+                    //         .checked_div(match_price.atomics())
+                    //         .unwrap(),
+                    //     lef_sell_offer_amount,
+                    // );
                     if sell_ask_asset.amount.is_zero() || sell_offer_amount.is_zero() {
                         continue;
                     }
