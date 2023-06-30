@@ -300,21 +300,13 @@ pub fn excecute_pair(
                         info: orderbook_pair.quote_coin_info.to_normal(deps.api)?,
                         amount: Uint128::min(lef_buy_offer_amount, lef_sell_ask_amount),
                     };
-
+                    // multiply by decimal atomics because we want to get good round values
                     let sell_offer_amount = Uint128::min(
-                        Uint128::from(
-                            sell_ask_asset.amount * Uint128::from(1000000000000000000u128),
-                        )
-                        .checked_div(match_price * Uint128::from(1000000000000000000u128))
-                        .unwrap(),
+                        Uint128::from(sell_ask_asset.amount * Decimal::one().atomics())
+                            .checked_div(match_price.atomics())
+                            .unwrap(),
                         lef_sell_offer_amount,
                     );
-                    // let sell_offer_amount = Uint128::min(
-                    //     Uint128::from(sell_ask_asset.amount * Decimal::one())
-                    //         .checked_div(match_price.atomics())
-                    //         .unwrap(),
-                    //     lef_sell_offer_amount,
-                    // );
                     if sell_ask_asset.amount.is_zero() || sell_offer_amount.is_zero() {
                         continue;
                     }
