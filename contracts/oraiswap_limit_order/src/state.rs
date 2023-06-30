@@ -130,6 +130,16 @@ pub fn store_order(
     )
     .save(order_id_key, &order.direction)?;
 
+    Bucket::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_STATUS,
+            pair_key,
+            &order.status.as_bytes(),
+        ],
+    )
+    .save(order_id_key, &order.direction)?;
+
     Ok(total_tick_orders)
 }
 
@@ -178,6 +188,16 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
             PREFIX_ORDER_BY_DIRECTION,
             pair_key,
             &order.direction.as_bytes(),
+        ],
+    )
+    .remove(order_id_key);
+
+    Bucket::<bool>::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_STATUS,
+            pair_key,
+            &order.status.as_bytes(),
         ],
     )
     .remove(order_id_key);
@@ -251,4 +271,5 @@ static PREFIX_REWARD: &[u8] = b"reward_wallet"; // executor that running matchin
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick
 pub static PREFIX_ORDER_BY_DIRECTION: &[u8] = b"order_by_direction"; // order from the direction
+pub static PREFIX_ORDER_BY_STATUS: &[u8] = b"order_by_status"; // order from the status
 pub static PREFIX_TICK: &[u8] = b"tick"; // this is tick with value is the total orders

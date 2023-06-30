@@ -33,7 +33,6 @@ impl OrderDirection {
 #[derive(Copy)]
 pub enum OrderStatus {
     Open,
-    Filling,
     PartialFilled,
     Fulfilled,
     Cancel,
@@ -43,10 +42,9 @@ impl OrderStatus {
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             OrderStatus::Open => &[0u8],
-            OrderStatus::Filling => &[1u8],
-            OrderStatus::PartialFilled => &[2u8],
-            OrderStatus::Fulfilled => &[3u8],
-            OrderStatus::Cancel => &[4u8],
+            OrderStatus::PartialFilled => &[1u8],
+            OrderStatus::Fulfilled => &[2u8],
+            OrderStatus::Cancel => &[3u8],
         }
     }
 }
@@ -120,10 +118,11 @@ pub enum Cw20HookMsg {
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String), // filter by bidder
-    Price(Decimal), // filter by price
-    Tick,           // filter by direction
-    None,           // no filter
+    Bidder(String),             // filter by bidder
+    Price(Decimal),             // filter by price
+    Status(OrderStatus),        // filter by status
+    Tick,                       // filter by direction
+    None,                       // no filter
 }
 
 #[cw_serde]

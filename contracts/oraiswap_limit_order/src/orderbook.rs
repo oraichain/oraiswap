@@ -20,13 +20,13 @@ use crate::state::{
 #[cw_serde]
 pub struct Order {
     pub order_id: u64,
+    pub status: OrderStatus,
     pub direction: OrderDirection, // if direction is sell then offer => sell asset, ask => buy asset
     pub bidder_addr: CanonicalAddr,
     pub offer_amount: Uint128,
     pub ask_amount: Uint128,
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
-    pub status: OrderStatus,
 }
 
 #[cw_serde]

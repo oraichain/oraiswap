@@ -6,7 +6,7 @@ use crate::state::{
     increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
     read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
     remove_orderbook, store_order, store_reward, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
+    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_STATUS,
 };
 use cosmwasm_std::{
     attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
@@ -668,6 +668,17 @@ pub fn query_orders(
             read_orders_with_indexer::<OrderDirection>(
                 deps.storage,
                 &[PREFIX_ORDER_BY_PRICE, &pair_key, &price_key],
+                direction_filter,
+                start_after,
+                limit,
+                order_by,
+            )?
+        }
+        OrderFilter::Status(status) => {
+            let status_key = status.as_bytes();
+            read_orders_with_indexer::<OrderDirection>(
+                deps.storage,
+                &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
                 direction_filter,
                 start_after,
                 limit,
