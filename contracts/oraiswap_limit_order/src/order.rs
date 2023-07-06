@@ -228,7 +228,7 @@ pub fn excecute_pair(
             *buy_price,
             OrderDirection::Buy,
             limit,
-        );
+        ).unwrap();
         for sell_price in &best_sell_price_list {
             if buy_price.lt(sell_price) {
                 continue;
@@ -243,7 +243,7 @@ pub fn excecute_pair(
                 *sell_price,
                 OrderDirection::Sell,
                 limit,
-            );
+            ).unwrap();
 
             for buy_order in &mut match_buy_orders {
                 if buy_order
@@ -252,12 +252,15 @@ pub fn excecute_pair(
                     .is_zero()
                     || buy_order.status == OrderStatus::Fulfilled
                 {
-                    remove_order(deps.storage, &pair_key, buy_order)?;
-                    ret_events.push(to_events(
-                        &buy_order,
-                        deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                        format!("remove stuff order"),
-                    ));
+                    if read_order(deps.storage, &pair_key, buy_order.order_id).is_ok() {
+                        remove_order(deps.storage, &pair_key, buy_order)?;
+                        ret_events.push(to_events(
+                            &buy_order,
+                            deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
+                            format!("remove stuff order")
+                        ));
+                    }
+
                     continue;
                 }
 
@@ -277,12 +280,14 @@ pub fn excecute_pair(
                     if lef_sell_offer_amount.is_zero()
                         || sell_order.status == OrderStatus::Fulfilled
                     {
-                        remove_order(deps.storage, &pair_key, sell_order)?;
-                        ret_events.push(to_events(
-                            &sell_order,
-                            deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                            format!("remove stuff order"),
-                        ));
+                        if read_order(deps.storage, &pair_key, sell_order.order_id).is_ok() {
+                            remove_order(deps.storage, &pair_key, sell_order)?;
+                            ret_events.push(to_events(
+                                &sell_order,
+                                deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
+                                format!("remove stuff order")
+                            ));
+                        }
                         continue;
                     }
 
@@ -639,7 +644,7 @@ pub fn query_orders(
             None => (Box::new(|_| true), OrderDirection::Buy.as_bytes().to_vec()),
         };
 
-    let orders: Vec<Order> = match filter {
+    let orders: Option<Vec<Order>> = match filter {
         OrderFilter::Bidder(bidder_addr) => {
             let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
             read_orders_with_indexer::<OrderDirection>(
@@ -678,13 +683,13 @@ pub fn query_orders(
             let status_key = status.as_bytes();
             match direction {
                 Some(_) => read_orders_with_indexer::<OrderDirection>(
-                        deps.storage,
-                        &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                        direction_filter,
-                        start_after,
-                        limit,
-                        order_by,
-                    )?,
+                            deps.storage,
+                            &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
+                            direction_filter,
+                            start_after,
+                            limit,
+                            order_by,
+                        )?,
                 None => read_orders_with_indexer::<OrderDirection>(
                             deps.storage,
                             &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
@@ -705,12 +710,12 @@ pub fn query_orders(
                 limit,
                 order_by,
             )?,
-            None => read_orders(deps.storage, &pair_key, start_after, limit, order_by)?,
+            None => Some(read_orders(deps.storage, &pair_key, start_after, limit, order_by)?),
         },
     };
 
     let resp = OrdersResponse {
-        orders: orders
+        orders: orders.unwrap_or_default()
             .iter()
             .map(|order| {
                 order.to_response(

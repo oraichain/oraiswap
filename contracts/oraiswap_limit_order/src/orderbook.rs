@@ -216,7 +216,7 @@ impl OrderBook {
         direction: OrderDirection,
         start_after: Option<u64>,
         limit: Option<u32>,
-    ) -> StdResult<Vec<Order>> {
+    ) -> Option<Vec<Order>> {
         let pair_key = &self.get_pair_key();
         read_orders_with_indexer::<OrderDirection>(
             storage,
@@ -229,7 +229,7 @@ impl OrderBook {
             start_after,
             limit,
             Some(OrderBy::Ascending), // first in first out
-        )
+        ).unwrap()
     }
 
     // get_orders returns all orders in the order book, with pagination
@@ -397,7 +397,7 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Uint128 {
-        let orders = self.find_match_orders(storage, price, direction, None);
+        let orders = self.find_match_orders(storage, price, direction, None).unwrap();
         // in Order, ask amount is alway paid amount
         // in Orderbook, buy order is opposite to sell order
         orders
@@ -415,7 +415,7 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
         limit: Option<u32>
-    ) -> Vec<Order> {
+    ) -> Option<Vec<Order>> {
         let pair_key = &self.get_pair_key();
         let price_key = price.atomics().to_be_bytes();
 
@@ -427,8 +427,7 @@ impl OrderBook {
             None,
             limit,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
-        )
-        .unwrap()
+        ).unwrap()
     }
 }
 

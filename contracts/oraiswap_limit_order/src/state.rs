@@ -218,7 +218,7 @@ pub fn read_orders_with_indexer<T: Serialize + DeserializeOwned>(
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
-) -> StdResult<Vec<Order>> {
+) -> StdResult<Option<Vec<Order>>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {
@@ -234,7 +234,7 @@ pub fn read_orders_with_indexer<T: Serialize + DeserializeOwned>(
         .range(start.as_deref(), end.as_deref(), order_by)
         .filter(|item| item.as_ref().map_or(false, |item| filter(&item.1)))
         .take(limit)
-        .map(|item| order_bucket.load(&item?.0))
+        .map(|item| order_bucket.may_load(&item?.0))
         .collect()
 }
 
