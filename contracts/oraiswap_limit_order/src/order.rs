@@ -159,7 +159,7 @@ fn to_events(order: &Order, human_bidder: String, fee: String) -> Event {
     Event::new("matched_order").add_attributes(attrs)
 }
 
-pub fn process_reward(
+fn process_reward(
     storage: &dyn Storage,
     pair_key: &[u8],
     address: CanonicalAddr,
@@ -170,6 +170,88 @@ pub fn process_reward(
         Ok(r_reward) => r_reward,
         Err(_err) => Executor::new(address, reward_assets),
     };
+}
+
+fn transfer_reward(
+    deps: &DepsMut,
+    reward: &mut Executor,
+    relayer: &mut Executor,
+    total_reward: &mut Vec<String>,
+    messages: &mut Vec<CosmosMsg>,
+)  {
+    for i in 0..=1 {
+        if Uint128::from(reward.reward_assets[i].amount) >= Uint128::from(1000000u128) {
+            messages.push(
+                reward.reward_assets[i].into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api
+                        .addr_validate(deps.api.addr_humanize(&reward.address).unwrap().as_str()).unwrap(),
+                ).unwrap(),
+            );
+            total_reward.push(reward.reward_assets[i].to_string());
+            reward.reward_assets[i].amount = Uint128::zero();
+        }
+
+        if Uint128::from(relayer.reward_assets[i].amount) >= Uint128::from(1000000u128) {
+            messages.push(
+                relayer.reward_assets[i].into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api
+                        .addr_validate(deps.api.addr_humanize(&relayer.address).unwrap().as_str()).unwrap(),
+                ).unwrap(),
+            );
+            total_reward.push(relayer.reward_assets[i].to_string());
+            relayer.reward_assets[i].amount = Uint128::zero();
+        }
+    }
+}
+
+fn transfer_to_trader(
+    deps: &DepsMut,
+    list_bidder: Vec<Payment>,
+    list_asker: Vec<Payment>,
+    messages: &mut Vec<CosmosMsg>,
+)  {
+    let mut minimalist_asker: Vec<Payment> = vec![];
+    let mut minimalist_bidder: Vec<Payment> = vec![];
+
+    for asker in list_asker {
+        if let Some(existing_payment) = minimalist_asker
+            .iter_mut()
+            .find(|p| p.address == asker.address)
+        {
+            existing_payment.asset.amount += asker.asset.amount;
+        } else {
+            minimalist_asker.push(asker);
+        }
+    }
+    for bidder in list_bidder {
+        if let Some(existing_payment) = minimalist_bidder
+            .iter_mut()
+            .find(|p| p.address == bidder.address)
+        {
+            existing_payment.asset.amount += bidder.asset.amount;
+        } else {
+            minimalist_bidder.push(bidder);
+        }
+    }
+
+    for asker in minimalist_asker {
+        messages.push(asker.asset.into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(asker.address.as_str()).unwrap(),
+        ).unwrap());
+    }
+    for bidder in minimalist_bidder {
+        messages.push(bidder.asset.into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(bidder.address.as_str()).unwrap(),
+        ).unwrap());
+    }
 }
 
 pub fn excecute_pair(
@@ -491,72 +573,8 @@ pub fn excecute_pair(
         }
     }
 
-    let mut minimalist_asker: Vec<Payment> = vec![];
-    let mut minimalist_bidder: Vec<Payment> = vec![];
-
-    for asker in list_asker {
-        if let Some(existing_payment) = minimalist_asker
-            .iter_mut()
-            .find(|p| p.address == asker.address)
-        {
-            existing_payment.asset.amount += asker.asset.amount;
-        } else {
-            minimalist_asker.push(asker);
-        }
-    }
-    for bidder in list_bidder {
-        if let Some(existing_payment) = minimalist_bidder
-            .iter_mut()
-            .find(|p| p.address == bidder.address)
-        {
-            existing_payment.asset.amount += bidder.asset.amount;
-        } else {
-            minimalist_bidder.push(bidder);
-        }
-    }
-
-    for asker in minimalist_asker {
-        messages.push(asker.asset.into_msg(
-            None,
-            &deps.querier,
-            deps.api.addr_validate(asker.address.as_str())?,
-        )?);
-    }
-    for bidder in minimalist_bidder {
-        messages.push(bidder.asset.into_msg(
-            None,
-            &deps.querier,
-            deps.api.addr_validate(bidder.address.as_str())?,
-        )?);
-    }
-
-    for i in 0..=1 {
-        if Uint128::from(reward.reward_assets[i].amount) >= Uint128::from(1000000u128) {
-            messages.push(
-                reward.reward_assets[i].into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api
-                        .addr_validate(deps.api.addr_humanize(&reward.address)?.as_str())?,
-                )?,
-            );
-            total_reward.push(reward.reward_assets[i].to_string());
-            reward.reward_assets[i].amount = Uint128::zero();
-        }
-
-        if Uint128::from(relayer.reward_assets[i].amount) >= Uint128::from(1000000u128) {
-            messages.push(
-                relayer.reward_assets[i].into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api
-                        .addr_validate(deps.api.addr_humanize(&relayer.address)?.as_str())?,
-                )?,
-            );
-            total_reward.push(relayer.reward_assets[i].to_string());
-            relayer.reward_assets[i].amount = Uint128::zero();
-        }
-    }
+    transfer_to_trader(&deps, list_bidder, list_asker, &mut messages);
+    transfer_reward(&deps, &mut reward, &mut relayer, &mut total_reward, &mut messages);
 
     store_reward(deps.storage, &pair_key, &reward)?;
     store_reward(deps.storage, &pair_key, &relayer)?;
