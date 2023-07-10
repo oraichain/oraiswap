@@ -738,6 +738,8 @@ fn cancel_order_native_token() {
             ("direction", "Buy"),
             ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
+            ("offer_amount", "6666666"),
+            ("ask_amount", "500000"),
             ("bidder_refund", &format!("6666666{}", USDT_DENOM)),
         ]
     );
@@ -891,6 +893,8 @@ fn cancel_order_native_token() {
             ("direction", "Sell"),
             ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
+            ("offer_amount", "1234560"),
+            ("ask_amount", "1000000"),
             ("bidder_refund", &format!("1234560{}", ORAI_DENOM)),
         ]
     );
@@ -1159,6 +1163,8 @@ fn cancel_order_token() {
             ("direction", "Buy"),
             ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
+            ("offer_amount", "1234567"),
+            ("ask_amount", "4567890"),
             ("bidder_refund", &format!("1234567{}", token_addrs[0])),
         ]
     );
@@ -1193,6 +1199,8 @@ fn cancel_order_token() {
             ("direction", "Sell"),
             ("status", "Cancel"),
             ("bidder_addr", "addr0000"),
+            ("offer_amount", "3333335"),
+            ("ask_amount", "1212121"),
             ("bidder_refund", &format!("3333335{}", token_addrs[1])),
         ]
     );

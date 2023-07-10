@@ -139,6 +139,8 @@ pub fn cancel_order(
             "bidder_addr",
             &deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
         ),
+        ("offer_amount", &order.offer_amount.to_string()),
+        ("ask_amount", &order.ask_amount.to_string()),
         ("bidder_refund", &bidder_refund.to_string()),
     ]))
 }
