@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Binary};
 
 use crate::asset::{AssetInfo, PairInfo};
 
@@ -28,6 +28,11 @@ pub enum ExecuteMsg {
     },
     AddPair {
         pair_info: PairInfo,
+    },
+    MigrateContract {
+        contract_addr: String,
+        new_code_id: u64,
+        msg: Binary,
     },
 }
 
