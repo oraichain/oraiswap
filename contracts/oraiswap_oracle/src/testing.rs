@@ -147,12 +147,14 @@ fn test_asset() {
 
     assert_eq!(
         native_token_asset
-            .deduct_tax(&orai_oracle, &app.as_querier())
+            .amount
+            .checked_sub(
+                native_token_asset
+                    .compute_tax(&orai_oracle, &app.as_querier())
+                    .unwrap()
+            )
             .unwrap(),
-        Coin {
-            denom: "uusd".to_string(),
-            amount: Uint128::from(121903u128),
-        }
+        Uint128::from(121903u128)
     );
 
     assert_eq!(
