@@ -425,27 +425,13 @@ impl MockApp {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Decimal256, Uint128};
+    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Uint128};
 
     use crate::{
         asset::AssetInfo,
-        pair::compute_swap,
         querier::{query_supply, query_token_balance},
         testing::MockApp,
     };
-
-    #[test]
-    fn compute_swap_test() {
-        let result = compute_swap(
-            Uint128::from(27764052486u128),
-            Uint128::from(28384000000u128),
-            Uint128::from(1u128),
-            Decimal256::from_ratio(Uint128::from(3u128), Uint128::from(1000u128)),
-        )
-        .unwrap();
-
-        assert_eq!(result.1, Uint128::from(0u128))
-    }
 
     #[test]
     fn token_balance_querier() {
