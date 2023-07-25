@@ -318,6 +318,7 @@ impl OrderBook {
         limit: Option<u32>,
     ) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
         let pair_key = &self.get_pair_key();
+        // asc
         let sell_price_list = query_ticks(
             storage,
             pair_key,
@@ -350,6 +351,8 @@ impl OrderBook {
         } else {
             None
         };
+
+        // desc, all items in this list are ge than the first item in sell list
         let buy_price_list = query_ticks(
             storage,
             pair_key,
@@ -396,29 +399,9 @@ impl OrderBook {
                 }
             }
         } else {
-            for buy_price in &buy_price_list {
-                let mut is_greater: bool = false;
-                for sell_price in &sell_price_list {
-                    if buy_price.ge(&sell_price) {
-                        is_greater = true;
-                    }
-                }
-                if is_greater {
-                    best_buy_price_list.push(*buy_price);
-                }
-            }
-
-            for sell_price in &sell_price_list {
-                let mut is_less: bool = false;
-                for buy_price in &buy_price_list {
-                    if buy_price.ge(&sell_price) {
-                        is_less = true;
-                    }
-                }
-                if is_less {
-                    best_sell_price_list.push(*sell_price);
-                }
-            }
+            // both price lists are applicable because buy list is always larger than the first item of sell list
+            best_buy_price_list = buy_price_list;
+            best_sell_price_list = sell_price_list;
         }
 
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
