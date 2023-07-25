@@ -4,17 +4,17 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
-    limit_order::{OrderBookResponse, OrderDirection, OrderStatus, OrderResponse},
+    limit_order::{OrderBookResponse, OrderDirection, OrderResponse, OrderStatus, TicksResponse},
 };
 
-use cosmwasm_std::{
-    Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult,
-    Storage, Uint128,
-};
+use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 
-use crate::state::{
-    read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
-    PREFIX_TICK,
+use crate::{
+    state::{
+        read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
+        PREFIX_TICK,
+    },
+    tick::query_ticks,
 };
 
 #[cw_serde]
@@ -46,7 +46,9 @@ impl Order {
     ) -> Self {
         let offer_amount = match direction {
             OrderDirection::Buy => ask_amount * price,
-            OrderDirection::Sell => Uint128::from(ask_amount * Uint128::from(1000000u128)).checked_div(price * Uint128::from(1000000u128)).unwrap(),
+            OrderDirection::Sell => Uint128::from(ask_amount * Uint128::from(1000000u128))
+                .checked_div(price * Uint128::from(1000000u128))
+                .unwrap(),
         };
 
         Order {
@@ -154,7 +156,10 @@ impl OrderBook {
     }
 
     pub fn get_pair_key(&self) -> Vec<u8> {
-        pair_key_from_asset_keys(self.base_coin_info.as_bytes(), self.quote_coin_info.as_bytes())
+        pair_key_from_asset_keys(
+            self.base_coin_info.as_bytes(),
+            self.quote_coin_info.as_bytes(),
+        )
     }
 
     pub fn add_order(&mut self, storage: &mut dyn Storage, order: &Order) -> StdResult<u64> {
@@ -229,7 +234,8 @@ impl OrderBook {
             start_after,
             limit,
             Some(OrderBy::Ascending), // first in first out
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     // get_orders returns all orders in the order book, with pagination
@@ -255,15 +261,20 @@ impl OrderBook {
         // if there is spread, find the best sell price closest to best buy price
         if let Some(spread) = self.spread {
             let spread_factor = Decimal::one() + spread;
-            let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
-                .range(None, None, OrderBy::Descending)
-                .filter_map(|item| {
-                    if let Ok((price_key, _)) = item {
-                        let buy_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                        return Some(buy_price);
-                    }
-                    None
-                }).collect::<Vec<Decimal>>();
+            let buy_price_list = ReadonlyBucket::<u64>::multilevel(
+                storage,
+                &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
+            )
+            .range(None, None, OrderBy::Descending)
+            .filter_map(|item| {
+                if let Ok((price_key, _)) = item {
+                    let buy_price =
+                        Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                    return Some(buy_price);
+                }
+                None
+            })
+            .collect::<Vec<Decimal>>();
 
             let tick_namespaces = &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()];
 
@@ -272,11 +283,12 @@ impl OrderBook {
                 .range(None, None, OrderBy::Ascending)
                 .find_map(|item| {
                     if let Ok((price_key, _)) = item {
-                        let sell_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+                        let sell_price =
+                            Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
 
                         for buy_price in &buy_price_list {
                             if buy_price.ge(&sell_price)
-                            && buy_price.le(&(sell_price * spread_factor))
+                                && buy_price.le(&(sell_price * spread_factor))
                             {
                                 best_buy_price = *buy_price;
                                 return Some(sell_price);
@@ -300,30 +312,43 @@ impl OrderBook {
     }
 
     /// find list best buy / sell prices
-    pub fn find_list_match_price(&self, storage: &dyn Storage, limit: Option<u32>) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
+    pub fn find_list_match_price(
+        &self,
+        storage: &dyn Storage,
+        limit: Option<u32>,
+    ) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
         let pair_key = &self.get_pair_key();
-        let limit = limit.unwrap_or(20) as usize;
-        let buy_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()])
-                .range(None, None, OrderBy::Descending)
-                .take(limit)
-                .filter_map(|item| {
-                    if let Ok((price_key, _)) = item {
-                        let buy_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                        return Some(buy_price);
-                    }
-                    None
-                }).collect::<Vec<Decimal>>();
+        let sell_price_list = query_ticks(
+            storage,
+            pair_key,
+            OrderDirection::Sell,
+            None,
+            limit,
+            Some(1i32),
+        )
+        .unwrap_or(TicksResponse { ticks: vec![] })
+        .ticks
+        .into_iter()
+        .map(|tick| tick.price)
+        .collect::<Vec<Decimal>>();
 
-        let sell_price_list = ReadonlyBucket::<u64>::multilevel(storage, &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()])
-                .range(None, None, OrderBy::Ascending)
-                .take(limit)
-                .filter_map(|item| {
-                    if let Ok((price_key, _)) = item {
-                        let sell_price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                        return Some(sell_price);
-                    }
-                    None
-                }).collect::<Vec<Decimal>>();
+        // guard code
+        if sell_price_list.len() == 0 {
+            return None;
+        }
+        let buy_price_list = query_ticks(
+            storage,
+            pair_key,
+            OrderDirection::Buy,
+            None,
+            limit,
+            Some(2i32),
+        )
+        .unwrap_or(TicksResponse { ticks: vec![] })
+        .ticks
+        .into_iter()
+        .map(|tick| tick.price)
+        .collect::<Vec<Decimal>>();
 
         let mut best_buy_price_list: Vec<Decimal> = Vec::new();
         let mut best_sell_price_list: Vec<Decimal> = Vec::new();
@@ -335,8 +360,7 @@ impl OrderBook {
             for buy_price in &buy_price_list {
                 let mut is_greater: bool = false;
                 for sell_price in &sell_price_list {
-                    if buy_price.ge(&sell_price)
-                    && buy_price.le(&(sell_price * spread_factor)) {
+                    if buy_price.ge(&sell_price) && buy_price.le(&(sell_price * spread_factor)) {
                         is_greater = true;
                     }
                 }
@@ -344,12 +368,11 @@ impl OrderBook {
                     best_buy_price_list.push(*buy_price);
                 }
             }
-        
+
             for sell_price in &sell_price_list {
                 let mut is_less: bool = false;
                 for buy_price in &buy_price_list {
-                    if buy_price.ge(&sell_price)
-                    && buy_price.le(&(sell_price * spread_factor)) {
+                    if buy_price.ge(&sell_price) && buy_price.le(&(sell_price * spread_factor)) {
                         is_less = true;
                     }
                 }
@@ -369,7 +392,7 @@ impl OrderBook {
                     best_buy_price_list.push(*buy_price);
                 }
             }
-        
+
             for sell_price in &sell_price_list {
                 let mut is_less: bool = false;
                 for buy_price in &buy_price_list {
@@ -397,7 +420,9 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Uint128 {
-        let orders = self.find_match_orders(storage, price, direction, None).unwrap();
+        let orders = self
+            .find_match_orders(storage, price, direction, None)
+            .unwrap();
         // in Order, ask amount is alway paid amount
         // in Orderbook, buy order is opposite to sell order
         orders
@@ -414,7 +439,7 @@ impl OrderBook {
         storage: &dyn Storage,
         price: Decimal,
         direction: OrderDirection,
-        limit: Option<u32>
+        limit: Option<u32>,
     ) -> Option<Vec<Order>> {
         let pair_key = &self.get_pair_key();
         let price_key = price.atomics().to_be_bytes();
@@ -427,15 +452,13 @@ impl OrderBook {
             None,
             limit,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
-        ).unwrap()
+        )
+        .unwrap()
     }
 }
 
 impl Executor {
-    pub fn new(
-        address: CanonicalAddr,
-        reward_assets: [Asset; 2],
-    ) -> Self {
+    pub fn new(address: CanonicalAddr, reward_assets: [Asset; 2]) -> Self {
         Executor {
             address,
             reward_assets,
