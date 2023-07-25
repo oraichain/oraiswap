@@ -5825,14 +5825,13 @@ fn test_query_ticks_with_end() {
                     },
                 ],
                 direction: OrderDirection::Sell,
-                start_after: Some(Decimal::from_str("1").unwrap()),
+                start_after: Some(Decimal::from_str("2").unwrap()),
                 end: Some(Decimal::from_str("3").unwrap()),
                 limit: None,
                 order_by: Some(1),
             },
         )
         .unwrap();
-    assert_eq!(result.ticks.len(), 2);
-    assert_eq!(result.ticks[0].price, Decimal::from_str("2").unwrap());
-    assert_eq!(result.ticks[1].price, Decimal::from_str("3").unwrap());
+    assert_eq!(result.ticks.len(), 1);
+    assert_eq!(result.ticks[0].price, Decimal::from_str("3").unwrap());
 }

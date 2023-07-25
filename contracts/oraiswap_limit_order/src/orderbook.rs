@@ -14,7 +14,7 @@ use crate::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
     },
-    tick::query_ticks,
+    tick::{query_ticks, query_ticks_with_end},
 };
 
 #[cw_serde]
@@ -338,75 +338,91 @@ impl OrderBook {
             return None;
         }
 
-        let start_after = if let Some(start_after) = Decimal::from_atomics(
-            sell_price_list[0]
-                .atomics()
-                .checked_sub(Uint128::from(1u64))
-                .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
-            Decimal::DECIMAL_PLACES,
-        )
-        .ok()
-        {
-            Some(start_after)
-        } else {
-            None
-        };
-
-        // desc, all items in this list are ge than the first item in sell list
-        let buy_price_list = query_ticks(
-            storage,
-            pair_key,
-            OrderDirection::Buy,
-            start_after,
-            limit,
-            Some(1i32),
-        )
-        .unwrap_or(TicksResponse { ticks: vec![] })
-        .ticks
-        .into_iter()
-        .rev()
-        .map(|tick| tick.price)
-        .collect::<Vec<Decimal>>();
-
         let mut best_buy_price_list: Vec<Decimal> = Vec::new();
         let mut best_sell_price_list: Vec<Decimal> = Vec::new();
 
         // if there is spread, find the best list sell price
         if let Some(spread) = self.spread {
             let spread_factor = Decimal::one() + spread;
+            for sell_price in sell_price_list {
+                let sell_price_with_spread =
+                    sell_price.checked_mul(spread_factor).unwrap_or_default();
+                if sell_price_with_spread.is_zero() {
+                    continue;
+                }
+                let start_after = if let Some(start_after) = Decimal::from_atomics(
+                    sell_price
+                        .atomics()
+                        .checked_sub(Uint128::from(1u64))
+                        .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
+                    Decimal::DECIMAL_PLACES,
+                )
+                .ok()
+                {
+                    Some(start_after)
+                } else {
+                    None
+                };
+                let suitable_buy_price_list = query_ticks_with_end(
+                    storage,
+                    pair_key,
+                    OrderDirection::Buy,
+                    start_after,
+                    Some(sell_price_with_spread),
+                    Some(1), // limit 1 because we only need to get the closest buy price possible to the sell price
+                    Some(1),
+                )
+                .unwrap_or(TicksResponse { ticks: vec![] })
+                .ticks
+                .into_iter()
+                .map(|tick| tick.price)
+                .collect::<Vec<Decimal>>();
 
-            for buy_price in &buy_price_list {
-                let mut is_greater: bool = false;
-                for sell_price in &sell_price_list {
-                    if buy_price.ge(&sell_price) && buy_price.le(&(sell_price * spread_factor)) {
-                        is_greater = true;
-                    }
+                // cannot find suitable buy price list for the given sell price
+                if suitable_buy_price_list.len() == 0 {
+                    continue;
                 }
-                if is_greater {
-                    best_buy_price_list.push(*buy_price);
-                }
-            }
-
-            for sell_price in &sell_price_list {
-                let mut is_less: bool = false;
-                for buy_price in &buy_price_list {
-                    if buy_price.ge(&sell_price) && buy_price.le(&(sell_price * spread_factor)) {
-                        is_less = true;
-                    }
-                }
-                if is_less {
-                    best_sell_price_list.push(*sell_price);
-                }
+                // we loop sell price from smallest to highest, matching buy price must go from highest to lowest => always insert highest into the first element
+                best_buy_price_list.insert(0, suitable_buy_price_list[0]);
+                best_sell_price_list.push(sell_price);
             }
         } else {
+            let start_after = if let Some(start_after) = Decimal::from_atomics(
+                sell_price_list[0]
+                    .atomics()
+                    .checked_sub(Uint128::from(1u64))
+                    .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
+                Decimal::DECIMAL_PLACES,
+            )
+            .ok()
+            {
+                Some(start_after)
+            } else {
+                None
+            };
+            // desc, all items in this list are ge than the first item in sell list
+            best_buy_price_list = query_ticks(
+                storage,
+                pair_key,
+                OrderDirection::Buy,
+                start_after,
+                limit,
+                Some(1i32),
+            )
+            .unwrap_or(TicksResponse { ticks: vec![] })
+            .ticks
+            .into_iter()
+            .rev()
+            .map(|tick| tick.price)
+            .collect::<Vec<Decimal>>();
             // both price lists are applicable because buy list is always larger than the first item of sell list
-            best_buy_price_list = buy_price_list;
             best_sell_price_list = sell_price_list;
         }
 
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
             return None;
         }
+        println!();
         return Some((best_buy_price_list, best_sell_price_list));
     }
 

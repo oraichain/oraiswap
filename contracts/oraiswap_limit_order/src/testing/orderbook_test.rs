@@ -292,8 +292,8 @@ fn sell_orders_at() {
             None,
         )
         .unwrap();
-    
-    println!("sell_orders: {:?}",sell_orders);
+
+    println!("sell_orders: {:?}", sell_orders);
     assert!(ob
         .orders_at(
             deps.as_ref().storage,
@@ -433,7 +433,10 @@ fn highest_lowest_price() {
 
         if found_buy || found_sell {
             let highest_price = Decimal::max(highest_buy, highest_sell);
-            println!("tc.highest_price: {} - highest_price: {}", tc.highest_price, highest_price);
+            println!(
+                "tc.highest_price: {} - highest_price: {}",
+                tc.highest_price, highest_price
+            );
         }
 
         let (lowest_buy, found_buy, _) = tc
@@ -445,7 +448,10 @@ fn highest_lowest_price() {
 
         if found_buy || found_sell {
             let lowest_price = Decimal::min(lowest_buy, lowest_sell);
-            println!("tc.lowest_price: {} - lowest_price: {}", tc.lowest_price, lowest_price);
+            println!(
+                "tc.lowest_price: {} - lowest_price: {}",
+                tc.lowest_price, lowest_price
+            );
         }
     }
 }
