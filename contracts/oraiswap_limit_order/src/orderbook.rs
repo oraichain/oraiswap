@@ -390,15 +390,15 @@ impl OrderBook {
                 None
             };
             // desc, all items in this list are ge than the first item in sell list
-            best_buy_price_list = query_ticks_prices(
+            best_buy_price_list = query_ticks_prices_with_end(
                 storage,
                 pair_key,
                 OrderDirection::Buy,
+                None,
                 start_after,
                 limit,
-                Some(1i32),
+                Some(2i32),
             );
-            best_buy_price_list.reverse();
             // both price lists are applicable because buy list is always larger than the first item of sell list
             best_sell_price_list = sell_price_list;
         }
