@@ -4,7 +4,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
-    limit_order::{OrderBookResponse, OrderDirection, OrderResponse, OrderStatus, TicksResponse},
+    limit_order::{OrderBookResponse, OrderDirection, OrderResponse, OrderStatus},
 };
 
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
@@ -14,7 +14,7 @@ use crate::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
     },
-    tick::{query_ticks, query_ticks_with_end},
+    tick::{query_ticks_prices, query_ticks_prices_with_end},
 };
 
 #[cw_serde]
@@ -319,20 +319,14 @@ impl OrderBook {
     ) -> Option<(Vec<Decimal>, Vec<Decimal>)> {
         let pair_key = &self.get_pair_key();
         // asc
-        let sell_price_list = query_ticks(
+        let sell_price_list = query_ticks_prices(
             storage,
             pair_key,
             OrderDirection::Sell,
             None,
             limit,
             Some(1i32),
-        )
-        .unwrap_or(TicksResponse { ticks: vec![] })
-        .ticks
-        .into_iter()
-        .map(|tick| tick.price)
-        .collect::<Vec<Decimal>>();
-
+        );
         // guard code
         if sell_price_list.len() == 0 {
             return None;
@@ -363,7 +357,7 @@ impl OrderBook {
                 } else {
                     None
                 };
-                let suitable_buy_price_list = query_ticks_with_end(
+                let suitable_buy_price_list = query_ticks_prices_with_end(
                     storage,
                     pair_key,
                     OrderDirection::Buy,
@@ -371,12 +365,7 @@ impl OrderBook {
                     Some(sell_price_with_spread),
                     Some(1), // limit 1 because we only need to get the closest buy price possible to the sell price
                     Some(1),
-                )
-                .unwrap_or(TicksResponse { ticks: vec![] })
-                .ticks
-                .into_iter()
-                .map(|tick| tick.price)
-                .collect::<Vec<Decimal>>();
+                );
 
                 // cannot find suitable buy price list for the given sell price
                 if suitable_buy_price_list.len() == 0 {
@@ -401,20 +390,15 @@ impl OrderBook {
                 None
             };
             // desc, all items in this list are ge than the first item in sell list
-            best_buy_price_list = query_ticks(
+            best_buy_price_list = query_ticks_prices(
                 storage,
                 pair_key,
                 OrderDirection::Buy,
                 start_after,
                 limit,
                 Some(1i32),
-            )
-            .unwrap_or(TicksResponse { ticks: vec![] })
-            .ticks
-            .into_iter()
-            .rev()
-            .map(|tick| tick.price)
-            .collect::<Vec<Decimal>>();
+            );
+            best_buy_price_list.reverse();
             // both price lists are applicable because buy list is always larger than the first item of sell list
             best_sell_price_list = sell_price_list;
         }
@@ -422,7 +406,6 @@ impl OrderBook {
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
             return None;
         }
-        println!();
         return Some((best_buy_price_list, best_sell_price_list));
     }
 

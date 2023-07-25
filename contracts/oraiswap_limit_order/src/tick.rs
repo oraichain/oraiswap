@@ -9,24 +9,24 @@ use oraiswap::{
 
 use crate::state::{DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK};
 
-pub fn query_ticks(
-    storage: &dyn Storage,
-    pair_key: &[u8],
-    direction: OrderDirection,
-    start_after: Option<Decimal>,
-    limit: Option<u32>,
-    order_by: Option<i32>,
-) -> StdResult<TicksResponse> {
-    query_ticks_with_end(
-        storage,
-        pair_key,
-        direction,
-        start_after,
-        None,
-        limit,
-        order_by,
-    )
-}
+// pub fn query_ticks(
+//     storage: &dyn Storage,
+//     pair_key: &[u8],
+//     direction: OrderDirection,
+//     start_after: Option<Decimal>,
+//     limit: Option<u32>,
+//     order_by: Option<i32>,
+// ) -> StdResult<TicksResponse> {
+//     query_ticks_with_end(
+//         storage,
+//         pair_key,
+//         direction,
+//         start_after,
+//         None,
+//         limit,
+//         order_by,
+//     )
+// }
 
 pub fn query_ticks_prices(
     storage: &dyn Storage,

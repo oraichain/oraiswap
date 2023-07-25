@@ -10,7 +10,7 @@ use oraiswap::{
 use crate::{
     orderbook::{Order, OrderBook},
     state::{increase_last_order_id, init_last_order_id},
-    tick::query_ticks,
+    tick::query_ticks_prices,
 };
 
 #[test]
@@ -101,26 +101,24 @@ fn initialize() {
     }
     let pair_key = &ob.get_pair_key();
 
-    let buy_ticks = query_ticks(
+    let buy_ticks = query_ticks_prices(
         deps.as_ref().storage,
         pair_key,
         OrderDirection::Buy,
         None,
         None,
         Some(1),
-    )
-    .unwrap();
+    );
     println!("buy ticks: {:?}", buy_ticks);
 
-    let sell_ticks = query_ticks(
+    let sell_ticks = query_ticks_prices(
         deps.as_ref().storage,
         pair_key,
         OrderDirection::Sell,
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
     println!("sell ticks: {:?}", sell_ticks);
 
     let (highest, found, _) = ob.highest_price(deps.as_ref().storage, OrderDirection::Buy);
