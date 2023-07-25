@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, ops::Sub};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
@@ -336,17 +336,28 @@ impl OrderBook {
         if sell_price_list.len() == 0 {
             return None;
         }
+        let start_after = if let Some(start_after) = Decimal::from_atomics(
+            sell_price_list[0].atomics().sub(Uint128::from(1u64)), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
+            Decimal::DECIMAL_PLACES,
+        )
+        .ok()
+        {
+            Some(start_after)
+        } else {
+            None
+        };
         let buy_price_list = query_ticks(
             storage,
             pair_key,
             OrderDirection::Buy,
-            None,
+            start_after,
             limit,
-            Some(2i32),
+            Some(1i32),
         )
         .unwrap_or(TicksResponse { ticks: vec![] })
         .ticks
         .into_iter()
+        .rev()
         .map(|tick| tick.price)
         .collect::<Vec<Decimal>>();
 
