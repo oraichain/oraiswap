@@ -4351,8 +4351,7 @@ fn reward_to_executor_test() {
     assert_eq!(address1_balances, expected_balances,);
 }
 
-#[test]
-fn query_matchable() {
+fn mock_basic_query_data() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -4431,6 +4430,12 @@ fn query_matchable() {
         &msg,
         &[],
     );
+    (app, limit_order_addr)
+}
+
+#[test]
+fn query_matchable() {
+    let (mut app, limit_order_addr) = mock_basic_query_data();
 
     /* <----------------------------------- order 1 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
@@ -5567,6 +5572,7 @@ fn orders_querier() {
                 ],
                 direction: OrderDirection::Buy,
                 start_after: None,
+                end: None,
                 limit: None,
                 order_by: Some(1),
             },
@@ -5600,84 +5606,7 @@ fn orders_querier() {
 
 #[test]
 fn test_query_ticks_start_after() {
-    let mut app = MockApp::new(&[
-        (
-            &"addr0000".to_string(),
-            &[
-                Coin {
-                    denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-                Coin {
-                    denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-            ],
-        ),
-        (
-            &"addr0001".to_string(),
-            &[
-                Coin {
-                    denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-                Coin {
-                    denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-            ],
-        ),
-        (
-            &"addr0002".to_string(),
-            &[
-                Coin {
-                    denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-                Coin {
-                    denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000u128),
-                },
-            ],
-        ),
-    ]);
-
-    let msg = InstantiateMsg {
-        name: None,
-        version: None,
-        admin: None,
-        commission_rate: None,
-        reward_address: None,
-    };
-    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
-        .instantiate(
-            code_id,
-            Addr::unchecked("addr0000"),
-            &msg,
-            &[],
-            "limit order",
-        )
-        .unwrap();
-
-    // Create pair [orai, usdt] for order book
-    let msg = ExecuteMsg::CreateOrderBookPair {
-        base_coin_info: AssetInfo::NativeToken {
-            denom: ORAI_DENOM.to_string(),
-        },
-        quote_coin_info: AssetInfo::NativeToken {
-            denom: USDT_DENOM.to_string(),
-        },
-        spread: Some(Decimal::percent(10)),
-        min_quote_coin_amount: Uint128::from(10u128),
-    };
-
-    let _res = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
+    let (mut app, limit_order_addr) = mock_basic_query_data();
 
     /* <----------------------------------- order 1 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
@@ -5755,12 +5684,34 @@ fn test_query_ticks_start_after() {
                 ],
                 direction: OrderDirection::Sell,
                 start_after: Some(Decimal::from_str("3").unwrap()),
+                end: None,
                 limit: None,
                 order_by: Some(2),
             },
         )
         .unwrap();
-    println!("result ticks sell: {:?}", result);
+    assert_eq!(result.ticks.len(), 1);
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("2").unwrap()),
+                end: None,
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
     assert_eq!(result.ticks.len(), 1);
 }
 
@@ -5770,4 +5721,118 @@ fn test_unwrap_default_check_sub_uint128() {
         .checked_sub(Uint128::from(1u64))
         .unwrap_or_default();
     assert_eq!(result, Uint128::from(0u64));
+}
+
+#[test]
+fn test_query_ticks_with_end() {
+    let (mut app, limit_order_addr) = mock_basic_query_data();
+
+    /* <----------------------------------- order 1 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(20000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    /* <----------------------------------- order 2 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(30000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("3").unwrap()),
+                end: Some(Decimal::from_str("2").unwrap()),
+                limit: None,
+                order_by: Some(2),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 1);
+    assert_eq!(result.ticks[0].price, Decimal::from_str("2").unwrap());
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("1").unwrap()),
+                end: Some(Decimal::from_str("3").unwrap()),
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 2);
+    assert_eq!(result.ticks[0].price, Decimal::from_str("2").unwrap());
+    assert_eq!(result.ticks[1].price, Decimal::from_str("3").unwrap());
 }

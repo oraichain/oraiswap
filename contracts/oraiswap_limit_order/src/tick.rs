@@ -17,7 +17,7 @@ pub fn query_ticks(
     limit: Option<u32>,
     order_by: Option<i32>,
 ) -> StdResult<TicksResponse> {
-    query_ticks_with_end_after(
+    query_ticks_with_end(
         storage,
         pair_key,
         direction,
@@ -28,12 +28,12 @@ pub fn query_ticks(
     )
 }
 
-pub fn query_ticks_with_end_after(
+pub fn query_ticks_with_end(
     storage: &dyn Storage,
     pair_key: &[u8],
     direction: OrderDirection,
     start_after: Option<Decimal>,
-    end_after: Option<Decimal>,
+    end: Option<Decimal>,
     limit: Option<u32>,
     order_by: Option<i32>,
 ) -> StdResult<TicksResponse> {
@@ -44,11 +44,15 @@ pub fn query_ticks_with_end_after(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_after = start_after.map(|id| id.atomics().to_be_bytes().to_vec());
-    let end_after = end_after.map(|id| id.atomics().to_be_bytes().to_vec());
+    let end = end.map(|id| id.atomics().to_be_bytes().to_vec());
 
     let (start, end, order_by) = match order_by {
-        Some(OrderBy::Ascending) => (calc_range_start(start_after), end_after, OrderBy::Ascending),
-        _ => (end_after, start_after, OrderBy::Descending),
+        Some(OrderBy::Ascending) => (
+            calc_range_start(start_after),
+            calc_range_start(end),
+            OrderBy::Ascending,
+        ),
+        _ => (end, start_after, OrderBy::Descending),
     };
 
     let ticks = position_bucket
