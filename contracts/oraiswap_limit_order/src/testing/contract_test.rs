@@ -5763,3 +5763,11 @@ fn test_query_ticks_start_after() {
     println!("result ticks sell: {:?}", result);
     assert_eq!(result.ticks.len(), 1);
 }
+
+#[test]
+fn test_unwrap_default_check_sub_uint128() {
+    let result = Uint128::from(0u64)
+        .checked_sub(Uint128::from(1u64))
+        .unwrap_or_default();
+    assert_eq!(result, Uint128::from(0u64));
+}
