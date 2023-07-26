@@ -6,7 +6,7 @@ use crate::state::{
     increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
     read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
     remove_orderbook, store_order, store_reward, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
-    PREFIX_ORDER_BY_PRICE, PREFIX_TICK, PREFIX_ORDER_BY_STATUS,
+    PREFIX_ORDER_BY_PRICE, PREFIX_ORDER_BY_STATUS, PREFIX_TICK,
 };
 use cosmwasm_std::{
     attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
@@ -180,16 +180,21 @@ fn transfer_reward(
     relayer: &mut Executor,
     total_reward: &mut Vec<String>,
     messages: &mut Vec<CosmosMsg>,
-)  {
+) {
     for i in 0..=1 {
         if Uint128::from(reward.reward_assets[i].amount) >= Uint128::from(1000000u128) {
             messages.push(
-                reward.reward_assets[i].into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api
-                        .addr_validate(deps.api.addr_humanize(&reward.address).unwrap().as_str()).unwrap(),
-                ).unwrap(),
+                reward.reward_assets[i]
+                    .into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api
+                            .addr_validate(
+                                deps.api.addr_humanize(&reward.address).unwrap().as_str(),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap(),
             );
             total_reward.push(reward.reward_assets[i].to_string());
             reward.reward_assets[i].amount = Uint128::zero();
@@ -197,12 +202,17 @@ fn transfer_reward(
 
         if Uint128::from(relayer.reward_assets[i].amount) >= Uint128::from(1000000u128) {
             messages.push(
-                relayer.reward_assets[i].into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api
-                        .addr_validate(deps.api.addr_humanize(&relayer.address).unwrap().as_str()).unwrap(),
-                ).unwrap(),
+                relayer.reward_assets[i]
+                    .into_msg(
+                        None,
+                        &deps.querier,
+                        deps.api
+                            .addr_validate(
+                                deps.api.addr_humanize(&relayer.address).unwrap().as_str(),
+                            )
+                            .unwrap(),
+                    )
+                    .unwrap(),
             );
             total_reward.push(relayer.reward_assets[i].to_string());
             relayer.reward_assets[i].amount = Uint128::zero();
@@ -215,7 +225,7 @@ fn transfer_to_trader(
     list_bidder: Vec<Payment>,
     list_asker: Vec<Payment>,
     messages: &mut Vec<CosmosMsg>,
-)  {
+) {
     let mut minimalist_asker: Vec<Payment> = vec![];
     let mut minimalist_bidder: Vec<Payment> = vec![];
 
@@ -241,18 +251,28 @@ fn transfer_to_trader(
     }
 
     for asker in minimalist_asker {
-        messages.push(asker.asset.into_msg(
-            None,
-            &deps.querier,
-            deps.api.addr_validate(asker.address.as_str()).unwrap(),
-        ).unwrap());
+        messages.push(
+            asker
+                .asset
+                .into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api.addr_validate(asker.address.as_str()).unwrap(),
+                )
+                .unwrap(),
+        );
     }
     for bidder in minimalist_bidder {
-        messages.push(bidder.asset.into_msg(
-            None,
-            &deps.querier,
-            deps.api.addr_validate(bidder.address.as_str()).unwrap(),
-        ).unwrap());
+        messages.push(
+            bidder
+                .asset
+                .into_msg(
+                    None,
+                    &deps.querier,
+                    deps.api.addr_validate(bidder.address.as_str()).unwrap(),
+                )
+                .unwrap(),
+        );
     }
 }
 
@@ -307,27 +327,28 @@ pub fn excecute_pair(
         .unwrap();
 
     for buy_price in &best_buy_price_list {
-        let mut match_buy_orders = orderbook_pair.find_match_orders(
-            deps.as_ref().storage,
-            *buy_price,
-            OrderDirection::Buy,
-            limit,
-        ).unwrap();
+        let mut match_buy_orders = orderbook_pair
+            .query_orders_by_price_and_direction(
+                deps.as_ref().storage,
+                *buy_price,
+                OrderDirection::Buy,
+                limit,
+            )
+            .unwrap();
         for sell_price in &best_sell_price_list {
-            if buy_price.lt(sell_price) {
-                continue;
-            }
             let mut match_one_price = false;
             if buy_price.eq(&sell_price) {
                 match_one_price = true;
             }
 
-            let mut match_sell_orders = orderbook_pair.find_match_orders(
-                deps.as_ref().storage,
-                *sell_price,
-                OrderDirection::Sell,
-                limit,
-            ).unwrap();
+            let mut match_sell_orders = orderbook_pair
+                .query_orders_by_price_and_direction(
+                    deps.as_ref().storage,
+                    *sell_price,
+                    OrderDirection::Sell,
+                    limit,
+                )
+                .unwrap();
 
             for buy_order in &mut match_buy_orders {
                 if buy_order
@@ -341,7 +362,7 @@ pub fn excecute_pair(
                         ret_events.push(to_events(
                             &buy_order,
                             deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                            format!("remove stuff order")
+                            format!("remove stuff order"),
                         ));
                     }
 
@@ -369,7 +390,7 @@ pub fn excecute_pair(
                             ret_events.push(to_events(
                                 &sell_order,
                                 deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                                format!("remove stuff order")
+                                format!("remove stuff order"),
                             ));
                         }
                         continue;
@@ -576,7 +597,13 @@ pub fn excecute_pair(
     }
 
     transfer_to_trader(&deps, list_bidder, list_asker, &mut messages);
-    transfer_reward(&deps, &mut reward, &mut relayer, &mut total_reward, &mut messages);
+    transfer_reward(
+        &deps,
+        &mut reward,
+        &mut relayer,
+        &mut total_reward,
+        &mut messages,
+    );
 
     store_reward(deps.storage, &pair_key, &reward)?;
     store_reward(deps.storage, &pair_key, &relayer)?;
@@ -703,23 +730,22 @@ pub fn query_orders(
             let status_key = status.as_bytes();
             match direction {
                 Some(_) => read_orders_with_indexer::<OrderDirection>(
-                            deps.storage,
-                            &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                            direction_filter,
-                            start_after,
-                            limit,
-                            order_by,
-                        )?,
+                    deps.storage,
+                    &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
+                    direction_filter,
+                    start_after,
+                    limit,
+                    order_by,
+                )?,
                 None => read_orders_with_indexer::<OrderDirection>(
-                            deps.storage,
-                            &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                            Box::new(|_| true),
-                            start_after,
-                            limit,
-                            order_by,
-                        )?,
+                    deps.storage,
+                    &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
+                    Box::new(|_| true),
+                    start_after,
+                    limit,
+                    order_by,
+                )?,
             }
-            
         }
         OrderFilter::None => match direction {
             Some(_) => read_orders_with_indexer::<OrderDirection>(
@@ -730,12 +756,19 @@ pub fn query_orders(
                 limit,
                 order_by,
             )?,
-            None => Some(read_orders(deps.storage, &pair_key, start_after, limit, order_by)?),
+            None => Some(read_orders(
+                deps.storage,
+                &pair_key,
+                start_after,
+                limit,
+                order_by,
+            )?),
         },
     };
 
     let resp = OrdersResponse {
-        orders: orders.unwrap_or_default()
+        orders: orders
+            .unwrap_or_default()
             .iter()
             .map(|order| {
                 order.to_response(

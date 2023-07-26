@@ -417,21 +417,24 @@ impl OrderBook {
         price: Decimal,
         direction: OrderDirection,
     ) -> Uint128 {
-        let orders = self
-            .find_match_orders(storage, price, direction, None)
-            .unwrap();
-        // in Order, ask amount is alway paid amount
-        // in Orderbook, buy order is opposite to sell order
-        orders
-            .iter()
-            .map(|order| order.ask_amount.u128())
-            .sum::<u128>()
-            .into()
+        if let Some(orders) =
+            self.query_orders_by_price_and_direction(storage, price, direction, None)
+        {
+            // in Order, ask amount is alway paid amount
+            // in Orderbook, buy order is opposite to sell order
+            return orders
+                .iter()
+                .map(|order| order.ask_amount.u128())
+                .sum::<u128>()
+                .into();
+        }
+
+        Uint128::zero()
     }
 
     /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price
     /// The matching continues until there's no more matchable orders.
-    pub fn find_match_orders(
+    pub fn query_orders_by_price_and_direction(
         &self,
         storage: &dyn Storage,
         price: Decimal,
@@ -450,7 +453,7 @@ impl OrderBook {
             limit,
             Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
         )
-        .unwrap()
+        .unwrap_or_default()
     }
 }
 
