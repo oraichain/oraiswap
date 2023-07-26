@@ -92,10 +92,10 @@ pub struct SimulateSwapOperationsResponse {
 }
 
 #[cw_serde]
-pub struct RouterController(pub Addr);
+pub struct RouterController(pub String);
 
 impl RouterController {
-    pub fn addr(&self) -> Addr {
+    pub fn addr(&self) -> String {
         self.0.clone()
     }
 
@@ -114,7 +114,7 @@ impl RouterController {
             AssetInfo::Token { contract_addr } => WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
                 msg: to_binary(&Cw20ExecuteMsg::Send {
-                    contract: self.addr().to_string(),
+                    contract: self.addr(),
                     amount,
                     msg: to_binary(&Cw20HookMsg::ExecuteSwapOperations {
                         operations,
@@ -126,7 +126,7 @@ impl RouterController {
             }
             .into(),
             AssetInfo::NativeToken { denom } => WasmMsg::Execute {
-                contract_addr: self.addr().to_string(),
+                contract_addr: self.addr(),
                 msg: to_binary(&ExecuteMsg::ExecuteSwapOperations {
                     operations,
                     minimum_receive,
