@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, excecute_pair, query_last_order_id, query_order, query_orderbook,
-    query_orderbook_is_matchable, query_orderbooks, query_orders, remove_pair, submit_order,
+    cancel_order, query_last_order_id, query_order, query_orderbook,
+    query_orderbook_is_matchable, query_orderbooks, query_orders, remove_pair, submit_order, execute_matching_orders,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{
@@ -180,7 +180,7 @@ pub fn execute(
             asset_infos,
         } => cancel_order(deps, info, order_id, asset_infos),
         ExecuteMsg::ExecuteOrderBookPair { asset_infos, limit } => {
-            excecute_pair(deps, info, asset_infos, limit)
+            execute_matching_orders(deps, info, asset_infos, limit)
         }
         ExecuteMsg::RemoveOrderBookPair { asset_infos } => remove_pair(deps, info, asset_infos),
     }
