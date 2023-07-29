@@ -36,17 +36,6 @@ pub struct Executor {
     pub reward_assets: [Asset; 2],
 }
 
-#[cw_serde]
-pub struct BulkOrders {
-    pub direction: OrderDirection,
-    pub price: Decimal,
-    pub average_order_id: u64,
-    pub volume: Uint128,
-    pub filled_volume: Uint128,
-    pub ask_volume: Uint128,
-    pub filled_ask_volume: Uint128
-}
-
 impl Order {
     // create new order given a price and an offer amount
     pub fn new(
@@ -76,11 +65,7 @@ impl Order {
         }
     }
 
-    pub fn fill_order(
-        &mut self,
-        ask_amount: Uint128,
-        offer_amount: Uint128,
-    ) {
+    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
@@ -91,11 +76,7 @@ impl Order {
         }
     }
 
-    pub fn match_order(
-        &mut self,
-        storage: &mut dyn Storage,
-        pair_key: &[u8],
-    ) -> StdResult<u64> {
+    pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
         if self.filled_offer_amount == self.offer_amount {
             // When match amount equals ask amount, close order
             remove_order(storage, pair_key, self)
@@ -476,50 +457,6 @@ impl OrderBook {
         )
         .unwrap_or_default()
     }
-
-    /// Calculate sum of orders base on direction
-    pub fn get_orders_sum(
-        &self,
-        storage: &dyn Storage,
-        price: Decimal,
-        direction: OrderDirection,
-        limit: Option<u32>,
-    ) -> Option<BulkOrders> {
-        let pair_key = &self.get_pair_key();
-        let price_key = price.atomics().to_be_bytes();
-
-        // there is a limit, and we just match a batch with maximum orders reach the limit step by step
-        let orders = read_orders_with_indexer::<OrderDirection>(
-            storage,
-            &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key],
-            Box::new(move |x| direction.eq(x)),
-            None,
-            limit,
-            Some(OrderBy::Ascending), // if mean we process from first to last order in the orderlist
-        )
-        .unwrap_or_default();
-
-        let mut bulk_orders: BulkOrders = BulkOrders::new(
-            0u64,
-            Uint128::zero(),
-            Uint128::zero(),
-        );
-
-        for order in orders.as_ref().unwrap() {
-            // println!("order: {:?}", order);
-            bulk_orders.average_order_id += order.order_id;
-            bulk_orders.volume += order.offer_amount;
-            bulk_orders.ask_volume += order.ask_amount;
-            bulk_orders.filled_ask_volume += order.filled_ask_amount;
-            bulk_orders.filled_volume += order.filled_offer_amount;
-        }
-
-        bulk_orders.price = price;
-        bulk_orders.direction = direction;
-        bulk_orders.average_order_id = bulk_orders.average_order_id.
-                                        checked_div(orders.unwrap().len() as u64).unwrap();
-        return Some(bulk_orders);
-    }
 }
 
 impl Executor {
@@ -531,20 +468,39 @@ impl Executor {
     }
 }
 
+pub struct BulkOrders {
+    pub orders: Vec<Order>,
+    pub direction: OrderDirection,
+    pub price: Decimal,
+    pub volume: Uint128,
+    pub filled_volume: Uint128,
+    pub ask_volume: Uint128,
+    pub filled_ask_volume: Uint128,
+}
+
 impl BulkOrders {
-    pub fn new(
-        average_order_id: u64,
-        offer: Uint128,
-        filled_offer: Uint128,
-    ) -> Self {
-        BulkOrders {
-            average_order_id,
-            volume: offer,
-            filled_volume: filled_offer,
-            ask_volume: Uint128::zero(),
-            filled_ask_volume: Uint128::zero(),
-            direction: OrderDirection::Buy,
-            price: Decimal::zero(),
+    /// Calculate sum of orders base on direction
+    pub fn from_orders(orders: &Vec<Order>, price: Decimal, direction: OrderDirection) -> Self {
+        let mut volume = Uint128::zero();
+        let mut filled_volume = Uint128::zero();
+        let mut ask_volume = Uint128::zero();
+        let mut filled_ask_volume = Uint128::zero();
+
+        for order in orders {
+            volume += order.offer_amount;
+            ask_volume += order.ask_amount;
+            filled_ask_volume += order.filled_ask_amount;
+            filled_volume += order.filled_offer_amount;
         }
+
+        return Self {
+            direction,
+            price,
+            orders: orders.clone(),
+            volume,
+            filled_volume,
+            ask_volume,
+            filled_ask_volume,
+        };
     }
 }
