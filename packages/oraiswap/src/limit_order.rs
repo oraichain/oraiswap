@@ -11,6 +11,7 @@ pub struct ContractInfo {
     pub admin: CanonicalAddr,
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
+    pub spread_address: CanonicalAddr,
 }
 
 #[cw_serde]
@@ -61,6 +62,7 @@ pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub commission_rate: Option<String>,
     pub reward_address: Option<Addr>,
+    pub spread_address: Option<Addr>,
 }
 
 #[cw_serde]
@@ -73,6 +75,7 @@ pub enum ExecuteMsg {
 
     UpdateConfig {
         reward_address: Option<Addr>,
+        spread_address: Option<Addr>,
         commission_rate: Option<String>,
     },
 

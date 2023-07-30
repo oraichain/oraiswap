@@ -476,6 +476,7 @@ pub struct BulkOrders {
     pub filled_volume: Uint128,
     pub ask_volume: Uint128,
     pub filled_ask_volume: Uint128,
+    pub spread_volume: Uint128,
 }
 
 impl BulkOrders {
@@ -485,6 +486,7 @@ impl BulkOrders {
         let mut filled_volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
         let mut filled_ask_volume = Uint128::zero();
+        let spread_volume = Uint128::zero();
 
         for order in orders {
             volume += order.offer_amount;
@@ -501,6 +503,7 @@ impl BulkOrders {
             filled_volume,
             ask_volume,
             filled_ask_volume,
+            spread_volume,
         };
     }
 }

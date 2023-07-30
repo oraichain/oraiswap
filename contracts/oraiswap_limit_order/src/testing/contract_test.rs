@@ -60,6 +60,7 @@ fn submit_order() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -612,6 +613,7 @@ fn cancel_order_native_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -950,6 +952,7 @@ fn cancel_order_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1267,6 +1270,7 @@ fn execute_pair_native_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2266,10 +2270,15 @@ fn execute_pair_native_token() {
     let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
     let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    let mut reward_balances = app.query_all_balances(Addr::unchecked("orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en")).unwrap();
+    let mut spread_balances = app.query_all_balances(Addr::unchecked("orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n")).unwrap();
+
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
-    println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
-
+    println!("round 0 - address2's balances: {:?}", address2_balances);
+    println!("round 0 - reward_balances's balances: {:?}", reward_balances);
+    println!("round 0 - spread_balances's balances: {:?}\n\n", spread_balances);
+    
     let mut expected_balances: Vec<Coin> = [
         Coin {
             denom: ORAI_DENOM.to_string(),
@@ -2306,6 +2315,10 @@ fn execute_pair_native_token() {
     ]
     .to_vec();
     assert_eq!(address2_balances, expected_balances,);
+    expected_balances = [
+    ]
+    .to_vec();
+    assert_eq!(spread_balances, expected_balances);
 
     // assertion; native asset balance
     let msg = ExecuteMsg::ExecuteOrderBookPair {
@@ -2354,10 +2367,15 @@ fn execute_pair_native_token() {
 
     address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();      
+    reward_balances = app.query_all_balances(Addr::unchecked("orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en")).unwrap();
+    spread_balances = app.query_all_balances(Addr::unchecked("orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n")).unwrap();
+
     println!("round 1 - address0's balances: {:?}", address0_balances);
     println!("round 1 - address1's balances: {:?}", address1_balances);
-    println!("round 1 - address2's balances: {:?}\n\n", address2_balances);
+    println!("round 1 - address2's balances: {:?}", address2_balances);
+    println!("round 1 - reward_balances's balances: {:?}", reward_balances);
+    println!("round 1 - spread_balances's balances: {:?}\n\n", spread_balances);
 
     expected_balances = [
         Coin {
@@ -2366,7 +2384,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(984185u128),
+            amount: Uint128::from(978214u128),
         },
     ]
     .to_vec();
@@ -2382,7 +2400,7 @@ fn execute_pair_native_token() {
         },
     ]
     .to_vec();
-    assert_eq!(address1_balances, expected_balances,);
+    assert_eq!(address1_balances, expected_balances);
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
@@ -2394,7 +2412,16 @@ fn execute_pair_native_token() {
         },
     ]
     .to_vec();
-    assert_eq!(address2_balances, expected_balances,);
+    assert_eq!(address2_balances, expected_balances);
+
+    expected_balances = [
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(8400u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(spread_balances, expected_balances);
 
     let res = app
         .query::<OrderBookMatchableResponse, _>(
@@ -2458,6 +2485,7 @@ fn execute_pair_cw20_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -3638,6 +3666,7 @@ fn spread_test() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4022,7 +4051,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1019449u128),
+            amount: Uint128::from(1019380u128),
         },
     ]
     .to_vec();
@@ -4034,7 +4063,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1015312u128),
+            amount: Uint128::from(990311u128),
         },
     ]
     .to_vec();
@@ -4090,6 +4119,7 @@ fn reward_to_executor_test() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4328,7 +4358,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000609084u128),
+            amount: Uint128::from(1000617082u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4344,7 +4374,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000099851u128),
+            amount: Uint128::from(1000101135u128),
         },
     ]
     .to_vec();
@@ -4400,6 +4430,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4678,6 +4709,7 @@ fn remove_orderbook_pair() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -5006,6 +5038,7 @@ fn orders_querier() {
         admin: None,
         commission_rate: None,
         reward_address: None,
+        spread_address:None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
