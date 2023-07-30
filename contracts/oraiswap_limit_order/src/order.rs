@@ -280,39 +280,43 @@ fn transfer_to_trader(
 fn transfer_spread(
     deps: &DepsMut,
     orderbook_pair: &OrderBook,
+    direction: OrderDirection,
     bulk_orders: &mut Vec<BulkOrders>,
     messages: &mut Vec<CosmosMsg>,
 ) {
     let contract_info = read_config(deps.storage).unwrap();
     let spread_address = contract_info.spread_address;
+    let mut total_spread = Uint128::zero();
     
     for orders in bulk_orders.iter_mut() {
         if !orders.spread_volume.is_zero() {
-            let spread_payment:Payment = Payment {
-                address: deps.api.addr_humanize(&spread_address).unwrap(),
-                asset: Asset {
-                    info: match orders.direction {
-                        OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api).unwrap(),
-                        OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api).unwrap(),
-                    },
-                    amount: orders.spread_volume 
-                }
-            };
+            total_spread += orders.spread_volume;
             orders.spread_volume = Uint128::zero();
-
-            messages.push(
-                spread_payment.asset
-                .into_msg(
-                    None,
-                    &deps.querier,
-                    spread_payment.address
-                ).unwrap()
-            );
         }
         else {
             continue;
         }
     }
+
+    let spread_payment:Payment = Payment {
+        address: deps.api.addr_humanize(&spread_address).unwrap(),
+        asset: Asset {
+            info: match direction {
+                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api).unwrap(),
+                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api).unwrap(),
+            },
+            amount: total_spread
+        }
+    };
+
+    messages.push(
+        spread_payment.asset
+        .into_msg(
+            None,
+            &deps.querier,
+            spread_payment.address
+        ).unwrap()
+    );
 }
 
 fn execute_bulk_orders(
@@ -611,8 +615,13 @@ pub fn execute_matching_orders(
         }
     }
 
-    transfer_spread(&deps, &orderbook_pair, &mut buy_list, &mut messages);
-    transfer_spread(&deps, &orderbook_pair, &mut sell_list, &mut messages);
+    transfer_spread(
+        &deps,
+        &orderbook_pair,
+        OrderDirection::Sell,
+        &mut sell_list,
+        &mut messages
+    );
 
     transfer_to_trader(&deps, list_bidder, list_asker, &mut messages);
 
