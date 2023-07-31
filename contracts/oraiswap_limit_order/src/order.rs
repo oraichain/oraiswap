@@ -288,10 +288,6 @@ fn execute_bulk_orders(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
 
-    // let (best_buy_price_list, best_sell_price_list) = orderbook_pair
-    //     .find_list_match_price(deps.as_ref().storage, limit)
-    //     .unwrap();
-
     let mut i = 0;
     let mut j = 0;
     let min_vol = Uint128::from(10u128);
@@ -500,13 +496,19 @@ fn process_orders(
 
         for order in bulk.orders.iter_mut() {
             let filled_offer = Uint128::min(
-                order.offer_amount.checked_sub(order.filled_offer_amount).unwrap(),
-                bulk.filled_volume
+                order
+                    .offer_amount
+                    .checked_sub(order.filled_offer_amount)
+                    .unwrap(),
+                bulk.filled_volume,
             );
 
             let filled_ask = Uint128::min(
-                order.ask_amount.checked_sub(order.filled_ask_amount).unwrap(),
-                bulk.filled_ask_volume
+                order
+                    .ask_amount
+                    .checked_sub(order.filled_ask_amount)
+                    .unwrap(),
+                bulk.filled_ask_volume,
             );
 
             bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer).unwrap();
