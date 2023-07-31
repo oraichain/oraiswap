@@ -22,7 +22,7 @@ cosmwasm-std = { workspace = true }
 cosmwasm-storage = { workspace = true }
 cw-storage-plus = { workspace = true, features = ["iterator"] }
 cosmwasm-schema = { workspace = true }
-oraiswap = { workspace = true, default-features = false }
+oraiswap = { workspace = true }
 
 [dev-dependencies]
 oraiswap-pair = { workspace = true }

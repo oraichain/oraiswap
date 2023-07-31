@@ -24,7 +24,7 @@ cw20 = { workspace = true }
 cosmwasm-std = { workspace = true }
 cosmwasm-storage = { workspace = true }
 cosmwasm-schema = { workspace = true }
-oraiswap = { workspace = true, default-features = false }
+oraiswap = { workspace = true }
 oraiswap-token = { workspace = true }
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
