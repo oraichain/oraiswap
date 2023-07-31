@@ -394,7 +394,7 @@ fn execute_bulk_orders(
         buy_bulk_orders.filled_volume += sell_ask_amount;
         buy_bulk_orders.filled_ask_volume += sell_offer_amount;
 
-        buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount).unwrap();
+        buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
 
         sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
