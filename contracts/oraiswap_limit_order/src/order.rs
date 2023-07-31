@@ -5,14 +5,15 @@ use crate::orderbook::{BulkOrders, Executor, Order, OrderBook};
 use crate::state::{
     increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
     read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
-    remove_orderbook, store_order, store_reward, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
-    PREFIX_ORDER_BY_PRICE, PREFIX_ORDER_BY_STATUS, PREFIX_TICK,
+    remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_ORDER_BY_BIDDER,
+    PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_ORDER_BY_STATUS, PREFIX_TICK,
 };
 use cosmwasm_std::{
     attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
     Order as OrderBy, Response, StdResult, Storage, Uint128,
 };
 
+use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
@@ -270,24 +271,78 @@ fn execute_bulk_orders(
     orderbook_pair: OrderBook,
     limit: Option<u32>,
 ) -> StdResult<(Vec<BulkOrders>, Vec<BulkOrders>)> {
-    let (best_buy_price_list, best_sell_price_list) = orderbook_pair
-        .find_list_match_price(deps.as_ref().storage, limit)
-        .unwrap();
+    let pair_key = &orderbook_pair.get_pair_key();
+
+    let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+        deps.storage,
+        &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
+    );
+
+    let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
+
+    let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+        deps.storage,
+        &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
+    );
+
+    let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
+
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+
+    // let (best_buy_price_list, best_sell_price_list) = orderbook_pair
+    //     .find_list_match_price(deps.as_ref().storage, limit)
+    //     .unwrap();
 
     let mut i = 0;
     let mut j = 0;
     let min_vol = Uint128::from(10u128);
 
+    let mut best_buy_price_list = vec![];
+    let mut best_sell_price_list = vec![];
     let mut buy_bulk_orders_list = vec![];
     let mut sell_bulk_orders_list = vec![];
 
-    while i < best_buy_price_list.len() && j < best_sell_price_list.len() {
-        let buy_price = best_buy_price_list[i];
+    let spread_factor = match orderbook_pair.spread {
+        Some(spread) => Decimal::one() + spread,
+        None => Decimal::zero(),
+    };
+
+    while i < limit && j < limit {
+        if best_sell_price_list.len() <= j {
+            if let Some(Ok((k, _))) = sell_cursor.next() {
+                let price = Decimal::raw(u128::from_be_bytes(k.try_into().unwrap()));
+                best_sell_price_list.push(price);
+            } else {
+                break;
+            }
+        }
         let sell_price = best_sell_price_list[j];
+
+        if best_buy_price_list.len() <= i {
+            if let Some(Ok((k, _))) = buy_cursor.next() {
+                let price = Decimal::raw(u128::from_be_bytes(k.try_into().unwrap()));
+                best_buy_price_list.push(price);
+            } else {
+                break;
+            }
+        }
+
+        let buy_price = best_buy_price_list[i];
 
         if buy_price < sell_price {
             break;
         }
+
+        // check spreaad
+        if !spread_factor.is_zero() {
+            let sell_price_with_spread = sell_price.checked_mul(spread_factor)?;
+            if buy_price > sell_price_with_spread {
+                println!("continue next buy price");
+                i += 1;
+                continue;
+            }
+        }
+
         let match_price = buy_price;
 
         if buy_bulk_orders_list.len() <= i {
@@ -295,11 +350,10 @@ fn execute_bulk_orders(
                 deps.as_ref().storage,
                 buy_price,
                 OrderDirection::Buy,
-                limit,
+                None,
             ) {
                 let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy);
                 buy_bulk_orders_list.push(bulk);
-                println!("querying buy");
             } else {
                 break;
             }
@@ -310,7 +364,7 @@ fn execute_bulk_orders(
                 deps.as_ref().storage,
                 sell_price,
                 OrderDirection::Sell,
-                limit,
+                None,
             ) {
                 let bulk = BulkOrders::from_orders(&orders, sell_price, OrderDirection::Sell);
                 sell_bulk_orders_list.push(bulk);
@@ -379,6 +433,12 @@ fn execute_bulk_orders(
             j += 1;
         }
     }
+
+    println!(
+        "len {} {}",
+        best_buy_price_list.len(),
+        best_sell_price_list.len()
+    );
 
     return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
@@ -797,13 +857,7 @@ pub fn query_orderbook_is_matchable(
         .find_list_match_price(deps.storage, Some(30))
         .unwrap_or_default();
 
-    let mut resp = OrderBookMatchableResponse { is_matchable: true };
-
-    if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
-        resp = OrderBookMatchableResponse {
-            is_matchable: false,
-        };
-    };
-
-    Ok(resp)
+    Ok(OrderBookMatchableResponse {
+        is_matchable: best_buy_price_list.len() != 0 && best_sell_price_list.len() != 0,
+    })
 }
