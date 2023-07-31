@@ -332,7 +332,6 @@ fn execute_bulk_orders(
         if !spread_factor.is_zero() {
             let sell_price_with_spread = sell_price.checked_mul(spread_factor)?;
             if buy_price > sell_price_with_spread {
-                println!("continue next buy price");
                 i += 1;
                 continue;
             }
@@ -428,12 +427,6 @@ fn execute_bulk_orders(
             j += 1;
         }
     }
-
-    println!(
-        "len {} {}",
-        best_buy_price_list.len(),
-        best_sell_price_list.len()
-    );
 
     return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
