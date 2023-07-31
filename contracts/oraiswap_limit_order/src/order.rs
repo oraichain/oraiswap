@@ -177,104 +177,53 @@ fn process_reward(
 
 fn transfer_reward(
     deps: &DepsMut,
-    reward: &mut Executor,
-    relayer: &mut Executor,
+    executor: &mut Executor,
     total_reward: &mut Vec<String>,
     messages: &mut Vec<CosmosMsg>,
 ) {
-    for i in 0..=1 {
-        if Uint128::from(reward.reward_assets[i].amount) >= Uint128::from(1000000u128) {
+    for reward_asset in executor.reward_assets.iter_mut() {
+        if Uint128::from(reward_asset.amount) >= Uint128::from(1000000u128) {
             messages.push(
-                reward.reward_assets[i]
+                reward_asset
                     .into_msg(
                         None,
                         &deps.querier,
-                        deps.api
-                            .addr_validate(
-                                deps.api.addr_humanize(&reward.address).unwrap().as_str(),
-                            )
-                            .unwrap(),
+                        deps.api.addr_humanize(&executor.address).unwrap(),
                     )
                     .unwrap(),
             );
-            total_reward.push(reward.reward_assets[i].to_string());
-            reward.reward_assets[i].amount = Uint128::zero();
-        }
-
-        if Uint128::from(relayer.reward_assets[i].amount) >= Uint128::from(1000000u128) {
-            messages.push(
-                relayer.reward_assets[i]
-                    .into_msg(
-                        None,
-                        &deps.querier,
-                        deps.api
-                            .addr_validate(
-                                deps.api.addr_humanize(&relayer.address).unwrap().as_str(),
-                            )
-                            .unwrap(),
-                    )
-                    .unwrap(),
-            );
-            total_reward.push(relayer.reward_assets[i].to_string());
-            relayer.reward_assets[i].amount = Uint128::zero();
+            total_reward.push(reward_asset.to_string());
+            reward_asset.amount = Uint128::zero();
         }
     }
 }
 
-fn transfer_to_trader(
+fn process_list_trader(
     deps: &DepsMut,
-    list_bidder: Vec<Payment>,
-    list_asker: Vec<Payment>,
+    traders: Vec<Payment>,
     messages: &mut Vec<CosmosMsg>,
-) {
-    let mut minimalist_asker: Vec<Payment> = vec![];
-    let mut minimalist_bidder: Vec<Payment> = vec![];
-
-    for asker in list_asker {
-        if let Some(existing_payment) = minimalist_asker
+) -> StdResult<()> {
+    let mut minimalist_trader: Vec<Payment> = vec![];
+    for trader in traders {
+        if let Some(existing_payment) = minimalist_trader
             .iter_mut()
-            .find(|p| p.address == asker.address)
+            .find(|p| p.address == trader.address)
         {
-            existing_payment.asset.amount += asker.asset.amount;
+            existing_payment.asset.amount += trader.asset.amount;
         } else {
-            minimalist_asker.push(asker);
-        }
-    }
-    for bidder in list_bidder {
-        if let Some(existing_payment) = minimalist_bidder
-            .iter_mut()
-            .find(|p| p.address == bidder.address)
-        {
-            existing_payment.asset.amount += bidder.asset.amount;
-        } else {
-            minimalist_bidder.push(bidder);
+            minimalist_trader.push(trader);
         }
     }
 
-    for asker in minimalist_asker {
-        messages.push(
-            asker
-                .asset
-                .into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_validate(asker.address.as_str()).unwrap(),
-                )
-                .unwrap(),
-        );
+    for trader in minimalist_trader {
+        messages.push(trader.asset.into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_validate(trader.address.as_str())?,
+        )?);
     }
-    for bidder in minimalist_bidder {
-        messages.push(
-            bidder
-                .asset
-                .into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_validate(bidder.address.as_str()).unwrap(),
-                )
-                .unwrap(),
-        );
-    }
+
+    Ok(())
 }
 
 fn transfer_spread(
@@ -287,35 +236,32 @@ fn transfer_spread(
     let contract_info = read_config(deps.storage).unwrap();
     let spread_address = contract_info.spread_address;
     let mut total_spread = Uint128::zero();
-    
+
     for orders in bulk_orders.iter_mut() {
         if !orders.spread_volume.is_zero() {
             total_spread += orders.spread_volume;
             orders.spread_volume = Uint128::zero();
-        }
-        else {
+        } else {
             continue;
         }
     }
 
-    let spread_payment:Payment = Payment {
+    let spread_payment: Payment = Payment {
         address: deps.api.addr_humanize(&spread_address).unwrap(),
         asset: Asset {
             info: match direction {
                 OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api).unwrap(),
                 OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api).unwrap(),
             },
-            amount: total_spread
-        }
+            amount: total_spread,
+        },
     };
 
     messages.push(
-        spread_payment.asset
-        .into_msg(
-            None,
-            &deps.querier,
-            spread_payment.address
-        ).unwrap()
+        spread_payment
+            .asset
+            .into_msg(None, &deps.querier, spread_payment.address)
+            .unwrap(),
     );
 }
 
@@ -323,13 +269,14 @@ fn execute_bulk_orders(
     deps: &DepsMut,
     orderbook_pair: OrderBook,
     limit: Option<u32>,
-) -> (Vec<BulkOrders>, Vec<BulkOrders>) {
+) -> StdResult<(Vec<BulkOrders>, Vec<BulkOrders>)> {
     let (best_buy_price_list, best_sell_price_list) = orderbook_pair
         .find_list_match_price(deps.as_ref().storage, limit)
         .unwrap();
 
     let mut i = 0;
     let mut j = 0;
+    let min_vol = Uint128::from(10u128);
 
     let mut buy_bulk_orders_list = vec![];
     let mut sell_bulk_orders_list = vec![];
@@ -352,6 +299,7 @@ fn execute_bulk_orders(
             ) {
                 let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy);
                 buy_bulk_orders_list.push(bulk);
+                println!("querying buy");
             } else {
                 break;
             }
@@ -399,34 +347,40 @@ fn execute_bulk_orders(
 
         buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount).unwrap();
 
-        sell_bulk_orders.volume = sell_bulk_orders
-            .volume
-            .checked_sub(sell_offer_amount)
-            .unwrap();
+        sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
         if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.ask_volume {
-            buy_bulk_orders.spread_volume = buy_bulk_orders.filled_ask_volume.checked_sub(buy_bulk_orders.ask_volume).unwrap();
-            buy_bulk_orders.filled_ask_volume = buy_bulk_orders.filled_ask_volume.checked_sub(buy_bulk_orders.spread_volume).unwrap();
+            buy_bulk_orders.spread_volume = buy_bulk_orders
+                .filled_ask_volume
+                .checked_sub(buy_bulk_orders.ask_volume)?;
+            buy_bulk_orders.filled_ask_volume = buy_bulk_orders
+                .filled_ask_volume
+                .checked_sub(buy_bulk_orders.spread_volume)?;
             buy_bulk_orders.ask_volume = Uint128::zero();
         }
         if sell_bulk_orders.filled_ask_volume >= sell_bulk_orders.ask_volume {
-            sell_bulk_orders.spread_volume = sell_bulk_orders.filled_ask_volume.checked_sub(sell_bulk_orders.ask_volume).unwrap();
-            sell_bulk_orders.filled_ask_volume = sell_bulk_orders.filled_ask_volume.checked_sub(sell_bulk_orders.spread_volume).unwrap();
+            sell_bulk_orders.spread_volume = sell_bulk_orders
+                .filled_ask_volume
+                .checked_sub(sell_bulk_orders.ask_volume)?;
+            sell_bulk_orders.filled_ask_volume = sell_bulk_orders
+                .filled_ask_volume
+                .checked_sub(sell_bulk_orders.spread_volume)?;
             sell_bulk_orders.ask_volume = Uint128::zero();
         }
 
-        if buy_bulk_orders.volume <= Uint128::from(10u128) {
+        if buy_bulk_orders.volume <= min_vol {
             // buy out
             buy_bulk_orders.ask_volume = Uint128::zero();
             i += 1;
         }
-        if sell_bulk_orders.volume <= Uint128::from(10u128) {
+        if sell_bulk_orders.volume <= min_vol {
             // sell out
             sell_bulk_orders.ask_volume = Uint128::zero();
             j += 1;
         }
     }
-    return (buy_bulk_orders_list, sell_bulk_orders_list);
+
+    return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
 
 fn calculate_fee(
@@ -447,26 +401,23 @@ fn calculate_fee(
 
     match direction {
         OrderDirection::Buy => {
-            relayer_fee = Uint128::min(
-                Uint128::from(RELAY_FEE),
-                amount
-            );
+            relayer_fee = Uint128::min(Uint128::from(RELAY_FEE), amount);
 
             reward.reward_assets[0].amount += reward_fee;
             relayer.reward_assets[0].amount += relayer_fee;
         }
         OrderDirection::Sell => {
-            relayer_fee = Uint128::min(
-                relayer_usdt_fee,
-                amount
-            );
+            relayer_fee = Uint128::min(relayer_usdt_fee, amount);
 
             reward.reward_assets[1].amount += reward_fee;
             relayer.reward_assets[1].amount += relayer_fee;
         }
     }
 
-    trader_ask_asset.amount = trader_ask_asset.amount.checked_sub(reward_fee + relayer_fee).unwrap();
+    trader_ask_asset.amount = trader_ask_asset
+        .amount
+        .checked_sub(reward_fee + relayer_fee)
+        .unwrap();
     return relayer_fee + reward_fee;
 }
 
@@ -556,12 +507,7 @@ pub fn execute_matching_orders(
         reward_assets.clone(),
     );
 
-    let mut relayer = process_reward(
-        deps.storage,
-        &pair_key,
-        relayer_addr,
-        reward_assets
-    );
+    let mut relayer = process_reward(deps.storage, &pair_key, relayer_addr, reward_assets);
 
     let mut messages: Vec<CosmosMsg> = vec![];
 
@@ -573,7 +519,7 @@ pub fn execute_matching_orders(
 
     let mut total_orders: u64 = 0;
 
-    let (mut buy_list, mut sell_list) = execute_bulk_orders(&deps, orderbook_pair.clone(), limit);
+    let (mut buy_list, mut sell_list) = execute_bulk_orders(&deps, orderbook_pair.clone(), limit)?;
 
     process_orders(
         &deps,
@@ -620,18 +566,14 @@ pub fn execute_matching_orders(
         &orderbook_pair,
         OrderDirection::Sell,
         &mut sell_list,
-        &mut messages
-    );
-
-    transfer_to_trader(&deps, list_bidder, list_asker, &mut messages);
-
-    transfer_reward(
-        &deps,
-        &mut reward,
-        &mut relayer,
-        &mut total_reward,
         &mut messages,
     );
+
+    process_list_trader(&deps, list_bidder, &mut messages)?;
+    process_list_trader(&deps, list_asker, &mut messages)?;
+
+    transfer_reward(&deps, &mut reward, &mut total_reward, &mut messages);
+    transfer_reward(&deps, &mut relayer, &mut total_reward, &mut messages);
 
     store_reward(deps.storage, &pair_key, &reward)?;
     store_reward(deps.storage, &pair_key, &relayer)?;
