@@ -27,7 +27,6 @@ pub struct Order {
     pub ask_amount: Uint128,
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
-    pub fee: Uint128,
 }
 
 #[cw_serde]
@@ -61,7 +60,6 @@ impl Order {
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             status: OrderStatus::Open,
-            fee: Uint128::zero(),
         }
     }
 

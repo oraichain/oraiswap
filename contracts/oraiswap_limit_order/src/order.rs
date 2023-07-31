@@ -53,7 +53,6 @@ pub fn submit_order(
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             status: OrderStatus::Open,
-            fee: Uint128::zero(),
         },
         true,
     )?;
@@ -500,8 +499,15 @@ fn process_orders(
         let relayer_usdt_fee = Uint128::from(RELAY_FEE) * bulk.price;
 
         for order in bulk.orders.iter_mut() {
-            let filled_offer = Uint128::min(order.offer_amount, bulk.filled_volume);
-            let filled_ask = Uint128::min(order.ask_amount, bulk.filled_ask_volume);
+            let filled_offer = Uint128::min(
+                order.offer_amount.checked_sub(order.filled_offer_amount).unwrap(),
+                bulk.filled_volume
+            );
+
+            let filled_ask = Uint128::min(
+                order.ask_amount.checked_sub(order.filled_ask_amount).unwrap(),
+                bulk.filled_ask_volume
+            );
 
             bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer).unwrap();
             bulk.filled_ask_volume = bulk.filled_ask_volume.checked_sub(filled_ask).unwrap();
@@ -605,7 +611,7 @@ pub fn execute_matching_orders(
             ret_events.push(to_events(
                 &buy_order,
                 deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                format!("{} {}", buy_order.fee, &reward.reward_assets[0].info),
+                format!("{} {}", "1000", &reward.reward_assets[0].info),
             ));
         }
     }
@@ -616,7 +622,7 @@ pub fn execute_matching_orders(
             ret_events.push(to_events(
                 &sell_order,
                 deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                format!("{} {}", sell_order.fee, &reward.reward_assets[1].info),
+                format!("{} {}", "2000", &reward.reward_assets[1].info),
             ));
         }
     }
