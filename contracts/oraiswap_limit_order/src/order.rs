@@ -602,23 +602,29 @@ pub fn execute_matching_orders(
 
     for bulk in buy_list.iter_mut() {
         for buy_order in bulk.orders.iter_mut() {
-            total_orders += buy_order.match_order(deps.storage, &pair_key).unwrap();
-            ret_events.push(to_events(
-                &buy_order,
-                deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                format!("{} {}", "1000", &reward.reward_assets[0].info),
-            ));
+            if buy_order.status != OrderStatus::Open {
+                total_orders += 1;
+                buy_order.match_order(deps.storage, &pair_key).unwrap();
+                ret_events.push(to_events(
+                    &buy_order,
+                    deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
+                    format!("{} {}", "1000", &reward.reward_assets[0].info),
+                ));
+            }
         }
     }
 
     for bulk in sell_list.iter_mut() {
         for sell_order in bulk.orders.iter_mut() {
-            total_orders += sell_order.match_order(deps.storage, &pair_key).unwrap();
-            ret_events.push(to_events(
-                &sell_order,
-                deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                format!("{} {}", "2000", &reward.reward_assets[1].info),
-            ));
+            if sell_order.status != OrderStatus::Open {
+                total_orders += 1;
+                sell_order.match_order(deps.storage, &pair_key).unwrap();
+                ret_events.push(to_events(
+                    &sell_order,
+                    deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
+                    format!("{} {}", "2000", &reward.reward_assets[1].info),
+                ));
+            }
         }
     }
 

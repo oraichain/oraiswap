@@ -67,7 +67,8 @@ impl Order {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_offer_amount == self.offer_amount {
+        if  self.filled_offer_amount == self.offer_amount ||
+            self.filled_ask_amount == self.ask_amount {
             self.status = OrderStatus::Fulfilled;
         } else {
             self.status = OrderStatus::PartialFilled;
@@ -75,8 +76,8 @@ impl Order {
     }
 
     pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
-        if self.filled_offer_amount == self.offer_amount {
-            // When match amount equals ask amount, close order
+        if self.status == OrderStatus::Fulfilled {
+            // When status is Fulfilled, remove order
             remove_order(storage, pair_key, self)
         } else {
             // update order
