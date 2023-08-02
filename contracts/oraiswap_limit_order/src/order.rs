@@ -216,11 +216,13 @@ fn process_list_trader(
     }
 
     for trader in minimalist_trader {
-        messages.push(trader.asset.into_msg(
-            None,
-            &deps.querier,
-            deps.api.addr_validate(trader.address.as_str())?,
-        )?);
+        if !trader.asset.amount.is_zero() {
+            messages.push(trader.asset.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_validate(trader.address.as_str())?,
+            )?);
+        }
     }
 
     Ok(())
@@ -257,12 +259,15 @@ fn transfer_spread(
         },
     };
 
-    messages.push(
-        spread_payment
-            .asset
-            .into_msg(None, &deps.querier, spread_payment.address)
-            .unwrap(),
-    );
+    // Build refund msg
+    if !total_spread.is_zero() {
+        messages.push(
+            spread_payment
+                .asset
+                .into_msg(None, &deps.querier, spread_payment.address)
+                .unwrap(),
+        );
+    }
 }
 
 fn execute_bulk_orders(
@@ -297,11 +302,6 @@ fn execute_bulk_orders(
     let mut buy_bulk_orders_list = vec![];
     let mut sell_bulk_orders_list = vec![];
 
-    let spread_factor = match orderbook_pair.spread {
-        Some(spread) => Decimal::one() + spread,
-        None => Decimal::zero(),
-    };
-
     while i < limit && j < limit {
         if best_sell_price_list.len() <= j {
             if let Some(Ok((k, _))) = sell_cursor.next() {
@@ -328,15 +328,6 @@ fn execute_bulk_orders(
             break;
         }
 
-        // check spreaad
-        if !spread_factor.is_zero() {
-            let sell_price_with_spread = sell_price.checked_mul(spread_factor)?;
-            if buy_price > sell_price_with_spread {
-                i += 1;
-                continue;
-            }
-        }
-
         let match_price = buy_price;
 
         if buy_bulk_orders_list.len() <= i {
@@ -346,6 +337,9 @@ fn execute_bulk_orders(
                 OrderDirection::Buy,
                 None,
             ) {
+                if orders.len() == 0 {
+                    continue;
+                }
                 let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy);
                 buy_bulk_orders_list.push(bulk);
             } else {
@@ -360,6 +354,9 @@ fn execute_bulk_orders(
                 OrderDirection::Sell,
                 None,
             ) {
+                if orders.len() == 0 {
+                    continue;
+                }
                 let bulk = BulkOrders::from_orders(&orders, sell_price, OrderDirection::Sell);
                 sell_bulk_orders_list.push(bulk);
             } else {
@@ -394,7 +391,6 @@ fn execute_bulk_orders(
         buy_bulk_orders.filled_ask_volume += sell_offer_amount;
 
         buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
-
         sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
         if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.ask_volume {
@@ -503,6 +499,10 @@ fn process_orders(
                     .unwrap(),
                 bulk.filled_ask_volume,
             );
+
+            if filled_offer.is_zero() || filled_ask.is_zero() {
+                continue;
+            }
 
             bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer).unwrap();
             bulk.filled_ask_volume = bulk.filled_ask_volume.checked_sub(filled_ask).unwrap();

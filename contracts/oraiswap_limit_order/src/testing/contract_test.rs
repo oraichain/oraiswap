@@ -2384,7 +2384,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(978214u128),
+            amount: Uint128::from(977693u128),
         },
     ]
     .to_vec();
@@ -4063,7 +4063,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(990311u128),
+            amount: Uint128::from(1004846u128),
         },
     ]
     .to_vec();
@@ -4071,7 +4071,7 @@ fn spread_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1009690u128),
+            amount: Uint128::from(1019380u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
