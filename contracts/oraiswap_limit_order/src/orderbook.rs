@@ -482,16 +482,14 @@ impl BulkOrders {
     /// Calculate sum of orders base on direction
     pub fn from_orders(orders: &Vec<Order>, price: Decimal, direction: OrderDirection) -> Self {
         let mut volume = Uint128::zero();
-        let mut filled_volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
-        let mut filled_ask_volume = Uint128::zero();
+        let filled_volume = Uint128::zero();
+        let filled_ask_volume = Uint128::zero();
         let spread_volume = Uint128::zero();
 
         for order in orders {
-            volume += order.offer_amount;
-            ask_volume += order.ask_amount;
-            filled_ask_volume += order.filled_ask_amount;
-            filled_volume += order.filled_offer_amount;
+            volume += order.offer_amount.checked_sub(order.filled_offer_amount).unwrap();
+            ask_volume += order.ask_amount.checked_sub(order.filled_ask_amount).unwrap();
         }
 
         return Self {
