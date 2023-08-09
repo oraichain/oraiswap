@@ -1,9 +1,12 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage, CanonicalAddr};
+use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
+use oraiswap::{
+    limit_order::{ContractInfo, OrderDirection},
+    querier::calc_range_start,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::orderbook::{Order, OrderBook, Executor};
+use crate::orderbook::{Executor, Order, OrderBook};
 
 // settings for pagination
 pub const MAX_LIMIT: u32 = 100;
@@ -32,13 +35,17 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
 pub fn store_reward(
     storage: &mut dyn Storage,
     pair_key: &[u8],
-    reward_wallet: &Executor
+    reward_wallet: &Executor,
 ) -> StdResult<()> {
     let reward_address_key = &reward_wallet.address;
     Bucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).save(reward_address_key, reward_wallet)
 }
 
-pub fn read_reward(storage: &dyn Storage, pair_key: &[u8], address: &CanonicalAddr) -> StdResult<Executor> {
+pub fn read_reward(
+    storage: &dyn Storage,
+    pair_key: &[u8],
+    address: &CanonicalAddr,
+) -> StdResult<Executor> {
     ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).load(address)
 }
 
@@ -132,11 +139,7 @@ pub fn store_order(
 
     Bucket::multilevel(
         storage,
-        &[
-            PREFIX_ORDER_BY_STATUS,
-            pair_key,
-            &order.status.as_bytes(),
-        ],
+        &[PREFIX_ORDER_BY_STATUS, pair_key, &order.status.as_bytes()],
     )
     .save(order_id_key, &order.direction)?;
 
@@ -169,10 +172,10 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     }
 
     // value is just bool to represent indexer
-    Bucket::<bool>::multilevel(storage, &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key])
+    Bucket::<OrderDirection>::multilevel(storage, &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key])
         .remove(order_id_key);
 
-    Bucket::<bool>::multilevel(
+    Bucket::<OrderDirection>::multilevel(
         storage,
         &[
             PREFIX_ORDER_BY_BIDDER,
@@ -182,7 +185,7 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     )
     .remove(order_id_key);
 
-    Bucket::<bool>::multilevel(
+    Bucket::<OrderDirection>::multilevel(
         storage,
         &[
             PREFIX_ORDER_BY_DIRECTION,
@@ -192,13 +195,9 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
     )
     .remove(order_id_key);
 
-    Bucket::<bool>::multilevel(
+    Bucket::<OrderDirection>::multilevel(
         storage,
-        &[
-            PREFIX_ORDER_BY_STATUS,
-            pair_key,
-            &order.status.as_bytes(),
-        ],
+        &[PREFIX_ORDER_BY_STATUS, pair_key, &order.status.as_bytes()],
     )
     .remove(order_id_key);
 
