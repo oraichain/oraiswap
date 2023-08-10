@@ -6,7 +6,7 @@ use crate::state::{
     increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
     read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
     remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_ORDER_BY_STATUS, PREFIX_TICK,
+    PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
     attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
@@ -89,13 +89,7 @@ pub fn cancel_order(
         asset_infos[1].to_raw(deps.api)?,
     ]);
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-    let mut order = read_order(deps.storage, &pair_key, order_id)?;
-
-    if order.status == OrderStatus::Fulfilled {
-        return Err(ContractError::OrderFulfilled {
-            order_id: order.order_id,
-        });
-    }
+    let order = read_order(deps.storage, &pair_key, order_id)?;
 
     if order.bidder_addr != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
@@ -116,11 +110,11 @@ pub fn cancel_order(
     let messages = if left_offer_amount > Uint128::zero() {
         vec![bidder_refund
             .clone()
-            .into_msg(None, &deps.querier, info.sender)?]
+            .into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?]
     } else {
         vec![]
     };
-    order.status = OrderStatus::Cancel;
+
     remove_order(deps.storage, &pair_key, &order)?;
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
@@ -135,7 +129,7 @@ pub fn cancel_order(
         ),
         ("order_id", &order_id.to_string()),
         ("direction", &format!("{:?}", order.direction)),
-        ("status", &format!("{:?}", OrderStatus::Cancel)),
+        ("status", "Cancel"),
         (
             "bidder_addr",
             &deps.api.addr_humanize(&order.bidder_addr)?.to_string(),
@@ -762,27 +756,6 @@ pub fn query_orders(
                 limit,
                 order_by,
             )?
-        }
-        OrderFilter::Status(status) => {
-            let status_key = status.as_bytes();
-            match direction {
-                Some(_) => read_orders_with_indexer::<OrderDirection>(
-                    deps.storage,
-                    &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                    direction_filter,
-                    start_after,
-                    limit,
-                    order_by,
-                )?,
-                None => read_orders_with_indexer::<OrderDirection>(
-                    deps.storage,
-                    &[PREFIX_ORDER_BY_STATUS, &pair_key, &status_key],
-                    Box::new(|_| true),
-                    start_after,
-                    limit,
-                    order_by,
-                )?,
-            }
         }
         OrderFilter::None => match direction {
             Some(_) => read_orders_with_indexer::<OrderDirection>(

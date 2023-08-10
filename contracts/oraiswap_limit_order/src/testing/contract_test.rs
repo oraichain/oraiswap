@@ -5445,28 +5445,6 @@ fn orders_querier() {
         .unwrap();
     println!("[LOG] [3] - query all order: {}", jsonstr!(test));
 
-    let test1 = app
-        .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Orders {
-                asset_infos: [
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[1].clone(),
-                    },
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[0].clone(),
-                    },
-                ],
-                direction: None,
-                filter: OrderFilter::Status(OrderStatus::Open),
-                start_after: None,
-                limit: None,
-                order_by: None,
-            },
-        )
-        .unwrap();
-    println!("[LOG] [4] - query all open orders: {}", jsonstr!(test1));
-
     assert_eq!(
         OrdersResponse {
             orders: vec![order_1.clone()],
