@@ -1,12 +1,15 @@
-use cosmwasm_std::{Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use oraiswap::{limit_order::ContractInfo, querier::calc_range_start};
+use oraiswap::{
+    limit_order::{ContractInfo, OrderDirection},
+    querier::calc_range_start,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::orderbook::{Order, OrderBook};
+use crate::orderbook::{Executor, Order, OrderBook};
 
 // settings for pagination
-pub const MAX_LIMIT: u32 = 30;
+pub const MAX_LIMIT: u32 = 100;
 pub const DEFAULT_LIMIT: u32 = 10;
 
 pub fn init_last_order_id(storage: &mut dyn Storage) -> StdResult<()> {
@@ -27,6 +30,23 @@ pub fn store_config(storage: &mut dyn Storage, config: &ContractInfo) -> StdResu
 
 pub fn read_config(storage: &dyn Storage) -> StdResult<ContractInfo> {
     singleton_read(storage, CONTRACT_INFO).load()
+}
+
+pub fn store_reward(
+    storage: &mut dyn Storage,
+    pair_key: &[u8],
+    reward_wallet: &Executor,
+) -> StdResult<()> {
+    let reward_address_key = &reward_wallet.address;
+    Bucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).save(reward_address_key, reward_wallet)
+}
+
+pub fn read_reward(
+    storage: &dyn Storage,
+    pair_key: &[u8],
+    address: &CanonicalAddr,
+) -> StdResult<Executor> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, pair_key]).load(address)
 }
 
 pub fn store_orderbook(
@@ -61,10 +81,7 @@ pub fn read_orderbooks(
         .collect()
 }
 
-pub fn remove_orderbook<'a>(
-    storage: &'a mut dyn Storage,
-    pair_key: &[u8],
-) {
+pub fn remove_orderbook<'a>(storage: &'a mut dyn Storage, pair_key: &[u8]) {
     Bucket::<'a, OrderBook>::new(storage, PREFIX_ORDER_BOOK).remove(pair_key)
 }
 
@@ -110,6 +127,16 @@ pub fn store_order(
     )
     .save(order_id_key, &order.direction)?;
 
+    Bucket::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_DIRECTION,
+            pair_key,
+            &order.direction.as_bytes(),
+        ],
+    )
+    .save(order_id_key, &order.direction)?;
+
     Ok(total_tick_orders)
 }
 
@@ -130,22 +157,34 @@ pub fn remove_order(storage: &mut dyn Storage, pair_key: &[u8], order: &Order) -
         total_tick_orders -= 1;
         if total_tick_orders > 0 {
             // save total orders for a tick
-            Bucket::multilevel(storage, tick_namespaces).save(&price_key, &total_tick_orders)?;
+            Bucket::multilevel(storage, tick_namespaces)
+                .save(&price_key, &total_tick_orders)
+                .unwrap();
         } else {
             Bucket::<u64>::multilevel(storage, tick_namespaces).remove(&price_key);
         }
     }
 
     // value is just bool to represent indexer
-    Bucket::<bool>::multilevel(storage, &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key])
+    Bucket::<OrderDirection>::multilevel(storage, &[PREFIX_ORDER_BY_PRICE, pair_key, &price_key])
         .remove(order_id_key);
 
-    Bucket::<bool>::multilevel(
+    Bucket::<OrderDirection>::multilevel(
         storage,
         &[
             PREFIX_ORDER_BY_BIDDER,
             pair_key,
             order.bidder_addr.as_slice(),
+        ],
+    )
+    .remove(order_id_key);
+
+    Bucket::<OrderDirection>::multilevel(
+        storage,
+        &[
+            PREFIX_ORDER_BY_DIRECTION,
+            pair_key,
+            &order.direction.as_bytes(),
         ],
     )
     .remove(order_id_key);
@@ -159,17 +198,14 @@ pub fn read_order(storage: &dyn Storage, pair_key: &[u8], order_id: u64) -> StdR
 }
 
 /// read_orders_with_indexer: namespace is PREFIX + PAIR_KEY + INDEXER
-pub fn read_orders_with_indexer<T>(
+pub fn read_orders_with_indexer<T: Serialize + DeserializeOwned>(
     storage: &dyn Storage,
     namespaces: &[&[u8]],
     filter: Box<dyn Fn(&T) -> bool>,
     start_after: Option<u64>,
     limit: Option<u32>,
     order_by: Option<OrderBy>,
-) -> StdResult<Vec<Order>>
-where
-    T: Serialize + DeserializeOwned,
-{
+) -> StdResult<Option<Vec<Order>>> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_after = start_after.map(|id| id.to_be_bytes().to_vec());
     let (start, end, order_by) = match order_by {
@@ -185,7 +221,7 @@ where
         .range(start.as_deref(), end.as_deref(), order_by)
         .filter(|item| item.as_ref().map_or(false, |item| filter(&item.1)))
         .take(limit)
-        .map(|item| order_bucket.load(&item?.0))
+        .map(|item| order_bucket.may_load(&item?.0))
         .collect()
 }
 
@@ -217,7 +253,9 @@ static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess
 static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
 static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
+static PREFIX_REWARD: &[u8] = b"reward_wallet"; // executor that running matching engine for orderbook pair
 
 pub static PREFIX_ORDER_BY_BIDDER: &[u8] = b"order_by_bidder"; // order from a bidder
 pub static PREFIX_ORDER_BY_PRICE: &[u8] = b"order_by_price"; // this where orders belong to tick
+pub static PREFIX_ORDER_BY_DIRECTION: &[u8] = b"order_by_direction"; // order from the direction
 pub static PREFIX_TICK: &[u8] = b"tick"; // this is tick with value is the total orders

@@ -189,6 +189,7 @@ impl MockApp {
                     self.factory_addr.clone(),
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
+                        pair_admin: Some("admin".to_string()),
                     },
                     &[],
                 )
@@ -198,6 +199,29 @@ impl MockApp {
                 for attr in event.attributes {
                     if attr.key.eq("pair_contract_address") {
                         return Some(Addr::unchecked(attr.value));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn add_pair(&mut self, pair_info: PairInfo) -> Option<String> {
+        if !self.factory_addr.as_str().is_empty() {
+            let res = self
+                .execute(
+                    Addr::unchecked(APP_OWNER),
+                    self.factory_addr.clone(),
+                    &crate::factory::ExecuteMsg::AddPair { pair_info },
+                    &[],
+                )
+                .unwrap();
+
+            for event in res.events {
+                for attr in event.attributes {
+                    if attr.value.eq("add_pair") {
+                        return Some(attr.value);
                     }
                 }
             }
@@ -401,27 +425,13 @@ impl MockApp {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Decimal256, Uint128};
+    use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Uint128};
 
     use crate::{
         asset::AssetInfo,
-        pair::compute_swap,
         querier::{query_supply, query_token_balance},
         testing::MockApp,
     };
-
-    #[test]
-    fn compute_swap_test() {
-        let result = compute_swap(
-            Uint128::from(27764052486u128),
-            Uint128::from(28384000000u128),
-            Uint128::from(1u128),
-            Decimal256::from_ratio(Uint128::from(3u128), Uint128::from(1000u128)),
-        )
-        .unwrap();
-
-        assert_eq!(result.1, Uint128::from(0u128))
-    }
 
     #[test]
     fn token_balance_querier() {

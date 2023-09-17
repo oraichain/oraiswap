@@ -9,11 +9,75 @@ use oraiswap::{
 
 use crate::state::{DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK};
 
-pub fn query_ticks(
+// pub fn query_ticks(
+//     storage: &dyn Storage,
+//     pair_key: &[u8],
+//     direction: OrderDirection,
+//     start_after: Option<Decimal>,
+//     limit: Option<u32>,
+//     order_by: Option<i32>,
+// ) -> StdResult<TicksResponse> {
+//     query_ticks_with_end(
+//         storage,
+//         pair_key,
+//         direction,
+//         start_after,
+//         None,
+//         limit,
+//         order_by,
+//     )
+// }
+
+pub fn query_ticks_prices(
     storage: &dyn Storage,
     pair_key: &[u8],
     direction: OrderDirection,
     start_after: Option<Decimal>,
+    limit: Option<u32>,
+    order_by: Option<i32>,
+) -> Vec<Decimal> {
+    query_ticks_prices_with_end(
+        storage,
+        pair_key,
+        direction,
+        start_after,
+        None,
+        limit,
+        order_by,
+    )
+}
+
+pub fn query_ticks_prices_with_end(
+    storage: &dyn Storage,
+    pair_key: &[u8],
+    direction: OrderDirection,
+    start_after: Option<Decimal>,
+    end: Option<Decimal>,
+    limit: Option<u32>,
+    order_by: Option<i32>,
+) -> Vec<Decimal> {
+    query_ticks_with_end(
+        storage,
+        pair_key,
+        direction,
+        start_after,
+        end,
+        limit,
+        order_by,
+    )
+    .unwrap_or(TicksResponse { ticks: vec![] })
+    .ticks
+    .into_iter()
+    .map(|tick| tick.price)
+    .collect::<Vec<Decimal>>()
+}
+
+pub fn query_ticks_with_end(
+    storage: &dyn Storage,
+    pair_key: &[u8],
+    direction: OrderDirection,
+    start_after: Option<Decimal>,
+    end: Option<Decimal>,
     limit: Option<u32>,
     order_by: Option<i32>,
 ) -> StdResult<TicksResponse> {
@@ -24,9 +88,17 @@ pub fn query_ticks(
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_after = start_after.map(|id| id.atomics().to_be_bytes().to_vec());
+    let end = end.map(|id| id.atomics().to_be_bytes().to_vec());
+
     let (start, end, order_by) = match order_by {
-        Some(OrderBy::Ascending) => (calc_range_start(start_after), None, OrderBy::Ascending),
-        _ => (None, start_after, OrderBy::Descending),
+        // start_after < x <= end
+        Some(OrderBy::Ascending) => (
+            calc_range_start(start_after),
+            calc_range_start(end),
+            OrderBy::Ascending,
+        ),
+        // start_after < x <= end
+        _ => (end, start_after, OrderBy::Descending),
     };
 
     let ticks = position_bucket

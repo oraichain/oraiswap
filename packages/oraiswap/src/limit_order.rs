@@ -9,6 +9,9 @@ pub struct ContractInfo {
     pub version: String,
     // admin can update the parameter, may be multisig
     pub admin: CanonicalAddr,
+    pub commission_rate: String,
+    pub reward_address: CanonicalAddr,
+    pub spread_address: CanonicalAddr,
 }
 
 #[cw_serde]
@@ -31,7 +34,6 @@ impl OrderDirection {
 #[derive(Copy)]
 pub enum OrderStatus {
     Open,
-    Filling,
     PartialFilled,
     Fulfilled,
     Cancel,
@@ -41,10 +43,9 @@ impl OrderStatus {
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             OrderStatus::Open => &[0u8],
-            OrderStatus::Filling => &[1u8],
-            OrderStatus::PartialFilled => &[2u8],
-            OrderStatus::Fulfilled => &[3u8],
-            OrderStatus::Cancel => &[4u8],
+            OrderStatus::PartialFilled => &[1u8],
+            OrderStatus::Fulfilled => &[2u8],
+            OrderStatus::Cancel => &[3u8],
         }
     }
 }
@@ -59,6 +60,9 @@ pub struct InstantiateMsg {
     pub name: Option<String>,
     pub version: Option<String>,
     pub admin: Option<Addr>,
+    pub commission_rate: Option<String>,
+    pub reward_address: Option<Addr>,
+    pub spread_address: Option<Addr>,
 }
 
 #[cw_serde]
@@ -69,11 +73,17 @@ pub enum ExecuteMsg {
         admin: Addr,
     },
 
+    UpdateConfig {
+        reward_address: Option<Addr>,
+        spread_address: Option<Addr>,
+        commission_rate: Option<String>,
+    },
+
     CreateOrderBookPair {
         base_coin_info: AssetInfo,
         quote_coin_info: AssetInfo,
-        precision: Option<Decimal>,
-        min_base_coin_amount: Uint128,
+        spread: Option<Decimal>,
+        min_quote_coin_amount: Uint128,
     },
 
     ///////////////////////
@@ -84,30 +94,19 @@ pub enum ExecuteMsg {
         assets: [Asset; 2],
     },
 
-    UpdateOrder {
-        order_id: u64,
-        assets: [Asset; 2],
-    },
-
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
     },
 
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        ask_asset: Asset,
-        order_id: u64,
-        offer_info: AssetInfo,
-    },
-
     /// Arbitrager execute order book pair
     ExecuteOrderBookPair {
         asset_infos: [AssetInfo; 2],
+        limit: Option<u32>,
     },
 
     /// Arbitrager remove order book
-    RemoveOrderBook {
+    RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
 }
@@ -118,20 +117,14 @@ pub enum Cw20HookMsg {
         direction: OrderDirection,
         assets: [Asset; 2],
     },
-
-    /// Arbitrager execute order to get profit
-    ExecuteOrder {
-        order_id: u64,
-        offer_info: AssetInfo,
-    },
 }
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String), // filter by bidder
-    Price(Decimal), // filter by price
-    Tick,           // filter by direction
-    None,           // no filter
+    Bidder(String),      // filter by bidder
+    Price(Decimal),      // filter by price
+    Tick,                // filter by direction
+    None,                // no filter
 }
 
 #[cw_serde]
@@ -140,9 +133,7 @@ pub enum QueryMsg {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
     #[returns(OrderBookResponse)]
-    OrderBook {
-        asset_infos: [AssetInfo; 2],
-    },
+    OrderBook { asset_infos: [AssetInfo; 2] },
     #[returns(OrderBooksResponse)]
     OrderBooks {
         start_after: Option<Vec<u8>>,
@@ -174,11 +165,14 @@ pub enum QueryMsg {
         asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
         start_after: Option<Decimal>,
+        end: Option<Decimal>,
         limit: Option<u32>,
         order_by: Option<i32>, // convert OrderBy to i32
     },
     #[returns(LastOrderIdResponse)]
     LastOrderId {},
+    #[returns(OrderBookMatchableResponse)]
+    OrderBookMatchable { asset_infos: [AssetInfo; 2] },
 }
 
 #[cw_serde]
@@ -193,6 +187,7 @@ pub struct ContractInfoResponse {
 #[cw_serde]
 pub struct OrderResponse {
     pub order_id: u64,
+    pub status: OrderStatus,
     pub direction: OrderDirection,
     pub bidder_addr: String,
     pub offer_asset: Asset,
@@ -205,8 +200,8 @@ pub struct OrderResponse {
 pub struct OrderBookResponse {
     pub base_coin_info: AssetInfo,
     pub quote_coin_info: AssetInfo,
-    pub precision: Option<Decimal>,
-    pub min_base_coin_amount: Uint128,
+    pub spread: Option<Decimal>,
+    pub min_quote_coin_amount: Uint128,
 }
 
 #[cw_serde]
@@ -233,6 +228,11 @@ pub struct TicksResponse {
 #[cw_serde]
 pub struct LastOrderIdResponse {
     pub last_order_id: u64,
+}
+
+#[cw_serde]
+pub struct OrderBookMatchableResponse {
+    pub is_matchable: bool,
 }
 
 /// We currently take no arguments for migrations
