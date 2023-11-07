@@ -39,25 +39,13 @@ pub enum ExecuteMsg {
 }
 
 /// QueryMsg is defines available query datas
-#[cfg(not(target_arch = "wasm32"))]
-#[cw_serde]
-#[derive(QueryResponses)]
-#[serde(untagged)]
-#[query_responses(nested)]
-pub enum QueryMsg {
-    Treasury(OracleTreasuryQuery),
-    Exchange(OracleExchangeQuery),
-    Contract(OracleContractQuery),
-}
-
-#[cfg(target_arch = "wasm32")]
 #[cw_serde]
 #[derive(QueryResponses)]
 #[query_responses(nested)]
-pub enum QueryMsg {
-    Treasury(OracleTreasuryQuery),
-    Exchange(OracleExchangeQuery),
-    Contract(OracleContractQuery),
+pub enum QueryMsg<TreasuryMsg, ExchangeMsg, ContractMsg> {
+    Treasury(TreasuryMsg),
+    Exchange(ExchangeMsg),
+    Contract(ContractMsg),
 }
 
 #[cw_serde]
@@ -190,7 +178,7 @@ impl OracleContract {
     pub fn query<T: DeserializeOwned>(
         &self,
         querier: &QuerierWrapper,
-        req: QueryMsg,
+        req: QueryMsg<OracleTreasuryQuery, OracleExchangeQuery, OracleContractQuery>,
     ) -> StdResult<T> {
         querier.query_wasm_smart(self.to_string(), &req)
     }

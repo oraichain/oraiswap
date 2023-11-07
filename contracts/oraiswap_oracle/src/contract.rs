@@ -176,7 +176,11 @@ pub fn execute_delete_exchange_rate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(
+    deps: Deps,
+    env: Env,
+    msg: QueryMsg<OracleTreasuryQuery, OracleExchangeQuery, OracleContractQuery>,
+) -> StdResult<Binary> {
     match msg {
         QueryMsg::Treasury(query_data) => match query_data {
             OracleTreasuryQuery::TaxRate {} => to_binary(&query_tax_rate(deps)?),
