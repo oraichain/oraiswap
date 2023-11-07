@@ -42,10 +42,10 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 #[query_responses(nested)]
-pub enum QueryMsg<TreasuryMsg, ExchangeMsg, ContractMsg> {
-    Treasury(TreasuryMsg),
-    Exchange(ExchangeMsg),
-    Contract(ContractMsg),
+pub enum QueryMsg {
+    Treasury(OracleTreasuryQuery),
+    Exchange(OracleExchangeQuery),
+    Contract(OracleContractQuery),
 }
 
 #[cw_serde]
@@ -178,7 +178,7 @@ impl OracleContract {
     pub fn query<T: DeserializeOwned>(
         &self,
         querier: &QuerierWrapper,
-        req: QueryMsg<OracleTreasuryQuery, OracleExchangeQuery, OracleContractQuery>,
+        req: QueryMsg,
     ) -> StdResult<T> {
         querier.query_wasm_smart(self.to_string(), &req)
     }

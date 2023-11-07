@@ -1,15 +1,12 @@
 use cosmwasm_schema::write_api;
 
-use oraiswap::oracle::{
-    ExecuteMsg, InstantiateMsg, MigrateMsg, OracleContractQuery, OracleExchangeQuery,
-    OracleTreasuryQuery, QueryMsg,
-};
+use oraiswap::oracle::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
 fn main() {
     write_api! {
         instantiate: InstantiateMsg,
         execute: ExecuteMsg,
-        query: QueryMsg<OracleTreasuryQuery,OracleExchangeQuery,OracleContractQuery>,
+        query: QueryMsg,
         migrate: MigrateMsg
     }
 }
