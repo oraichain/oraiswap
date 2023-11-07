@@ -123,7 +123,6 @@ pub enum Cw20HookMsg {
 pub enum OrderFilter {
     Bidder(String),      // filter by bidder
     Price(Decimal),      // filter by price
-    Status(OrderStatus), // filter by status
     Tick,                // filter by direction
     None,                // no filter
 }
