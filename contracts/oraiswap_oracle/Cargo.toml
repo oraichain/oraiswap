@@ -1,13 +1,10 @@
 [package]
 name = "oraiswap-oracle"
-version = "0.1.0"
-authors = ["tupt <tubackkhoa@gmail.com>"]
-edition = "2021"
-
-exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "artifacts/*",
-]
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+readme = { workspace = true }
+exclude = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -21,12 +18,12 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw-storage-plus = { version = "1.0.1", features = ["iterator"] }
-cosmwasm-std = { version = "1.1.9" }
-thiserror = { version = "1.0.23" }
-cosmwasm-schema = "1.1.9"
-oraiswap = { path = "../../packages/oraiswap" }
+cw-storage-plus = { workspace = true, features = ["iterator"] }
+cosmwasm-std = { workspace = true }
+thiserror = { workspace = true }
+cosmwasm-schema = { workspace = true }
+oraiswap = { workspace = true }
 
 [dev-dependencies]
-cw20 = { version = "1.0.1" }
-oraiswap-token = { path = "../oraiswap_token" }
+cw20 = { workspace = true }
+oraiswap-token = { workspace = true }

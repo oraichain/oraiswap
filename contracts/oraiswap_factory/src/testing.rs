@@ -1,3 +1,4 @@
+use cosmwasm_std::Addr;
 use oraiswap::asset::{AssetInfo, PairInfo};
 
 use oraiswap::create_entry_points_testing;
@@ -48,4 +49,44 @@ fn create_pair() {
             commission_rate: DEFAULT_COMMISSION_RATE.into()
         }
     );
+}
+
+#[test]
+fn add_pair() {
+    let mut app = MockApp::new(&[]);
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_factory_and_pair_contract(
+        Box::new(create_entry_points_testing!(crate).with_reply(crate::contract::reply)),
+        Box::new(
+            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+        ),
+    );
+
+    let contract_addr1 = app.create_token("assetA");
+    let contract_addr2 = app.create_token("assetB");
+
+    let asset_infos = [
+        AssetInfo::Token {
+            contract_addr: contract_addr1,
+        },
+        AssetInfo::Token {
+            contract_addr: contract_addr2,
+        },
+    ];
+
+    let pair_info = PairInfo {
+        oracle_addr: app.oracle_addr.clone(),
+        liquidity_token: Addr::unchecked("liquidity_token"),
+        contract_addr: Addr::unchecked("contract_addr"),
+        asset_infos: asset_infos.clone(),
+        commission_rate: DEFAULT_COMMISSION_RATE.into(),
+    };
+
+    // add pair
+    app.add_pair(pair_info.clone()).unwrap();
+
+    let pair_res = app.query_pair(asset_infos.clone()).unwrap();
+    assert_eq!(pair_res, pair_info);
 }

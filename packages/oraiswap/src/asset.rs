@@ -5,7 +5,7 @@ use crate::oracle::OracleContract;
 use crate::querier::query_token_balance;
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, Coin, CosmosMsg, Decimal, MessageInfo,
+    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
@@ -55,22 +55,6 @@ impl Asset {
         }
     }
 
-    pub fn deduct_tax(
-        &self,
-        oracle_contract: &OracleContract,
-        querier: &QuerierWrapper,
-    ) -> StdResult<Coin> {
-        let amount = self.amount;
-        if let AssetInfo::NativeToken { denom } = &self.info {
-            Ok(Coin {
-                denom: denom.to_string(),
-                amount: amount.checked_sub(self.compute_tax(oracle_contract, querier)?)?,
-            })
-        } else {
-            Err(StdError::generic_err("cannot deduct tax from token asset"))
-        }
-    }
-
     /// create a CosmosMsg send message to receiver
     pub fn into_msg(
         &self,
@@ -92,7 +76,12 @@ impl Asset {
             AssetInfo::NativeToken { denom } => {
                 // if there is oracle contract then calculate tax deduction
                 let send_amount = if let Some(oracle_contract) = oracle_contract {
-                    self.deduct_tax(oracle_contract, querier)?
+                    coin(
+                        self.amount
+                            .checked_sub(self.compute_tax(oracle_contract, querier)?)?
+                            .into(),
+                        denom,
+                    )
                 } else {
                     coin(amount.u128(), denom)
                 };

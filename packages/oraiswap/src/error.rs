@@ -65,15 +65,12 @@ pub enum ContractError {
     #[error("Order asset must not be zero")]
     AssetMustNotBeZero {},
 
-    #[error("Order {order_id} is filling")]
-    OrderIsFilling {order_id: u64},
-
     #[error("Order {order_id} has already fulfilled")]
     OrderFulfilled {order_id: u64},
 
-    #[error("Amount of {base_coin} must be greater than {min_base_amount}")]
-    TooSmallBaseCoinAmount {
-        base_coin: String,
-        min_base_amount: Uint128,
+    #[error("Amount of {quote_coin} must be greater than {min_quote_amount}")]
+    TooSmallQuoteAsset {
+        quote_coin: String,
+        min_quote_amount: Uint128,
     },
 }
