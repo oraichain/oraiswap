@@ -27,16 +27,15 @@ pub enum ExecuteMsg {
         owner: Option<Addr>,
     },
     RegisterAsset {
-        asset_info: AssetInfo, // can be ow20 token or native token
         staking_token: Addr,
     },
     DeprecateStakingToken {
-        asset_info: AssetInfo,
+        staking_token: Addr,
         new_staking_token: Addr,
     },
     // update rewards per second for an asset
     UpdateRewardsPerSec {
-        asset_info: AssetInfo,
+        staking_token: Addr,
         assets: Vec<Asset>,
     },
     // reward tokens are in amount proportionaly, and used by minter contract to update amounts after checking the balance, which
@@ -49,17 +48,17 @@ pub enum ExecuteMsg {
     /// User operations ///
     ////////////////////////
     Unbond {
-        asset_info: AssetInfo,
+        staking_token: Addr,
         amount: Uint128,
     },
     /// Withdraw pending rewards
     Withdraw {
         // If the asset token is not given, then all rewards are withdrawn
-        asset_info: Option<AssetInfo>,
+        staking_token: Option<Addr>,
     },
     // Withdraw for others in this pool, such as when rewards per second are changed for the pool
     WithdrawOthers {
-        asset_info: Option<AssetInfo>,
+        staking_token: Option<Addr>,
         staker_addrs: Vec<Addr>,
     },
 
@@ -70,13 +69,12 @@ pub enum ExecuteMsg {
     },
     /// Hook to stake the minted LP tokens
     AutoStakeHook {
-        asset_info: AssetInfo,
         staking_token: Addr,
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
     UpdateListStakers {
-        asset_info: AssetInfo,
+        staking_token: Addr,
         stakers: Vec<Addr>,
     },
 }
@@ -84,7 +82,7 @@ pub enum ExecuteMsg {
 #[cw_serde]
 pub enum Cw20HookMsg {
     // this call from LP token contract
-    Bond { asset_info: AssetInfo },
+    Bond {},
 }
 
 /// We currently take no arguments for migrations
@@ -109,18 +107,18 @@ pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(PoolInfoResponse)]
-    PoolInfo { asset_info: AssetInfo },
+    PoolInfo { staking_token: Addr },
     #[returns(RewardsPerSecResponse)]
-    RewardsPerSec { asset_info: AssetInfo },
+    RewardsPerSec { staking_token: Addr },
     #[returns(RewardInfoResponse)]
     RewardInfo {
         staker_addr: Addr,
-        asset_info: Option<AssetInfo>,
+        staking_token: Option<Addr>,
     },
     #[returns(Vec<RewardInfoResponse>)]
     // Query all staker belong to the pool
     RewardInfos {
-        asset_info: AssetInfo,
+        staking_token: Addr,
         start_after: Option<Addr>,
         limit: Option<u32>,
         // so can convert or throw error
@@ -146,7 +144,6 @@ pub struct RewardsPerSecResponse {
 // We define a custom struct for each query response
 #[cw_serde]
 pub struct PoolInfoResponse {
-    pub asset_info: AssetInfo,
     pub staking_token: Addr,
     pub total_bond_amount: Uint128,
     pub reward_index: Decimal,
@@ -164,7 +161,7 @@ pub struct RewardInfoResponse {
 
 #[cw_serde]
 pub struct RewardInfoResponseItem {
-    pub asset_info: AssetInfo,
+    pub staking_token: Addr,
     pub bond_amount: Uint128,
     pub pending_reward: Uint128,
     pub pending_withdraw: Vec<Asset>,

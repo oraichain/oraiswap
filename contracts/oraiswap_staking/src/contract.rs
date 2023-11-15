@@ -13,8 +13,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Order, Response, StdError, StdResult, Uint128,
+    from_json, to_json_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
@@ -53,32 +53,30 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
         ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
-        ExecuteMsg::UpdateRewardsPerSec { asset_info, assets } => {
-            update_rewards_per_sec(deps, info, asset_info, assets)
-        }
-        ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
-        ExecuteMsg::RegisterAsset {
-            asset_info,
+        ExecuteMsg::UpdateRewardsPerSec {
             staking_token,
-        } => register_asset(deps, info, asset_info, staking_token),
+            assets,
+        } => update_rewards_per_sec(deps, info, staking_token, assets),
+        ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
+        ExecuteMsg::RegisterAsset { staking_token } => register_asset(deps, info, staking_token),
         ExecuteMsg::DeprecateStakingToken {
-            asset_info,
+            staking_token,
             new_staking_token,
-        } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
-        ExecuteMsg::Unbond { asset_info, amount } => {
-            unbond(deps, env, info.sender, asset_info, amount)
-        }
-        ExecuteMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
+        } => deprecate_staking_token(deps, info, staking_token, new_staking_token),
+        ExecuteMsg::Unbond {
+            staking_token,
+            amount,
+        } => unbond(deps, env, info.sender, staking_token, amount),
+        ExecuteMsg::Withdraw { staking_token } => withdraw_reward(deps, env, info, staking_token),
         ExecuteMsg::WithdrawOthers {
-            asset_info,
+            staking_token,
             staker_addrs,
-        } => withdraw_reward_others(deps, env, info, staker_addrs, asset_info),
+        } => withdraw_reward_others(deps, env, info, staker_addrs, staking_token),
         ExecuteMsg::AutoStake {
             assets,
             slippage_tolerance,
         } => auto_stake(deps, env, info, assets, slippage_tolerance),
         ExecuteMsg::AutoStakeHook {
-            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
@@ -86,15 +84,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             deps,
             env,
             info,
-            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
         ),
         ExecuteMsg::UpdateListStakers {
-            asset_info,
+            staking_token,
             stakers,
-        } => update_list_stakers(deps, env, info, asset_info, stakers),
+        } => update_list_stakers(deps, env, info, staking_token, stakers),
     }
 }
 
@@ -103,14 +100,14 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
-    match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Bond { asset_info }) => {
+    match from_json(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::Bond {}) => {
             // check permission
-            let asset_key = asset_info.to_vec(deps.api)?;
-            let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+            let asset_key = token_raw.as_slice();
+            let pool_info = read_pool_info(deps.storage, asset_key)?;
 
             // only staking token contract can execute this message
-            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
             if pool_info.staking_token != token_raw {
                 // if user is trying to bond old token, return friendly error message
                 if let Some(params) = pool_info.migration_params {
@@ -130,7 +127,7 @@ pub fn receive_cw20(
             bond(
                 deps,
                 Addr::unchecked(cw20_msg.sender),
-                asset_info,
+                info.sender,
                 cw20_msg.amount,
             )
         }
@@ -167,7 +164,7 @@ pub fn update_config(
 fn update_rewards_per_sec(
     deps: DepsMut,
     info: MessageInfo,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     assets: Vec<Asset>,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
@@ -176,7 +173,7 @@ fn update_rewards_per_sec(
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
     // withdraw all rewards for all stakers from this pool
     let staker_addrs = stakers_read(deps.storage, &asset_key)
@@ -194,7 +191,7 @@ fn update_rewards_per_sec(
         process_reward_assets(
             deps.storage,
             &staker_addr_raw,
-            &Some(asset_key.clone()),
+            &Some(asset_key.to_vec()),
             false,
         )?;
     }
@@ -210,12 +207,7 @@ fn update_rewards_per_sec(
     Ok(Response::new().add_attribute("action", "update_rewards_per_sec"))
 }
 
-fn register_asset(
-    deps: DepsMut,
-    info: MessageInfo,
-    asset_info: AssetInfo,
-    staking_token: Addr,
-) -> StdResult<Response> {
+fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -223,7 +215,7 @@ fn register_asset(
     }
 
     // query asset_key from AssetInfo
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
     if read_pool_info(deps.storage, &asset_key).is_ok() {
         return Err(StdError::generic_err("Asset was already registered"));
     }
@@ -242,14 +234,14 @@ fn register_asset(
 
     Ok(Response::new().add_attributes([
         ("action", "register_asset"),
-        ("asset_info", &asset_info.to_string()),
+        ("staking_token", staking_token.as_str()),
     ]))
 }
 
 fn deprecate_staking_token(
     deps: DepsMut,
     info: MessageInfo,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     new_staking_token: Addr,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
@@ -258,8 +250,8 @@ fn deprecate_staking_token(
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let mut pool_info = read_pool_info(deps.storage, &asset_key)?;
 
     if pool_info.migration_params.is_some() {
         return Err(StdError::generic_err(
@@ -280,7 +272,7 @@ fn deprecate_staking_token(
 
     Ok(Response::new().add_attributes([
         ("action", "depcrecate_staking_token"),
-        ("asset_info", &asset_info.to_string()),
+        ("staking_token", &staking_token.as_str()),
         (
             "deprecated_staking_token",
             &deprecated_token_addr.to_string(),
@@ -292,23 +284,25 @@ fn deprecate_staking_token(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
-        QueryMsg::RewardsPerSec { asset_info } => {
-            to_binary(&query_rewards_per_sec(deps, asset_info)?)
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::PoolInfo { staking_token } => {
+            to_json_binary(&query_pool_info(deps, staking_token)?)
+        }
+        QueryMsg::RewardsPerSec { staking_token } => {
+            to_json_binary(&query_rewards_per_sec(deps, staking_token)?)
         }
         QueryMsg::RewardInfo {
             staker_addr,
-            asset_info,
-        } => to_binary(&query_reward_info(deps, staker_addr, asset_info)?),
+            staking_token,
+        } => to_json_binary(&query_reward_info(deps, staker_addr, staking_token)?),
         QueryMsg::RewardInfos {
-            asset_info,
+            staking_token,
             start_after,
             limit,
             order,
-        } => to_binary(&query_all_reward_infos(
+        } => to_json_binary(&query_all_reward_infos(
             deps,
-            asset_info,
+            staking_token,
             start_after,
             limit,
             order,
@@ -329,11 +323,10 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(resp)
 }
 
-pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+pub fn query_pool_info(deps: Deps, staking_token: Addr) -> StdResult<PoolInfoResponse> {
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let pool_info = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
-        asset_info,
         staking_token: deps.api.addr_humanize(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
         reward_index: pool_info.reward_index,
@@ -349,11 +342,8 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
     })
 }
 
-pub fn query_rewards_per_sec(
-    deps: Deps,
-    asset_info: AssetInfo,
-) -> StdResult<RewardsPerSecResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
+pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<RewardsPerSecResponse> {
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
     let raw_assets = read_rewards_per_sec(deps.storage, &asset_key)?;
 

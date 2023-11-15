@@ -2,7 +2,9 @@ use crate::contract::{execute, instantiate, query};
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
-use cosmwasm_std::{attr, coin, from_binary, to_binary, Addr, Decimal, Order, StdError, Uint128};
+use cosmwasm_std::{
+    attr, coin, from_json, to_json_binary, Addr, Decimal, Order, StdError, Uint128,
+};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
@@ -30,7 +32,7 @@ fn proper_initialization() {
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config: ConfigResponse = from_binary(&res).unwrap();
+    let config: ConfigResponse = from_json(&res).unwrap();
     assert_eq!(
         ConfigResponse {
             owner: Addr::unchecked("owner"),
@@ -71,7 +73,7 @@ fn update_config() {
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config: ConfigResponse = from_binary(&res).unwrap();
+    let config: ConfigResponse = from_json(&res).unwrap();
     assert_eq!(
         ConfigResponse {
             owner: Addr::unchecked("owner2"),
@@ -116,9 +118,6 @@ fn test_register() {
     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -144,19 +143,14 @@ fn test_register() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
+            staking_token: Addr::unchecked("staking"),
         },
     )
     .unwrap();
-    let pool_info: PoolInfoResponse = from_binary(&res).unwrap();
+    let pool_info: PoolInfoResponse = from_json(&res).unwrap();
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset")
-            },
             staking_token: Addr::unchecked("staking"),
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
@@ -186,9 +180,7 @@ fn test_query_staker_pagination() {
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![Asset {
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -200,9 +192,6 @@ fn test_query_staker_pagination() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -214,12 +203,7 @@ fn test_query_staker_pagination() {
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: format!("addr{}", i),
             amount: Uint128::from(100u128),
-            msg: to_binary(&Cw20HookMsg::Bond {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
-            })
-            .unwrap(),
+            msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
         });
         let info = mock_info("staking", &[]);
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -232,16 +216,14 @@ fn test_query_staker_pagination() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::RewardInfos {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
                 limit: Some(10),
                 order: Some(Order::Ascending.into()),
                 start_after: start_after.clone(),
             },
         )
         .unwrap();
-        let res: Vec<RewardInfoResponse> = from_binary(&data).unwrap();
+        let res: Vec<RewardInfoResponse> = from_json(&data).unwrap();
         let stakers: Vec<Addr> = res.into_iter().map(|r| r.staker_addr).collect();
         let staker_addrs: Vec<String> =
             stakers.clone().into_iter().map(|s| s.to_string()).collect();

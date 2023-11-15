@@ -4,8 +4,8 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, to_json_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
@@ -17,7 +17,7 @@ use oraiswap::staking::ExecuteMsg;
 pub fn bond(
     deps: DepsMut,
     staker_addr: Addr,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     amount: Uint128,
 ) -> StdResult<Response> {
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
@@ -25,14 +25,14 @@ pub fn bond(
         deps.storage,
         deps.api,
         &staker_addr_raw,
-        &asset_info,
+        staking_token.clone(),
         amount,
     )?;
 
     Ok(Response::new().add_attributes([
         ("action", "bond"),
         ("staker_addr", staker_addr.as_str()),
-        ("asset_info", &asset_info.to_string()),
+        ("staking_token", staking_token.as_str()),
         ("amount", &amount.to_string()),
     ]))
 }
@@ -41,7 +41,7 @@ pub fn unbond(
     deps: DepsMut,
     _env: Env,
     staker_addr: Addr,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     amount: Uint128,
 ) -> StdResult<Response> {
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
@@ -49,13 +49,13 @@ pub fn unbond(
         deps.storage,
         deps.api,
         &staker_addr_raw,
-        &asset_info,
+        &staking_token,
         amount,
     )?;
     let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
     let mut messages = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.to_string(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+        msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
             recipient: staker_addr.to_string(),
             amount,
         })?,
@@ -74,7 +74,6 @@ pub fn unbond(
     Ok(Response::new().add_messages(messages).add_attributes([
         attr("action", "unbond"),
         attr("staker_addr", staker_addr.as_str()),
-        attr("asset_info", &asset_info.to_string()),
         attr("amount", &amount.to_string()),
         attr("staking_token", staking_token_addr.as_str()),
     ]))
@@ -84,7 +83,7 @@ pub fn update_list_stakers(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     stakers: Vec<Addr>,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
@@ -92,9 +91,9 @@ pub fn update_list_stakers(
     if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
-    let asset_info_raw = asset_info.to_raw(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
     for staker in stakers {
-        stakers_store(deps.storage, asset_info_raw.as_bytes()).save(
+        stakers_store(deps.storage, &asset_key).save(
             deps.api.addr_canonicalize(staker.as_str())?.as_slice(),
             &true,
         )?;
@@ -141,17 +140,15 @@ pub fn auto_stake(
     let asset_infos: [AssetInfo; 2] = [assets[0].info.clone(), assets[1].info.clone()];
     let oraiswap_pair: PairInfo = query_pair_info(&deps.querier, factory_addr, &asset_infos)?;
 
-    // assert the token and lp token match with pool info
-    let pool_info: PoolInfo = read_pool_info(
-        deps.storage,
-        &deps.api.addr_canonicalize(token_addr.as_str())?,
-    )?;
+    let staking_token = deps
+        .api
+        .addr_canonicalize(oraiswap_pair.liquidity_token.as_str())?;
+    let asset_key = staking_token.as_slice();
 
-    if pool_info.staking_token
-        != deps
-            .api
-            .addr_canonicalize(oraiswap_pair.liquidity_token.as_str())?
-    {
+    // assert the token and lp token match with pool info
+    let pool_info = read_pool_info(deps.storage, asset_key)?;
+
+    if pool_info.staking_token != staking_token {
         return Err(StdError::generic_err("Invalid staking token"));
     }
 
@@ -175,7 +172,7 @@ pub fn auto_stake(
         .add_messages(vec![
             WasmMsg::Execute {
                 contract_addr: token_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+                msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
                     owner: info.sender.to_string(),
                     recipient: env.contract.address.to_string(),
                     amount: token_amount,
@@ -184,7 +181,7 @@ pub fn auto_stake(
             },
             WasmMsg::Execute {
                 contract_addr: token_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                     spender: oraiswap_pair.contract_addr.to_string(),
                     amount: token_amount,
                     expires: None,
@@ -193,7 +190,7 @@ pub fn auto_stake(
             },
             WasmMsg::Execute {
                 contract_addr: oraiswap_pair.contract_addr.to_string(),
-                msg: to_binary(&PairExecuteMsg::ProvideLiquidity {
+                msg: to_json_binary(&PairExecuteMsg::ProvideLiquidity {
                     assets: [
                         Asset {
                             amount: native_asset.amount.checked_sub(tax_amount)?,
@@ -216,10 +213,7 @@ pub fn auto_stake(
             },
             WasmMsg::Execute {
                 contract_addr: env.contract.address.to_string(),
-                msg: to_binary(&ExecuteMsg::AutoStakeHook {
-                    asset_info: AssetInfo::Token {
-                        contract_addr: token_addr.clone(),
-                    },
+                msg: to_json_binary(&ExecuteMsg::AutoStakeHook {
                     staking_token: oraiswap_pair.liquidity_token,
                     staker_addr: info.sender,
                     prev_staking_token_amount,
@@ -238,7 +232,6 @@ pub fn auto_stake_hook(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    asset_info: AssetInfo,
     staking_token: Addr,
     staker_addr: Addr,
     prev_staking_token_amount: Uint128,
@@ -250,25 +243,25 @@ pub fn auto_stake_hook(
 
     // stake all lp tokens received, compare with staking token amount before liquidity provision was executed
     let current_staking_token_amount =
-        query_token_balance(&deps.querier, staking_token, env.contract.address)?;
+        query_token_balance(&deps.querier, staking_token.clone(), env.contract.address)?;
     let amount_to_stake = current_staking_token_amount.checked_sub(prev_staking_token_amount)?;
 
-    bond(deps, staker_addr, asset_info, amount_to_stake)
+    bond(deps, staker_addr, staking_token, amount_to_stake)
 }
 
 fn _increase_bond_amount(
     storage: &mut dyn Storage,
     api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_info: &AssetInfo,
+    staking_token: Addr,
     amount: Uint128,
 ) -> StdResult<()> {
-    let asset_key = &asset_info.to_vec(api)?;
-    let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
+    let asset_key = api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let mut pool_info = read_pool_info(storage, &asset_key)?;
     let mut reward_info: RewardInfo = rewards_read(storage, staker_addr)
-        .load(asset_key)
+        .load(&asset_key)
         .unwrap_or_else(|_| RewardInfo {
-            native_token: asset_info.is_native_token(),
+            native_token: false,
             index: Decimal::zero(),
             bond_amount: Uint128::zero(),
             pending_reward: Uint128::zero(),
@@ -276,14 +269,14 @@ fn _increase_bond_amount(
         });
 
     // check if the position should be migrated
-    let is_position_migrated = read_is_migrated(storage, asset_key, staker_addr);
+    let is_position_migrated = read_is_migrated(storage, &asset_key, staker_addr);
     if pool_info.migration_params.is_some() {
         // the pool has been migrated, if position is not migrated and has tokens bonded, return error
         if !reward_info.bond_amount.is_zero() && !is_position_migrated {
             return Err(StdError::generic_err("The LP token for this asset has been deprecated, withdraw all your deprecated tokens to migrate your position"));
         } else if !is_position_migrated {
             // if the position is not migrated, but bond amount is zero, it means it's a new position, so store it as migrated
-            store_is_migrated(storage, asset_key, staker_addr)?;
+            store_is_migrated(storage, &asset_key, staker_addr)?;
         }
     }
 
@@ -295,11 +288,11 @@ fn _increase_bond_amount(
 
     reward_info.bond_amount += amount;
 
-    rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
-    store_pool_info(storage, asset_key, &pool_info)?;
+    rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
+    store_pool_info(storage, &asset_key, &pool_info)?;
 
     // mark this staker belong to the pool the first time
-    let mut stakers_bucket = stakers_store(storage, asset_key);
+    let mut stakers_bucket = stakers_store(storage, &asset_key);
     if stakers_bucket.may_load(staker_addr)?.is_none() {
         stakers_bucket.save(staker_addr, &true)?;
     }
@@ -311,12 +304,12 @@ fn _decrease_bond_amount(
     storage: &mut dyn Storage,
     api: &dyn Api,
     staker_addr: &CanonicalAddr,
-    asset_info: &AssetInfo,
+    staking_token: &Addr,
     amount: Uint128,
 ) -> StdResult<(CanonicalAddr, Vec<Asset>)> {
-    let asset_key = &asset_info.to_vec(api)?;
-    let mut pool_info: PoolInfo = read_pool_info(storage, asset_key)?;
-    let mut reward_info: RewardInfo = rewards_read(storage, staker_addr).load(asset_key)?;
+    let asset_key = api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let mut pool_info: PoolInfo = read_pool_info(storage, &asset_key)?;
+    let mut reward_info: RewardInfo = rewards_read(storage, staker_addr).load(&asset_key)?;
     let mut reward_assets = vec![];
     if reward_info.bond_amount < amount {
         return Err(StdError::generic_err("Cannot unbond more than bond amount"));
@@ -324,7 +317,7 @@ fn _decrease_bond_amount(
 
     // if the lp token was migrated, and the user did not close their position yet, cap the reward at the snapshot
     let should_migrate =
-        !read_is_migrated(storage, asset_key, staker_addr) && pool_info.migration_params.is_some();
+        !read_is_migrated(storage, &asset_key, staker_addr) && pool_info.migration_params.is_some();
     let (pool_index, staking_token) = if should_migrate {
         let migraton_params = pool_info.migration_params.clone().unwrap();
         (
@@ -348,7 +341,7 @@ fn _decrease_bond_amount(
     reward_info.bond_amount = reward_info.bond_amount.checked_sub(amount)?;
 
     if reward_info.bond_amount.is_zero() && should_migrate {
-        store_is_migrated(storage, asset_key, staker_addr)?;
+        store_is_migrated(storage, &asset_key, staker_addr)?;
     }
 
     if reward_info.pending_reward.is_zero() && reward_info.bond_amount.is_zero() {
@@ -359,15 +352,15 @@ fn _decrease_bond_amount(
             .map(|ra| Ok(ra.to_normal(api)?))
             .collect::<StdResult<Vec<Asset>>>()?;
 
-        rewards_store(storage, staker_addr).remove(asset_key);
+        rewards_store(storage, staker_addr).remove(&asset_key);
         // remove staker from the pool
-        stakers_store(storage, asset_key).remove(staker_addr);
+        stakers_store(storage, &asset_key).remove(staker_addr);
     } else {
-        rewards_store(storage, staker_addr).save(asset_key, &reward_info)?;
+        rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
     }
 
     // Update pool info
-    store_pool_info(storage, asset_key, &pool_info)?;
+    store_pool_info(storage, &asset_key, &pool_info)?;
 
     Ok((staking_token, reward_assets))
 }

@@ -1,7 +1,7 @@
 use crate::contract::{execute, instantiate, query};
 use crate::state::{read_pool_info, rewards_read, store_pool_info, PoolInfo, RewardInfo};
 use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-use cosmwasm_std::{coin, from_binary, to_binary, Addr, Api, Decimal, Uint128};
+use cosmwasm_std::{coin, from_json, to_json_binary, Addr, Api, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
@@ -32,9 +32,7 @@ fn test_deposit_reward() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -54,9 +52,6 @@ fn test_deposit_reward() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -71,12 +66,7 @@ fn test_deposit_reward() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -94,14 +84,12 @@ fn test_deposit_reward() {
     let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
-    let res: PoolInfoResponse = from_binary(
+    let res: PoolInfoResponse = from_json(
         &query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
             },
         )
         .unwrap(),
@@ -131,14 +119,12 @@ fn test_deposit_reward() {
 
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let res: PoolInfoResponse = from_binary(
+    let res: PoolInfoResponse = from_json(
         &query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
             },
         )
         .unwrap(),
@@ -176,9 +162,7 @@ fn test_deposit_reward_when_no_bonding() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -198,9 +182,6 @@ fn test_deposit_reward_when_no_bonding() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -224,14 +205,12 @@ fn test_deposit_reward_when_no_bonding() {
     let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
-    let res: PoolInfoResponse = from_binary(
+    let res: PoolInfoResponse = from_json(
         &query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
             },
         )
         .unwrap(),
@@ -261,14 +240,12 @@ fn test_deposit_reward_when_no_bonding() {
 
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let res: PoolInfoResponse = from_binary(
+    let res: PoolInfoResponse = from_json(
         &query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
             },
         )
         .unwrap(),
@@ -306,9 +283,7 @@ fn test_before_share_changes() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -328,9 +303,6 @@ fn test_before_share_changes() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -345,12 +317,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -386,12 +353,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -423,9 +385,7 @@ fn test_before_share_changes() {
 
     // unbond
     let msg = ExecuteMsg::Unbond {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         amount: Uint128::from(100u128),
     };
     let info = mock_info("addr", &[]);
@@ -526,9 +486,7 @@ fn test_withdraw() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: asset_addr.clone(),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -558,9 +516,6 @@ fn test_withdraw() {
     let lp_addr = app.create_token("lptoken");
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: asset_addr.clone(),
-        },
         staking_token: lp_addr.clone(),
     };
 
@@ -572,12 +527,7 @@ fn test_withdraw() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: asset_addr.clone(),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
 
     let _res = app
@@ -611,9 +561,7 @@ fn test_withdraw() {
     .unwrap();
 
     let msg = ExecuteMsg::Withdraw {
-        asset_info: Some(AssetInfo::Token {
-            contract_addr: asset_addr.clone(),
-        }),
+        staking_token: Some(Addr::unchecked("staking")),
     };
 
     let res = app
@@ -644,9 +592,7 @@ fn test_update_rewards_per_sec() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -666,9 +612,6 @@ fn test_update_rewards_per_sec() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -683,12 +626,7 @@ fn test_update_rewards_per_sec() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(300u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -711,9 +649,7 @@ fn test_update_rewards_per_sec() {
         mock_env(),
         mock_info("owner", &[]),
         ExecuteMsg::UpdateRewardsPerSec {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
+            staking_token: Addr::unchecked("staking"),
             assets: vec![
                 Asset {
                     info: AssetInfo::NativeToken {
@@ -749,20 +685,18 @@ fn test_update_rewards_per_sec() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_info: None,
+            staking_token: None,
             staker_addr: Addr::unchecked("addr"),
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();
+    let res: RewardInfoResponse = from_json(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset")
-                },
+                staking_token: Addr::unchecked("staking"),
                 bond_amount: Uint128::from(300u128),
                 pending_reward: Uint128::from(99u128),
                 pending_withdraw: vec![
@@ -806,9 +740,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -828,9 +760,6 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -845,12 +774,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(300u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -873,9 +797,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         mock_env(),
         mock_info("owner", &[]),
         ExecuteMsg::UpdateRewardsPerSec {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
+            staking_token: Addr::unchecked("staking"),
             assets: vec![
                 Asset {
                     info: AssetInfo::NativeToken {
@@ -898,12 +820,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr1".into(),
         amount: Uint128::from(300u128),
-        msg: to_binary(&Cw20HookMsg::Bond {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-        })
-        .unwrap(),
+        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -912,20 +829,18 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_info: None,
+            staking_token: None,
             staker_addr: Addr::unchecked("addr1"),
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();
+    let res: RewardInfoResponse = from_json(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr1"),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset")
-                },
+                staking_token: Addr::unchecked("staking"),
                 bond_amount: Uint128::from(300u128),
                 pending_reward: Uint128::zero(),
                 pending_withdraw: vec![],
@@ -951,20 +866,18 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_info: None,
+            staking_token: None,
             staker_addr: Addr::unchecked("addr"),
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();
+    let res: RewardInfoResponse = from_json(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset")
-                },
+                staking_token: Addr::unchecked("staking"),
                 bond_amount: Uint128::from(300u128),
                 pending_reward: Uint128::from(49u128),
                 pending_withdraw: vec![
@@ -991,20 +904,18 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            asset_info: None,
+            staking_token: None,
             staker_addr: Addr::unchecked("addr1"),
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();
+    let res: RewardInfoResponse = from_json(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr1"),
             reward_infos: vec![RewardInfoResponseItem {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset")
-                },
+                staking_token: Addr::unchecked("staking"),
                 bond_amount: Uint128::from(300u128),
                 pending_reward: Uint128::from(49u128),
                 pending_withdraw: vec![],

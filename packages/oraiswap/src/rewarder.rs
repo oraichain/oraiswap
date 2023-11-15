@@ -38,7 +38,7 @@ pub enum QueryMsg {
     #[returns(DistributionInfoResponse)]
     DistributionInfo { asset_info: AssetInfo },
     #[returns(RewardAmountPerSecondResponse)]
-    RewardAmountPerSec { asset_info: AssetInfo },
+    RewardAmountPerSec { staking_token: Addr },
 }
 
 // We define a custom struct for each query response
