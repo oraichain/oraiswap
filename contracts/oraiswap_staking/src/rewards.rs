@@ -8,9 +8,9 @@ use cosmwasm_std::{
     Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response,
     StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
+use oraiswap::asset::{Asset, AssetRaw};
 use oraiswap::querier::calc_range_start;
-use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
+use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem, RewardMsg};
 
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
@@ -19,7 +19,7 @@ const MAX_LIMIT: u32 = 30;
 pub fn deposit_reward(
     deps: DepsMut,
     info: MessageInfo,
-    rewards: Vec<Asset>,
+    rewards: Vec<RewardMsg>,
 ) -> StdResult<Response> {
     let config = read_config(deps.storage)?;
 
@@ -30,12 +30,11 @@ pub fn deposit_reward(
 
     let mut rewards_amount = Uint128::zero();
 
-    for asset in rewards.iter() {
-        let asset_key = asset.info.to_vec(deps.api)?;
+    for reward_msg in rewards.iter() {
+        let asset_key = reward_msg.staking_token.as_bytes();
+        let mut pool_info: PoolInfo = read_pool_info(deps.storage, asset_key)?;
 
-        let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
-
-        let mut normal_reward = asset.amount;
+        let mut normal_reward = reward_msg.total_accumulation_amount;
 
         // normal rewards are array of Assets
         if pool_info.total_bond_amount.is_zero() {
@@ -48,9 +47,9 @@ pub fn deposit_reward(
             pool_info.pending_reward = Uint128::zero();
         }
 
-        store_pool_info(deps.storage, &asset_key, &pool_info)?;
+        store_pool_info(deps.storage, asset_key, &pool_info)?;
 
-        rewards_amount += asset.amount;
+        rewards_amount += reward_msg.total_accumulation_amount;
     }
 
     Ok(Response::new().add_attributes([

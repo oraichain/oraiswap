@@ -23,7 +23,7 @@ pub enum ExecuteMsg {
 
     // distribute for a list of pools
     Distribute {
-        asset_infos: Vec<AssetInfo>,
+        staking_tokens: Vec<Addr>,
     },
 }
 

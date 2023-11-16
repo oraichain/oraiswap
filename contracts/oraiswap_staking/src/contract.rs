@@ -16,7 +16,7 @@ use cosmwasm_std::{
     from_json, to_json_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
     MessageInfo, Order, Response, StdError, StdResult, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
     QueryMsg, RewardsPerSecResponse,

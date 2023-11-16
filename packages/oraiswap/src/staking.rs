@@ -41,7 +41,7 @@ pub enum ExecuteMsg {
     // reward tokens are in amount proportionaly, and used by minter contract to update amounts after checking the balance, which
     // will be used as rewards for the specified asset's staking pool.
     DepositReward {
-        rewards: Vec<Asset>,
+        rewards: Vec<RewardMsg>,
     },
 
     ////////////////////////
@@ -168,4 +168,10 @@ pub struct RewardInfoResponseItem {
     // returns true if the position should be closed to keep receiving rewards
     // with the new lp token
     pub should_migrate: Option<bool>,
+}
+
+#[cw_serde]
+pub struct RewardMsg {
+    pub staking_token: Addr,
+    pub total_accumulation_amount: Uint128,
 }

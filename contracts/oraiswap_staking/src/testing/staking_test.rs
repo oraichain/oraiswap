@@ -12,7 +12,7 @@ use oraiswap::create_entry_points_testing;
 use oraiswap::pair::PairResponse;
 use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem,
+    RewardInfoResponseItem, RewardMsg,
 };
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -196,11 +196,9 @@ fn test_unbond() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(300u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(300u128),
         }],
     };
     let info = mock_info("rewarder", &[]);

@@ -8,7 +8,7 @@ use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem,
+    RewardInfoResponseItem, RewardMsg,
 };
 use oraiswap::testing::ATOM_DENOM;
 
@@ -76,11 +76,9 @@ fn test_deprecate() {
     // owner of reward contract deposit 100 reward tokens
     // distribute weight => 80:20
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -143,11 +141,9 @@ fn test_deprecate() {
 
     // deposit more rewards
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -277,11 +273,9 @@ fn test_deprecate() {
     // deposit new rewards
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);

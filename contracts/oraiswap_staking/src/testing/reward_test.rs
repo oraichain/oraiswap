@@ -7,7 +7,7 @@ use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
 use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem,
+    RewardInfoResponseItem, RewardMsg,
 };
 use oraiswap::testing::{MockApp, ATOM_DENOM};
 
@@ -73,11 +73,9 @@ fn test_deposit_reward() {
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -194,11 +192,9 @@ fn test_deposit_reward_when_no_bonding() {
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -323,11 +319,9 @@ fn test_before_share_changes() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
 
@@ -373,11 +367,9 @@ fn test_before_share_changes() {
 
     // factory deposit 100 reward tokens; = 0.8 + 0.4 = 1.2 is reward_index
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -535,11 +527,9 @@ fn test_withdraw() {
         .unwrap();
 
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: asset_addr.clone(),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: asset_addr.clone(),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
 
@@ -633,11 +623,9 @@ fn test_update_rewards_per_sec() {
 
     // factory deposit 300 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(300u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(300u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -670,11 +658,9 @@ fn test_update_rewards_per_sec() {
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -781,11 +767,9 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
 
     // factory deposit 300 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(300u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(300u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
@@ -851,11 +835,9 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
-        rewards: vec![Asset {
-            info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
-            amount: Uint128::from(100u128),
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("asset"),
+            total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);

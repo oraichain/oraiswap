@@ -8,8 +8,8 @@ use crate::state::{
     read_config, read_last_distributed, store_config, store_last_distributed, Config,
 };
 
-use oraiswap::staking::QueryMsg as StakingQueryMsg;
 use oraiswap::staking::{ExecuteMsg as StakingExecuteMsg, RewardsPerSecResponse};
+use oraiswap::staking::{QueryMsg as StakingQueryMsg, RewardMsg};
 
 use oraiswap::rewarder::{
     ConfigResponse, DistributionInfoResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
@@ -52,7 +52,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             distribution_interval,
         } => update_config(deps, info, owner, staking_contract, distribution_interval),
 
-        ExecuteMsg::Distribute { asset_infos } => distribute(deps, env, asset_infos),
+        ExecuteMsg::Distribute { staking_tokens } => distribute(deps, env, staking_tokens),
     }
 }
 
@@ -96,7 +96,7 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
     let config: Config = read_config(deps.storage)?;
     let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
     let now = env.block.time.seconds();
-    let mut rewards: Vec<Asset> = vec![];
+    let mut rewards: Vec<RewardMsg> = vec![];
     for staking_token in staking_tokens {
         let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
         // default is init time
@@ -122,10 +122,10 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
         // get total reward amount for a pool
         let distribution_amount = Uint128::from(reward_amount.u128() * (last_time_elapsed as u128));
 
-        // update rewards
-        rewards.push(Asset {
-            info: asset_info,
-            amount: distribution_amount,
+        // we will accumulate all rewards of a pool into a reward info pool. After that, we will re-calculate the percent of each reward token later in withdraw reward
+        rewards.push(RewardMsg {
+            staking_token,
+            total_accumulation_amount: distribution_amount,
         });
     }
 
