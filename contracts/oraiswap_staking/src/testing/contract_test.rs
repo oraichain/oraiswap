@@ -2,9 +2,7 @@ use crate::contract::{execute, instantiate, query};
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
-use cosmwasm_std::{
-    attr, coin, from_json, to_json_binary, Addr, Decimal, Order, StdError, Uint128,
-};
+use cosmwasm_std::{attr, coin, from_binary, to_binary, Addr, Decimal, Order, StdError, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
@@ -32,7 +30,7 @@ fn proper_initialization() {
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config: ConfigResponse = from_json(&res).unwrap();
+    let config: ConfigResponse = from_binary(&res).unwrap();
     assert_eq!(
         ConfigResponse {
             owner: Addr::unchecked("owner"),
@@ -73,7 +71,7 @@ fn update_config() {
 
     // it worked, let's query the state
     let res = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config: ConfigResponse = from_json(&res).unwrap();
+    let config: ConfigResponse = from_binary(&res).unwrap();
     assert_eq!(
         ConfigResponse {
             owner: Addr::unchecked("owner2"),
@@ -147,7 +145,7 @@ fn test_register() {
         },
     )
     .unwrap();
-    let pool_info: PoolInfoResponse = from_json(&res).unwrap();
+    let pool_info: PoolInfoResponse = from_binary(&res).unwrap();
     assert_eq!(
         pool_info,
         PoolInfoResponse {
@@ -203,7 +201,7 @@ fn test_query_staker_pagination() {
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: format!("addr{}", i),
             amount: Uint128::from(100u128),
-            msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+            msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
         });
         let info = mock_info("staking", &[]);
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -223,7 +221,7 @@ fn test_query_staker_pagination() {
             },
         )
         .unwrap();
-        let res: Vec<RewardInfoResponse> = from_json(&data).unwrap();
+        let res: Vec<RewardInfoResponse> = from_binary(&data).unwrap();
         let stakers: Vec<Addr> = res.into_iter().map(|r| r.staker_addr).collect();
         let staker_addrs: Vec<String> =
             stakers.clone().into_iter().map(|s| s.to_string()).collect();

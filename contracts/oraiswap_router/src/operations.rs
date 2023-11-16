@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128, WasmMsg,
+    to_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
 
@@ -110,7 +110,7 @@ pub fn execute_swap_operations(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: env.contract.address.to_string(),
                 funds: vec![],
-                msg: to_json_binary(&ExecuteMsg::ExecuteSwapOperation {
+                msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: op,
                     to: if operation_index == operations_len {
                         Some(to.clone())
@@ -129,7 +129,7 @@ pub fn execute_swap_operations(
         messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: env.contract.address.to_string(),
             funds: vec![],
-            msg: to_json_binary(&ExecuteMsg::AssertMinimumReceive {
+            msg: to_binary(&ExecuteMsg::AssertMinimumReceive {
                 asset_info: target_asset_info,
                 prev_balance: receiver_balance,
                 minimum_receive,
@@ -166,7 +166,7 @@ fn asset_into_swap_msg(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: pair_contract.to_string(),
                 funds: vec![Coin { denom, amount }],
-                msg: to_json_binary(&PairExecuteMsg::Swap {
+                msg: to_binary(&PairExecuteMsg::Swap {
                     offer_asset: Asset {
                         amount,
                         ..offer_asset
@@ -180,10 +180,10 @@ fn asset_into_swap_msg(
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: contract_addr.to_string(),
             funds: vec![],
-            msg: to_json_binary(&Cw20ExecuteMsg::Send {
+            msg: to_binary(&Cw20ExecuteMsg::Send {
                 contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
-                msg: to_json_binary(&PairExecuteMsgCw20::Swap {
+                msg: to_binary(&PairExecuteMsgCw20::Swap {
                     belief_price: None,
                     max_spread,
                     to,

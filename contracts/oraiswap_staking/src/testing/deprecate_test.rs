@@ -2,7 +2,7 @@ use crate::contract::{execute, instantiate, query};
 use crate::state::{read_pool_info, store_pool_info};
 use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
 use cosmwasm_std::{
-    coin, from_json, to_json_binary, Addr, Api, Decimal, StdError, SubMsg, Uint128, WasmMsg,
+    coin, from_binary, to_binary, Addr, Api, Decimal, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
@@ -68,7 +68,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -77,7 +77,7 @@ fn test_deprecate() {
     // distribute weight => 80:20
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -85,7 +85,7 @@ fn test_deprecate() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query pool and reward info
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -116,7 +116,7 @@ fn test_deprecate() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -142,7 +142,7 @@ fn test_deprecate() {
     // deposit more rewards
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -150,7 +150,7 @@ fn test_deprecate() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // query again
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -183,7 +183,7 @@ fn test_deprecate() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -202,7 +202,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
@@ -229,7 +229,7 @@ fn test_deprecate() {
         res.messages,
         vec![SubMsg::new(WasmMsg::Execute {
             contract_addr: "staking".into(),
-            msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: "addr".to_string(),
                 amount: Uint128::from(100u128),
             })
@@ -246,7 +246,7 @@ fn test_deprecate() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -265,7 +265,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("new_staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -292,7 +292,7 @@ fn test_deprecate() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -311,7 +311,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "newaddr".into(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("new_staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -325,7 +325,7 @@ fn test_deprecate() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {

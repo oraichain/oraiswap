@@ -3,8 +3,8 @@ use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
 use cosmwasm_std::{
-    attr, coin, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, StdError,
-    SubMsg, Uint128, WasmMsg,
+    attr, coin, from_binary, to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, StdError, SubMsg,
+    Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
@@ -42,7 +42,7 @@ fn test_bond_tokens() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
 
     let info = mock_info("staking", &[]);
@@ -56,7 +56,7 @@ fn test_bond_tokens() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -80,7 +80,7 @@ fn test_bond_tokens() {
     )
     .unwrap();
 
-    let pool_info: PoolInfoResponse = from_json(&data).unwrap();
+    let pool_info: PoolInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         pool_info,
         PoolInfoResponse {
@@ -97,7 +97,7 @@ fn test_bond_tokens() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr2".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -110,7 +110,7 @@ fn test_bond_tokens() {
         },
     )
     .unwrap();
-    let pool_info: PoolInfoResponse = from_json(&data).unwrap();
+    let pool_info: PoolInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         pool_info,
         PoolInfoResponse {
@@ -176,14 +176,14 @@ fn test_unbond() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(300u128),
         }],
     };
@@ -239,7 +239,7 @@ fn test_unbond() {
         vec![
             SubMsg::new(WasmMsg::Execute {
                 contract_addr: "staking".to_string(),
-                msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: "addr".to_string(),
                     amount: Uint128::from(100u128),
                 })
@@ -265,7 +265,7 @@ fn test_unbond() {
         },
     )
     .unwrap();
-    let pool_info: PoolInfoResponse = from_json(&data).unwrap();
+    let pool_info: PoolInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         pool_info,
         PoolInfoResponse {
@@ -287,7 +287,7 @@ fn test_unbond() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {

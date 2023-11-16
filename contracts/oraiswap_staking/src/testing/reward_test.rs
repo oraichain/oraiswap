@@ -1,7 +1,7 @@
 use crate::contract::{execute, instantiate, query};
 use crate::state::{read_pool_info, rewards_read, store_pool_info, PoolInfo, RewardInfo};
 use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-use cosmwasm_std::{coin, from_json, to_json_binary, Addr, Api, Decimal, Uint128};
+use cosmwasm_std::{coin, from_binary, to_binary, Addr, Api, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
@@ -70,7 +70,7 @@ fn test_deposit_reward() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -86,7 +86,7 @@ fn test_deposit_reward() {
     let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -120,7 +120,7 @@ fn test_deposit_reward() {
 
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -204,7 +204,7 @@ fn test_deposit_reward_when_no_bonding() {
     let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
     // Check pool state
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -239,7 +239,7 @@ fn test_deposit_reward_when_no_bonding() {
 
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let res: PoolInfoResponse = from_json(
+    let res: PoolInfoResponse = from_binary(
         &query(
             deps.as_ref(),
             mock_env(),
@@ -316,7 +316,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -350,7 +350,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -522,7 +522,7 @@ fn test_withdraw() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
 
     let _res = app
@@ -635,7 +635,7 @@ fn test_update_rewards_per_sec() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(300u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info(staking_token.as_str(), &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -695,7 +695,7 @@ fn test_update_rewards_per_sec() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -779,7 +779,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".into(),
         amount: Uint128::from(300u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -823,7 +823,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr1".into(),
         amount: Uint128::from(300u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -837,7 +837,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -872,7 +872,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {
@@ -910,7 +910,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         },
     )
     .unwrap();
-    let res: RewardInfoResponse = from_json(&data).unwrap();
+    let res: RewardInfoResponse = from_binary(&data).unwrap();
     assert_eq!(
         res,
         RewardInfoResponse {

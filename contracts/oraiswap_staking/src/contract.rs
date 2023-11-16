@@ -13,8 +13,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdError, StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Order, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
@@ -100,7 +100,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
-    match from_json(&cw20_msg.msg) {
+    match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Bond {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -166,6 +166,8 @@ fn update_rewards_per_sec(
     if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
+
+    println!("running");
 
     let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
 
@@ -278,23 +280,21 @@ fn deprecate_staking_token(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::PoolInfo { staking_token } => {
-            to_json_binary(&query_pool_info(deps, staking_token)?)
-        }
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::PoolInfo { staking_token } => to_binary(&query_pool_info(deps, staking_token)?),
         QueryMsg::RewardsPerSec { staking_token } => {
-            to_json_binary(&query_rewards_per_sec(deps, staking_token)?)
+            to_binary(&query_rewards_per_sec(deps, staking_token)?)
         }
         QueryMsg::RewardInfo {
             staker_addr,
             staking_token,
-        } => to_json_binary(&query_reward_info(deps, staker_addr, staking_token)?),
+        } => to_binary(&query_reward_info(deps, staker_addr, staking_token)?),
         QueryMsg::RewardInfos {
             staking_token,
             start_after,
             limit,
             order,
-        } => to_json_binary(&query_all_reward_infos(
+        } => to_binary(&query_all_reward_infos(
             deps,
             staking_token,
             start_after,

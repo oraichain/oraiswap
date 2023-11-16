@@ -1,8 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
-use cosmwasm_std::{
-    coin, to_json_binary, Addr, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
-};
+use cosmwasm_std::{coin, to_binary, Addr, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::asset::AssetInfo;
@@ -115,10 +113,10 @@ impl RouterController {
         let cosmos_msg: CosmosMsg = match swap_asset_info {
             AssetInfo::Token { contract_addr } => WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
-                msg: to_json_binary(&Cw20ExecuteMsg::Send {
+                msg: to_binary(&Cw20ExecuteMsg::Send {
                     contract: self.addr(),
                     amount,
-                    msg: to_json_binary(&Cw20HookMsg::ExecuteSwapOperations {
+                    msg: to_binary(&Cw20HookMsg::ExecuteSwapOperations {
                         operations,
                         minimum_receive,
                         to: swap_to.map(|to| to.into_string()),
@@ -129,7 +127,7 @@ impl RouterController {
             .into(),
             AssetInfo::NativeToken { denom } => WasmMsg::Execute {
                 contract_addr: self.addr(),
-                msg: to_json_binary(&ExecuteMsg::ExecuteSwapOperations {
+                msg: to_binary(&ExecuteMsg::ExecuteSwapOperations {
                     operations,
                     minimum_receive,
                     to: swap_to,

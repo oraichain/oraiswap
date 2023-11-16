@@ -9,9 +9,9 @@ version = "0.1.1"
 authors = ["Terraform Labs, PTE.", "Oraichain Labs"]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/oraichain/cosmwasm.git"
+repository = "https://github.com/oraichain/oraiswap.git"
 homepage = "https://orai.io"
-documentation = "https://github.com/oraichain/cosmwasm.git"
+documentation = "https://github.com/oraichain/oraiswap.git"
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
   "contract.wasm",
@@ -19,9 +19,9 @@ exclude = [
 ]
 
 [workspace.dependencies]
-cosmwasm-std = { version = "1.5" }
-cosmwasm-schema = "1.5"
-cosmwasm-storage = { version = "1.5" }
+cosmwasm-std = { version = "=1.2" }
+cosmwasm-schema = "=1.2"
+cosmwasm-storage = { version = "=1.2" }
 thiserror = "1.0.26"
 
 cw2 = { version = "1.0.1" }
