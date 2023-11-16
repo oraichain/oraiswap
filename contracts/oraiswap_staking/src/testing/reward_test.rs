@@ -307,7 +307,7 @@ fn test_before_share_changes() {
     let info = mock_info("owner", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let token_raw = deps.api.addr_canonicalize("asset").unwrap();
+    let token_raw = deps.api.addr_canonicalize("staking").unwrap().to_vec();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
 
@@ -330,7 +330,7 @@ fn test_before_share_changes() {
     let info = mock_info("rewarder", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let asset_key = deps.api.addr_canonicalize("asset").unwrap();
+    let asset_key = deps.api.addr_canonicalize("staking").unwrap();
     let addr_raw = deps.api.addr_canonicalize("addr").unwrap();
     let reward_bucket = rewards_read(&deps.storage, &addr_raw);
     let reward_info: RewardInfo = reward_bucket.load(asset_key.as_slice()).unwrap();
@@ -600,7 +600,7 @@ fn test_update_rewards_per_sec() {
 
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        staking_token: Addr::unchecked("staking"),
+        staking_token: staking_token.clone(),
         assets: vec![
             Asset {
                 info: AssetInfo::NativeToken {
@@ -770,7 +770,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let info = mock_info("owner", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let token_raw = deps.api.addr_canonicalize("asset").unwrap();
+    let token_raw = deps.api.addr_canonicalize("staking").unwrap();
     let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
     store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
 

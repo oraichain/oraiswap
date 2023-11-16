@@ -9,7 +9,6 @@ use cosmwasm_std::{
 };
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
-use oraiswap::oracle::OracleContract;
 use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
 use oraiswap::querier::{query_pair_info, query_token_balance};
 use oraiswap::staking::ExecuteMsg;
@@ -112,30 +111,6 @@ pub fn auto_stake(
     let config: Config = read_config(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
 
-    let mut native_asset_op: Option<Asset> = None;
-    let mut token_info_op: Option<(Addr, Uint128)> = None;
-    for asset in assets.iter() {
-        match asset.info.clone() {
-            AssetInfo::NativeToken { .. } => {
-                asset.assert_sent_native_token_balance(&info)?;
-                native_asset_op = Some(asset.clone())
-            }
-            AssetInfo::Token { contract_addr } => {
-                token_info_op = Some((contract_addr, asset.amount))
-            }
-        }
-    }
-
-    // will fail if one of them is missing
-    let native_asset: Asset = match native_asset_op {
-        Some(v) => v,
-        None => return Err(StdError::generic_err("Missing native asset")),
-    };
-    let (token_addr, token_amount) = match token_info_op {
-        Some(v) => v,
-        None => return Err(StdError::generic_err("Missing token asset")),
-    };
-
     // query pair info to obtain pair contract address
     let asset_infos: [AssetInfo; 2] = [assets[0].info.clone(), assets[1].info.clone()];
     let oraiswap_pair: PairInfo = query_pair_info(&deps.querier, factory_addr, &asset_infos)?;
@@ -159,73 +134,72 @@ pub fn auto_stake(
         env.contract.address.clone(),
     )?;
 
-    let oracle_contract = OracleContract(oraiswap_pair.oracle_addr);
+    let mut msgs = vec![];
+    let mut funds = vec![];
 
-    // compute tax
-    let tax_amount: Uint128 = native_asset.compute_tax(&oracle_contract, &deps.querier)?;
+    for asset in assets.iter() {
+        match asset.info.clone() {
+            AssetInfo::NativeToken { .. } => {
+                asset.assert_sent_native_token_balance(&info)?;
+                funds.push(Coin {
+                    denom: asset.info.to_string(),
+                    amount: asset.amount,
+                });
+            }
+            AssetInfo::Token { contract_addr } => {
+                // 1. Transfer token asset to staking contract
+                // 2. Increase allowance of token for pair contract
+                // require transfer and increase allowance
+                msgs.push(WasmMsg::Execute {
+                    contract_addr: contract_addr.to_string(),
+                    msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+                        owner: info.sender.to_string(),
+                        recipient: env.contract.address.to_string(),
+                        amount: asset.amount,
+                    })?,
+                    funds: vec![],
+                });
+                msgs.push(WasmMsg::Execute {
+                    contract_addr: contract_addr.to_string(),
+                    msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                        spender: oraiswap_pair.contract_addr.to_string(),
+                        amount: asset.amount,
+                        expires: None,
+                    })?,
+                    funds: vec![],
+                });
+            }
+        }
+    }
 
-    // 1. Transfer token asset to staking contract
-    // 2. Increase allowance of token for pair contract
     // 3. Provide liquidity
+    // provide liquidity with funds from native tokens, run first
+    msgs.push(WasmMsg::Execute {
+        contract_addr: oraiswap_pair.contract_addr.to_string(),
+        msg: to_binary(&PairExecuteMsg::ProvideLiquidity {
+            assets: assets.clone(),
+            slippage_tolerance,
+            receiver: None,
+        })?,
+        funds,
+    });
+
     // 4. Execute staking hook, will stake in the name of the sender
-    Ok(Response::new()
-        .add_messages(vec![
-            WasmMsg::Execute {
-                contract_addr: token_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
-                    owner: info.sender.to_string(),
-                    recipient: env.contract.address.to_string(),
-                    amount: token_amount,
-                })?,
-                funds: vec![],
-            },
-            WasmMsg::Execute {
-                contract_addr: token_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
-                    spender: oraiswap_pair.contract_addr.to_string(),
-                    amount: token_amount,
-                    expires: None,
-                })?,
-                funds: vec![],
-            },
-            WasmMsg::Execute {
-                contract_addr: oraiswap_pair.contract_addr.to_string(),
-                msg: to_binary(&PairExecuteMsg::ProvideLiquidity {
-                    assets: [
-                        Asset {
-                            amount: native_asset.amount.checked_sub(tax_amount)?,
-                            info: native_asset.info.clone(),
-                        },
-                        Asset {
-                            amount: token_amount,
-                            info: AssetInfo::Token {
-                                contract_addr: token_addr.clone(),
-                            },
-                        },
-                    ],
-                    slippage_tolerance,
-                    receiver: None,
-                })?,
-                funds: vec![Coin {
-                    denom: native_asset.info.to_string(),
-                    amount: native_asset.amount.checked_sub(tax_amount)?,
-                }],
-            },
-            WasmMsg::Execute {
-                contract_addr: env.contract.address.to_string(),
-                msg: to_binary(&ExecuteMsg::AutoStakeHook {
-                    staking_token: oraiswap_pair.liquidity_token,
-                    staker_addr: info.sender,
-                    prev_staking_token_amount,
-                })?,
-                funds: vec![],
-            },
-        ])
-        .add_attributes([
-            ("action", "auto_stake"),
-            ("asset_token", &token_addr.to_string()),
-            ("tax_amount", &tax_amount.to_string()),
-        ]))
+    // then auto stake hoook
+    msgs.push(WasmMsg::Execute {
+        contract_addr: env.contract.address.to_string(),
+        msg: to_binary(&ExecuteMsg::AutoStakeHook {
+            staking_token: oraiswap_pair.liquidity_token.clone(),
+            staker_addr: info.sender,
+            prev_staking_token_amount,
+        })?,
+        funds: vec![],
+    });
+
+    Ok(Response::new().add_messages(msgs).add_attributes([
+        ("action", "auto_stake"),
+        ("staking_token", oraiswap_pair.liquidity_token.as_str()),
+    ]))
 }
 
 pub fn auto_stake_hook(

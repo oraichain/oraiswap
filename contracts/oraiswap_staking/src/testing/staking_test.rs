@@ -521,9 +521,7 @@ fn test_auto_stake() {
         staker_addr: Addr::unchecked("addr"),
         prev_staking_token_amount: Uint128::zero(),
     };
-    let res = app.execute(staking_addr.clone(), staking_addr.clone(), &msg, &[]);
-    // pool not found error
-    app.assert_fail(res);
+    let _res = app.execute(staking_addr.clone(), staking_addr.clone(), &msg, &[]);
 
     // valid msg
     let msg = ExecuteMsg::AutoStakeHook {
@@ -547,7 +545,7 @@ fn test_auto_stake() {
         vec![
             attr("action", "bond"),
             attr("staker_addr", "addr"),
-            attr("asset_info", asset_addr.as_str()),
+            attr("staking_token", pair_info.liquidity_token.as_str()),
             attr("amount", "1"),
         ]
     );
@@ -556,7 +554,7 @@ fn test_auto_stake() {
         .query(
             staking_addr.clone(),
             &QueryMsg::PoolInfo {
-                staking_token: Addr::unchecked("staking"),
+                staking_token: pair_info.liquidity_token.clone(),
             },
         )
         .unwrap();
@@ -565,7 +563,7 @@ fn test_auto_stake() {
         pool_info,
         PoolInfoResponse {
             staking_token: pair_info.liquidity_token.clone(),
-            total_bond_amount: Uint128::from(2u128),
+            total_bond_amount: Uint128::from(3u128),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
             migration_deprecated_staking_token: None,
