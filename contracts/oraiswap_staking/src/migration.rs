@@ -28,11 +28,13 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<(
             stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
             stakers_remove(storage, &asset_key, &staker);
 
-            let rewards_bucket = rewards_read(storage, &staker).load(&asset_key)?;
-            // update new key for our reward bucket
-            rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket)?;
-            // remove old key
-            rewards_store(storage, &staker).remove(&asset_key);
+            let rewards_bucket = rewards_read(storage, &staker).may_load(&asset_key)?;
+            if rewards_bucket.is_some() {
+                // update new key for our reward bucket
+                rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket.unwrap())?;
+                // remove old key
+                rewards_store(storage, &staker).remove(&asset_key);
+            }
 
             let is_store_migrated = read_is_migrated(storage, &asset_key, &staker);
             if is_store_migrated {
