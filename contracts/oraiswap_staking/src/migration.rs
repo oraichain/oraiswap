@@ -1,72 +1,52 @@
-use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
-use cosmwasm_storage::ReadonlyBucket;
+use cosmwasm_std::{CanonicalAddr, Order, StdResult, Storage};
 
-use crate::state::{rewards_store, MigrationParams, RewardInfo, PREFIX_REWARD};
+use crate::state::{
+    read_all_pool_info_keys, read_is_migrated, read_pool_info, read_rewards_per_sec,
+    remove_pool_info, remove_rewards_per_sec, remove_store_is_migrated, rewards_read,
+    rewards_store, stakers_read, stakers_remove, stakers_store, store_is_migrated, store_pool_info,
+    store_rewards_per_sec,
+};
 
-#[cw_serde]
-pub struct LegacyPoolInfo {
-    pub staking_token: CanonicalAddr,
-    pub pending_reward: Uint128, // not distributed amount due to zero bonding
-    pub short_pending_reward: Uint128, // not distributed amount due to zero bonding
-    pub total_bond_amount: Uint128,
-    pub total_short_amount: Uint128,
-    pub reward_index: Decimal,
-    pub short_reward_index: Decimal,
-    pub premium_rate: Decimal,
-    pub short_reward_weight: Decimal,
-    pub premium_updated_time: u64,
-    pub migration_params: Option<MigrationParams>,
-}
-
-// migrate reward store
-#[cw_serde]
-pub struct LegacyRewardInfo {
-    pub index: Decimal,
-    pub bond_amount: Uint128,
-    pub pending_reward: Uint128,
-    pub native_token: bool,
-}
-
-/// returns a bucket with all rewards owned by this owner (query it by owner)
-/// (read-only version for queries)
-#[allow(dead_code)]
-pub fn legacy_rewards_read<'a>(
-    storage: &'a dyn Storage,
-    owner: &CanonicalAddr,
-) -> ReadonlyBucket<'a, LegacyRewardInfo> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, owner.as_slice()])
-}
-
-#[allow(dead_code)]
-pub fn migrate_rewards_store(
-    store: &mut dyn Storage,
-    api: &dyn Api,
-    staker_addrs: Vec<Addr>,
-) -> StdResult<()> {
-    let list_staker_addrs: Vec<CanonicalAddr> = staker_addrs
-        .iter()
-        .map(|addr| Ok(api.addr_canonicalize(addr.as_str())?))
-        .collect::<StdResult<Vec<CanonicalAddr>>>()?;
-    for staker_addr in list_staker_addrs {
-        let rewards_bucket = legacy_rewards_read(store, &staker_addr);
-        let reward_pairs = rewards_bucket
+pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<()> {
+    let asset_keys = read_all_pool_info_keys(storage)?;
+    for asset_key in asset_keys {
+        let pool_info = read_pool_info(storage, &asset_key)?;
+        // store new pool info with new staking token key
+        store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
+        remove_pool_info(storage, &asset_key);
+        let stakers = stakers_read(storage, &asset_key)
             .range(None, None, Order::Ascending)
-            .collect::<StdResult<Vec<(Vec<u8>, LegacyRewardInfo)>>>()?;
+            .map(|item| {
+                let (k, _) = item?;
+                Ok(CanonicalAddr::from(k))
+            })
+            .collect::<StdResult<Vec<CanonicalAddr>>>()?;
 
-        for reward_pair in reward_pairs {
-            let (asset_key, reward_info) = reward_pair;
-            let native_token = reward_info.native_token;
-            // try convert to contract token, otherwise it is native token
-            let new_reward_info = RewardInfo {
-                native_token,
-                index: reward_info.index,
-                bond_amount: reward_info.bond_amount,
-                pending_reward: reward_info.pending_reward,
-                pending_withdraw: vec![],
-            };
-            rewards_store(store, &staker_addr).save(&asset_key, &new_reward_info)?;
+        // process each staker's map
+        for staker in stakers {
+            // first thing first, we update ≈our stakers list mapped with the old asset key
+            stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
+            stakers_remove(storage, &asset_key, &staker);
+
+            let rewards_bucket = rewards_read(storage, &staker).load(&asset_key)?;
+            // update new key for our reward bucket
+            rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket)?;
+            // remove old key
+            rewards_store(storage, &staker).remove(&asset_key);
+
+            let is_store_migrated = read_is_migrated(storage, &asset_key, &staker);
+            if is_store_migrated {
+                // new asset key is our lp token, we wont be using asset_info no more, so we need to update our store to a new key
+                store_is_migrated(storage, &pool_info.staking_token, &staker)?;
+                // remove old key
+                remove_store_is_migrated(storage, &asset_key, &staker);
+            }
         }
+
+        // our final map, rewards per sec
+        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
+        store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
+        remove_rewards_per_sec(storage, &asset_key);
     }
 
     Ok(())
