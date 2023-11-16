@@ -27,16 +27,14 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<(
             // first thing first, we update ≈our stakers list mapped with the old asset key
             stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
             stakers_remove(storage, &asset_key, &staker);
-            let rewards_bucket = rewards_read(storage, &staker).may_load(&asset_key)?;
-            if rewards_bucket.is_some() {
+            if let Some(rewards_bucket) = rewards_read(storage, &staker).may_load(&asset_key)? {
                 // update new key for our reward bucket
-                rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket.unwrap())?;
+                rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket)?;
                 // remove old key
                 rewards_store(storage, &staker).remove(&asset_key);
             }
 
-            let is_store_migrated = read_is_migrated(storage, &asset_key, &staker);
-            if is_store_migrated {
+            if read_is_migrated(storage, &asset_key, &staker) {
                 // new asset key is our lp token, we wont be using asset_info no more, so we need to update our store to a new key
                 store_is_migrated(storage, &pool_info.staking_token, &staker)?;
                 // remove old key
@@ -45,9 +43,8 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<(
         }
 
         // our final map, rewards per sec
-        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key);
-        if rewards_per_sec.is_ok() {
-            store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec.unwrap())?;
+        if let Some(rewards_per_sec) = read_rewards_per_sec(storage, &asset_key).ok() {
+            store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
             remove_rewards_per_sec(storage, &asset_key);
         }
     }
