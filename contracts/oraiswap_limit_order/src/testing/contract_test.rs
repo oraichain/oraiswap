@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -60,7 +60,7 @@ fn submit_order() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -435,7 +435,7 @@ fn submit_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1212121u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -613,7 +613,7 @@ fn cancel_order_native_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -952,7 +952,7 @@ fn cancel_order_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1004,7 +1004,7 @@ fn cancel_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1234567u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -1027,7 +1027,7 @@ fn cancel_order_token() {
     let msg2 = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(3333335u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1050,7 +1050,7 @@ fn cancel_order_token() {
     let msg3 = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(3333336u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1100,7 +1100,7 @@ fn cancel_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1223344u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1270,7 +1270,7 @@ fn execute_pair_native_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2270,15 +2270,29 @@ fn execute_pair_native_token() {
     let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
     let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    let mut reward_balances = app.query_all_balances(Addr::unchecked("orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en")).unwrap();
-    let mut spread_balances = app.query_all_balances(Addr::unchecked("orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n")).unwrap();
+    let mut reward_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
+        ))
+        .unwrap();
+    let mut spread_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n",
+        ))
+        .unwrap();
 
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
     println!("round 0 - address2's balances: {:?}", address2_balances);
-    println!("round 0 - reward_balances's balances: {:?}", reward_balances);
-    println!("round 0 - spread_balances's balances: {:?}\n\n", spread_balances);
-    
+    println!(
+        "round 0 - reward_balances's balances: {:?}",
+        reward_balances
+    );
+    println!(
+        "round 0 - spread_balances's balances: {:?}\n\n",
+        spread_balances
+    );
+
     let mut expected_balances: Vec<Coin> = [
         Coin {
             denom: ORAI_DENOM.to_string(),
@@ -2315,9 +2329,7 @@ fn execute_pair_native_token() {
     ]
     .to_vec();
     assert_eq!(address2_balances, expected_balances,);
-    expected_balances = [
-    ]
-    .to_vec();
+    expected_balances = [].to_vec();
     assert_eq!(spread_balances, expected_balances);
 
     // assertion; native asset balance
@@ -2367,15 +2379,29 @@ fn execute_pair_native_token() {
 
     address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();      
-    reward_balances = app.query_all_balances(Addr::unchecked("orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en")).unwrap();
-    spread_balances = app.query_all_balances(Addr::unchecked("orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    reward_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
+        ))
+        .unwrap();
+    spread_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n",
+        ))
+        .unwrap();
 
     println!("round 1 - address0's balances: {:?}", address0_balances);
     println!("round 1 - address1's balances: {:?}", address1_balances);
     println!("round 1 - address2's balances: {:?}", address2_balances);
-    println!("round 1 - reward_balances's balances: {:?}", reward_balances);
-    println!("round 1 - spread_balances's balances: {:?}\n\n", spread_balances);
+    println!(
+        "round 1 - reward_balances's balances: {:?}",
+        reward_balances
+    );
+    println!(
+        "round 1 - spread_balances's balances: {:?}\n\n",
+        spread_balances
+    );
 
     expected_balances = [
         Coin {
@@ -2414,12 +2440,10 @@ fn execute_pair_native_token() {
     .to_vec();
     assert_eq!(address2_balances, expected_balances);
 
-    expected_balances = [
-        Coin {
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(8400u128),
-        },
-    ]
+    expected_balances = [Coin {
+        denom: USDT_DENOM.to_string(),
+        amount: Uint128::from(8400u128),
+    }]
     .to_vec();
     assert_eq!(spread_balances, expected_balances);
 
@@ -2485,7 +2509,7 @@ fn execute_pair_cw20_token() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2583,7 +2607,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2614,7 +2638,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2648,7 +2672,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2681,7 +2705,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2746,7 +2770,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2779,7 +2803,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2843,7 +2867,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -2876,7 +2900,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3033,7 +3057,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3066,7 +3090,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3100,7 +3124,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3133,7 +3157,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3198,7 +3222,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3231,7 +3255,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3295,7 +3319,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3328,7 +3352,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3454,7 +3478,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3487,7 +3511,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3666,7 +3690,7 @@ fn spread_test() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4119,7 +4143,7 @@ fn reward_to_executor_test() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4430,7 +4454,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4709,7 +4733,7 @@ fn remove_orderbook_pair() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -5038,7 +5062,7 @@ fn orders_querier() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address:None,
+        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -5153,7 +5177,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -5185,7 +5209,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::from(12345678u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -5217,7 +5241,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: limit_order_addr.to_string(),
         amount: Uint128::from(22334455u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {

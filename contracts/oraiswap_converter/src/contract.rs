@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
+    entry_point, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 use cw20::Cw20ReceiveMsg;
@@ -66,7 +66,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
-    match from_binary(&cw20_msg.msg) {
+    match from_json(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Convert {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -226,8 +226,10 @@ pub fn convert_reverse(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::ConvertInfo { asset_info } => to_binary(&query_convert_info(deps, asset_info)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::ConvertInfo { asset_info } => {
+            to_json_binary(&query_convert_info(deps, asset_info)?)
+        }
     }
 }
 

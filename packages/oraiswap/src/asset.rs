@@ -5,7 +5,7 @@ use crate::oracle::OracleContract;
 use crate::querier::query_token_balance;
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, MessageInfo,
+    coin, to_json_binary, Addr, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, MessageInfo,
     QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
@@ -67,7 +67,7 @@ impl Asset {
         match &self.info {
             AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: recipient.to_string(),
                     amount,
                 })?,

@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::{
     attr, coin,
     testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
-    to_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
+    to_json_binary, Addr, BankMsg, CosmosMsg, Decimal, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::{
@@ -92,7 +92,7 @@ fn test_convert_reverse() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
         sender: info.sender.to_string(),
-        msg: to_binary(&convert_msg).unwrap(),
+        msg: to_json_binary(&convert_msg).unwrap(),
     });
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
@@ -100,7 +100,7 @@ fn test_convert_reverse() {
         res.messages,
         vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset1".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.to_string(),
                 amount: Uint128::from(10u128.pow(12))
             })
@@ -128,7 +128,7 @@ fn test_convert_reverse() {
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         amount: Uint128::from(1u64),
         sender: info.sender.to_string(),
-        msg: to_binary(&convert_msg).unwrap(),
+        msg: to_json_binary(&convert_msg).unwrap(),
     });
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
@@ -170,7 +170,7 @@ fn test_convert_reverse() {
         res.messages,
         vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset1".to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.to_string(),
                 amount: Uint128::from(1u128)
             })
