@@ -189,14 +189,14 @@ fn test_deposit_reward_when_no_bonding() {
     let info = mock_info("owner", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let token_raw = deps.api.addr_canonicalize("asset").unwrap();
-    let pool_info = read_pool_info(&deps.storage, &token_raw).unwrap();
-    store_pool_info(&mut deps.storage, &token_raw, &pool_info).unwrap();
+    let asset_key = deps.api.addr_canonicalize("staking").unwrap().to_vec();
+    let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
+    store_pool_info(&mut deps.storage, &asset_key, &pool_info).unwrap();
 
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -225,7 +225,6 @@ fn test_deposit_reward_when_no_bonding() {
         }
     );
 
-    let asset_key = deps.api.addr_canonicalize("asset").unwrap();
     let pool_info: PoolInfo = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(
         &mut deps.storage,
@@ -323,7 +322,7 @@ fn test_before_share_changes() {
 
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -371,7 +370,7 @@ fn test_before_share_changes() {
     // factory deposit 100 reward tokens; = 0.8 + 0.4 = 1.2 is reward_index
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -531,7 +530,7 @@ fn test_withdraw() {
 
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: asset_addr.clone(),
+            staking_token: lp_addr.clone(),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
@@ -787,7 +786,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     // factory deposit 300 reward tokens
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(300u128),
         }],
     };
@@ -855,7 +854,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     // factory deposit 100 reward tokens
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };

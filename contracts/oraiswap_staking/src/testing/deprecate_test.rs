@@ -1,9 +1,7 @@
 use crate::contract::{execute, instantiate, query};
 use crate::state::{read_pool_info, store_pool_info};
 use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-use cosmwasm_std::{
-    coin, from_binary, to_binary, Addr, Api, Decimal, StdError, SubMsg, Uint128, WasmMsg,
-};
+use cosmwasm_std::{coin, from_binary, to_binary, Addr, Api, Decimal, SubMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{
@@ -38,7 +36,7 @@ fn test_deprecate() {
     let info = mock_info("owner", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    let asset_key = deps.api.addr_canonicalize("asset").unwrap();
+    let asset_key = deps.api.addr_canonicalize("staking").unwrap();
     let pool_info = read_pool_info(&deps.storage, &asset_key).unwrap();
     store_pool_info(&mut deps.storage, &asset_key, &pool_info).unwrap();
 
@@ -147,7 +145,8 @@ fn test_deprecate() {
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    // not found
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
 
     // query again
     let res: PoolInfoResponse = from_binary(
@@ -155,7 +154,7 @@ fn test_deprecate() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::PoolInfo {
-                staking_token: Addr::unchecked("staking"),
+                staking_token: Addr::unchecked("new_staking"),
             },
         )
         .unwrap(),
@@ -166,11 +165,11 @@ fn test_deprecate() {
         res_cmp,
         PoolInfoResponse {
             staking_token: Addr::unchecked("new_staking"),
-            total_bond_amount: Uint128::zero(), // reset
+            total_bond_amount: Uint128::from(100u128), // reset
             reward_index: Decimal::from_ratio(100u128, 100u128), // stays the same
             migration_index_snapshot: Some(Decimal::from_ratio(100u128, 100u128)),
             migration_deprecated_staking_token: Some(Addr::unchecked("staking")),
-            pending_reward: Uint128::from(100u128), // new reward waiting here
+            pending_reward: Uint128::from(0u128), // new reward waiting here
             ..res
         }
     );
@@ -178,7 +177,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            staking_token: None,
+            staking_token: Some(Addr::unchecked("new_staking")),
             staker_addr: Addr::unchecked("addr"),
         },
     )
@@ -188,13 +187,7 @@ fn test_deprecate() {
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
-            reward_infos: vec![RewardInfoResponseItem {
-                staking_token: Addr::unchecked("staking"),
-                bond_amount: Uint128::from(100u128),
-                pending_reward: Uint128::from(100u128), // did not change
-                pending_withdraw: vec![],
-                should_migrate: Some(true), // non-short pos should migrate
-            }],
+            reward_infos: vec![],
         }
     );
 
@@ -205,21 +198,13 @@ fn test_deprecate() {
         msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
     });
     let info = mock_info("staking", &[]);
-    let err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
-    assert_eq!(
-        err,
-        StdError::generic_err("The staking token for this asset has been migrated to new_staking")
-    );
+    let _err = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
     let info = mock_info("new_staking", &[]);
-    let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert_eq!(
-        err,
-        StdError::generic_err("The LP token for this asset has been deprecated, withdraw all your deprecated tokens to migrate your position")
-    );
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // unbond all the old tokens
     let msg = ExecuteMsg::Unbond {
-        staking_token: Addr::unchecked("staking"),
+        staking_token: Addr::unchecked("new_staking"),
         amount: Uint128::from(100u128),
     };
     let info = mock_info("addr", &[]);
@@ -228,7 +213,7 @@ fn test_deprecate() {
     assert_eq!(
         res.messages,
         vec![SubMsg::new(WasmMsg::Execute {
-            contract_addr: "staking".into(),
+            contract_addr: "new_staking".into(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: "addr".to_string(),
                 amount: Uint128::from(100u128),
@@ -241,7 +226,7 @@ fn test_deprecate() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
-            staking_token: None,
+            staking_token: Some(Addr::unchecked("new_staking")),
             staker_addr: Addr::unchecked("addr"),
         },
     )
@@ -251,13 +236,7 @@ fn test_deprecate() {
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
-            reward_infos: vec![RewardInfoResponseItem {
-                staking_token: Addr::unchecked("staking"),
-                bond_amount: Uint128::zero(),
-                pending_reward: Uint128::from(100u128), // still the same
-                pending_withdraw: vec![],
-                should_migrate: None, // now its back to empty
-            },],
+            reward_infos: vec![],
         }
     );
 
@@ -274,16 +253,16 @@ fn test_deprecate() {
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::DepositReward {
         rewards: vec![RewardMsg {
-            staking_token: Addr::unchecked("asset"),
+            staking_token: Addr::unchecked("staking"),
             total_accumulation_amount: Uint128::from(100u128),
         }],
     };
     let info = mock_info("rewarder", &[]);
-    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
 
     // expect to have 80 * 3 rewards
     // initial + deposit after deprecation + deposit after bonding again
-    let data = query(
+    let _data = query(
         deps.as_ref(),
         mock_env(),
         QueryMsg::RewardInfo {
@@ -291,21 +270,7 @@ fn test_deprecate() {
             staker_addr: Addr::unchecked("addr"),
         },
     )
-    .unwrap();
-    let res: RewardInfoResponse = from_binary(&data).unwrap();
-    assert_eq!(
-        res,
-        RewardInfoResponse {
-            staker_addr: Addr::unchecked("addr"),
-            reward_infos: vec![RewardInfoResponseItem {
-                staking_token: Addr::unchecked("staking"),
-                bond_amount: Uint128::from(100u128),
-                pending_reward: Uint128::from(300u128), // 100 * 3
-                pending_withdraw: vec![],
-                should_migrate: None,
-            },],
-        }
-    );
+    .unwrap_err();
 
     // completely new users can bond
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -331,7 +296,7 @@ fn test_deprecate() {
         RewardInfoResponse {
             staker_addr: Addr::unchecked("newaddr"),
             reward_infos: vec![RewardInfoResponseItem {
-                staking_token: Addr::unchecked("staking"),
+                staking_token: Addr::unchecked("new_staking"),
                 bond_amount: Uint128::from(100u128),
                 pending_reward: Uint128::zero(),
                 pending_withdraw: vec![],

@@ -8,8 +8,8 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
-    read_config, read_pool_info, read_rewards_per_sec, stakers_read, store_config, store_pool_info,
-    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
+    read_config, read_pool_info, read_rewards_per_sec, remove_pool_info, stakers_read,
+    store_config, store_pool_info, store_rewards_per_sec, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -104,6 +104,7 @@ pub fn receive_cw20(
         Ok(Cw20HookMsg::Bond {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+
             let pool_info = read_pool_info(deps.storage, &token_raw)?;
 
             // only staking token contract can execute this message
@@ -167,9 +168,7 @@ fn update_rewards_per_sec(
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    println!("running");
-
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
     // withdraw all rewards for all stakers from this pool
     let staker_addrs = stakers_read(deps.storage, &asset_key)
@@ -187,7 +186,7 @@ fn update_rewards_per_sec(
         process_reward_assets(
             deps.storage,
             &staker_addr_raw,
-            &Some(asset_key.to_vec()),
+            &Some(asset_key.clone()),
             false,
         )?;
     }
@@ -254,17 +253,23 @@ fn deprecate_staking_token(
             "This asset LP token has already been migrated",
         ));
     }
+    let deprecated_staking_token = pool_info.staking_token;
+    let deprecated_token_addr = deps.api.addr_humanize(&deprecated_staking_token)?;
 
-    let deprecated_token_addr = deps.api.addr_humanize(&pool_info.staking_token)?;
-
-    pool_info.total_bond_amount = Uint128::zero();
-    pool_info.migration_params = Some(MigrationParams {
-        index_snapshot: pool_info.reward_index,
-        deprecated_staking_token: pool_info.staking_token,
-    });
     pool_info.staking_token = deps.api.addr_canonicalize(new_staking_token.as_str())?;
 
-    store_pool_info(deps.storage, &asset_key, &pool_info)?;
+    // mark old pool as migration
+    pool_info.migration_params = Some(MigrationParams {
+        index_snapshot: pool_info.reward_index,
+        deprecated_staking_token,
+    });
+    let new_asset_key = deps
+        .api
+        .addr_canonicalize(new_staking_token.as_str())?
+        .to_vec();
+    // remove old pool
+    remove_pool_info(deps.storage, &asset_key);
+    store_pool_info(deps.storage, &new_asset_key, &pool_info)?;
 
     Ok(Response::new().add_attributes([
         ("action", "depcrecate_staking_token"),
