@@ -104,24 +104,18 @@ pub fn receive_cw20(
         Ok(Cw20HookMsg::Bond {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
-            let asset_key = token_raw.as_slice();
-            let pool_info = read_pool_info(deps.storage, asset_key)?;
+            let pool_info = read_pool_info(deps.storage, &token_raw)?;
 
             // only staking token contract can execute this message
-            if pool_info.staking_token != token_raw {
-                // if user is trying to bond old token, return friendly error message
-                if let Some(params) = pool_info.migration_params {
-                    if params.deprecated_staking_token == token_raw {
-                        let staking_token_addr =
-                            deps.api.addr_humanize(&pool_info.staking_token)?;
-                        return Err(StdError::generic_err(format!(
-                            "The staking token for this asset has been migrated to {}",
-                            staking_token_addr
-                        )));
-                    }
+            // if user is trying to bond old token, return friendly error message
+            if let Some(params) = pool_info.migration_params {
+                if params.deprecated_staking_token == token_raw {
+                    let staking_token_addr = deps.api.addr_humanize(&pool_info.staking_token)?;
+                    return Err(StdError::generic_err(format!(
+                        "The staking token for this asset has been migrated to {}",
+                        staking_token_addr
+                    )));
                 }
-
-                return Err(StdError::generic_err("unauthorized"));
             }
 
             bond(
@@ -173,7 +167,7 @@ fn update_rewards_per_sec(
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
 
     // withdraw all rewards for all stakers from this pool
     let staker_addrs = stakers_read(deps.storage, &asset_key)
@@ -215,16 +209,16 @@ fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdR
     }
 
     // query asset_key from AssetInfo
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
     if read_pool_info(deps.storage, &asset_key).is_ok() {
         return Err(StdError::generic_err("Asset was already registered"));
     }
 
     store_pool_info(
         deps.storage,
-        &asset_key,
+        &asset_key.clone(),
         &PoolInfo {
-            staking_token: deps.api.addr_canonicalize(staking_token.as_str())?,
+            staking_token: asset_key,
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),

@@ -135,7 +135,7 @@ fn test_register() {
         res.attributes,
         vec![
             attr("action", "register_asset"),
-            attr("asset_info", "asset"),
+            attr("staking_token", "staking"),
         ]
     );
 

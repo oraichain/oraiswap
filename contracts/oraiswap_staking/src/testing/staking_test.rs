@@ -122,20 +122,6 @@ fn test_bond_tokens() {
             migration_index_snapshot: None,
         }
     );
-
-    // failed with unauthorized
-    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: "addr".to_string(),
-        amount: Uint128::from(100u128),
-        msg: to_json_binary(&Cw20HookMsg::Bond {}).unwrap(),
-    });
-
-    let info = mock_info("staking2", &[]);
-    let res = execute(deps.as_mut(), mock_env(), info, msg);
-    match res {
-        Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "unauthorized"),
-        _ => panic!("Must return unauthorized error"),
-    }
 }
 
 #[test]

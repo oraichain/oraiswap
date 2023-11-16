@@ -31,8 +31,8 @@ pub fn deposit_reward(
     let mut rewards_amount = Uint128::zero();
 
     for reward_msg in rewards.iter() {
-        let asset_key = reward_msg.staking_token.as_bytes();
-        let mut pool_info: PoolInfo = read_pool_info(deps.storage, asset_key)?;
+        let asset_key = deps.api.addr_canonicalize(reward_msg.staking_token.as_str())?;
+        let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
         let mut normal_reward = reward_msg.total_accumulation_amount;
 
@@ -47,7 +47,7 @@ pub fn deposit_reward(
             pool_info.pending_reward = Uint128::zero();
         }
 
-        store_pool_info(deps.storage, asset_key, &pool_info)?;
+        store_pool_info(deps.storage, &asset_key, &pool_info)?;
 
         rewards_amount += reward_msg.total_accumulation_amount;
     }
