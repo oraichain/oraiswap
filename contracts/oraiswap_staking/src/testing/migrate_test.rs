@@ -72,7 +72,8 @@ fn test_migration() {
         stakers_store(storage, &asset_key)
             .save(&staker, &true)
             .unwrap();
-        rewards_store(storage, &staker)
+        if n/2 == 0 {
+            rewards_store(storage, &staker)
             .save(
                 &asset_key,
                 &RewardInfo {
@@ -84,20 +85,23 @@ fn test_migration() {
                 },
             )
             .unwrap();
+        }
         if is_store_migrated {
             store_is_migrated(storage, &asset_key, &staker).unwrap();
         }
-        store_rewards_per_sec(
-            storage,
-            &asset_key,
-            vec![AssetRaw {
-                info: AssetInfoRaw::NativeToken {
-                    denom: "atom".to_string(),
-                },
-                amount: amount.clone(),
-            }],
-        )
-        .unwrap();
+        if n/2 != 0 {
+            store_rewards_per_sec(
+                storage,
+                &asset_key,
+                vec![AssetRaw {
+                    info: AssetInfoRaw::NativeToken {
+                        denom: "atom".to_string(),
+                    },
+                    amount: amount.clone(),
+                }],
+            )
+            .unwrap();
+        }
     }
 
     // check asset keys. They should match with our old asset keys set above
@@ -158,17 +162,21 @@ fn test_migration() {
             is_store_migrated
         );
 
-        assert_eq!(
-            rewards_read(storage, &staker)
-                .load(&staking_token)
-                .unwrap()
-                .bond_amount,
-            amount.clone()
-        );
+        if n/2 == 0 {
+            assert_eq!(
+                rewards_read(storage, &staker)
+                    .load(&staking_token)
+                    .unwrap()
+                    .bond_amount,
+                amount.clone()
+            );
+        }
 
-        assert_eq!(
-            read_rewards_per_sec(storage, &staking_token).unwrap().len(),
-            1
-        );
+        if n/2 != 0 {
+            assert_eq!(
+                read_rewards_per_sec(storage, &staking_token).unwrap().len(),
+                1
+            );
+        }
     }
 }

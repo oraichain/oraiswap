@@ -27,7 +27,6 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<(
             // first thing first, we update ≈our stakers list mapped with the old asset key
             stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
             stakers_remove(storage, &asset_key, &staker);
-
             let rewards_bucket = rewards_read(storage, &staker).may_load(&asset_key)?;
             if rewards_bucket.is_some() {
                 // update new key for our reward bucket
@@ -46,10 +45,11 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage) -> StdResult<(
         }
 
         // our final map, rewards per sec
-        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key)?;
-        store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
-        remove_rewards_per_sec(storage, &asset_key);
+        let rewards_per_sec = read_rewards_per_sec(storage, &asset_key);
+        if rewards_per_sec.is_ok() {
+            store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec.unwrap())?;
+            remove_rewards_per_sec(storage, &asset_key);
+        }
     }
-
     Ok(())
 }
