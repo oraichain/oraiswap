@@ -87,11 +87,7 @@ pub enum Cw20HookMsg {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {
-    pub staker_addrs: Vec<Addr>,
-    // pub amount_infos: Vec<AmountInfo>,
-    // pub new_staking_token: Addr,
-}
+pub struct MigrateMsg {}
 
 /// We currently take no arguments for migrations
 #[cw_serde]
