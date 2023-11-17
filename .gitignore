@@ -24,3 +24,6 @@ node_modules
 
 # leveldb
 datadir/
+
+# orai sync db
+data/
