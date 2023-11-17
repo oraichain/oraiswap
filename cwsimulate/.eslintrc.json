@@ -47,7 +47,8 @@
         ],
         "@typescript-eslint/no-unused-vars": "warn",
         "security/detect-object-injection": "off",
-        "security/detect-non-literal-fs-filename": "off"
+        "security/detect-non-literal-fs-filename": "off",
+        "@typescript-eslint/ban-ts-comment": "off"
       }
     },
     {

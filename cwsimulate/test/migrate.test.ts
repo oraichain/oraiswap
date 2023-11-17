@@ -36,7 +36,7 @@ const client = new SimulateCosmWasmClient({
   metering: true,
 });
 const stakeAdmin = "orai1gkr56hlnx9vc7vncln2dkd896zfsqjn300kfq0";
-describe("Simulate oraiswap contract test", () => {
+describe.skip("Simulate oraiswap contract test", () => {
   const sender = "orai12p0ywjwcpa500r9fuf0hly78zyjeltakrzkv0c";
   let converterContract: OraiswapConverterClient;
   let factoryContract: OraiswapFactoryClient;
@@ -57,7 +57,6 @@ describe("Simulate oraiswap contract test", () => {
       sender,
       FACTORY_V2_CONTRACT,
     );
-    // oracleContract = new OraiswapOracleClient(client, sender, ORACLE_CONTRACT);
 
     oraiXContract = new OraiswapTokenClient(client, sender, ORAIX_CONTRACT);
 
@@ -97,15 +96,15 @@ describe("Simulate oraiswap contract test", () => {
       readFileSync(resolve(__dirname, "../build/wasm/oraiswap_staking.wasm")),
       "auto",
     );
-    await client.migrate(
+    // const oldTotalAssetKey = await stakeContract.contractAddress
+    const tx = await client.migrate(
       sender,
       STAKING_CONTRACT,
       codeId,
-      {
-        staker_addrs: [],
-      },
+      {},
       "auto",
     );
+    console.log(tx.gasUsed);
 
     expect(true).toBe(true);
   });

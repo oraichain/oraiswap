@@ -16,7 +16,7 @@
     "defi"
   ],
   "dependencies": {
-    "@oraichain/cw-simulate": "^2.8.71",
+    "@oraichain/cw-simulate": "^2.8.72",
     "@oraichain/oraidex-common": "^1.0.36"
   },
   "devDependencies": {

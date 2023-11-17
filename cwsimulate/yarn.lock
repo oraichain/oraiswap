@@ -1138,10 +1138,10 @@
     elliptic "^6.5.4"
     secp256k1 "^4.0.3"
 
-"@oraichain/cw-simulate@^2.8.71":
-  version "2.8.71"
-  resolved "https://registry.yarnpkg.com/@oraichain/cw-simulate/-/cw-simulate-2.8.71.tgz#2d9fa9c73e81dfecfb3cc19699d88fa5b6900fb4"
-  integrity sha512-QTjI3+LMxt04oqChTQRum9TaReUWLGHHkl3H2E4Z7eJAwEI2R4fOl9Mc3Wp1uExMdnpukDLSigwRsYrgY1sl1Q==
+"@oraichain/cw-simulate@^2.8.72":
+  version "2.8.72"
+  resolved "https://registry.yarnpkg.com/@oraichain/cw-simulate/-/cw-simulate-2.8.72.tgz#c8191e824c2e5b49a983812e16cef192fa867270"
+  integrity sha512-RsyBmkAbZIuxPbHqPWjqCrP+GpFi/tIXr4CPSKtVlv5HqEPwVGuvnZVycoB0A+s6T4xZsxUCOXID1DAoGC449A==
   dependencies:
     "@cosmjs/amino" "^0.31.0"
     "@cosmjs/cosmwasm-stargate" "^0.31.0"

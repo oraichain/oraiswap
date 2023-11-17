@@ -9,8 +9,9 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
-    read_config, read_pool_info, read_rewards_per_sec, remove_pool_info, stakers_read,
-    store_config, store_pool_info, store_rewards_per_sec, Config, MigrationParams, PoolInfo,
+    read_all_pool_info_keys, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
+    stakers_read, store_config, store_pool_info, store_rewards_per_sec, Config, MigrationParams,
+    PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -307,6 +308,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order,
         )?),
+        QueryMsg::TotalAssetKey {} => to_binary(&query_total_asset_key(deps)?),
     }
 }
 
@@ -355,6 +357,18 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
     Ok(RewardsPerSecResponse { assets })
 }
 
+// For testing
+pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
+    let asset_keys = read_all_pool_info_keys(deps.storage)?;
+    let keys = asset_keys
+        .iter()
+        .map(|key| {
+            let result: String = String::from_utf8_lossy(key.as_slice()).into();
+            result
+        })
+        .collect::<Vec<String>>();
+    Ok(keys)
+}
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
