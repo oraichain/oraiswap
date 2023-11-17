@@ -4,7 +4,9 @@
     "module": "NodeNext",
     "rootDir": ".",
     "outDir": "./dist",
-    "lib": ["es2022"],
+    "lib": [
+      "es2022"
+    ],
     "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "sourceMap": true,
@@ -17,10 +19,16 @@
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
     "allowJs": true,
-    "typeRoots": ["node_modules/@types", "src/@types"]
+    "typeRoots": [
+      "node_modules/@types",
+      "src/@types"
+    ]
   },
   "ts-node": {
     "files": true
   },
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

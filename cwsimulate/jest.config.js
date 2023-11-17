@@ -1,7 +1,7 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   transform: {
-    "^.+\\.ts?$": ["ts-jest", { isolatedModules: true }],
+    "^.+\\.ts?$": ["ts-jest", { tsconfig: "tsconfig.jest.json" }],
   },
   testEnvironment: "node",
 };
