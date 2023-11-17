@@ -363,8 +363,14 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
     let keys = asset_keys
         .iter()
         .map(|key| {
-            let result: String = String::from_utf8_lossy(key.as_slice()).into();
-            result
+            let canonical_addr = CanonicalAddr::from(key.as_slice());
+            let ibc: String;
+            if canonical_addr.len() == 20 || canonical_addr.len() == 32 {
+                deps.api.addr_humanize(&canonical_addr).unwrap().to_string()
+            } else {
+                ibc = String::from_utf8_lossy(key.as_slice()).into();
+                ibc
+            }
         })
         .collect::<Vec<String>>();
     Ok(keys)

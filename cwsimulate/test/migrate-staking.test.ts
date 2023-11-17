@@ -30,19 +30,20 @@ describe("Simulate oraiswap contract test", () => {
       readFileSync(resolve(__dirname, "../build/wasm/oraiswap_staking.wasm")),
       "auto",
     ));
-
     if (!existsSync(`${dataPath}/${STAKING_CONTRACT}.state`)) {
-      downloadState.saveState(STAKING_CONTRACT);
+      await downloadState.saveState(STAKING_CONTRACT);
     }
-    const buffer = readFileSync(`${dataPath}/${STAKING_CONTRACT}.state`);
-    // @ts-ignore
-    const state = SortedMap.rawPack(new BufferCollection(buffer), compare);
 
-    await client.loadContract(
-      STAKING_CONTRACT,
-      { codeId, label: "label", admin: sender, creator: sender, created: 1 },
-      state,
-    );
+    // const buffer = readFileSync(`${dataPath}/${STAKING_CONTRACT}.state`);
+    // // @ts-ignore
+    // const state = SortedMap.rawPack(new BufferCollection(buffer), compare);
+    //
+    // await client.loadContract(
+    //   STAKING_CONTRACT,
+    //   { codeId, label: "label", admin: sender, creator: sender, created: 1 },
+    //   state,
+    // );
+    await downloadState.loadState(client, sender, STAKING_CONTRACT, "label");
     stakeContract = new OraiswapStakingClient(client, sender, STAKING_CONTRACT);
   }, 600000);
 
@@ -53,8 +54,8 @@ describe("Simulate oraiswap contract test", () => {
   });
 
   it("should migrate stake contract succesfully", async () => {
-    const oldTotalAssetKey = await stakeContract.totalAssetKey();
-    console.log("oldTotalAssetKey", oldTotalAssetKey);
+    // const oldTotalAssetKey = await stakeContract.totalAssetKey();
+    // console.log("oldTotalAssetKey", oldTotalAssetKey);
 
     const tx = await client.migrate(
       sender,
@@ -67,6 +68,17 @@ describe("Simulate oraiswap contract test", () => {
 
     const newTotalAssetKey = await stakeContract.totalAssetKey();
     console.log("newTotalAssetKey", newTotalAssetKey);
+
+    const result = await Promise.allSettled(
+      newTotalAssetKey.map(async (key) => {
+        return stakeContract.poolInfo({ stakingToken: key });
+      }),
+    );
+
+    result.forEach((poolInfo, i) => {
+      console.log(newTotalAssetKey[i]);
+      console.log({ poolInfo });
+    });
 
     // expect(oldTotalAssetKey.length).toEqual(newTotalAssetKey.length);
   });
