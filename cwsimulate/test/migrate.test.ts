@@ -17,6 +17,8 @@ import {
   OraiswapStakingClient,
   OraiswapTokenClient,
 } from "../build/contracts";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 const listContracts = [
   CONVERTER_CONTRACT,
@@ -33,7 +35,7 @@ const client = new SimulateCosmWasmClient({
   chainId: "Oraichain",
   metering: true,
 });
-
+const stakeAdmin = "orai1gkr56hlnx9vc7vncln2dkd896zfsqjn300kfq0";
 describe("Simulate oraiswap contract test", () => {
   const sender = "orai12p0ywjwcpa500r9fuf0hly78zyjeltakrzkv0c";
   let converterContract: OraiswapConverterClient;
@@ -87,5 +89,24 @@ describe("Simulate oraiswap contract test", () => {
     expect(stakeInfo).toBeDefined();
     expect(routerInfo).toBeDefined();
     expect(rewarderInfo).toBeDefined();
+  });
+
+  it("should migrate stake contract succesfully", async () => {
+    const { codeId } = await client.upload(
+      stakeAdmin,
+      readFileSync(resolve(__dirname, "../build/wasm/oraiswap_staking.wasm")),
+      "auto",
+    );
+    await client.migrate(
+      sender,
+      STAKING_CONTRACT,
+      codeId,
+      {
+        staker_addrs: [],
+      },
+      "auto",
+    );
+
+    expect(true).toBe(true);
   });
 });
