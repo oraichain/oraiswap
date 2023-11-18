@@ -66,6 +66,13 @@ pub fn read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>>
         .collect()
 }
 
+pub fn read_all_pool_infos(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, PoolInfo)>> {
+    ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
+        .range(None, None, cosmwasm_std::Order::Ascending)
+        // .map(|bucket| Ok(bucket?.0))
+        .collect()
+}
+
 #[cw_serde]
 pub struct RewardInfo {
     pub native_token: bool,
@@ -77,20 +84,14 @@ pub struct RewardInfo {
 }
 
 /// returns a bucket with all rewards owned by this staker (query it by staker)
-pub fn rewards_store<'a>(
-    storage: &'a mut dyn Storage,
-    staker: &CanonicalAddr,
-) -> Bucket<'a, RewardInfo> {
-    Bucket::multilevel(storage, &[PREFIX_REWARD, staker.as_slice()])
+pub fn rewards_store<'a>(storage: &'a mut dyn Storage, staker: &[u8]) -> Bucket<'a, RewardInfo> {
+    Bucket::multilevel(storage, &[PREFIX_REWARD, staker])
 }
 
 /// returns a bucket with all rewards owned by this staker (query it by staker)
 /// (read-only version for queries)
-pub fn rewards_read<'a>(
-    storage: &'a dyn Storage,
-    staker: &CanonicalAddr,
-) -> ReadonlyBucket<'a, RewardInfo> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, staker.as_slice()])
+pub fn rewards_read<'a>(storage: &'a dyn Storage, staker: &[u8]) -> ReadonlyBucket<'a, RewardInfo> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, staker])
 }
 
 /// returns a bucket with all stakers belong by this staker (query it by staker)
@@ -105,32 +106,24 @@ pub fn stakers_read<'a>(storage: &'a dyn Storage, asset_key: &[u8]) -> ReadonlyB
 }
 
 /// returns a bucket with all stakers belong by this staker (query it by staker)
-pub fn stakers_remove<'a>(
-    storage: &'a mut dyn Storage,
-    asset_key: &[u8],
-    staker: &CanonicalAddr,
-) -> () {
+pub fn stakers_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8], staker: &[u8]) -> () {
     Bucket::<CanonicalAddr>::multilevel(storage, &[PREFIX_STAKER, asset_key]).remove(staker)
 }
 
 pub fn store_is_migrated(
     storage: &mut dyn Storage,
     asset_key: &[u8],
-    staker: &CanonicalAddr,
+    staker: &[u8],
 ) -> StdResult<()> {
-    Bucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()]).save(asset_key, &true)
+    Bucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).save(asset_key, &true)
 }
 
-pub fn remove_store_is_migrated(
-    storage: &mut dyn Storage,
-    asset_key: &[u8],
-    staker: &CanonicalAddr,
-) -> () {
-    Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()]).remove(&asset_key)
+pub fn remove_store_is_migrated(storage: &mut dyn Storage, asset_key: &[u8], staker: &[u8]) -> () {
+    Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).remove(&asset_key)
 }
 
-pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &CanonicalAddr) -> bool {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker.as_slice()])
+pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
         .load(asset_key)
         .unwrap_or(false)
 }

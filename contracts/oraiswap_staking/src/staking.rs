@@ -51,6 +51,7 @@ pub fn unbond(
         &staking_token,
         amount,
     )?;
+
     let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
     let mut messages = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.to_string(),

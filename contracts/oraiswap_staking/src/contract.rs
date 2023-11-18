@@ -368,6 +368,6 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<Addr>> {
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    migrate_asset_keys_to_lp_tokens(deps.storage)?;
+    migrate_asset_keys_to_lp_tokens(deps.api, deps.storage)?;
     Ok(Response::default())
 }
