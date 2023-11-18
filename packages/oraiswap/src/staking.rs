@@ -120,8 +120,8 @@ pub enum QueryMsg {
         // so can convert or throw error
         order: Option<i32>,
     },
-    #[returns(Vec<String>)]
-    TotalAssetKey {},
+    #[returns(Vec<Addr>)]
+    TotalPoolAssetKeys {},
 }
 
 // We define a custom struct for each query response

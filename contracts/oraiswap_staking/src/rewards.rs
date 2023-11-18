@@ -31,7 +31,9 @@ pub fn deposit_reward(
     let mut rewards_amount = Uint128::zero();
 
     for reward_msg in rewards.iter() {
-        let asset_key = deps.api.addr_canonicalize(reward_msg.staking_token.as_str())?;
+        let asset_key = deps
+            .api
+            .addr_canonicalize(reward_msg.staking_token.as_str())?;
         let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
         let mut normal_reward = reward_msg.total_accumulation_amount;
@@ -252,7 +254,7 @@ pub fn query_all_reward_infos(
 ) -> StdResult<Vec<RewardInfoResponse>> {
     // default is Ascending
     let order_by = Order::try_from(order.unwrap_or(1))?;
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
 
     let start_after = start_after
         .map_or(None, |a| deps.api.addr_canonicalize(a.as_str()).ok())

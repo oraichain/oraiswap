@@ -1,10 +1,11 @@
-use crate::contract::{execute, instantiate, query};
+use crate::contract::{execute, instantiate, query, query_total_asset_key};
+use crate::state::{store_pool_info, PoolInfo};
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
 use cosmwasm_std::{
-    attr, coin, from_binary, to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, StdError, SubMsg,
-    Uint128, WasmMsg,
+    attr, coin, from_binary, to_binary, Addr, Api, BankMsg, Coin, CosmosMsg, Decimal, StdError,
+    SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
@@ -15,6 +16,46 @@ use oraiswap::staking::{
     RewardInfoResponseItem, RewardMsg,
 };
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
+
+#[test]
+fn test_query_all_pool_keys() {
+    let mut deps = mock_dependencies();
+    let first_staking_token = Addr::unchecked("staking1");
+    let second_staking_token = Addr::unchecked("staking2");
+    let first_staking_canon = deps
+        .api
+        .addr_canonicalize(first_staking_token.as_str())
+        .unwrap();
+    let second_staking_canon = deps
+        .api
+        .addr_canonicalize(second_staking_token.as_str())
+        .unwrap();
+
+    let deps_mut = deps.as_mut();
+    let storage = deps_mut.storage;
+
+    // populate fake data, can change to 100 if want
+    for n in 0..10u64 {
+        let amount = Uint128::from(n);
+        let (asset_key, staking_token) = if n < 5 {
+            (first_staking_canon.clone(), first_staking_canon.clone())
+        } else {
+            (second_staking_canon.clone(), second_staking_canon.clone())
+        };
+        let pool_info = PoolInfo {
+            staking_token: staking_token.clone(),
+            pending_reward: amount.clone(),
+            total_bond_amount: amount.clone(),
+            reward_index: Decimal::zero(),
+            migration_params: None,
+        };
+        store_pool_info(storage, &asset_key, &pool_info).unwrap();
+    }
+
+    let all_pool_keys = query_total_asset_key(deps.as_ref()).unwrap();
+    assert_eq!(all_pool_keys.contains(&first_staking_token), true);
+    assert_eq!(all_pool_keys.contains(&second_staking_token), true);
+}
 
 #[test]
 fn test_bond_tokens() {

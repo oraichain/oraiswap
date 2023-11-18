@@ -308,7 +308,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order,
         )?),
-        QueryMsg::TotalAssetKey {} => to_binary(&query_total_asset_key(deps)?),
+        QueryMsg::TotalPoolAssetKeys {} => to_binary(&query_total_asset_key(deps)?),
     }
 }
 
@@ -357,22 +357,12 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
     Ok(RewardsPerSecResponse { assets })
 }
 
-// For testing
-pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
+pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<Addr>> {
     let asset_keys = read_all_pool_info_keys(deps.storage)?;
     let keys = asset_keys
-        .iter()
-        .map(|key| {
-            let canonical_addr = CanonicalAddr::from(key.as_slice());
-            let ibc: String;
-            if canonical_addr.len() == 20 || canonical_addr.len() == 32 {
-                deps.api.addr_humanize(&canonical_addr).unwrap().to_string()
-            } else {
-                ibc = String::from_utf8_lossy(key.as_slice()).into();
-                ibc
-            }
-        })
-        .collect::<Vec<String>>();
+        .into_iter()
+        .map(|key| deps.api.addr_humanize(&CanonicalAddr::from(key)))
+        .collect::<StdResult<Vec<Addr>>>()?;
     Ok(keys)
 }
 // migrate contract
