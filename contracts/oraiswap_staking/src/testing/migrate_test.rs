@@ -1,12 +1,50 @@
 use crate::migration::migrate_asset_keys_to_lp_tokens;
 use crate::state::{
-    read_all_pool_info_keys, read_is_migrated, read_rewards_per_sec, rewards_read, rewards_store,
-    stakers_read, stakers_store, store_is_migrated, store_pool_info, store_rewards_per_sec,
-    PoolInfo, RewardInfo,
+    read_all_pool_info_keys, read_config, read_is_migrated, read_pool_info, read_rewards_per_sec,
+    rewards_read, rewards_store, stakers_read, stakers_store, store_is_migrated, store_pool_info,
+    store_rewards_per_sec, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{testing::mock_dependencies, Api};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use oraiswap::asset::{AssetInfo, AssetInfoRaw, AssetRaw};
+
+const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
+
+#[test]
+fn test_forked_mainnet() {
+    let mut deps = mock_dependencies();
+    let deps_mut = deps.as_mut();
+    let storage = deps_mut.storage;
+
+    // first 4 bytes is for uint32 be
+    // 1 byte key length + key
+    // 2 bytes value length + value
+    let mut ind = 4;
+
+    // let items_length = u32::from_be_bytes(MAINET_STATE_BYTES[0..ind].try_into().unwrap());
+    while ind < MAINET_STATE_BYTES.len() {
+        let key_length = MAINET_STATE_BYTES[ind];
+        ind += 1;
+        let key = &MAINET_STATE_BYTES[ind..ind + key_length as usize];
+        ind += key_length as usize;
+        let value_length = u16::from_be_bytes(MAINET_STATE_BYTES[ind..ind + 2].try_into().unwrap());
+        ind += 2;
+        let value = &MAINET_STATE_BYTES[ind..ind + value_length as usize];
+        ind += value_length as usize;
+        storage.set(key, value);
+    }
+
+    // milky asset
+    let asset_key = deps_mut
+        .api
+        .addr_canonicalize("orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw")
+        .unwrap();
+
+    // let pool_info = read_pool_info(storage, &asset_key).unwrap();
+    let config = read_config(storage).unwrap();
+
+    println!("config {:?}", config);
+}
 
 #[test]
 fn test_migration() {
@@ -72,24 +110,24 @@ fn test_migration() {
         stakers_store(storage, &asset_key)
             .save(&staker, &true)
             .unwrap();
-        if n/2 == 0 {
+        if n / 2 == 0 {
             rewards_store(storage, &staker)
-            .save(
-                &asset_key,
-                &RewardInfo {
-                    native_token: true,
-                    index: Decimal::zero(),
-                    bond_amount: amount.clone(),
-                    pending_reward: amount.clone(),
-                    pending_withdraw: vec![],
-                },
-            )
-            .unwrap();
+                .save(
+                    &asset_key,
+                    &RewardInfo {
+                        native_token: true,
+                        index: Decimal::zero(),
+                        bond_amount: amount.clone(),
+                        pending_reward: amount.clone(),
+                        pending_withdraw: vec![],
+                    },
+                )
+                .unwrap();
         }
         if is_store_migrated {
             store_is_migrated(storage, &asset_key, &staker).unwrap();
         }
-        if n/2 != 0 {
+        if n / 2 != 0 {
             store_rewards_per_sec(
                 storage,
                 &asset_key,
@@ -114,7 +152,7 @@ fn test_migration() {
     );
 
     // action
-    migrate_asset_keys_to_lp_tokens(storage).unwrap();
+    migrate_asset_keys_to_lp_tokens(deps_mut.api, storage).unwrap();
 
     // assert
     // query to see if the stores have been migrated successfully
@@ -162,7 +200,7 @@ fn test_migration() {
             is_store_migrated
         );
 
-        if n/2 == 0 {
+        if n / 2 == 0 {
             assert_eq!(
                 rewards_read(storage, &staker)
                     .load(&staking_token)
@@ -172,7 +210,7 @@ fn test_migration() {
             );
         }
 
-        if n/2 != 0 {
+        if n / 2 != 0 {
             assert_eq!(
                 read_rewards_per_sec(storage, &staking_token).unwrap().len(),
                 1
