@@ -53,8 +53,14 @@ fn test_query_all_pool_keys() {
     }
 
     let all_pool_keys = query_total_asset_key(deps.as_ref()).unwrap();
-    assert_eq!(all_pool_keys.contains(&first_staking_token), true);
-    assert_eq!(all_pool_keys.contains(&second_staking_token), true);
+    assert_eq!(
+        all_pool_keys.contains(&first_staking_token.to_string()),
+        true
+    );
+    assert_eq!(
+        all_pool_keys.contains(&second_staking_token.to_string()),
+        true
+    );
 }
 
 #[test]

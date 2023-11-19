@@ -6,9 +6,9 @@ use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config_v2";
 pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
-pub static PREFIX_REWARD: &[u8] = b"reward_v2";
-static PREFIX_STAKER: &[u8] = b"staker";
-static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
+pub static PREFIX_REWARD: &[u8] = b"reward_v3";
+static PREFIX_STAKER: &[u8] = b"staker_v2";
+static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated_v2";
 static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
 #[cw_serde]
@@ -62,14 +62,13 @@ pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Pool
 pub fn read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>> {
     ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
         .range(None, None, cosmwasm_std::Order::Ascending)
-        .map(|bucket| Ok(bucket?.0))
+        .map(|bucket| bucket.map(|b| b.0))
         .collect()
 }
 
 pub fn read_all_pool_infos(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, PoolInfo)>> {
     ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
         .range(None, None, cosmwasm_std::Order::Ascending)
-        // .map(|bucket| Ok(bucket?.0))
         .collect()
 }
 
