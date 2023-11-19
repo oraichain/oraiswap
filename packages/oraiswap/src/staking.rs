@@ -77,6 +77,11 @@ pub enum ExecuteMsg {
         staking_token: Addr,
         stakers: Vec<Addr>,
     },
+    MigrateStore {
+        asset_info: AssetInfo,
+        limit: Option<u32>,
+        // so can convert or throw error
+    },
 }
 
 #[cw_serde]
@@ -120,7 +125,7 @@ pub enum QueryMsg {
         // so can convert or throw error
         order: Option<i32>,
     },
-    #[returns(Vec<Addr>)]
+    #[returns(Vec<String>)]
     TotalPoolAssetKeys {},
 }
 
