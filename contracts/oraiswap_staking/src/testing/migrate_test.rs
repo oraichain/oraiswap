@@ -1,42 +1,57 @@
-use crate::contract::{migrate_store, query_pool_info};
+use crate::contract::migrate_store;
 use crate::migration::{
     migrate_asset_keys_to_lp_tokens, old_rewards_read, old_rewards_store, old_stakers_read,
     old_stakers_store,
 };
 use crate::state::{
-    read_all_pool_info_keys, read_pool_info, rewards_read, stakers_read, store_pool_info, PoolInfo,
-    RewardInfo,
+    read_all_pool_info_keys, rewards_read, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 
-use cosmwasm_testing_util::mock::{load_state, mock_dependencies};
+use cosmwasm_std::testing::mock_dependencies;
+use cosmwasm_testing_util::mock::{load_state, mock_instance, GAS_PER_US};
 
-use cosmwasm_std::{Addr, Decimal, Uint128};
-use cosmwasm_std::{Api, DepsMut};
+use cosmwasm_std::Api;
+use cosmwasm_std::{from_binary, Addr, Decimal, Response, Uint128};
+use cosmwasm_vm::testing::{migrate, mock_env, query, MockInstanceOptions};
 use oraiswap::asset::AssetInfo;
+use oraiswap::staking::{MigrateMsg, PoolInfoResponse, QueryMsg};
 
+const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
-const MILKY_CONTRACT: &str = "orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw";
+const MILKY_STAKING_TOKEN: &str = "orai18ywllw03hvy720l06rme0apwyyq9plk64h9ccf";
 
 #[test]
 fn test_forked_mainnet() {
-    let mut deps = mock_dependencies();
-    let DepsMut { api, storage, .. } = deps.as_mut();
+    let mut options = MockInstanceOptions::default();
+    options.gas_limit = 1_000_000_000_000_000_000;
+    let mut deps = mock_instance(WASM_BYTES, options);
 
-    load_state(storage, MAINET_STATE_BYTES);
-
-    let staking_token = read_pool_info(storage, &api.addr_canonicalize(MILKY_CONTRACT).unwrap())
-        .unwrap()
-        .staking_token;
-
-    migrate_asset_keys_to_lp_tokens(storage, api).unwrap();
-
-    let pool_info = query_pool_info(
-        deps.as_ref(),
-        deps.api.addr_humanize(&staking_token).unwrap(),
-    )
+    deps.with_storage(|store| {
+        load_state(store, MAINET_STATE_BYTES);
+        Ok(())
+    })
     .unwrap();
 
-    println!("milky pool {:?}", pool_info);
+    let gas_before = deps.get_gas_left();
+    let ret: Response = migrate(&mut deps, mock_env(), MigrateMsg {}).unwrap();
+    let gas_used = (gas_before - deps.get_gas_left()) / GAS_PER_US;
+
+    println!("gas used {}, ret {:?}", gas_used, ret);
+
+    let gas_before = deps.get_gas_left();
+    let pool_info: PoolInfoResponse = from_binary(
+        &query(
+            &mut deps,
+            mock_env(),
+            QueryMsg::PoolInfo {
+                staking_token: Addr::unchecked(MILKY_STAKING_TOKEN),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let gas_used = (gas_before - deps.get_gas_left()) / GAS_PER_US;
+    println!("gas used {}, pool info {:?}", gas_used, pool_info);
 }
 
 #[test]
