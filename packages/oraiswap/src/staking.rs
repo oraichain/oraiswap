@@ -92,7 +92,11 @@ pub enum Cw20HookMsg {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub asset_info: AssetInfo,
+    pub staker_after: Option<String>,
+    pub limit: Option<u64>,
+}
 
 /// We currently take no arguments for migrations
 #[cw_serde]

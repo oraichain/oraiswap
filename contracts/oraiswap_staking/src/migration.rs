@@ -130,16 +130,18 @@ pub fn migrate_single_asset_key_to_lp_token(
     asset_key: &[u8],
     start_staker: Option<&[u8]>,
     limit_staker: Option<u64>,
-) -> StdResult<()> {
-    // const MAX_STAKER: u64 = 1000;
-    // const DEFAULT_STAKER: u64 = 100;
-    // let limit = limit_staker.unwrap_or(DEFAULT_STAKER).min(MAX_STAKER) as usize;
+) -> StdResult<(u64, Option<Vec<u8>>)> {
+    const MAX_STAKER: u64 = 1000;
+    const DEFAULT_STAKER: u64 = 100;
+
+    let limit = limit_staker.unwrap_or(DEFAULT_STAKER).min(MAX_STAKER) as usize;
 
     let pool_info = read_pool_info(storage, asset_key)?;
     // store pool_info to new key
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
 
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
+    let next_key;
 
     #[cfg(debug_assertions)]
     if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
@@ -156,17 +158,21 @@ pub fn migrate_single_asset_key_to_lp_token(
         ));
     }
 
-    let stakers = old_stakers_read(storage, asset_key)
+    let mut stakers = old_stakers_read(storage, asset_key)
         .range(start_staker, None, Order::Ascending)
-        // .take(limit)
+        // Get next_key
+        .take(limit + 1)
         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
 
     if stakers.len() == 0 {
-        return Ok(());
+        return Ok((0, None));
     }
 
-    // #[cfg(debug_assertions)]
-    // api.debug(&format!("first stakers {:?}", stakers.first()));
+    if stakers.len() > limit {
+        next_key = Some(stakers.pop().unwrap().0);
+    } else {
+        next_key = None;
+    }
 
     // store reward_per_sec to new new key
     if let Some(rewards_per_sec) = read_rewards_per_sec(storage, &asset_key).ok() {
@@ -193,5 +199,5 @@ pub fn migrate_single_asset_key_to_lp_token(
         }
     }
 
-    Ok(())
+    Ok((stakers.len() as u64, next_key))
 }

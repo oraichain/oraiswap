@@ -306,6 +306,7 @@ fn test_migrate_single_asset_key_to_lp_token() {
     let mut deps = mock_dependencies();
     let deps_mut = deps.as_mut();
     load_state(deps_mut.storage, MAINET_STATE_BYTES);
+    let limit = Some(1000);
 
     let asset_keys = read_all_pool_infos(deps_mut.storage).unwrap();
 
@@ -315,14 +316,13 @@ fn test_migrate_single_asset_key_to_lp_token() {
             deps_mut.api,
             asset_key.as_slice(),
             None,
-            None,
+            limit,
         )
         .unwrap();
-        for item in old_stakers_read(deps_mut.as_ref().storage, asset_key).range(
-            None,
-            None,
-            Order::Ascending,
-        ) {
+        for item in old_stakers_read(deps_mut.as_ref().storage, asset_key)
+            .range(None, None, Order::Ascending)
+            .take(1000)
+        {
             let (staker, ..) = item.unwrap();
 
             // assert staker in new asset_key
