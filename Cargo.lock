@@ -287,7 +287,7 @@ dependencies = [
 [[package]]
 name = "cosmwasm-testing-util"
 version = "0.1.0"
-source = "git+https://github.com/oraichain/cosmwasm-testing-util.git?rev=eb90f9b#eb90f9b7807f8f72b0de6c9579428fb508ff3191"
+source = "git+https://github.com/oraichain/cosmwasm-testing-util.git?rev=9a5f7c8#9a5f7c80cbc7cea3171a1967a489b2de9c1a5130"
 dependencies = [
  "bech32",
  "cosmwasm-schema",
