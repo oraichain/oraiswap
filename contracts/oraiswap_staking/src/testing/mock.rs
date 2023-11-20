@@ -98,7 +98,7 @@ impl Api for MockApi {
     }
 
     fn debug(&self, message: &str) {
-        todo!()
+        println!("{message}");
     }
 }
 

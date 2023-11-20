@@ -10,26 +10,25 @@ use crate::state::{
 };
 
 use cosmwasm_std::testing::{digit_sum, riffle_shuffle};
-use cosmwasm_std::Api;
 use cosmwasm_std::{Addr, CanonicalAddr, Decimal, Uint128};
+use cosmwasm_std::{Api, DepsMut};
 use oraiswap::asset::{AssetInfo, AssetInfoRaw, AssetRaw};
 
 use super::mock::mock_dependencies;
 
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
+const MILKY_CONTRACT: &str = "orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw";
 
 #[test]
 fn test_forked_mainnet() {
     let mut deps = mock_dependencies();
-    let deps_mut = deps.as_mut();
-    let storage = deps_mut.storage;
+    let DepsMut { api, storage, .. } = deps.as_mut();
 
     // first 4 bytes is for uint32 be
     // 1 byte key length + key
     // 2 bytes value length + value
     let mut ind = 4;
 
-    // let items_length = u32::from_be_bytes(MAINET_STATE_BYTES[0..ind].try_into().unwrap());
     while ind < MAINET_STATE_BYTES.len() {
         let key_length = MAINET_STATE_BYTES[ind];
         ind += 1;
@@ -42,27 +41,11 @@ fn test_forked_mainnet() {
         storage.set(key, value);
     }
 
-    // // milky asset
-    // let asset_key = deps_mut
-    //     .api
-    //     .addr_canonicalize("orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw")
-    //     .unwrap();
+    migrate_asset_keys_to_lp_tokens(storage, api).unwrap();
+    let asset_key = api.addr_canonicalize(MILKY_CONTRACT).unwrap();
+    let pool_info = read_pool_info(storage, &asset_key);
 
-    // let pool_info = read_pool_info(storage, &asset_key).unwrap();
-
-    // println!("pool info {:?}", pool_info);
-    // let config = read_config(storage).unwrap();
-
-    let infos = read_all_pool_infos(storage).unwrap();
-    for (k, v) in infos {
-        let token = if let Ok(token) = String::from_utf8(k.clone()) {
-            token
-        } else {
-            deps.api.addr_humanize(&k.into()).unwrap().to_string()
-        };
-
-        println!("token {}, pool info {:?}", token, v);
-    }
+    println!("milky pool {:?}", pool_info);
 }
 
 #[test]
