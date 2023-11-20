@@ -90,13 +90,8 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api)
             .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
 
         // process each staker's map
-        let mut ind = 0;
+
         for (staker, _) in stakers {
-            #[cfg(debug_assertions)]
-            if let Ok(staker_addr) = api.addr_humanize(&staker.clone().into()) {
-                api.debug(&format!("staker {} {}", ind, staker_addr.as_str()));
-                ind += 1;
-            }
             // first thing first, we update ≈our stakers list mapped with the old asset key
             stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
             stakers_remove(storage, &asset_key, &staker);
