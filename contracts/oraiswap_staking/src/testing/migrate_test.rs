@@ -42,18 +42,27 @@ fn test_forked_mainnet() {
         storage.set(key, value);
     }
 
-    // milky asset
-    let asset_key = deps_mut
-        .api
-        .addr_canonicalize("orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw")
-        .unwrap();
+    // // milky asset
+    // let asset_key = deps_mut
+    //     .api
+    //     .addr_canonicalize("orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw")
+    //     .unwrap();
 
-    let pool_info = read_pool_info(storage, &asset_key).unwrap();
+    // let pool_info = read_pool_info(storage, &asset_key).unwrap();
 
-    println!("pool info {:?}", pool_info);
+    // println!("pool info {:?}", pool_info);
     // let config = read_config(storage).unwrap();
 
-    // let infos = read_all_pool_infos(storage).unwrap();
+    let infos = read_all_pool_infos(storage).unwrap();
+    for (k, v) in infos {
+        let token = if let Ok(token) = String::from_utf8(k.clone()) {
+            token
+        } else {
+            deps.api.addr_humanize(&k.into()).unwrap().to_string()
+        };
+
+        println!("token {}, pool info {:?}", token, v);
+    }
 }
 
 #[test]
