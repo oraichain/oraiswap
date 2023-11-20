@@ -4,13 +4,17 @@ use crate::migration::{
     old_stakers_store,
 };
 use crate::state::{
-    read_all_pool_info_keys, read_config, read_is_migrated, read_pool_info, read_rewards_per_sec,
-    rewards_read, rewards_store, stakers_read, stakers_store, store_is_migrated, store_pool_info,
-    store_rewards_per_sec, PoolInfo, RewardInfo,
+    read_all_pool_info_keys, read_all_pool_infos, read_config, read_is_migrated, read_pool_info,
+    read_rewards_per_sec, rewards_read, rewards_store, stakers_read, stakers_store,
+    store_is_migrated, store_pool_info, store_rewards_per_sec, PoolInfo, RewardInfo,
 };
-use cosmwasm_std::{testing::mock_dependencies, Api};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+
+use cosmwasm_std::testing::{digit_sum, riffle_shuffle};
+use cosmwasm_std::Api;
+use cosmwasm_std::{Addr, CanonicalAddr, Decimal, Uint128};
 use oraiswap::asset::{AssetInfo, AssetInfoRaw, AssetRaw};
+
+use super::mock::mock_dependencies;
 
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
 
@@ -44,10 +48,12 @@ fn test_forked_mainnet() {
         .addr_canonicalize("orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw")
         .unwrap();
 
-    // let pool_info = read_pool_info(storage, &asset_key).unwrap();
-    let config = read_config(storage).unwrap();
+    let pool_info = read_pool_info(storage, &asset_key).unwrap();
 
-    println!("config {:?}", config);
+    println!("pool info {:?}", pool_info);
+    // let config = read_config(storage).unwrap();
+
+    // let infos = read_all_pool_infos(storage).unwrap();
 }
 
 #[test]
