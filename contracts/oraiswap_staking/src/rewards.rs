@@ -169,7 +169,7 @@ pub fn process_reward_assets(
         // Withdraw reward to pending reward
         // if the lp token was migrated, and the user did not close their position yet, cap the reward at the snapshot
         let pool_index = if pool_info.migration_params.is_some()
-            && !read_is_migrated(storage, &asset_key, staker_addr)
+            && !read_is_migrated(storage, &asset_key, staker_addr)?
         {
             pool_info.migration_params.unwrap().index_snapshot
         } else {
@@ -304,7 +304,7 @@ fn _read_reward_infos_response(
             let pool_info = read_pool_info(storage, &asset_key)?;
 
             let (pool_index, should_migrate) = if pool_info.migration_params.is_some()
-                && !read_is_migrated(storage, &asset_key, staker_addr)
+                && !read_is_migrated(storage, &asset_key, staker_addr)?
             {
                 (
                     pool_info.migration_params.unwrap().index_snapshot,

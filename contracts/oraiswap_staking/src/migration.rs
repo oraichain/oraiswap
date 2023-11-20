@@ -1,8 +1,8 @@
-use cosmwasm_std::{Api, CanonicalAddr, Order, StdResult, Storage};
+use cosmwasm_std::{Api, CanonicalAddr, DepsMut, Order, StdResult, Storage};
 use cosmwasm_storage::{Bucket, ReadonlyBucket};
 
 use crate::state::{
-    read_all_pool_infos, read_is_migrated, read_rewards_per_sec, remove_pool_info,
+    read_all_pool_infos, read_is_migrated, read_pool_info, read_rewards_per_sec, remove_pool_info,
     remove_rewards_per_sec, remove_store_is_migrated, rewards_read, rewards_store, stakers_read,
     stakers_remove, stakers_store, store_is_migrated, store_pool_info, store_rewards_per_sec,
     RewardInfo,
@@ -100,14 +100,14 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api)
             // first thing first, we update ≈our stakers list mapped with the old asset key
             stakers_store(storage, &pool_info.staking_token).save(&staker, &true)?;
             stakers_remove(storage, &asset_key, &staker);
-            if let Ok(rewards_bucket) = rewards_read(storage, &staker).load(&asset_key) {
+            if let Ok(Some(rewards_bucket)) = rewards_read(storage, &staker).may_load(&asset_key) {
                 // update new key for our reward bucket
                 rewards_store(storage, &staker).save(&pool_info.staking_token, &rewards_bucket)?;
                 // remove old key
                 rewards_store(storage, &staker).remove(&asset_key);
             }
 
-            if read_is_migrated(storage, &asset_key, &staker) {
+            if read_is_migrated(storage, &asset_key, &staker)? {
                 // new asset key is our lp token, we wont be using asset_info no more, so we need to update our store to a new key
                 store_is_migrated(storage, &pool_info.staking_token, &staker)?;
                 // remove old key
@@ -121,5 +121,77 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api)
             remove_rewards_per_sec(storage, &asset_key);
         }
     }
+    Ok(())
+}
+
+pub fn migrate_single_asset_key_to_lp_token(
+    storage: &mut dyn Storage,
+    api: &dyn Api,
+    asset_key: &[u8],
+    start_staker: Option<&[u8]>,
+    limit_staker: Option<u64>,
+) -> StdResult<()> {
+    // const MAX_STAKER: u64 = 1000;
+    // const DEFAULT_STAKER: u64 = 100;
+    // let limit = limit_staker.unwrap_or(DEFAULT_STAKER).min(MAX_STAKER) as usize;
+
+    let pool_info = read_pool_info(storage, asset_key)?;
+    // store pool_info to new key
+    store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
+
+    let staking_token = api.addr_humanize(&pool_info.staking_token)?;
+
+    #[cfg(debug_assertions)]
+    if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
+        api.debug(&format!(
+            "native {}, lp {}",
+            native_token.as_str(),
+            staking_token.as_str()
+        ));
+    } else {
+        api.debug(&format!(
+            "cw20 {}, lp {}",
+            api.addr_humanize(&asset_key.clone().into())?.as_str(),
+            staking_token.as_str()
+        ));
+    }
+
+    let stakers = old_stakers_read(storage, asset_key)
+        .range(start_staker, None, Order::Ascending)
+        // .take(limit)
+        .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
+
+    if stakers.len() == 0 {
+        return Ok(());
+    }
+
+    // #[cfg(debug_assertions)]
+    // api.debug(&format!("first stakers {:?}", stakers.first()));
+
+    // store reward_per_sec to new new key
+    if let Some(rewards_per_sec) = read_rewards_per_sec(storage, &asset_key).ok() {
+        store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
+    }
+
+    #[cfg(debug_assertions)]
+    api.debug(&format!("stakers.len {:?} ", stakers.len()));
+
+    // Store stakers to new staking key token
+    for (staker, _) in stakers.iter() {
+        if let Ok(is_migrated) = read_is_migrated(storage, &pool_info.staking_token, staker) {
+            if is_migrated {
+                continue;
+            } else {
+                store_is_migrated(storage, &pool_info.staking_token, staker)?;
+
+                stakers_store(storage, &pool_info.staking_token).save(staker, &true)?;
+
+                if let Some(reward) = old_rewards_read(storage, staker).load(asset_key).ok() {
+                    rewards_store(storage, staker).save(&pool_info.staking_token, &reward)?;
+                }
+            }
+        }
+    }
+
     Ok(())
 }
