@@ -7,13 +7,12 @@ use crate::state::{
     read_all_pool_info_keys, read_pool_info, rewards_read, stakers_read, store_pool_info, PoolInfo,
     RewardInfo,
 };
-use crate::testing::mock::load_state;
+
+use cosmwasm_testing_util::mock::{load_state, mock_dependencies};
 
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_std::{Api, DepsMut};
 use oraiswap::asset::AssetInfo;
-
-use super::mock::mock_dependencies;
 
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
 const MILKY_CONTRACT: &str = "orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw";

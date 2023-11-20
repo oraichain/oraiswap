@@ -175,6 +175,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-testing-util"
+version = "0.1.0"
+source = "git+https://github.com/oraichain/cosmwasm-testing-util.git#119360d698e5c4d527285159a468ede195c13ebd"
+dependencies = [
+ "bech32",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -755,10 +765,10 @@ dependencies = [
 name = "oraiswap-staking"
 version = "0.1.1"
 dependencies = [
- "bech32",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cosmwasm-testing-util",
  "cw20",
  "oraiswap",
  "oraiswap-factory",
