@@ -6,9 +6,6 @@ use cosmwasm_std::{
     Addr, Api, CanonicalAddr, Empty, OwnedDeps, StdError, StdResult,
 };
 
-const SHUFFLES_ENCODE: usize = 10;
-const SHUFFLES_DECODE: usize = 2;
-
 // MockPrecompiles zero pads all human addresses to make them fit the canonical_length
 // it trims off zeros for the reverse operation.
 // not really smart, but allows us to see a difference (and consistent length for canonical adddresses)
