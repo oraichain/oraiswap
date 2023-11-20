@@ -143,7 +143,6 @@ pub fn migrate_single_asset_key_to_lp_token(
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
     let next_key;
 
-    #[cfg(debug_assertions)]
     if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
         api.debug(&format!(
             "native {}, lp {}",

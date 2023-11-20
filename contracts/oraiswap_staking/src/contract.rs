@@ -335,7 +335,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 }
 
 pub fn query_pool_info(deps: Deps, staking_token: Addr) -> StdResult<PoolInfoResponse> {
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
     let pool_info = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
         staking_token: deps.api.addr_humanize(&pool_info.staking_token)?,
@@ -371,15 +371,16 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
     let keys = asset_keys
         .into_iter()
         .map(|key| {
-            Ok(
-                if let Ok(addr) = deps.api.addr_humanize(&CanonicalAddr::from(key.clone())) {
-                    addr.to_string()
-                } else {
-                    String::from_utf8(key)?
-                },
-            )
+            if let Ok(native_token) = String::from_utf8(key.clone()) {
+                native_token
+            } else {
+                deps.api
+                    .addr_humanize(&key.clone().into())
+                    .unwrap()
+                    .to_string()
+            }
         })
-        .collect::<StdResult<Vec<String>>>()?;
+        .collect::<Vec<String>>();
     Ok(keys)
 }
 
