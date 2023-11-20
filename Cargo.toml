@@ -20,8 +20,10 @@ exclude = [
 
 [workspace.dependencies]
 cosmwasm-std = { version = "=1.2" }
-cosmwasm-schema = "=1.2"
+cosmwasm-schema = { version = "=1.2" }
 cosmwasm-storage = { version = "=1.2" }
+cosmwasm-vm = { version = "=1.2" }
+
 thiserror = "1.0.26"
 
 cw2 = { version = "1.0.1" }
@@ -35,6 +37,8 @@ oraiswap-oracle = { path = "./contracts/oraiswap_oracle" }
 oraiswap-token = { path = "./contracts/oraiswap_token" }
 oraiswap-pair = { path = "./contracts/oraiswap_pair" }
 oraiswap-factory = { path = "./contracts/oraiswap_factory" }
+
+cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git", rev = "9a5f7c8" }
 
 [profile.release]
 opt-level = 3

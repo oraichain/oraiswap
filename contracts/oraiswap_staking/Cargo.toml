@@ -30,4 +30,5 @@ oraiswap-oracle = { workspace = true }
 oraiswap-token = { workspace = true }
 oraiswap-pair = { workspace = true }
 oraiswap-factory = { workspace = true }
-cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git" }
+cosmwasm-testing-util = { workspace = true }
+cosmwasm-vm = { workspace = true }
