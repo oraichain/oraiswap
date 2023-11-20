@@ -2,8 +2,9 @@
 use cosmwasm_std::entry_point;
 
 use crate::migration::{
-    migrate_asset_keys_to_lp_tokens, old_read_is_migrated, old_remove_store_is_migrated,
-    old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_remove,
+    migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token, old_read_is_migrated,
+    old_remove_store_is_migrated, old_rewards_read, old_rewards_store, old_stakers_read,
+    old_stakers_remove,
 };
 // use crate::migration::migrate_rewards_store;
 use crate::rewards::{
@@ -334,7 +335,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 }
 
 pub fn query_pool_info(deps: Deps, staking_token: Addr) -> StdResult<PoolInfoResponse> {
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
     let pool_info = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
         staking_token: deps.api.addr_humanize(&pool_info.staking_token)?,
@@ -370,23 +371,50 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
     let keys = asset_keys
         .into_iter()
         .map(|key| {
-            Ok(
-                if let Ok(addr) = deps.api.addr_humanize(&CanonicalAddr::from(key.clone())) {
-                    addr.to_string()
-                } else {
-                    String::from_utf8(key)?
-                },
-            )
+            if let Ok(native_token) = String::from_utf8(key.clone()) {
+                native_token
+            } else {
+                deps.api
+                    .addr_humanize(&key.clone().into())
+                    .unwrap()
+                    .to_string()
+            }
         })
-        .collect::<StdResult<Vec<String>>>()?;
+        .collect::<Vec<String>>();
     Ok(keys)
 }
 
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    migrate_asset_keys_to_lp_tokens(deps.storage, deps.api)?;
-    Ok(Response::default())
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    let asset_key = msg.asset_info.to_vec(deps.api)?;
+    let start_after = match msg.staker_after {
+        Some(staker) => Some(deps.api.addr_canonicalize(&staker)?),
+        None => None,
+    };
+
+    let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
+        deps.storage,
+        deps.api,
+        asset_key.as_slice(),
+        start_after.as_deref(),
+        msg.limit,
+    )?;
+
+    let next_staker = match next_staker {
+        Some(staker) => deps
+            .api
+            .addr_humanize(&CanonicalAddr::from(staker))?
+            .to_string(),
+        None => "".into(),
+    };
+
+    Ok(Response::default().add_attributes(vec![
+        ("action", "migrate_store"),
+        ("asset_info", &msg.asset_info.to_string()),
+        ("staker_count", &total_staker.to_string()),
+        ("next_staker", &next_staker),
+    ]))
 }
 
 pub fn migrate_store(

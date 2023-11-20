@@ -121,10 +121,11 @@ pub fn remove_store_is_migrated(storage: &mut dyn Storage, asset_key: &[u8], sta
     Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).remove(&asset_key)
 }
 
-pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
-        .load(asset_key)
-        .unwrap_or(false)
+pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> StdResult<bool> {
+    match ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).may_load(asset_key) {
+        Ok(Some(v)) => Ok(v),
+        _ => Ok(false),
+    }
 }
 
 pub fn store_rewards_per_sec(
