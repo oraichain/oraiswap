@@ -4,15 +4,14 @@ use crate::migration::{
     old_stakers_store,
 };
 use crate::state::{
-    read_all_pool_info_keys, read_all_pool_infos, read_config, read_is_migrated, read_pool_info,
-    read_rewards_per_sec, rewards_read, rewards_store, stakers_read, stakers_store,
-    store_is_migrated, store_pool_info, store_rewards_per_sec, PoolInfo, RewardInfo,
+    read_all_pool_info_keys, read_pool_info, rewards_read, stakers_read, store_pool_info, PoolInfo,
+    RewardInfo,
 };
+use crate::testing::mock::load_state;
 
-use cosmwasm_std::testing::{digit_sum, riffle_shuffle};
-use cosmwasm_std::{Addr, CanonicalAddr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_std::{Api, DepsMut};
-use oraiswap::asset::{AssetInfo, AssetInfoRaw, AssetRaw};
+use oraiswap::asset::AssetInfo;
 
 use super::mock::mock_dependencies;
 
@@ -24,26 +23,15 @@ fn test_forked_mainnet() {
     let mut deps = mock_dependencies();
     let DepsMut { api, storage, .. } = deps.as_mut();
 
-    // first 4 bytes is for uint32 be
-    // 1 byte key length + key
-    // 2 bytes value length + value
-    let mut ind = 4;
+    load_state(storage, MAINET_STATE_BYTES);
 
-    while ind < MAINET_STATE_BYTES.len() {
-        let key_length = MAINET_STATE_BYTES[ind];
-        ind += 1;
-        let key = &MAINET_STATE_BYTES[ind..ind + key_length as usize];
-        ind += key_length as usize;
-        let value_length = u16::from_be_bytes(MAINET_STATE_BYTES[ind..ind + 2].try_into().unwrap());
-        ind += 2;
-        let value = &MAINET_STATE_BYTES[ind..ind + value_length as usize];
-        ind += value_length as usize;
-        storage.set(key, value);
-    }
+    let staking_token = read_pool_info(storage, &api.addr_canonicalize(MILKY_CONTRACT).unwrap())
+        .unwrap()
+        .staking_token;
 
     migrate_asset_keys_to_lp_tokens(storage, api).unwrap();
-    let asset_key = api.addr_canonicalize(MILKY_CONTRACT).unwrap();
-    let pool_info = read_pool_info(storage, &asset_key);
+
+    let pool_info = read_pool_info(storage, &staking_token).unwrap();
 
     println!("milky pool {:?}", pool_info);
 }

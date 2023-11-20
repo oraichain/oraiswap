@@ -12,9 +12,8 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
 use crate::state::{
-    read_all_pool_info_keys, read_config, read_is_migrated, read_pool_info, read_rewards_per_sec,
-    remove_pool_info, remove_store_is_migrated, rewards_read, rewards_store, stakers_read,
-    stakers_remove, stakers_store, store_config, store_is_migrated, store_pool_info,
+    read_all_pool_info_keys, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
+    rewards_store, stakers_read, stakers_store, store_config, store_is_migrated, store_pool_info,
     store_rewards_per_sec, Config, MigrationParams, PoolInfo,
 };
 
