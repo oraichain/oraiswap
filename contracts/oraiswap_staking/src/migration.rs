@@ -66,6 +66,8 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api)
     let pools = read_all_pool_infos(storage)?;
     for (asset_key, pool_info) in pools {
         let staking_token = api.addr_humanize(&pool_info.staking_token)?;
+
+        #[cfg(debug_assertions)]
         if let Ok(native_token) = String::from_utf8(asset_key.clone()) {
             api.debug(&format!(
                 "native {}, lp {}",
@@ -90,6 +92,7 @@ pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api)
         // process each staker's map
         let mut ind = 0;
         for (staker, _) in stakers {
+            #[cfg(debug_assertions)]
             if let Ok(staker_addr) = api.addr_humanize(&staker.clone().into()) {
                 api.debug(&format!("staker {} {}", ind, staker_addr.as_str()));
                 ind += 1;
