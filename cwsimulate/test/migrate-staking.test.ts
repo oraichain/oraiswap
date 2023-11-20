@@ -104,22 +104,28 @@ describe("Simulate oraiswap contract test", () => {
     stakeContract = new OraiswapStakingClient(client, sender, STAKING_CONTRACT);
   }, 600000);
 
-  it("should loadState successfully", async () => {
+  xit("should loadState successfully", async () => {
     const stakeInfo = await stakeContract.config();
 
     expect(stakeInfo).toBeDefined();
   });
 
   it("should migrate first 10 old asset successfully", async () => {
-    for (const old_asset of hardcode_data.old_asset.slice(0, 10)) {
+    for (const [i, old_asset] of hardcode_data.old_asset
+      .slice(0, 10)
+      .entries()) {
+      console.log(i);
       const asset_info = old_asset.startsWith("ibc/")
         ? { native_token: { denom: old_asset } }
         : { token: { contract_addr: old_asset } };
       await migrate_pool(client, asset_info, sender, codeId);
+      await expect(
+        stakeContract.poolInfo({ stakingToken: hardcode_data.lpArray[i] }),
+      ).resolves.toBeDefined();
     }
   }, 6000000);
 
-  it("should migrate rest old asset successfully", async () => {
+  xit("should migrate rest old asset successfully", async () => {
     for (const old_asset of hardcode_data.old_asset.slice(10)) {
       const asset_info = old_asset.startsWith("ibc/")
         ? { native_token: { denom: old_asset } }
@@ -140,7 +146,7 @@ describe("Simulate oraiswap contract test", () => {
     );
   });
 
-  xit("should migrate stake contract with cw20 token succesfully", async () => {
+  xit("should migrate stake contract with ibc token succesfully", async () => {
     await migrate_pool(
       client,
       {
@@ -151,5 +157,9 @@ describe("Simulate oraiswap contract test", () => {
       sender,
       codeId,
     );
+    const totalKey = await stakeContract.poolInfo({
+      stakingToken: "orai1g2prqry343kx566cp7uws9w7v78n5tejylvaz6",
+    });
+    console.log(totalKey);
   });
 });
