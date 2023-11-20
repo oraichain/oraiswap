@@ -1,4 +1,4 @@
-use crate::contract::migrate_store;
+use crate::contract::{migrate_store, query_pool_info};
 use crate::migration::{
     migrate_asset_keys_to_lp_tokens, old_rewards_read, old_rewards_store, old_stakers_read,
     old_stakers_store,
@@ -31,7 +31,11 @@ fn test_forked_mainnet() {
 
     migrate_asset_keys_to_lp_tokens(storage, api).unwrap();
 
-    let pool_info = read_pool_info(storage, &staking_token).unwrap();
+    let pool_info = query_pool_info(
+        deps.as_ref(),
+        deps.api.addr_humanize(&staking_token).unwrap(),
+    )
+    .unwrap();
 
     println!("milky pool {:?}", pool_info);
 }
