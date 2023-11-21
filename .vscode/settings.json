@@ -6,5 +6,8 @@
     "typescript.tsdk": "node_modules/typescript/lib",
     "rust-analyzer.cargo.extraEnv": {
         "CARGO_TARGET_DIR": "${userHome}/.cargo/target/analyzer"
-    }
+    },
+    "rust-analyzer.linkedProjects": [
+        "./contracts/oraiswap_staking/Cargo.toml"
+    ]
 }

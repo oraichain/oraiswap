@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::contract::migrate_store;
+use crate::legacy::v1::{old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_store};
 use crate::migration::{
-    migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token, old_rewards_read,
-    old_rewards_store, old_stakers_read, old_stakers_store,
+    migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token, MAX_STAKER,
 };
 use crate::state::{
     read_all_pool_info_keys, read_pool_info, read_rewards_per_sec, rewards_read, stakers_read,
@@ -18,7 +18,7 @@ use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::MockInstanceOptions;
 use cosmwasm_vm::Size;
 use oraiswap::asset::{AssetInfo, ORAI_DENOM};
-use oraiswap::staking::{MigrateMsg, PoolInfoResponse, QueryMsg};
+use oraiswap::staking::{ExecuteMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
@@ -48,16 +48,21 @@ const OLD_STAKING_TOKEN: [&str; 17] = [
 fn migrate_full_a_pool(
     contract_instance: &mut MockContract,
     asset_info: AssetInfo,
+    sender: &str,
 ) -> StdResult<()> {
     let mut next_key: Option<String> = None;
     let mut total_gas: u64 = 0;
-    while true {
+    loop {
         let (ret, gas_used) = contract_instance
-            .migrate(MigrateMsg {
-                asset_info: asset_info.clone(),
-                staker_after: next_key,
-                limit: Some(1000),
-            })
+            .execute(
+                ExecuteMsg::MigrateStore {
+                    asset_info: asset_info.clone(),
+                    staker_after: next_key,
+                    limit: Some(MAX_STAKER),
+                },
+                sender,
+                &vec![],
+            )
             .unwrap();
         total_gas += gas_used;
         let last_attribute_value = &ret.attributes.last().unwrap().value;
@@ -72,6 +77,7 @@ fn migrate_full_a_pool(
 
 #[test]
 fn test_forked_mainnet() {
+    let sender: &str = "sender";
     let mut contract_instance = MockContract::new(
         WASM_BYTES,
         Addr::unchecked(STAKING_CONTRACT),
@@ -97,7 +103,7 @@ fn test_forked_mainnet() {
                 contract_addr: Addr::unchecked(old_staking_token),
             },
         };
-        migrate_full_a_pool(&mut contract_instance, asset_info).unwrap();
+        migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
     }
 
     // let (pool_info, gas_used) = contract_instance

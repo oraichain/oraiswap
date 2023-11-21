@@ -1,11 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use crate::migration::{
-    migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token, old_read_is_migrated,
-    old_remove_store_is_migrated, old_rewards_read, old_rewards_store, old_stakers_read,
-    old_stakers_remove,
+use crate::legacy::v1::{
+    old_read_is_migrated, old_remove_store_is_migrated, old_rewards_read, old_rewards_store,
+    old_stakers_read, old_stakers_remove,
 };
+use crate::migration::{migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token};
 // use crate::migration::migrate_rewards_store;
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
@@ -100,9 +100,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staking_token,
             stakers,
         } => update_list_stakers(deps, env, info, staking_token, stakers),
-        ExecuteMsg::MigrateStore { asset_info, limit } => {
-            migrate_store(deps.storage, deps.api, asset_info, limit)
-        }
+        ExecuteMsg::MigrateStore {
+            asset_info,
+            staker_after,
+            limit,
+        } => migrate_store(deps.storage, deps.api, asset_info, staker_after, limit),
     }
 }
 
@@ -387,101 +389,61 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    let asset_key = msg.asset_info.to_vec(deps.api)?;
-    let start_after = match msg.staker_after {
-        Some(staker) => Some(deps.api.addr_canonicalize(&staker)?),
-        None => None,
-    };
+    // let asset_key = msg.asset_info.to_vec(deps.api)?;
+    // let start_after = match msg.staker_after {
+    //     Some(staker) => Some(deps.api.addr_canonicalize(&staker)?),
+    //     None => None,
+    // };
 
-    let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
-        deps.storage,
-        deps.api,
-        asset_key.as_slice(),
-        start_after.as_deref(),
-        msg.limit,
-    )?;
+    // let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
+    //     deps.storage,
+    //     deps.api,
+    //     asset_key.as_slice(),
+    //     start_after.as_deref(),
+    //     msg.limit,
+    // )?;
 
-    let next_staker = match next_staker {
-        Some(staker) => deps
-            .api
-            .addr_humanize(&CanonicalAddr::from(staker))?
-            .to_string(),
-        None => "".into(),
-    };
+    // let next_staker = match next_staker {
+    //     Some(staker) => deps
+    //         .api
+    //         .addr_humanize(&CanonicalAddr::from(staker))?
+    //         .to_string(),
+    //     None => "".into(),
+    // };
 
-    Ok(Response::default().add_attributes(vec![
-        ("action", "migrate_store"),
-        ("asset_info", &msg.asset_info.to_string()),
-        ("staker_count", &total_staker.to_string()),
-        ("next_staker", &next_staker),
-    ]))
+    Ok(Response::default().add_attributes(vec![("action", "migrate_store")]))
 }
 
 pub fn migrate_store(
     storage: &mut dyn Storage,
     api: &dyn Api,
     asset_info: AssetInfo,
+    staker_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<Response> {
     let asset_key = asset_info.to_vec(api)?;
-    // when migrating using migrate, we dont remove old pool info just yet because we need it to reference other stores like stakers
-    let old_pool_info = read_pool_info(storage, &asset_key)?;
-    let staking_token_cannonical = old_pool_info.staking_token;
-
-    let limit = limit.unwrap_or(MIGRATE_STORE_LIMIT) as usize;
-    let stakers: Vec<Vec<u8>> = old_stakers_read(storage, &asset_key)
-        .range(None, None, Order::Ascending)
-        .take(limit)
-        .map(|s| s.map(|op| op.0))
-        .collect::<StdResult<Vec<Vec<u8>>>>()?;
-
-    let last_staker = if let Some(staker) = stakers.last() {
-        api.addr_humanize(&CanonicalAddr::from(staker.to_owned()))
-            .map(|addr| addr.to_string())
-            .unwrap_or_default()
-    } else {
-        String::from("")
+    let start_after = match staker_after {
+        Some(staker) => Some(api.addr_canonicalize(&staker)?),
+        None => None,
     };
 
-    for staker in stakers.clone() {
-        // first thing first, we update ≈our stakers list mapped with the old asset key
-        stakers_store(storage, &staking_token_cannonical).save(&staker, &true)?;
-        old_stakers_remove(storage, &asset_key, &staker);
-        if let Ok(rewards_bucket) = old_rewards_read(storage, &staker).load(&asset_key) {
-            // update new key for our reward bucket
-            rewards_store(storage, &staker).save(&staking_token_cannonical, &rewards_bucket)?;
-            // remove old key
-            old_rewards_store(storage, &staker).remove(&asset_key);
-        }
+    let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
+        storage,
+        api,
+        asset_key.as_slice(),
+        start_after.as_deref(),
+        limit,
+    )?;
 
-        if old_read_is_migrated(storage, &asset_key, &staker) {
-            // new asset key is our lp token, we wont be using asset_info no more, so we need to update our store to a new key
-            store_is_migrated(storage, &staking_token_cannonical, &staker)?;
-            // remove old key
-            old_remove_store_is_migrated(storage, &asset_key, &staker);
-        }
-    }
-
-    // if we have fully removed stakers' data of the old key, then we can safely remove the pool info of the old key as well
-    let stakers_length = old_stakers_read(storage, &asset_key)
-        .range(None, None, Order::Ascending)
-        .count();
-    if stakers_length == 0usize {
-        remove_pool_info(storage, &asset_key);
-        return Ok(Response::default().add_attributes(vec![
-            ("action", "migrate_store"),
-            ("asset_info", &asset_info.to_string()),
-            ("last_staker", &last_staker.to_string()),
-            ("staker_count", &stakers.len().to_string()),
-            ("remove_pool_info", "true"),
-        ]));
-    }
+    let next_staker = match next_staker {
+        Some(staker) => api.addr_humanize(&CanonicalAddr::from(staker))?.to_string(),
+        None => "".into(),
+    };
 
     Ok(Response::default().add_attributes(vec![
         ("action", "migrate_store"),
         ("asset_info", &asset_info.to_string()),
-        ("last_staker", &last_staker.to_string()),
-        ("staker_count", &stakers.len().to_string()),
-        ("remove_pool_info", "false"),
+        ("staker_count", &total_staker.to_string()),
+        ("next_staker", &next_staker),
     ]))
 }

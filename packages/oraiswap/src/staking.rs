@@ -79,6 +79,7 @@ pub enum ExecuteMsg {
     },
     MigrateStore {
         asset_info: AssetInfo,
+        staker_after: Option<String>,
         limit: Option<u32>,
         // so can convert or throw error
     },
@@ -92,11 +93,7 @@ pub enum Cw20HookMsg {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {
-    pub asset_info: AssetInfo,
-    pub staker_after: Option<String>,
-    pub limit: Option<u64>,
-}
+pub struct MigrateMsg {}
 
 /// We currently take no arguments for migrations
 #[cw_serde]

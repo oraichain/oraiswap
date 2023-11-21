@@ -1,66 +1,22 @@
 use cosmwasm_std::{Api, CanonicalAddr, DepsMut, Order, StdResult, Storage};
 use cosmwasm_storage::{Bucket, ReadonlyBucket};
+use oraiswap::querier::calc_range_start;
 
-use crate::state::{
-    read_all_pool_infos, read_is_migrated, read_pool_info, read_rewards_per_sec, remove_pool_info,
-    remove_rewards_per_sec, remove_store_is_migrated, rewards_read, rewards_store, stakers_read,
-    stakers_remove, stakers_store, store_is_migrated, store_pool_info, store_rewards_per_sec,
-    RewardInfo,
+use crate::{
+    legacy::v1::{
+        old_read_is_migrated, old_read_pool_info, old_read_rewards_per_sec, old_rewards_read,
+        old_stakers_read,
+    },
+    state::{
+        read_all_pool_infos, read_is_migrated, read_pool_info, read_rewards_per_sec,
+        remove_pool_info, remove_rewards_per_sec, remove_store_is_migrated, rewards_read,
+        rewards_store, stakers_read, stakers_remove, stakers_store, store_is_migrated,
+        store_pool_info, store_rewards_per_sec,
+    },
 };
 
-pub static PREFIX_REWARD: &[u8] = b"reward_v2";
-static PREFIX_STAKER: &[u8] = b"staker";
-static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
-
-/// returns a bucket with all rewards owned by this staker (query it by staker)
-/// (read-only version for queries)
-pub fn old_stakers_read<'a>(
-    storage: &'a dyn Storage,
-    asset_key: &[u8],
-) -> ReadonlyBucket<'a, bool> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
-}
-
-/// returns a bucket with all stakers belong by this staker (query it by staker)
-pub fn old_stakers_store<'a>(storage: &'a mut dyn Storage, asset_key: &[u8]) -> Bucket<'a, bool> {
-    Bucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
-}
-
-// returns a bucket with all rewards owned by this staker (query it by staker)
-pub fn old_rewards_store<'a>(
-    storage: &'a mut dyn Storage,
-    staker: &[u8],
-) -> Bucket<'a, RewardInfo> {
-    Bucket::multilevel(storage, &[PREFIX_REWARD, staker])
-}
-
-/// returns a bucket with all rewards owned by this staker (query it by staker)
-/// (read-only version for queries)
-pub fn old_rewards_read<'a>(
-    storage: &'a dyn Storage,
-    staker: &[u8],
-) -> ReadonlyBucket<'a, RewardInfo> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_REWARD, staker])
-}
-
-/// returns a bucket with all stakers belong by this staker (query it by staker)
-pub fn old_stakers_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8], staker: &[u8]) -> () {
-    Bucket::<CanonicalAddr>::multilevel(storage, &[PREFIX_STAKER, asset_key]).remove(staker)
-}
-
-pub fn old_read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
-        .load(asset_key)
-        .unwrap_or(false)
-}
-
-pub fn old_remove_store_is_migrated(
-    storage: &mut dyn Storage,
-    asset_key: &[u8],
-    staker: &[u8],
-) -> () {
-    Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).remove(&asset_key)
-}
+pub const MAX_STAKER: u32 = 1000;
+const DEFAULT_STAKER: u32 = 100;
 
 pub fn migrate_asset_keys_to_lp_tokens(storage: &mut dyn Storage, api: &dyn Api) -> StdResult<()> {
     let pools = read_all_pool_infos(storage)?;
@@ -124,20 +80,17 @@ pub fn migrate_single_asset_key_to_lp_token(
     api: &dyn Api,
     asset_key: &[u8],
     start_staker: Option<&[u8]>,
-    limit_staker: Option<u64>,
+    limit_staker: Option<u32>,
 ) -> StdResult<(u64, Option<Vec<u8>>)> {
-    const MAX_STAKER: u64 = 1000;
-    const DEFAULT_STAKER: u64 = 100;
-
     let limit = limit_staker.unwrap_or(DEFAULT_STAKER).min(MAX_STAKER) as usize;
 
-    let pool_info = read_pool_info(storage, asset_key)?;
+    let pool_info = old_read_pool_info(storage, asset_key)?;
     // store pool_info to new key
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
 
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
-    let next_key;
 
+    #[cfg(debug_assertions)]
     if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
         api.debug(&format!(
             "native {}, lp {}",
@@ -147,51 +100,48 @@ pub fn migrate_single_asset_key_to_lp_token(
     } else {
         api.debug(&format!(
             "cw20 {}, lp {}",
-            api.addr_humanize(&asset_key.clone().into())?.as_str(),
+            api.addr_humanize(&asset_key.into())?.as_str(),
             staking_token.as_str()
         ));
     }
-
-    let mut stakers = old_stakers_read(storage, asset_key)
-        .range(start_staker, None, Order::Ascending)
-        // Get next_key
-        .take(limit + 1)
-        .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
-
-    if stakers.len() == 0 {
-        return Ok((0, None));
-    }
-
-    if stakers.len() > limit {
-        next_key = Some(stakers.pop().unwrap().0);
-    } else {
-        next_key = None;
-    }
-
     // store reward_per_sec to new new key
-    if let Some(rewards_per_sec) = read_rewards_per_sec(storage, &asset_key).ok() {
+    if let Some(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key).ok() {
         store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
     }
+
+    let stakers = old_stakers_read(storage, asset_key)
+        .range(start_staker, None, Order::Ascending)
+        // Get next_key
+        .take(limit)
+        .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
+
+    // if stakers.len() == 0 {
+    //     return Ok((0, None));
+    // }
+
+    // if stakers.len() > limit {
+    //     next_key = Some(stakers.pop().unwrap().0);
+    // } else {
+    //     next_key = None;
+    // }
 
     #[cfg(debug_assertions)]
     api.debug(&format!("stakers.len {:?} ", stakers.len()));
 
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
-        if let Ok(is_migrated) = read_is_migrated(storage, &pool_info.staking_token, staker) {
+        if let Ok(is_migrated) = old_read_is_migrated(storage, &pool_info.staking_token, staker) {
             if is_migrated {
-                continue;
-            } else {
                 store_is_migrated(storage, &pool_info.staking_token, staker)?;
-
-                stakers_store(storage, &pool_info.staking_token).save(staker, &true)?;
-
-                if let Some(reward) = old_rewards_read(storage, staker).load(asset_key).ok() {
-                    rewards_store(storage, staker).save(&pool_info.staking_token, &reward)?;
-                }
             }
+        };
+        stakers_store(storage, &pool_info.staking_token).save(staker, &true)?;
+        if let Some(reward) = old_rewards_read(storage, staker).load(asset_key).ok() {
+            rewards_store(storage, staker).save(&pool_info.staking_token, &reward)?;
         }
     }
-
-    Ok((stakers.len() as u64, next_key))
+    // get the last staker key from the list
+    let last_staker = stakers.last().map(|staker| staker.0.to_owned());
+    // increment 1 based on the bytes to process next key
+    Ok((stakers.len() as u64, calc_range_start(last_staker)))
 }
