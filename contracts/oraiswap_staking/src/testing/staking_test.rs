@@ -1,4 +1,4 @@
-use crate::contract::{execute, instantiate, query, query_total_asset_key};
+use crate::contract::{execute, instantiate, query, query_get_pools_infomation};
 use crate::state::{store_pool_info, PoolInfo};
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
@@ -52,8 +52,8 @@ fn test_query_all_pool_keys() {
         store_pool_info(storage, &asset_key, &pool_info).unwrap();
     }
 
-    let all_pool_keys = query_total_asset_key(deps.as_ref()).unwrap();
-    assert_eq!(all_pool_keys.len(), 2);
+    let all_pool_keys = query_get_pools_infomation(deps.as_ref()).unwrap();
+    assert_eq!(all_pool_keys.pool_infos.len(), 2);
     // assert_eq!(
     //     all_pool_keys.contains(&first_staking_token.to_string()),
     //     true

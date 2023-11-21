@@ -26,7 +26,9 @@ use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::{execute, MockInstanceOptions};
 use cosmwasm_vm::{BackendApi, BackendResult, Size};
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
-use oraiswap::staking::{ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
+use oraiswap::staking::{
+    AllPoolInfoResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
+};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
@@ -118,8 +120,14 @@ fn test_forked_mainnet() {
     }
 
     println!("gas used {}", total_gas);
-    let api = contract_instance.instance.api().clone();
 
+    let info = contract_instance
+        .query::<QueryMsg, AllPoolInfoResponse>(QueryMsg::GetPoolsInformation {})
+        .unwrap();
+
+    assert_eq!(info.0.pool_infos.len(), 17);
+
+    let api = contract_instance.instance.api().clone();
     let _ = contract_instance
         .instance
         .with_storage(|mock_store| {
@@ -136,14 +144,6 @@ fn test_forked_mainnet() {
                     .unwrap()
                     .len(),
                 read_all_pool_info_keys(&mock_store.wrap()).unwrap().len()
-            );
-            println!(
-                "pool info keys len {:?}",
-                read_all_pool_info_keys(&mock_store.wrap())
-                    .unwrap()
-                    .iter()
-                    .map(|item| api.human_address(item.as_slice()).0.unwrap())
-                    .collect::<Vec<String>>()
             );
 
             // assert stakers

@@ -9,9 +9,10 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_all_pool_info_keys, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
-    stakers_read, store_config, store_finish_migrate_store_status, store_pool_info,
-    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
+    read_all_pool_info_keys, read_all_pool_infos, read_config, read_pool_info,
+    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
+    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
+    MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -20,8 +21,8 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
-    QueryMsg, RewardsPerSecResponse,
+    AllPoolInfoResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
+    PoolInfoResponse, QueryMsg, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -324,7 +325,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order,
         )?),
-        QueryMsg::TotalPoolAssetKeys {} => to_binary(&query_total_asset_key(deps)?),
+        QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
     }
 }
 
@@ -373,22 +374,18 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
     Ok(RewardsPerSecResponse { assets })
 }
 
-pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
-    let asset_keys = read_all_pool_info_keys(deps.storage)?;
-    let keys = asset_keys
-        .into_iter()
-        .map(|key| {
-            if let Ok(native_token) = String::from_utf8(key.clone()) {
-                native_token
-            } else {
-                deps.api
-                    .addr_humanize(&key.clone().into())
-                    .unwrap()
-                    .to_string()
-            }
-        })
-        .collect::<Vec<String>>();
-    Ok(keys)
+pub fn query_get_pools_infomation(deps: Deps) -> StdResult<AllPoolInfoResponse> {
+    Ok(AllPoolInfoResponse {
+        pool_infos: read_all_pool_infos(deps.storage)?
+            .into_iter()
+            .map(|(key, pool_info)| {
+                let asset_key = CanonicalAddr::from(key);
+                let addr_humanize = deps.api.addr_humanize(&asset_key).unwrap();
+                let pool_info_response = query_pool_info(deps, addr_humanize.clone()).unwrap();
+                (addr_humanize, pool_info_response)
+            })
+            .collect::<Vec<(Addr, PoolInfoResponse)>>(),
+    })
 }
 
 // migrate contract
