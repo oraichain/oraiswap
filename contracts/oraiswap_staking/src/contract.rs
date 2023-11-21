@@ -1,20 +1,16 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use crate::legacy::v1::{
-    old_read_is_migrated, old_remove_store_is_migrated, old_rewards_read, old_rewards_store,
-    old_stakers_read, old_stakers_remove,
-};
-use crate::migration::{migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token};
+use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
 // use crate::migration::migrate_rewards_store;
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
     read_all_pool_info_keys, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
-    rewards_store, stakers_read, stakers_store, store_config, store_is_migrated, store_pool_info,
+    stakers_read, store_config, store_finish_migrate_store_status, store_pool_info,
     store_rewards_per_sec, Config, MigrationParams, PoolInfo,
 };
 
@@ -27,8 +23,6 @@ use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
     QueryMsg, RewardsPerSecResponse,
 };
-
-pub const MIGRATE_STORE_LIMIT: u32 = 1000;
 
 use cw20::Cw20ReceiveMsg;
 
@@ -52,6 +46,8 @@ pub fn instantiate(
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
         },
     )?;
+    // set to true to enable normal execute handling when instantiate
+    store_finish_migrate_store_status(deps.storage, true)?;
 
     Ok(Response::default())
 }
@@ -60,7 +56,11 @@ pub fn instantiate(
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
+        ExecuteMsg::UpdateConfig {
+            rewarder,
+            owner,
+            migrate_store_status,
+        } => update_config(deps, info, owner, rewarder, migrate_store_status),
         ExecuteMsg::UpdateRewardsPerSec {
             staking_token,
             assets,
@@ -96,10 +96,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
-        ExecuteMsg::UpdateListStakers {
-            staking_token,
-            stakers,
-        } => update_list_stakers(deps, env, info, staking_token, stakers),
         ExecuteMsg::MigrateStore {
             asset_info,
             staker_after,
@@ -113,6 +109,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Bond {}) => {
             // check permission
@@ -148,6 +145,7 @@ pub fn update_config(
     info: MessageInfo,
     owner: Option<Addr>,
     rewarder: Option<Addr>,
+    migrate_store_status: Option<bool>,
 ) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -163,6 +161,10 @@ pub fn update_config(
         config.rewarder = deps.api.addr_canonicalize(rewarder.as_str())?;
     }
 
+    if let Some(migrate_store_status) = migrate_store_status {
+        store_finish_migrate_store_status(deps.storage, migrate_store_status)?;
+    }
+
     store_config(deps.storage, &config)?;
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -175,6 +177,7 @@ fn update_rewards_per_sec(
     staking_token: Addr,
     assets: Vec<Asset>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
@@ -216,6 +219,7 @@ fn update_rewards_per_sec(
 }
 
 fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -252,6 +256,7 @@ fn deprecate_staking_token(
     staking_token: Addr,
     new_staking_token: Addr,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -388,8 +393,9 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
 
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    Ok(Response::default().add_attributes(vec![("action", "migrate_store")]))
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    store_finish_migrate_store_status(deps.storage, false)?;
+    Ok(Response::default())
 }
 
 pub fn migrate_store(

@@ -66,11 +66,13 @@ pub enum ContractError {
     AssetMustNotBeZero {},
 
     #[error("Order {order_id} has already fulfilled")]
-    OrderFulfilled {order_id: u64},
+    OrderFulfilled { order_id: u64 },
 
     #[error("Amount of {quote_coin} must be greater than {min_quote_amount}")]
     TooSmallQuoteAsset {
         quote_coin: String,
         min_quote_amount: Uint128,
     },
+    #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
+    ContractUpgrade {},
 }

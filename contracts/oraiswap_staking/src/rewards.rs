@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use crate::migration::validate_migrate_store_status;
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, read_rewards_per_sec, rewards_read,
     rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,
@@ -21,6 +22,7 @@ pub fn deposit_reward(
     info: MessageInfo,
     rewards: Vec<RewardMsg>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config = read_config(deps.storage)?;
 
     // only rewarder can execute this message, rewarder may be a contract
@@ -67,6 +69,7 @@ pub fn withdraw_reward(
     info: MessageInfo,
     staking_token: Option<Addr>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let staker_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
     let asset_key = staking_token.map_or(None, |a| {
         deps.api
@@ -98,6 +101,7 @@ pub fn withdraw_reward_others(
     staker_addrs: Vec<Addr>,
     staker_addr: Option<Addr>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config = read_config(deps.storage)?;
 
     // only admin can execute this message

@@ -1,24 +1,27 @@
 use std::collections::HashSet;
 
-use crate::contract::migrate_store;
+use crate::contract::{instantiate, migrate_store};
 use crate::legacy::v1::{old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_store};
 use crate::migration::{
-    migrate_asset_keys_to_lp_tokens, migrate_single_asset_key_to_lp_token, MAX_STAKER,
+    migrate_single_asset_key_to_lp_token, validate_migrate_store_status, MAX_STAKER,
 };
 use crate::state::{
-    read_all_pool_info_keys, read_pool_info, read_rewards_per_sec, rewards_read, stakers_read,
-    store_pool_info, PoolInfo, RewardInfo,
+    read_all_pool_info_keys, read_finish_migrate_store_status, read_pool_info,
+    read_rewards_per_sec, rewards_read, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 
-use cosmwasm_std::testing::mock_dependencies;
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_testing_util::mock::MockContract;
+use cw20::Cw20ReceiveMsg;
+use oraiswap::error::ContractError;
 
-use cosmwasm_std::{coins, Api, StdResult};
+use crate::contract::{execute as contract_execute, query};
+use cosmwasm_std::{coins, Api, Binary, StdError, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
-use cosmwasm_vm::testing::MockInstanceOptions;
+use cosmwasm_vm::testing::{execute, MockInstanceOptions};
 use cosmwasm_vm::Size;
-use oraiswap::asset::{AssetInfo, ORAI_DENOM};
-use oraiswap::staking::{ExecuteMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
+use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::staking::{ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
@@ -112,6 +115,223 @@ fn test_forked_mainnet() {
     //     })
     //     .unwrap();
     // println!("gas used {}, pool info {:?}", gas_used, pool_info);
+}
+
+#[test]
+fn test_validate_migrate_store_status() {
+    // fixture
+    let mut deps = mock_dependencies();
+    let msg = InstantiateMsg {
+        owner: None,
+        rewarder: Addr::unchecked("rewarder"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
+        base_denom: None,
+    };
+    let owner = mock_info("owner", &[]);
+    let _res = instantiate(deps.as_mut(), mock_env(), owner.clone(), msg).unwrap();
+    // when instantiating, by default we set migrate store status to true as we dont need to migrate anything, can operate as normal
+    assert_eq!(validate_migrate_store_status(deps.as_mut().storage), Ok(()));
+    // execute
+    contract_execute(
+        deps.as_mut(),
+        mock_env(),
+        owner.clone(),
+        ExecuteMsg::UpdateConfig {
+            rewarder: None,
+            owner: None,
+            migrate_store_status: Some(false),
+        },
+    )
+    .unwrap();
+    // assert
+    assert_eq!(
+        validate_migrate_store_status(deps.as_mut().storage),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+}
+
+#[test]
+fn test_validate_migrate_store_status_with_execute_msg() {
+    // fixture
+    let mut deps = mock_dependencies();
+    let msg = InstantiateMsg {
+        owner: None,
+        rewarder: Addr::unchecked("rewarder"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
+        base_denom: None,
+    };
+    let owner = mock_info("owner", &[]);
+    let empty_addr = Addr::unchecked("");
+    let _res = instantiate(deps.as_mut(), mock_env(), owner.clone(), msg).unwrap();
+    // execute
+    contract_execute(
+        deps.as_mut(),
+        mock_env(),
+        owner.clone(),
+        ExecuteMsg::UpdateConfig {
+            rewarder: None,
+            owner: None,
+            migrate_store_status: Some(false),
+        },
+    )
+    .unwrap();
+    // assert
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::DepositReward { rewards: vec![] }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::AutoStake {
+                assets: [
+                    Asset {
+                        amount: Uint128::zero(),
+                        info: AssetInfo::NativeToken {
+                            denom: "orai".to_string()
+                        }
+                    },
+                    Asset {
+                        amount: Uint128::zero(),
+                        info: AssetInfo::NativeToken {
+                            denom: "orai".to_string()
+                        }
+                    }
+                ],
+                slippage_tolerance: None
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::AutoStakeHook {
+                staking_token: empty_addr.clone(),
+                staker_addr: empty_addr.clone(),
+                prev_staking_token_amount: Uint128::zero()
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::DeprecateStakingToken {
+                staking_token: empty_addr.clone(),
+                new_staking_token: empty_addr.clone()
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::Receive(Cw20ReceiveMsg {
+                sender: "".to_string(),
+                amount: Uint128::zero(),
+                msg: Binary::default()
+            })
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::RegisterAsset {
+                staking_token: empty_addr.clone()
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::Unbond {
+                staking_token: empty_addr.clone(),
+                amount: Uint128::zero()
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::UpdateRewardsPerSec {
+                staking_token: empty_addr.clone(),
+                assets: vec![]
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::Withdraw {
+                staking_token: None
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
+    assert_eq!(
+        contract_execute(
+            deps.as_mut(),
+            mock_env(),
+            owner.clone(),
+            ExecuteMsg::WithdrawOthers {
+                staking_token: None,
+                staker_addrs: vec![]
+            }
+        ),
+        Err(StdError::generic_err(
+            ContractError::ContractUpgrade {}.to_string()
+        ))
+    );
 }
 
 // #[test]

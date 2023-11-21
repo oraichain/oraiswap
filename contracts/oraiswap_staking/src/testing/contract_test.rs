@@ -64,6 +64,7 @@ fn update_config() {
     let msg = ExecuteMsg::UpdateConfig {
         owner: Some(Addr::unchecked("owner2")),
         rewarder: None,
+        migrate_store_status: Some(true),
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -88,6 +89,7 @@ fn update_config() {
     let msg = ExecuteMsg::UpdateConfig {
         rewarder: None,
         owner: None,
+        migrate_store_status: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg);

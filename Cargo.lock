@@ -1217,7 +1217,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "oraiswap"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1232,7 +1232,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-converter"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-factory"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1257,7 +1257,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-limit-order"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-oracle"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1283,7 +1283,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-pair"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1301,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-rewarder"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1312,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-router"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-staking"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1345,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-token"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
