@@ -25,6 +25,7 @@ pub enum ExecuteMsg {
     UpdateConfig {
         rewarder: Option<Addr>,
         owner: Option<Addr>,
+        migrate_store_status: Option<bool>,
     },
     RegisterAsset {
         staking_token: Addr,
@@ -72,10 +73,6 @@ pub enum ExecuteMsg {
         staking_token: Addr,
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
-    },
-    UpdateListStakers {
-        staking_token: Addr,
-        stakers: Vec<Addr>,
     },
     MigrateStore {
         asset_info: AssetInfo,

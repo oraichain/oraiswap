@@ -10,6 +10,8 @@ pub static PREFIX_REWARD: &[u8] = b"reward_v3";
 static PREFIX_STAKER: &[u8] = b"staker_v3";
 static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated_v3";
 static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec_v3";
+// a key to validate if we have finished migrating the store. Only allow staking functionalities when we have finished migrating
+static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
 
 #[cw_serde]
 pub struct Config {
@@ -26,6 +28,17 @@ pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()>
 
 pub fn read_config(storage: &dyn Storage) -> StdResult<Config> {
     singleton_read(storage, KEY_CONFIG).load()
+}
+
+pub fn store_finish_migrate_store_status(
+    storage: &mut dyn Storage,
+    has_finished: bool,
+) -> StdResult<()> {
+    singleton(storage, KEY_MIGRATE_STORE_CHECK).save(&has_finished)
+}
+
+pub fn read_finish_migrate_store_status(storage: &dyn Storage) -> StdResult<bool> {
+    singleton_read(storage, KEY_MIGRATE_STORE_CHECK).load()
 }
 
 #[cw_serde]

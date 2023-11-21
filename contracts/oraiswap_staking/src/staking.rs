@@ -1,3 +1,4 @@
+use crate::migration::validate_migrate_store_status;
 use crate::rewards::before_share_change;
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, stakers_store,
@@ -43,6 +44,7 @@ pub fn unbond(
     staking_token: Addr,
     amount: Uint128,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
     let (staking_token, reward_assets) = _decrease_bond_amount(
         deps.storage,
@@ -79,29 +81,6 @@ pub fn unbond(
     ]))
 }
 
-pub fn update_list_stakers(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    staking_token: Addr,
-    stakers: Vec<Addr>,
-) -> StdResult<Response> {
-    let config: Config = read_config(deps.storage)?;
-
-    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
-    for staker in stakers {
-        stakers_store(deps.storage, &asset_key).save(
-            deps.api.addr_canonicalize(staker.as_str())?.as_slice(),
-            &true,
-        )?;
-    }
-
-    Ok(Response::new().add_attribute("action", "update_list_stakers"))
-}
-
 pub fn auto_stake(
     deps: DepsMut,
     env: Env,
@@ -109,6 +88,7 @@ pub fn auto_stake(
     assets: [Asset; 2],
     slippage_tolerance: Option<Decimal>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
 
@@ -212,6 +192,7 @@ pub fn auto_stake_hook(
     prev_staking_token_amount: Uint128,
 ) -> StdResult<Response> {
     // only can be called by itself
+    validate_migrate_store_status(deps.storage)?;
     if info.sender != env.contract.address {
         return Err(StdError::generic_err("unauthorized"));
     }
