@@ -3,8 +3,8 @@ use oraiswap::{error::ContractError, querier::calc_range_start};
 
 use crate::{
     legacy::v1::{
-        old_read_is_migrated, old_read_pool_info, old_read_rewards_per_sec, old_rewards_read,
-        old_stakers_read,
+        old_read_all_is_migrated, old_read_is_migrated, old_read_pool_info,
+        old_read_rewards_per_sec, old_rewards_read, old_stakers_read,
     },
     state::{
         read_finish_migrate_store_status, rewards_store, stakers_store, store_is_migrated,
@@ -27,7 +27,6 @@ pub fn migrate_single_asset_key_to_lp_token(
     let pool_info = old_read_pool_info(storage, asset_key)?;
     // store pool_info to new key
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
-
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
 
     #[cfg(debug_assertions)]
@@ -60,10 +59,9 @@ pub fn migrate_single_asset_key_to_lp_token(
 
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
-        if let Ok(is_migrated) = old_read_is_migrated(storage, asset_key, staker) {
-            if is_migrated {
-                store_is_migrated(storage, &pool_info.staking_token, staker)?;
-            }
+        let is_migrated = old_read_is_migrated(storage, asset_key, staker);
+        if is_migrated {
+            store_is_migrated(storage, &pool_info.staking_token, staker)?;
         };
         stakers_store(storage, &pool_info.staking_token).save(staker, &true)?;
         if let Some(reward) = old_rewards_read(storage, staker).load(asset_key).ok() {
