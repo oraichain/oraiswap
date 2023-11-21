@@ -11,24 +11,26 @@ use crate::state::{
 };
 
 use cosmwasm_std::testing::mock_dependencies;
+use cosmwasm_storage::ReadonlyBucket;
 use cosmwasm_testing_util::mock::MockContract;
 
 use cosmwasm_std::{coins, Api, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::MockInstanceOptions;
-use cosmwasm_vm::Size;
+use cosmwasm_vm::{BackendApi, Size};
 use oraiswap::asset::{AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{ExecuteMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
 const MILKY_STAKING_TOKEN: &str = "orai18ywllw03hvy720l06rme0apwyyq9plk64h9ccf";
+const MILKY_CONTRACT: &str = "orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw";
 const SENDER: &str = "orai1gkr56hlnx9vc7vncln2dkd896zfsqjn300kfq0";
 const STAKING_CONTRACT: &str = "orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu";
 const OLD_STAKING_TOKEN: [&str; 17] = [
     "orai19q4qak2g3cj2xc2y3060t0quzn3gfhzx08rjlrdd3vqxhjtat0cq668phq",
     "orai19rtmkk6sn4tppvjmp5d5zj6gfsdykrl5rw2euu5gwur3luheuuusesqn49",
-    "orai1gzvndtzceqwfymu2kqhta2jn6gmzxvzqwdgvjw",
+    MILKY_CONTRACT,
     "orai12hzjxfh77wl572gdzct2fxv2arxcwh6gykc7qh",
     "ibc/4F7464EEE736CCFB6B444EB72DE60B3B43C0DD509FFA2B87E05D584467AAE8C8",
     "ibc/A2E2EEC9057A4A1C2C0A6A4C78B0239118DF5F278830F50B4A6BDD7A66506B78",
@@ -94,17 +96,35 @@ fn test_forked_mainnet() {
     );
     contract_instance.load_state(MAINET_STATE_BYTES).unwrap();
 
-    for old_staking_token in OLD_STAKING_TOKEN.into_iter() {
-        let asset_info = match old_staking_token.starts_with("ibc/") {
-            true => AssetInfo::NativeToken {
-                denom: old_staking_token.to_string(),
-            },
-            false => AssetInfo::Token {
-                contract_addr: Addr::unchecked(old_staking_token),
-            },
-        };
-        migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
-    }
+    let asset_key = contract_instance
+        .instance
+        .api()
+        .canonical_address(MILKY_CONTRACT)
+        .0
+        .unwrap();
+
+    let pool_info: PoolInfo = contract_instance
+        .instance
+        .with_storage(|store| {
+            Ok(ReadonlyBucket::new(&store.wrap(), b"pool_info_v2")
+                .load(&asset_key)
+                .unwrap())
+        })
+        .unwrap();
+
+    println!("pool info {:?}", pool_info);
+
+    // for old_staking_token in OLD_STAKING_TOKEN.into_iter() {
+    //     let asset_info = match old_staking_token.starts_with("ibc/") {
+    //         true => AssetInfo::NativeToken {
+    //             denom: old_staking_token.to_string(),
+    //         },
+    //         false => AssetInfo::Token {
+    //             contract_addr: Addr::unchecked(old_staking_token),
+    //         },
+    //     };
+    //     migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
+    // }
 
     // let (pool_info, gas_used) = contract_instance
     //     .query::<_, PoolInfoResponse>(QueryMsg::PoolInfo {
