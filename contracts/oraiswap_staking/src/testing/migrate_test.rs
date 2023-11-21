@@ -11,6 +11,7 @@ use crate::state::{
 };
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+use cosmwasm_storage::ReadonlyBucket;
 use cosmwasm_testing_util::mock::MockContract;
 use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
@@ -19,7 +20,7 @@ use crate::contract::{execute as contract_execute, query};
 use cosmwasm_std::{coins, Api, Binary, StdError, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::{execute, MockInstanceOptions};
-use cosmwasm_vm::Size;
+use cosmwasm_vm::{BackendApi, Size};
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::staking::{ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
 
