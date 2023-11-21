@@ -388,29 +388,7 @@ pub fn query_total_asset_key(deps: Deps) -> StdResult<Vec<String>> {
 
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    // let asset_key = msg.asset_info.to_vec(deps.api)?;
-    // let start_after = match msg.staker_after {
-    //     Some(staker) => Some(deps.api.addr_canonicalize(&staker)?),
-    //     None => None,
-    // };
-
-    // let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
-    //     deps.storage,
-    //     deps.api,
-    //     asset_key.as_slice(),
-    //     start_after.as_deref(),
-    //     msg.limit,
-    // )?;
-
-    // let next_staker = match next_staker {
-    //     Some(staker) => deps
-    //         .api
-    //         .addr_humanize(&CanonicalAddr::from(staker))?
-    //         .to_string(),
-    //     None => "".into(),
-    // };
-
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default().add_attributes(vec![("action", "migrate_store")]))
 }
 
