@@ -58,7 +58,7 @@ fn migrate_full_a_pool(
     contract_instance: &mut MockContract,
     asset_info: AssetInfo,
     sender: &str,
-) -> StdResult<()> {
+) -> StdResult<u64> {
     let mut next_key: Option<String> = None;
     let mut total_gas: u64 = 0;
     loop {
@@ -80,13 +80,14 @@ fn migrate_full_a_pool(
         }
         next_key = Some(last_attribute_value.to_string());
     }
-    println!("gas used {}", total_gas);
-    Ok(())
+    println!("each time {}", total_gas);
+    Ok(total_gas)
 }
 
 #[test]
 fn test_forked_mainnet() {
     let sender: &str = "sender";
+    let mut total_gas: u64 = 0;
 
     let mut contract_instance = MockContract::new(
         WASM_BYTES,
@@ -113,9 +114,10 @@ fn test_forked_mainnet() {
                 contract_addr: Addr::unchecked(old_staking_token),
             },
         };
-        migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
+        total_gas += migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
     }
 
+    println!("gas used {}", total_gas);
     let api = contract_instance.instance.api().clone();
 
     let _ = contract_instance
