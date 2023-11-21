@@ -55,22 +55,12 @@ pub fn migrate_single_asset_key_to_lp_token(
         .take(limit)
         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
 
-    // if stakers.len() == 0 {
-    //     return Ok((0, None));
-    // }
-
-    // if stakers.len() > limit {
-    //     next_key = Some(stakers.pop().unwrap().0);
-    // } else {
-    //     next_key = None;
-    // }
-
     #[cfg(debug_assertions)]
     api.debug(&format!("stakers.len {:?} ", stakers.len()));
 
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
-        if let Ok(is_migrated) = old_read_is_migrated(storage, &pool_info.staking_token, staker) {
+        if let Ok(is_migrated) = old_read_is_migrated(storage, asset_key, staker) {
             if is_migrated {
                 store_is_migrated(storage, &pool_info.staking_token, staker)?;
             }

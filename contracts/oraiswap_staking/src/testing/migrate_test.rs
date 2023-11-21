@@ -1,12 +1,16 @@
 use std::collections::HashSet;
+use std::ops::Deref;
 
 use crate::contract::{instantiate, migrate_store};
-use crate::legacy::v1::{old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_store};
+use crate::legacy::v1::{
+    old_read_all_pool_info_keys, old_rewards_read, old_rewards_store, old_stakers_read,
+    old_stakers_store,
+};
 use crate::migration::{
     migrate_single_asset_key_to_lp_token, validate_migrate_store_status, MAX_STAKER,
 };
 use crate::state::{
-    read_all_pool_info_keys, read_finish_migrate_store_status, read_pool_info,
+    read_all_pool_info_keys, read_finish_migrate_store_status, read_is_migrated, read_pool_info,
     read_rewards_per_sec, rewards_read, stakers_read, store_pool_info, PoolInfo, RewardInfo,
 };
 
@@ -17,11 +21,11 @@ use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
 
 use crate::contract::{execute as contract_execute, query};
-use cosmwasm_std::{coins, Api, Binary, StdError, StdResult};
+use cosmwasm_std::{coins, Api, Binary, Order, StdError, StdResult, Storage};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::{execute, MockInstanceOptions};
-use cosmwasm_vm::{BackendApi, Size};
-use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use cosmwasm_vm::{BackendApi, BackendResult, Size};
+use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
@@ -83,6 +87,7 @@ fn migrate_full_a_pool(
 #[test]
 fn test_forked_mainnet() {
     let sender: &str = "sender";
+
     let mut contract_instance = MockContract::new(
         WASM_BYTES,
         Addr::unchecked(STAKING_CONTRACT),
@@ -99,42 +104,116 @@ fn test_forked_mainnet() {
     );
     contract_instance.load_state(MAINET_STATE_BYTES).unwrap();
 
-    let asset_key = contract_instance
-        .instance
-        .api()
-        .canonical_address(MILKY_CONTRACT)
-        .0
-        .unwrap();
+    for old_staking_token in OLD_STAKING_TOKEN.into_iter() {
+        let asset_info = match old_staking_token.starts_with("ibc/") {
+            true => AssetInfo::NativeToken {
+                denom: old_staking_token.to_string(),
+            },
+            false => AssetInfo::Token {
+                contract_addr: Addr::unchecked(old_staking_token),
+            },
+        };
+        migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
+    }
 
-    let pool_info: PoolInfo = contract_instance
+    let api = contract_instance.instance.api().clone();
+
+    let _ = contract_instance
         .instance
-        .with_storage(|store| {
-            Ok(ReadonlyBucket::new(&store.wrap(), b"pool_info_v2")
-                .load(&asset_key)
-                .unwrap())
+        .with_storage(|mock_store| {
+            println!(
+                "pool info keys len {:?}",
+                old_read_all_pool_info_keys(&mock_store.wrap())
+                    .unwrap()
+                    .len()
+            );
+
+            // assert pool len pool info
+            assert_eq!(
+                old_read_all_pool_info_keys(&mock_store.wrap())
+                    .unwrap()
+                    .len(),
+                read_all_pool_info_keys(&mock_store.wrap()).unwrap().len()
+            );
+            println!(
+                "pool info keys len {:?}",
+                read_all_pool_info_keys(&mock_store.wrap())
+                    .unwrap()
+                    .iter()
+                    .map(|item| api.human_address(item.as_slice()).0.unwrap())
+                    .collect::<Vec<String>>()
+            );
+
+            // assert stakers
+            let old_stakers: Vec<_> =
+                ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::legacy::v1::PREFIX_STAKER])
+                    .range(None, None, Order::Ascending)
+                    .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+                    .unwrap();
+            let new_stakers: Vec<_> =
+                ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::state::PREFIX_STAKER])
+                    .range(None, None, Order::Ascending)
+                    .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+                    .unwrap();
+
+            println!("old stakers len {:?}", old_stakers.len());
+            assert_eq!(old_stakers.len(), new_stakers.len());
+            // // assert is migrated
+            // let new_migrated_staker: Vec<_> =
+            //     ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::state::PREFIX_IS_MIGRATED])
+            //         .range(None, None, Order::Ascending)
+            //         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+            //         .unwrap();
+            //
+            // let old_migrated_staker: Vec<_> = ReadonlyBucket::multilevel(
+            //     &mock_store.wrap(),
+            //     &[crate::legacy::v1::PREFIX_IS_MIGRATED],
+            // )
+            // .range(None, None, Order::Ascending)
+            // .filter(|item| item.as_ref().unwrap().1)
+            // .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+            // .unwrap();
+            // assert_eq!(new_migrated_staker.len(), old_migrated_staker.len());
+
+            // assert reward
+            let old_reward: Vec<_> =
+                ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::legacy::v1::PREFIX_REWARD])
+                    .range(None, None, Order::Ascending)
+                    .filter(|item| item.is_ok())
+                    .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()
+                    .unwrap();
+
+            let new_reward: Vec<_> =
+                ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::state::PREFIX_REWARD])
+                    .range(None, None, Order::Ascending)
+                    .filter(|item| item.is_ok())
+                    .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()
+                    .unwrap();
+
+            println!("old reward len {:?}", old_reward.len());
+            assert_eq!(old_reward.len(), new_reward.len());
+
+            let old_reward_per_sec = ReadonlyBucket::multilevel(
+                &mock_store.wrap(),
+                &[crate::legacy::v1::PREFIX_REWARDS_PER_SEC],
+            )
+            .range(None, None, Order::Ascending)
+            .filter(|item| item.is_ok())
+            .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
+            .unwrap();
+
+            let new_reward_per_sec = ReadonlyBucket::multilevel(
+                &mock_store.wrap(),
+                &[crate::state::PREFIX_REWARDS_PER_SEC],
+            )
+            .range(None, None, Order::Ascending)
+            .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
+            .unwrap();
+
+            assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
+            Ok(())
         })
         .unwrap();
-
-    println!("pool info {:?}", pool_info);
-
-    // for old_staking_token in OLD_STAKING_TOKEN.into_iter() {
-    //     let asset_info = match old_staking_token.starts_with("ibc/") {
-    //         true => AssetInfo::NativeToken {
-    //             denom: old_staking_token.to_string(),
-    //         },
-    //         false => AssetInfo::Token {
-    //             contract_addr: Addr::unchecked(old_staking_token),
-    //         },
-    //     };
-    //     migrate_full_a_pool(&mut contract_instance, asset_info, sender).unwrap();
-    // }
-
-    // let (pool_info, gas_used) = contract_instance
-    //     .query::<_, PoolInfoResponse>(QueryMsg::PoolInfo {
-    //         staking_token: Addr::unchecked(MILKY_STAKING_TOKEN),
-    //     })
-    //     .unwrap();
-    // println!("gas used {}, pool info {:?}", gas_used, pool_info);
 }
 
 #[test]

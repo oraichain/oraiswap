@@ -4,11 +4,11 @@ use oraiswap::asset::AssetRaw;
 
 use crate::state::{PoolInfo, RewardInfo};
 
-static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
-static PREFIX_REWARD: &[u8] = b"reward_v2";
-static PREFIX_STAKER: &[u8] = b"staker";
-static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
-static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
+pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
+pub static PREFIX_REWARD: &[u8] = b"reward_v2";
+pub static PREFIX_STAKER: &[u8] = b"staker";
+pub static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
+pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
 pub fn old_remove_pool_info(storage: &mut dyn Storage, asset_key: &[u8]) {
     Bucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO).remove(&asset_key);
@@ -26,6 +26,12 @@ pub fn old_read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
+pub fn old_read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>> {
+    ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
+        .range(None, None, cosmwasm_std::Order::Ascending)
+        .map(|bucket| bucket.map(|b| b.0))
+        .collect()
+}
 /// returns a bucket with all rewards owned by this staker (query it by staker)
 /// (read-only version for queries)
 pub fn old_stakers_read<'a>(
