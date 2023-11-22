@@ -121,17 +121,18 @@ fn test_forked_mainnet() {
                 assert_eq!(new_keys.contains(&pool_info.staking_token.to_vec()), true);
                 let old_stakers = old_stakers_read(&mock_store.wrap(), &old_key)
                     .range(None, None, Order::Ascending)
-                    .map(|data| data.unwrap().0)
-                    .collect::<Vec<Vec<u8>>>();
+                    .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+                    .unwrap();
                 let new_stakers = stakers_read(&mock_store.wrap(), &pool_info.staking_token)
                     .range(None, None, Order::Ascending)
-                    .map(|data| data.unwrap().0)
-                    .collect::<Vec<Vec<u8>>>();
+                    .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
+                    .unwrap();
 
                 // assert stakers
                 assert_eq!(old_stakers.len(), new_stakers.len());
-                for old_staker in old_stakers {
-                    assert_eq!(new_stakers.contains(&old_staker), true);
+                for old_staker_data in old_stakers {
+                    assert_eq!(new_stakers.contains(&old_staker_data), true);
+                    let old_staker = old_staker_data.0;
                     // let old_rewards_store =
                     //     old_rewards_read(&mock_store.wrap(), &old_staker).may_load(&old_key);
                     // println!("old rewards store: {:?}", old_rewards_store);
