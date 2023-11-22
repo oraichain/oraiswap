@@ -7,8 +7,8 @@ use crate::{
         old_read_rewards_per_sec, old_rewards_read, old_stakers_read,
     },
     state::{
-        read_finish_migrate_store_status, rewards_store, stakers_store, store_is_migrated,
-        store_pool_info, store_rewards_per_sec,
+        read_finish_migrate_store_status, read_is_migrated, read_pool_info, rewards_store,
+        stakers_store, store_is_migrated, store_pool_info, store_rewards_per_sec,
     },
 };
 
@@ -54,20 +54,14 @@ pub fn migrate_single_asset_key_to_lp_token(
 
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
-        let is_migrated = old_read_is_migrated(storage, asset_key, staker);
-        let staker_addr =
-            api.addr_humanize(&cosmwasm_std::CanonicalAddr::from(staker.as_slice()))?;
-        if asset_key_string
-            .eq("ibc/9E4F68298EE0A201969E583100E5F9FAD145BAA900C04ED3B6B302D834D8E3C4")
-            && staker_addr
-                .to_string()
-                .eq("orai1v5x7d2csz5vwz48p6wkj4j2y884e0adeq3vjzn")
-        {
-            api.debug(&format!("staker: {:?}", staker));
+        let all_is_migrated = old_read_all_is_migrated(storage, staker)?;
+        for (old_asset_key, old_is_migrated) in all_is_migrated {
+            let old_pool_info = old_read_pool_info(storage, &old_asset_key)?;
+            let new_is_migrated = read_is_migrated(storage, &old_pool_info.staking_token, staker);
+            if old_is_migrated && !new_is_migrated {
+                store_is_migrated(storage, &old_pool_info.staking_token, staker)?;
+            }
         }
-        if is_migrated {
-            store_is_migrated(storage, &pool_info.staking_token, staker)?;
-        };
         stakers_store(storage, &pool_info.staking_token).save(staker, &true)?;
         if let Some(reward) = old_rewards_read(storage, staker).load(asset_key).ok() {
             rewards_store(storage, staker).save(&pool_info.staking_token, &reward)?;

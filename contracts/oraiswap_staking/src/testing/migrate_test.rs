@@ -149,43 +149,44 @@ fn test_forked_mainnet() {
                         old_is_migrated,
                         read_is_migrated(&mock_store.wrap(), &pool_info.staking_token, &old_staker)
                     );
-                    let list_is_migrated_old: Vec<(String, bool)> =
+                    let list_is_migrated_old: Vec<(Vec<u8>, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
                             &mock_store.wrap(),
                             &[crate::legacy::v1::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        .map(|data| {
-                            (
-                                if let Ok(native_token) = String::from_utf8(data.0.clone()) {
-                                    native_token
-                                } else {
-                                    api.human_address(data.0.as_slice()).0.unwrap()
-                                },
-                                data.1,
-                            )
-                        })
+                        // .map(|data| {
+                        //     (
+                        //         if let Ok(native_token) = String::from_utf8(data.0.clone()) {
+                        //             native_token
+                        //         } else {
+                        //             api.human_address(data.0.as_slice()).0.unwrap()
+                        //         },
+                        //         data.1,
+                        //     )
+                        // })
                         .collect();
 
-                    let list_is_migrated_new: Vec<(String, bool)> =
+                    let list_is_migrated_new: Vec<(Vec<u8>, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
                             &mock_store.wrap(),
                             &[crate::state::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        .map(|data| (api.human_address(data.0.as_slice()).0.unwrap(), data.1))
+                        // .map(|data| (api.human_address(data.0.as_slice()).0.unwrap(), data.1))
                         .collect();
 
-                    // assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
-                    if list_is_migrated_old.len() != list_is_migrated_new.len() {
-                        println!(
-                            "old staker: {:?}",
-                            api.human_address(&old_staker).0.unwrap()
+                    assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
+                    for (old_asset_key, old_is_migrated) in list_is_migrated_old {
+                        let old_pool =
+                            old_read_pool_info(&mock_store.wrap(), &old_asset_key).unwrap();
+                        assert_eq!(
+                            list_is_migrated_new
+                                .contains(&(old_pool.staking_token.to_vec(), old_is_migrated)),
+                            true
                         );
-                        println!("list is migrated old: {:?}", list_is_migrated_old);
-                        println!("list is migrated new: {:?}", list_is_migrated_new);
                     }
                 }
 
