@@ -5,8 +5,8 @@ use crate::legacy::v1::{
 };
 use crate::migration::validate_migrate_store_status;
 use crate::state::{
-    read_all_pool_info_keys, read_is_migrated, rewards_read, rewards_store, stakers_read,
-    RewardInfo,
+    read_all_pool_info_keys, read_is_migrated, read_rewards_per_sec, rewards_read, rewards_store,
+    stakers_read, RewardInfo,
 };
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
@@ -145,16 +145,6 @@ fn test_forked_mainnet() {
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        // .map(|data| {
-                        //     (
-                        //         if let Ok(native_token) = String::from_utf8(data.0.clone()) {
-                        //             native_token
-                        //         } else {
-                        //             api.human_address(data.0.as_slice()).0.unwrap()
-                        //         },
-                        //         data.1,
-                        //     )
-                        // })
                         .collect();
 
                     let list_is_migrated_new: Vec<(Vec<u8>, bool)> =
@@ -164,10 +154,10 @@ fn test_forked_mainnet() {
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        // .map(|data| (api.human_address(data.0.as_slice()).0.unwrap(), data.1))
                         .collect();
 
                     assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
+
                     for (old_asset_key, old_is_migrated) in list_is_migrated_old {
                         let old_pool = old_read_pool_info(mock_store, &old_asset_key).unwrap();
                         assert_eq!(
@@ -177,40 +167,22 @@ fn test_forked_mainnet() {
                         );
                     }
                 }
-
-                // assert reward
-                // let old_reward: Vec<_> = ReadonlyBucket::multilevel(
-                //     mock_store,
-                //     &[crate::legacy::v1::PREFIX_REWARD],
-                // )
-                // .range(None, None, Order::Ascending)
-                // .filter(|item| item.is_ok())
-                // .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()
-                // .unwrap();
-
-                // let new_reward: Vec<_> =
-                //     ReadonlyBucket::multilevel(mock_store, &[crate::state::PREFIX_REWARD])
-                //         .range(None, None, Order::Ascending)
-                //         .filter(|item| item.is_ok())
-                //         .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()
-                //         .unwrap();
-
-                // println!("old reward len {:?}", old_reward.len());
-                // assert_eq!(old_reward.len(), new_reward.len());
-
-                // // assert is migrated
-                // let new_migrated_staker: Vec<_> =
-                //     ReadonlyBucket::multilevel(mock_store, &[crate::state::PREFIX_IS_MIGRATED])
-                //         .range(None, None, Order::Ascending)
-                //         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
-                //         .unwrap();
-                // let old_is_migrated = old_read_all_is_migrated(mock_store).unwrap();
-                // assert_eq!(new_migrated_staker.len(), old_is_migrated.len());
             }
+
             let old_reward_per_sec =
                 ReadonlyBucket::new(mock_store, crate::legacy::v1::PREFIX_REWARDS_PER_SEC)
                     .range(None, None, Order::Ascending)
-                    .filter(|item| item.is_ok())
+                    .filter(|item| {
+                        item.is_ok()
+                    // filter wrong key which is scORAI/ORAI pair's lp 
+                            && !api
+                                .human_address(item.as_ref().unwrap().0.as_slice())
+                                .0
+                                .unwrap()
+                                .eq(&String::from(
+                                "orai1ay689ltr57jt2snujarvakxrmtuq8fhuat5rnvq6rct89vjer9gqm2vde6", // scOrai
+                            ))
+                    })
                     .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
                     .unwrap();
 
@@ -220,32 +192,13 @@ fn test_forked_mainnet() {
                     .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
                     .unwrap();
 
-            let old_reward_per_sec_keys = old_reward_per_sec
-                .iter()
-                .map(|item| {
-                    if let Ok(native_token) = String::from_utf8(item.0.clone()) {
-                        native_token
-                    } else {
-                        api.human_address(item.0.as_slice()).0.unwrap()
-                    }
-                })
-                .collect::<Vec<String>>();
+            assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
 
-            for old_reward_per_sec_key in old_reward_per_sec_keys.into_iter() {
-                if OLD_ASSET_KEYS
-                    .into_iter()
-                    .map(String::from)
-                    .collect::<Vec<String>>()
-                    .contains(&old_reward_per_sec_key)
-                {
-                    continue;
-                }
-                println!("old reward per sec key {:?}", old_reward_per_sec_key);
+            for old_rw_per_sec in old_reward_per_sec {
+                let pool_info = old_read_pool_info(mock_store, &old_rw_per_sec.0).unwrap();
+                let asset_raw = read_rewards_per_sec(mock_store, &pool_info.staking_token).unwrap();
+                assert_eq!(asset_raw, old_rw_per_sec.1);
             }
-            // assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
-            // for old_rw_per_sec in old_reward_per_sec {
-            //     assert_eq!(new_reward_per_sec.contains(&old_rw_per_sec), true);
-            // }
             Ok(())
         })
         .unwrap();

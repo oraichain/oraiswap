@@ -22,8 +22,8 @@ pub fn migrate_single_asset_key_to_lp_token(
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
 
-    // #[cfg(debug_assertions)]
     let asset_key_string = if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
+        #[cfg(debug_assertions)]
         api.debug(&format!(
             "native {}, lp {}",
             native_token.as_str(),
@@ -32,6 +32,8 @@ pub fn migrate_single_asset_key_to_lp_token(
         native_token
     } else {
         let key = api.addr_humanize(&asset_key.into())?.to_string();
+
+        #[cfg(debug_assertions)]
         api.debug(&format!(
             "cw20 {}, lp {}",
             key.as_str(),
@@ -41,6 +43,7 @@ pub fn migrate_single_asset_key_to_lp_token(
     };
     // store reward_per_sec to new new key
     if let Ok(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key) {
+        #[cfg(debug_assertions)]
         api.debug(&format!("rewards_per_sec {:?}", rewards_per_sec));
         store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
     }
