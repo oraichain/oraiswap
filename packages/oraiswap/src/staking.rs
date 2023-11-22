@@ -121,7 +121,7 @@ pub enum QueryMsg {
         // so can convert or throw error
         order: Option<i32>,
     },
-    #[returns(AllPoolInfoResponse)]
+    #[returns(Vec<QueryPoolInfoResponse>)]
     GetPoolsInformation {},
 }
 
@@ -176,6 +176,7 @@ pub struct RewardMsg {
 }
 
 #[cw_serde]
-pub struct AllPoolInfoResponse {
-    pub pool_infos: Vec<(Addr, PoolInfoResponse)>,
+pub struct QueryPoolInfoResponse {
+    pub asset_key: String,
+    pub pool_info: PoolInfoResponse,
 }

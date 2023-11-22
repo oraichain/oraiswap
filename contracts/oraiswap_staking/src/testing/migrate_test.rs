@@ -5,8 +5,8 @@ use crate::legacy::v1::{
 };
 use crate::migration::validate_migrate_store_status;
 use crate::state::{
-    read_all_pool_info_keys, read_is_migrated, read_rewards_per_sec, rewards_read, rewards_store,
-    stakers_read, RewardInfo,
+    read_is_migrated, read_rewards_per_sec, rewards_read, rewards_store, stakers_read, PoolInfo,
+    RewardInfo, PREFIX_POOL_INFO,
 };
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
@@ -16,14 +16,12 @@ use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
 
 use crate::contract::execute as contract_execute;
-use cosmwasm_std::{coins, Binary, Order, StdError, StdResult};
+use cosmwasm_std::{coins, Binary, Order, StdError, StdResult, Storage};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::MockInstanceOptions;
 use cosmwasm_vm::BackendApi;
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
-use oraiswap::staking::{
-    AllPoolInfoResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg,
-};
+use oraiswap::staking::{ExecuteMsg, InstantiateMsg, QueryMsg, QueryPoolInfoResponse};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
@@ -49,12 +47,19 @@ const OLD_ASSET_KEYS: [&str; 17] = [
     "orai1llsm2ly9lchj006cw2mmlu8wmhr0sa988sp3m5",
 ];
 
+fn read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>> {
+    ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
+        .range(None, None, cosmwasm_std::Order::Ascending)
+        .map(|bucket| bucket.map(|b| b.0))
+        .collect()
+}
+
 fn migrate_full_a_pool(
     contract_instance: &mut MockContract,
     asset_info: AssetInfo,
     sender: &str,
 ) -> StdResult<u64> {
-    let (ret, gas_used) = contract_instance
+    let (_ret, gas_used) = contract_instance
         .execute(
             ExecuteMsg::MigrateStore {
                 asset_info: asset_info.clone(),
@@ -100,11 +105,11 @@ fn test_forked_mainnet() {
     println!("gas used {}", total_gas);
 
     let info = contract_instance
-        .query::<QueryMsg, AllPoolInfoResponse>(QueryMsg::GetPoolsInformation {})
+        .query::<QueryMsg, Vec<QueryPoolInfoResponse>>(QueryMsg::GetPoolsInformation {})
         .unwrap();
     println!("query_gas_used {}", info.1);
 
-    assert_eq!(info.0.pool_infos.len(), 17);
+    assert_eq!(info.0.len(), 17);
 
     let api = contract_instance.api();
 

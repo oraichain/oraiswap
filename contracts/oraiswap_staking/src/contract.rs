@@ -9,10 +9,9 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_all_pool_info_keys, read_all_pool_infos, read_config, read_pool_info,
-    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
-    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
-    MigrationParams, PoolInfo,
+    read_all_pool_infos, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
+    stakers_read, store_config, store_finish_migrate_store_status, store_pool_info,
+    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -21,8 +20,8 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    AllPoolInfoResponse, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
-    PoolInfoResponse, QueryMsg, RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
+    QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -372,18 +371,33 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
     Ok(RewardsPerSecResponse { assets })
 }
 
-pub fn query_get_pools_infomation(deps: Deps) -> StdResult<AllPoolInfoResponse> {
-    Ok(AllPoolInfoResponse {
-        pool_infos: read_all_pool_infos(deps.storage)?
-            .into_iter()
-            .map(|(key, pool_info)| {
-                let asset_key = CanonicalAddr::from(key);
-                let addr_humanize = deps.api.addr_humanize(&asset_key).unwrap();
-                let pool_info_response = query_pool_info(deps, addr_humanize.clone()).unwrap();
-                (addr_humanize, pool_info_response)
+pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResponse>> {
+    read_all_pool_infos(deps.storage)?
+        .into_iter()
+        .map(|(key, pool_info)| {
+            let asset_key = CanonicalAddr::from(key);
+            let staking_token = deps.api.addr_humanize(&asset_key)?;
+            Ok(QueryPoolInfoResponse {
+                asset_key: staking_token.to_string(),
+                pool_info: PoolInfoResponse {
+                    staking_token,
+                    total_bond_amount: pool_info.total_bond_amount,
+                    reward_index: pool_info.reward_index,
+                    pending_reward: pool_info.pending_reward,
+                    migration_deprecated_staking_token: pool_info
+                        .migration_params
+                        .clone()
+                        .map(|params| -> StdResult<Addr> {
+                            Ok(deps.api.addr_humanize(&params.deprecated_staking_token)?)
+                        })
+                        .transpose()?,
+                    migration_index_snapshot: pool_info
+                        .migration_params
+                        .map(|params| params.index_snapshot),
+                },
             })
-            .collect::<Vec<(Addr, PoolInfoResponse)>>(),
-    })
+        })
+        .collect::<StdResult<Vec<QueryPoolInfoResponse>>>()
 }
 
 // migrate contract
