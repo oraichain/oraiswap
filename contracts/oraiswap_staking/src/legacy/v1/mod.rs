@@ -10,18 +10,6 @@ pub static PREFIX_STAKER: &[u8] = b"staker";
 pub static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
 pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
-pub fn old_remove_pool_info(storage: &mut dyn Storage, asset_key: &[u8]) {
-    Bucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO).remove(&asset_key);
-}
-
-pub fn old_store_pool_info(
-    storage: &mut dyn Storage,
-    asset_key: &[u8],
-    pool_info: &PoolInfo,
-) -> StdResult<()> {
-    Bucket::new(storage, PREFIX_POOL_INFO).save(asset_key, pool_info)
-}
-
 pub fn old_read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<PoolInfo> {
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
