@@ -79,12 +79,6 @@ pub fn read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>>
         .collect()
 }
 
-pub fn read_all_pool_infos(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, PoolInfo)>> {
-    ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
-        .range(None, None, cosmwasm_std::Order::Ascending)
-        .collect()
-}
-
 #[cw_serde]
 pub struct RewardInfo {
     pub native_token: bool,
@@ -117,21 +111,12 @@ pub fn stakers_read<'a>(storage: &'a dyn Storage, asset_key: &[u8]) -> ReadonlyB
     ReadonlyBucket::multilevel(storage, &[PREFIX_STAKER, asset_key])
 }
 
-/// returns a bucket with all stakers belong by this staker (query it by staker)
-pub fn stakers_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8], staker: &[u8]) -> () {
-    Bucket::<CanonicalAddr>::multilevel(storage, &[PREFIX_STAKER, asset_key]).remove(staker)
-}
-
 pub fn store_is_migrated(
     storage: &mut dyn Storage,
     asset_key: &[u8],
     staker: &[u8],
 ) -> StdResult<()> {
     Bucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).save(asset_key, &true)
-}
-
-pub fn remove_store_is_migrated(storage: &mut dyn Storage, asset_key: &[u8], staker: &[u8]) -> () {
-    Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).remove(&asset_key)
 }
 
 pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
@@ -153,8 +138,4 @@ pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResul
     let weight_bucket: ReadonlyBucket<Vec<AssetRaw>> =
         ReadonlyBucket::new(storage, PREFIX_REWARDS_PER_SEC);
     weight_bucket.load(asset_key)
-}
-
-pub fn remove_rewards_per_sec(storage: &mut dyn Storage, asset_key: &[u8]) -> () {
-    Bucket::<Vec<AssetRaw>>::new(storage, PREFIX_REWARDS_PER_SEC).remove(asset_key)
 }

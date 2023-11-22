@@ -1,14 +1,14 @@
-use cosmwasm_std::{Api, Deps, DepsMut, Order, StdError, StdResult, Storage};
-use oraiswap::{error::ContractError, querier::calc_range_start};
+use cosmwasm_std::{Api, Order, StdError, StdResult, Storage};
+use oraiswap::error::ContractError;
 
 use crate::{
     legacy::v1::{
-        old_read_all_is_migrated, old_read_is_migrated, old_read_pool_info,
-        old_read_rewards_per_sec, old_rewards_read, old_stakers_read,
+        old_read_all_is_migrated, old_read_pool_info, old_read_rewards_per_sec, old_rewards_read,
+        old_stakers_read,
     },
     state::{
-        read_finish_migrate_store_status, read_is_migrated, read_pool_info, rewards_store,
-        stakers_store, store_is_migrated, store_pool_info, store_rewards_per_sec,
+        read_finish_migrate_store_status, read_is_migrated, rewards_store, stakers_store,
+        store_is_migrated, store_pool_info, store_rewards_per_sec,
     },
 };
 
@@ -22,14 +22,13 @@ pub fn migrate_single_asset_key_to_lp_token(
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
 
-    let asset_key_string = if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
+    if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
         #[cfg(debug_assertions)]
         api.debug(&format!(
             "native {}, lp {}",
             native_token.as_str(),
             staking_token.as_str()
         ));
-        native_token
     } else {
         let key = api.addr_humanize(&asset_key.into())?.to_string();
 
@@ -39,7 +38,6 @@ pub fn migrate_single_asset_key_to_lp_token(
             key.as_str(),
             staking_token.as_str()
         ));
-        key
     };
     // store reward_per_sec to new new key
     if let Ok(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key) {
