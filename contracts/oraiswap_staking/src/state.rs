@@ -7,11 +7,11 @@ use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 pub static KEY_CONFIG: &[u8] = b"config_v2";
 pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v3";
 pub static PREFIX_REWARD: &[u8] = b"reward_v3";
-static PREFIX_STAKER: &[u8] = b"staker_v3";
-static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated_v3";
-static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec_v3";
+pub static PREFIX_STAKER: &[u8] = b"staker_v3";
+pub static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated_v3";
+pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec_v3";
 // a key to validate if we have finished migrating the store. Only allow staking functionalities when we have finished migrating
-static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
+pub static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
 
 #[cw_serde]
 pub struct Config {
@@ -134,11 +134,10 @@ pub fn remove_store_is_migrated(storage: &mut dyn Storage, asset_key: &[u8], sta
     Bucket::<bool>::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).remove(&asset_key)
 }
 
-pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> StdResult<bool> {
-    match ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).may_load(asset_key) {
-        Ok(Some(v)) => Ok(v),
-        _ => Ok(false),
-    }
+pub fn read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
+        .load(asset_key)
+        .unwrap_or(false)
 }
 
 pub fn store_rewards_per_sec(

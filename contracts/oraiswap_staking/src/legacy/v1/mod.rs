@@ -1,14 +1,14 @@
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, Order, StdResult, Storage};
 use cosmwasm_storage::{Bucket, ReadonlyBucket};
 use oraiswap::asset::AssetRaw;
 
 use crate::state::{PoolInfo, RewardInfo};
 
-static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
-static PREFIX_REWARD: &[u8] = b"reward_v2";
-static PREFIX_STAKER: &[u8] = b"staker";
-static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
-static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
+pub static PREFIX_POOL_INFO: &[u8] = b"pool_info_v2";
+pub static PREFIX_REWARD: &[u8] = b"reward_v2";
+pub static PREFIX_STAKER: &[u8] = b"staker";
+pub static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated";
+pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec";
 
 pub fn old_remove_pool_info(storage: &mut dyn Storage, asset_key: &[u8]) {
     Bucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO).remove(&asset_key);
@@ -26,6 +26,12 @@ pub fn old_read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
+pub fn old_read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>> {
+    ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
+        .range(None, None, cosmwasm_std::Order::Ascending)
+        .map(|bucket| bucket.map(|b| b.0))
+        .collect()
+}
 /// returns a bucket with all rewards owned by this staker (query it by staker)
 /// (read-only version for queries)
 pub fn old_stakers_read<'a>(
@@ -62,15 +68,16 @@ pub fn old_stakers_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8], st
     Bucket::<CanonicalAddr>::multilevel(storage, &[PREFIX_STAKER, asset_key]).remove(staker)
 }
 
-pub fn old_read_is_migrated(
-    storage: &dyn Storage,
-    asset_key: &[u8],
-    staker: &[u8],
-) -> StdResult<bool> {
-    match ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).may_load(asset_key) {
-        Ok(Some(v)) => Ok(v),
-        _ => Ok(false),
-    }
+pub fn old_read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
+        .load(asset_key)
+        .unwrap_or(false)
+}
+
+pub fn old_read_all_is_migrated(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, bool)>> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED])
+        .range(None, None, Order::Ascending)
+        .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
 }
 
 pub fn old_remove_store_is_migrated(

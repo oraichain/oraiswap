@@ -225,7 +225,7 @@ fn _increase_bond_amount(
         });
 
     // check if the position should be migrated
-    let is_position_migrated = read_is_migrated(storage, &asset_key, staker_addr)?;
+    let is_position_migrated = read_is_migrated(storage, &asset_key, staker_addr);
     if pool_info.migration_params.is_some() {
         // the pool has been migrated, if position is not migrated and has tokens bonded, return error
         if !reward_info.bond_amount.is_zero() && !is_position_migrated {
@@ -272,8 +272,8 @@ fn _decrease_bond_amount(
     }
 
     // if the lp token was migrated, and the user did not close their position yet, cap the reward at the snapshot
-    let should_migrate = !read_is_migrated(storage, &asset_key, staker_addr)?
-        && pool_info.migration_params.is_some();
+    let should_migrate =
+        !read_is_migrated(storage, &asset_key, staker_addr) && pool_info.migration_params.is_some();
     let (pool_index, staking_token) = if should_migrate {
         let migraton_params = pool_info.migration_params.clone().unwrap();
         (
