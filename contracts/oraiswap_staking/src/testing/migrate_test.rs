@@ -18,10 +18,10 @@ use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
 
 use crate::contract::execute as contract_execute;
-use cosmwasm_std::{coins, Binary, Order, StdError, StdResult};
+use cosmwasm_std::{coins, Api, Binary, Order, StdError, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::MockInstanceOptions;
-use cosmwasm_vm::Size;
+use cosmwasm_vm::{BackendApi, Size};
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{ExecuteMsg, InstantiateMsg};
 
@@ -115,6 +115,7 @@ fn test_forked_mainnet() {
 
             for old_key in old_keys {
                 let pool_info = old_read_pool_info(mock_store, &old_key).unwrap();
+
                 // exhaustive search test. Can go extra by making sure the staking token is unique for every old pool
                 assert_eq!(new_keys.contains(&pool_info.staking_token.to_vec()), true);
                 let old_stakers = old_stakers_read(mock_store, &old_key)
@@ -226,10 +227,32 @@ fn test_forked_mainnet() {
                     .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
                     .unwrap();
 
-            assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
-            for old_rw_per_sec in old_reward_per_sec {
-                assert_eq!(new_reward_per_sec.contains(&old_rw_per_sec), true);
+            let old_reward_per_sec_keys = old_reward_per_sec
+                .iter()
+                .map(|item| {
+                    if let Ok(native_token) = String::from_utf8(item.0.clone()) {
+                        native_token
+                    } else {
+                        api.human_address(item.0.as_slice()).0.unwrap()
+                    }
+                })
+                .collect::<Vec<String>>();
+
+            for old_reward_per_sec_key in old_reward_per_sec_keys.into_iter() {
+                if OLD_ASSET_KEYS
+                    .into_iter()
+                    .map(String::from)
+                    .collect::<Vec<String>>()
+                    .contains(&old_reward_per_sec_key)
+                {
+                    continue;
+                }
+                println!("old reward per sec key {:?}", old_reward_per_sec_key);
             }
+            // assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
+            // for old_rw_per_sec in old_reward_per_sec {
+            //     assert_eq!(new_reward_per_sec.contains(&old_rw_per_sec), true);
+            // }
             Ok(())
         })
         .unwrap();

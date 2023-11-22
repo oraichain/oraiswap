@@ -40,7 +40,8 @@ pub fn migrate_single_asset_key_to_lp_token(
         key
     };
     // store reward_per_sec to new new key
-    if let Some(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key).ok() {
+    if let Ok(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key) {
+        api.debug(&format!("rewards_per_sec {:?}", rewards_per_sec));
         store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
     }
 
