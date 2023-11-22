@@ -74,8 +74,11 @@ pub fn old_read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u
         .unwrap_or(false)
 }
 
-pub fn old_read_all_is_migrated(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, bool)>> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED])
+pub fn old_read_all_is_migrated(
+    storage: &dyn Storage,
+    staker: &[u8],
+) -> StdResult<Vec<(Vec<u8>, bool)>> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
         .range(None, None, Order::Ascending)
         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
 }

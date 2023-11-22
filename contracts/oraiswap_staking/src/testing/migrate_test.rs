@@ -1,30 +1,28 @@
 use std::collections::HashSet;
 
-use crate::contract::{instantiate, migrate_store, query_pool_info};
+use crate::contract::instantiate;
 use crate::legacy::v1::{
-    old_read_all_is_migrated, old_read_all_pool_info_keys, old_read_is_migrated,
-    old_read_pool_info, old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_store,
+    old_read_all_pool_info_keys, old_read_is_migrated, old_read_pool_info, old_stakers_read,
 };
-use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
+use crate::migration::validate_migrate_store_status;
 use crate::state::{
-    read_all_pool_info_keys, read_finish_migrate_store_status, read_is_migrated, read_pool_info,
-    read_rewards_per_sec, rewards_read, rewards_store, stakers_read, store_pool_info, PoolInfo,
+    read_all_pool_info_keys, read_is_migrated, rewards_read, rewards_store, stakers_read,
     RewardInfo,
 };
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_storage::ReadonlyBucket;
-use cosmwasm_testing_util::mock::{self, MockContract};
+use cosmwasm_testing_util::mock::MockContract;
 use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
 
-use crate::contract::{execute as contract_execute, query};
-use cosmwasm_std::{coins, Api, Binary, CanonicalAddr, Order, StdError, StdResult, Storage};
+use crate::contract::execute as contract_execute;
+use cosmwasm_std::{coins, Binary, Order, StdError, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
-use cosmwasm_vm::testing::{execute, MockInstanceOptions};
-use cosmwasm_vm::{BackendApi, BackendResult, Size};
+use cosmwasm_vm::testing::MockInstanceOptions;
+use cosmwasm_vm::Size;
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
-use oraiswap::staking::{ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse, QueryMsg};
+use oraiswap::staking::{ExecuteMsg, InstantiateMsg};
 
 const WASM_BYTES: &[u8] = include_bytes!("../../artifacts/oraiswap_staking.wasm");
 const MAINET_STATE_BYTES: &[u8] = include_bytes!("./mainnet.state");
@@ -147,48 +145,43 @@ fn test_forked_mainnet() {
                         old_is_migrated,
                         read_is_migrated(mock_store, &pool_info.staking_token, &old_staker)
                     );
-                    let list_is_migrated_old: Vec<(String, bool)> =
+                    let list_is_migrated_old: Vec<(Vec<u8>, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
                             mock_store,
                             &[crate::legacy::v1::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        .map(|data| {
-                            (
-                                if let Ok(native_token) = String::from_utf8(data.0.clone()) {
-                                    native_token
-                                } else {
-                                    api.addr_humanize(&data.0.into()).unwrap().to_string()
-                                },
-                                data.1,
-                            )
-                        })
+                        // .map(|data| {
+                        //     (
+                        //         if let Ok(native_token) = String::from_utf8(data.0.clone()) {
+                        //             native_token
+                        //         } else {
+                        //             api.human_address(data.0.as_slice()).0.unwrap()
+                        //         },
+                        //         data.1,
+                        //     )
+                        // })
                         .collect();
 
-                    let list_is_migrated_new: Vec<(String, bool)> =
+                    let list_is_migrated_new: Vec<(Vec<u8>, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
                             mock_store,
                             &[crate::state::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        .map(|data| {
-                            (
-                                api.addr_humanize(&data.0.into()).unwrap().to_string(),
-                                data.1,
-                            )
-                        })
+                        // .map(|data| (api.human_address(data.0.as_slice()).0.unwrap(), data.1))
                         .collect();
 
-                    // assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
-                    if list_is_migrated_old.len() != list_is_migrated_new.len() {
-                        println!(
-                            "old staker: {:?}",
-                            api.addr_humanize(&old_staker.into()).unwrap()
+                    assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
+                    for (old_asset_key, old_is_migrated) in list_is_migrated_old {
+                        let old_pool = old_read_pool_info(mock_store, &old_asset_key).unwrap();
+                        assert_eq!(
+                            list_is_migrated_new
+                                .contains(&(old_pool.staking_token.to_vec(), old_is_migrated)),
+                            true
                         );
-                        println!("list is migrated old: {:?}", list_is_migrated_old);
-                        println!("list is migrated new: {:?}", list_is_migrated_new);
                     }
                 }
 
