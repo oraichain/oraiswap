@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, Order, StdResult, Storage};
 use cosmwasm_storage::{Bucket, ReadonlyBucket};
 use oraiswap::asset::AssetRaw;
 
@@ -68,15 +68,19 @@ pub fn old_stakers_remove<'a>(storage: &'a mut dyn Storage, asset_key: &[u8], st
     Bucket::<CanonicalAddr>::multilevel(storage, &[PREFIX_STAKER, asset_key]).remove(staker)
 }
 
-pub fn old_read_is_migrated(
+pub fn old_read_is_migrated(storage: &dyn Storage, asset_key: &[u8], staker: &[u8]) -> bool {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
+        .load(asset_key)
+        .unwrap_or(false)
+}
+
+pub fn old_read_all_is_migrated(
     storage: &dyn Storage,
-    asset_key: &[u8],
     staker: &[u8],
-) -> StdResult<bool> {
-    match ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker]).may_load(asset_key) {
-        Ok(Some(v)) => Ok(v),
-        _ => Ok(false),
-    }
+) -> StdResult<Vec<(Vec<u8>, bool)>> {
+    ReadonlyBucket::multilevel(storage, &[PREFIX_IS_MIGRATED, staker])
+        .range(None, None, Order::Ascending)
+        .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
 }
 
 pub fn old_remove_store_is_migrated(
