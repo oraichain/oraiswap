@@ -30,19 +30,22 @@ pub fn migrate_single_asset_key_to_lp_token(
     let staking_token = api.addr_humanize(&pool_info.staking_token)?;
 
     #[cfg(debug_assertions)]
-    if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
+    let asset_key_string = if let Ok(native_token) = String::from_utf8(asset_key.to_vec()) {
         api.debug(&format!(
             "native {}, lp {}",
             native_token.as_str(),
             staking_token.as_str()
         ));
+        native_token
     } else {
+        let key = api.addr_humanize(&asset_key.into())?.to_string();
         api.debug(&format!(
             "cw20 {}, lp {}",
-            api.addr_humanize(&asset_key.into())?.as_str(),
+            key.as_str(),
             staking_token.as_str()
         ));
-    }
+        key
+    };
     // store reward_per_sec to new new key
     if let Some(rewards_per_sec) = old_read_rewards_per_sec(storage, &asset_key).ok() {
         store_rewards_per_sec(storage, &pool_info.staking_token, rewards_per_sec)?;
@@ -59,7 +62,16 @@ pub fn migrate_single_asset_key_to_lp_token(
 
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
+        #[cfg(debug_assertions)]
         let is_migrated = old_read_is_migrated(storage, asset_key, staker);
+        if asset_key_string
+            .eq("ibc/9E4F68298EE0A201969E583100E5F9FAD145BAA900C04ED3B6B302D834D8E3C4")
+        {
+            api.debug(&format!(
+                "staker: {:?}",
+                api.addr_humanize(&cosmwasm_std::CanonicalAddr::from(staker.as_slice()))
+            ));
+        }
         if is_migrated {
             store_is_migrated(storage, &pool_info.staking_token, staker)?;
         };
