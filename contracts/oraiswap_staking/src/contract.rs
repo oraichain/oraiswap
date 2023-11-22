@@ -1,6 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
+use crate::legacy::v1::{
+    old_read_all_is_migrated_key_parsed, old_read_all_rewards_per_sec, old_rewards_read_all,
+    old_stakers_read,
+};
 use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
 // use crate::migration::migrate_rewards_store;
 use crate::rewards::{
@@ -20,8 +24,8 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
-    QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
+    PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -323,6 +327,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             order,
         )?),
         QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
+        QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
     }
 }
 
@@ -371,12 +376,15 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
     Ok(RewardsPerSecResponse { assets })
 }
 
-pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResponse>> {
-    read_all_pool_infos(deps.storage)?
+pub fn parse_read_all_pool_infos(
+    storage: &dyn Storage,
+    api: &dyn Api,
+) -> StdResult<Vec<QueryPoolInfoResponse>> {
+    read_all_pool_infos(storage)?
         .into_iter()
         .map(|(key, pool_info)| {
             let asset_key = CanonicalAddr::from(key);
-            let staking_token = deps.api.addr_humanize(&asset_key)?;
+            let staking_token = api.addr_humanize(&asset_key)?;
             Ok(QueryPoolInfoResponse {
                 asset_key: staking_token.to_string(),
                 pool_info: PoolInfoResponse {
@@ -388,7 +396,7 @@ pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResp
                         .migration_params
                         .clone()
                         .map(|params| -> StdResult<Addr> {
-                            Ok(deps.api.addr_humanize(&params.deprecated_staking_token)?)
+                            Ok(api.addr_humanize(&params.deprecated_staking_token)?)
                         })
                         .transpose()?,
                     migration_index_snapshot: pool_info
@@ -398,6 +406,48 @@ pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResp
             })
         })
         .collect::<StdResult<Vec<QueryPoolInfoResponse>>>()
+}
+
+pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResponse>> {
+    parse_read_all_pool_infos(deps.storage, deps.api)
+}
+
+pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Binary> {
+    match old_store_type {
+        OldStoreType::Pools {} => {
+            let all_pools = parse_read_all_pool_infos(deps.storage, deps.api)?;
+            to_binary(&all_pools)
+        }
+        OldStoreType::Stakers { asset_info } => {
+            let asset_key = asset_info.to_vec(deps.api)?;
+            let all_stakers_given_key = old_stakers_read(deps.storage, &asset_key)
+                .range(None, None, Order::Ascending)
+                .map(|data| {
+                    data.and_then(|da| {
+                        Ok((deps.api.addr_humanize(&CanonicalAddr::from(da.0))?, da.1))
+                    })
+                })
+                .collect::<StdResult<Vec<(Addr, bool)>>>()?;
+            to_binary(&all_stakers_given_key)
+        }
+        OldStoreType::RewardsPerSec {} => {
+            let list_old_rw_per_sec = old_read_all_rewards_per_sec(deps.storage, deps.api);
+            to_binary(&list_old_rw_per_sec)
+        }
+        OldStoreType::IsMigrated { staker } => {
+            let list_is_migrated_given_staker = old_read_all_is_migrated_key_parsed(
+                deps.storage,
+                deps.api,
+                deps.api.addr_canonicalize(&staker)?,
+            );
+            to_binary(&list_is_migrated_given_staker)
+        }
+        OldStoreType::Rewards { staker } => {
+            let list_old_rewards_store =
+                old_rewards_read_all(deps.storage, deps.api, deps.api.addr_canonicalize(&staker)?);
+            to_binary(&list_old_rewards_store)
+        }
+    }
 }
 
 // migrate contract

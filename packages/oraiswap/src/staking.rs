@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Binary, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -123,6 +123,8 @@ pub enum QueryMsg {
     },
     #[returns(Vec<QueryPoolInfoResponse>)]
     GetPoolsInformation {},
+    #[returns(Binary)]
+    QueryOldStore { store_type: OldStoreType },
 }
 
 // We define a custom struct for each query response
@@ -179,4 +181,13 @@ pub struct RewardMsg {
 pub struct QueryPoolInfoResponse {
     pub asset_key: String,
     pub pool_info: PoolInfoResponse,
+}
+
+#[cw_serde]
+pub enum OldStoreType {
+    Pools {},
+    Stakers { asset_info: AssetInfo },
+    Rewards { staker: String },
+    IsMigrated { staker: String },
+    RewardsPerSec {},
 }
