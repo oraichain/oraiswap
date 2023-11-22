@@ -56,13 +56,15 @@ pub fn migrate_single_asset_key_to_lp_token(
     for (staker, _) in stakers.iter() {
         #[cfg(debug_assertions)]
         let is_migrated = old_read_is_migrated(storage, asset_key, staker);
+        let staker_addr =
+            api.addr_humanize(&cosmwasm_std::CanonicalAddr::from(staker.as_slice()))?;
         if asset_key_string
             .eq("ibc/9E4F68298EE0A201969E583100E5F9FAD145BAA900C04ED3B6B302D834D8E3C4")
+            && staker_addr
+                .to_string()
+                .eq("orai1v5x7d2csz5vwz48p6wkj4j2y884e0adeq3vjzn")
         {
-            api.debug(&format!(
-                "staker: {:?}",
-                api.addr_humanize(&cosmwasm_std::CanonicalAddr::from(staker.as_slice()))
-            ));
+            api.debug(&format!("staker: {:?}", staker));
         }
         if is_migrated {
             store_is_migrated(storage, &pool_info.staking_token, staker)?;
@@ -72,9 +74,6 @@ pub fn migrate_single_asset_key_to_lp_token(
             rewards_store(storage, staker).save(&pool_info.staking_token, &reward)?;
         }
     }
-    // get the last staker key from the list
-    let last_staker = stakers.last().map(|staker| staker.0.to_owned());
-    // increment 1 based on the bytes to process next key
     Ok(stakers.len() as u64)
 }
 
