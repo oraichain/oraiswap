@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::contract::instantiate;
 use crate::legacy::v1::{
     old_read_all_pool_info_keys, old_read_is_migrated, old_read_pool_info, old_rewards_read,
@@ -18,10 +16,10 @@ use cw20::Cw20ReceiveMsg;
 use oraiswap::error::ContractError;
 
 use crate::contract::execute as contract_execute;
-use cosmwasm_std::{coins, Api, Binary, Order, StdError, StdResult};
+use cosmwasm_std::{coins, Binary, Order, StdError, StdResult};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cosmwasm_vm::testing::MockInstanceOptions;
-use cosmwasm_vm::{BackendApi, Size};
+use cosmwasm_vm::BackendApi;
 use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{ExecuteMsg, InstantiateMsg};
 
@@ -79,13 +77,8 @@ fn test_forked_mainnet() {
         Addr::unchecked(STAKING_CONTRACT),
         MockInstanceOptions {
             balances: &[(SENDER, &coins(100_000_000_000, ORAI_DENOM))],
-            contract_balance: None,
-            backend_error: None,
-            // instance
-            available_capabilities: HashSet::default(),
             gas_limit: 40_000_000_000_000_000,
-            print_debug: true,
-            memory_limit: Some(Size::mebi(16)),
+            ..MockInstanceOptions::default()
         },
     );
     contract_instance.load_state(MAINET_STATE_BYTES).unwrap();
