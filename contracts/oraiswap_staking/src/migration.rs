@@ -12,18 +12,11 @@ use crate::{
     },
 };
 
-pub const MAX_STAKER: u32 = 1000;
-const DEFAULT_STAKER: u32 = 100;
-
 pub fn migrate_single_asset_key_to_lp_token(
     storage: &mut dyn Storage,
     api: &dyn Api,
     asset_key: &[u8],
-    start_staker: Option<&[u8]>,
-    limit_staker: Option<u32>,
-) -> StdResult<(u64, Option<Vec<u8>>)> {
-    let limit = limit_staker.unwrap_or(DEFAULT_STAKER).min(MAX_STAKER) as usize;
-
+) -> StdResult<u64> {
     let pool_info = old_read_pool_info(storage, asset_key)?;
     // store pool_info to new key
     store_pool_info(storage, &pool_info.staking_token, &pool_info)?;
@@ -52,9 +45,8 @@ pub fn migrate_single_asset_key_to_lp_token(
     }
 
     let stakers = old_stakers_read(storage, asset_key)
-        .range(start_staker, None, Order::Ascending)
+        .range(None, None, Order::Ascending)
         // Get next_key
-        .take(limit)
         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()?;
 
     #[cfg(debug_assertions)]
@@ -83,7 +75,7 @@ pub fn migrate_single_asset_key_to_lp_token(
     // get the last staker key from the list
     let last_staker = stakers.last().map(|staker| staker.0.to_owned());
     // increment 1 based on the bytes to process next key
-    Ok((stakers.len() as u64, calc_range_start(last_staker)))
+    Ok(stakers.len() as u64)
 }
 
 pub fn validate_migrate_store_status(storage: &mut dyn Storage) -> StdResult<()> {

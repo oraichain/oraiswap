@@ -5,9 +5,7 @@ use crate::legacy::v1::{
     old_read_all_is_migrated, old_read_all_pool_info_keys, old_read_is_migrated,
     old_read_pool_info, old_rewards_read, old_rewards_store, old_stakers_read, old_stakers_store,
 };
-use crate::migration::{
-    migrate_single_asset_key_to_lp_token, validate_migrate_store_status, MAX_STAKER,
-};
+use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
 use crate::state::{
     read_all_pool_info_keys, read_finish_migrate_store_status, read_is_migrated, read_pool_info,
     read_rewards_per_sec, rewards_read, rewards_store, stakers_read, store_pool_info, PoolInfo,
@@ -57,29 +55,17 @@ fn migrate_full_a_pool(
     asset_info: AssetInfo,
     sender: &str,
 ) -> StdResult<u64> {
-    let mut next_key: Option<String> = None;
-    let mut total_gas: u64 = 0;
-    loop {
-        let (ret, gas_used) = contract_instance
-            .execute(
-                ExecuteMsg::MigrateStore {
-                    asset_info: asset_info.clone(),
-                    staker_after: next_key,
-                    limit: Some(MAX_STAKER),
-                },
-                sender,
-                &vec![],
-            )
-            .unwrap();
-        total_gas += gas_used;
-        let last_attribute_value = &ret.attributes.last().unwrap().value;
-        if last_attribute_value.is_empty() {
-            break;
-        }
-        next_key = Some(last_attribute_value.to_string());
-    }
-    println!("each time {}", total_gas);
-    Ok(total_gas)
+    let (ret, gas_used) = contract_instance
+        .execute(
+            ExecuteMsg::MigrateStore {
+                asset_info: asset_info.clone(),
+            },
+            sender,
+            &vec![],
+        )
+        .unwrap();
+    println!("gas used for asset info: {:?} is: {}", asset_info, gas_used);
+    Ok(gas_used)
 }
 
 // note: run `cwtools build contracts/oraiswap_staking -d -w` to hot reload building the wasm binary to run this test correctly

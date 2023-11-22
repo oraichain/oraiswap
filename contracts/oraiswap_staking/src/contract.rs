@@ -96,11 +96,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
-        ExecuteMsg::MigrateStore {
-            asset_info,
-            staker_after,
-            limit,
-        } => migrate_store(deps.storage, deps.api, asset_info, staker_after, limit),
+        ExecuteMsg::MigrateStore { asset_info } => {
+            migrate_store(deps.storage, deps.api, asset_info)
+        }
     }
 }
 
@@ -402,32 +400,14 @@ pub fn migrate_store(
     storage: &mut dyn Storage,
     api: &dyn Api,
     asset_info: AssetInfo,
-    staker_after: Option<String>,
-    limit: Option<u32>,
 ) -> StdResult<Response> {
     let asset_key = asset_info.to_vec(api)?;
-    let start_after = match staker_after {
-        Some(staker) => Some(api.addr_canonicalize(&staker)?),
-        None => None,
-    };
 
-    let (total_staker, next_staker) = migrate_single_asset_key_to_lp_token(
-        storage,
-        api,
-        asset_key.as_slice(),
-        start_after.as_deref(),
-        limit,
-    )?;
-
-    let next_staker = match next_staker {
-        Some(staker) => api.addr_humanize(&CanonicalAddr::from(staker))?.to_string(),
-        None => "".into(),
-    };
+    let total_staker = migrate_single_asset_key_to_lp_token(storage, api, asset_key.as_slice())?;
 
     Ok(Response::default().add_attributes(vec![
         ("action", "migrate_store"),
         ("asset_info", &asset_info.to_string()),
         ("staker_count", &total_staker.to_string()),
-        ("next_staker", &next_staker),
     ]))
 }

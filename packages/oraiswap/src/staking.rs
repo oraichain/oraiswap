@@ -76,8 +76,6 @@ pub enum ExecuteMsg {
     },
     MigrateStore {
         asset_info: AssetInfo,
-        staker_after: Option<String>,
-        limit: Option<u32>,
         // so can convert or throw error
     },
 }
