@@ -55,8 +55,8 @@ pub fn migrate_single_asset_key_to_lp_token(
     // Store stakers to new staking key token
     for (staker, _) in stakers.iter() {
         let is_migrated = old_read_is_migrated(storage, asset_key, staker);
-
-        #[cfg(debug_assertions)]
+        let staker_addr =
+            api.addr_humanize(&cosmwasm_std::CanonicalAddr::from(staker.as_slice()))?;
         if asset_key_string
             .eq("ibc/9E4F68298EE0A201969E583100E5F9FAD145BAA900C04ED3B6B302D834D8E3C4")
             && staker_addr

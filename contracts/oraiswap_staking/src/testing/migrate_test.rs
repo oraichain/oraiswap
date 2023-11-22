@@ -186,7 +186,6 @@ fn test_forked_mainnet() {
                         );
                         println!("list is migrated old: {:?}", list_is_migrated_old);
                         println!("list is migrated new: {:?}", list_is_migrated_new);
-                        // panic!();
                     }
                 }
 
