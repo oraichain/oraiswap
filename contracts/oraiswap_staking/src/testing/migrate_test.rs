@@ -104,26 +104,25 @@ fn test_forked_mainnet() {
     }
 
     println!("gas used {}", total_gas);
-    let api = contract_instance.instance.api().clone();
+    let api = contract_instance.api();
 
-    let _ = contract_instance
-        .instance
+    contract_instance
         .with_storage(|mock_store| {
-            let old_keys = old_read_all_pool_info_keys(&mock_store.wrap()).unwrap();
-            let new_keys = read_all_pool_info_keys(&mock_store.wrap()).unwrap();
+            let old_keys = old_read_all_pool_info_keys(mock_store).unwrap();
+            let new_keys = read_all_pool_info_keys(mock_store).unwrap();
 
             // assert pool len pool info
             assert_eq!(old_keys.len(), new_keys.len());
 
             for old_key in old_keys {
-                let pool_info = old_read_pool_info(&mock_store.wrap(), &old_key).unwrap();
+                let pool_info = old_read_pool_info(mock_store, &old_key).unwrap();
                 // exhaustive search test. Can go extra by making sure the staking token is unique for every old pool
                 assert_eq!(new_keys.contains(&pool_info.staking_token.to_vec()), true);
-                let old_stakers = old_stakers_read(&mock_store.wrap(), &old_key)
+                let old_stakers = old_stakers_read(mock_store, &old_key)
                     .range(None, None, Order::Ascending)
                     .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
                     .unwrap();
-                let new_stakers = stakers_read(&mock_store.wrap(), &pool_info.staking_token)
+                let new_stakers = stakers_read(mock_store, &pool_info.staking_token)
                     .range(None, None, Order::Ascending)
                     .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
                     .unwrap();
@@ -134,24 +133,23 @@ fn test_forked_mainnet() {
                     assert_eq!(new_stakers.contains(&old_staker_data), true);
                     let old_staker = old_staker_data.0;
                     // let old_rewards_store =
-                    //     old_rewards_read(&mock_store.wrap(), &old_staker).may_load(&old_key);
+                    //     old_rewards_read(mock_store, &old_staker).may_load(&old_key);
                     // println!("old rewards store: {:?}", old_rewards_store);
                     // assert_eq!(
-                    //     rewards_read(&mock_store.wrap(), &old_staker)
+                    //     rewards_read(mock_store, &old_staker)
                     //         .may_load(&pool_info.staking_token),
                     //     old_rewards_store
                     // );
 
                     // assert is_migrated. Exhaustive search since old staker list = new staker list.
-                    let old_is_migrated =
-                        old_read_is_migrated(&mock_store.wrap(), &old_key, &old_staker);
+                    let old_is_migrated = old_read_is_migrated(mock_store, &old_key, &old_staker);
                     assert_eq!(
                         old_is_migrated,
-                        read_is_migrated(&mock_store.wrap(), &pool_info.staking_token, &old_staker)
+                        read_is_migrated(mock_store, &pool_info.staking_token, &old_staker)
                     );
                     let list_is_migrated_old: Vec<(String, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
-                            &mock_store.wrap(),
+                            mock_store,
                             &[crate::legacy::v1::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
@@ -161,7 +159,7 @@ fn test_forked_mainnet() {
                                 if let Ok(native_token) = String::from_utf8(data.0.clone()) {
                                     native_token
                                 } else {
-                                    api.human_address(data.0.as_slice()).0.unwrap()
+                                    api.addr_humanize(&data.0.into()).unwrap().to_string()
                                 },
                                 data.1,
                             )
@@ -170,19 +168,24 @@ fn test_forked_mainnet() {
 
                     let list_is_migrated_new: Vec<(String, bool)> =
                         ReadonlyBucket::<bool>::multilevel(
-                            &mock_store.wrap(),
+                            mock_store,
                             &[crate::state::PREFIX_IS_MIGRATED, &old_staker],
                         )
                         .range(None, None, Order::Ascending)
                         .map(|data| data.unwrap())
-                        .map(|data| (api.human_address(data.0.as_slice()).0.unwrap(), data.1))
+                        .map(|data| {
+                            (
+                                api.addr_humanize(&data.0.into()).unwrap().to_string(),
+                                data.1,
+                            )
+                        })
                         .collect();
 
                     // assert_eq!(list_is_migrated_old.len(), list_is_migrated_new.len());
                     if list_is_migrated_old.len() != list_is_migrated_new.len() {
                         println!(
                             "old staker: {:?}",
-                            api.human_address(&old_staker).0.unwrap()
+                            api.addr_humanize(&old_staker.into()).unwrap()
                         );
                         println!("list is migrated old: {:?}", list_is_migrated_old);
                         println!("list is migrated new: {:?}", list_is_migrated_new);
@@ -191,7 +194,7 @@ fn test_forked_mainnet() {
 
                 // assert reward
                 // let old_reward: Vec<_> = ReadonlyBucket::multilevel(
-                //     &mock_store.wrap(),
+                //     mock_store,
                 //     &[crate::legacy::v1::PREFIX_REWARD],
                 // )
                 // .range(None, None, Order::Ascending)
@@ -200,7 +203,7 @@ fn test_forked_mainnet() {
                 // .unwrap();
 
                 // let new_reward: Vec<_> =
-                //     ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::state::PREFIX_REWARD])
+                //     ReadonlyBucket::multilevel(mock_store, &[crate::state::PREFIX_REWARD])
                 //         .range(None, None, Order::Ascending)
                 //         .filter(|item| item.is_ok())
                 //         .collect::<StdResult<Vec<(Vec<u8>, RewardInfo)>>>()
@@ -211,24 +214,22 @@ fn test_forked_mainnet() {
 
                 // // assert is migrated
                 // let new_migrated_staker: Vec<_> =
-                //     ReadonlyBucket::multilevel(&mock_store.wrap(), &[crate::state::PREFIX_IS_MIGRATED])
+                //     ReadonlyBucket::multilevel(mock_store, &[crate::state::PREFIX_IS_MIGRATED])
                 //         .range(None, None, Order::Ascending)
                 //         .collect::<StdResult<Vec<(Vec<u8>, bool)>>>()
                 //         .unwrap();
-                // let old_is_migrated = old_read_all_is_migrated(&mock_store.wrap()).unwrap();
+                // let old_is_migrated = old_read_all_is_migrated(mock_store).unwrap();
                 // assert_eq!(new_migrated_staker.len(), old_is_migrated.len());
             }
-            let old_reward_per_sec = ReadonlyBucket::new(
-                &mock_store.wrap(),
-                crate::legacy::v1::PREFIX_REWARDS_PER_SEC,
-            )
-            .range(None, None, Order::Ascending)
-            .filter(|item| item.is_ok())
-            .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
-            .unwrap();
+            let old_reward_per_sec =
+                ReadonlyBucket::new(mock_store, crate::legacy::v1::PREFIX_REWARDS_PER_SEC)
+                    .range(None, None, Order::Ascending)
+                    .filter(|item| item.is_ok())
+                    .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
+                    .unwrap();
 
             let new_reward_per_sec =
-                ReadonlyBucket::new(&mock_store.wrap(), crate::state::PREFIX_REWARDS_PER_SEC)
+                ReadonlyBucket::new(mock_store, crate::state::PREFIX_REWARDS_PER_SEC)
                     .range(None, None, Order::Ascending)
                     .collect::<StdResult<Vec<(Vec<u8>, Vec<AssetRaw>)>>>()
                     .unwrap();
@@ -237,10 +238,10 @@ fn test_forked_mainnet() {
             for old_rw_per_sec in old_reward_per_sec {
                 assert_eq!(new_reward_per_sec.contains(&old_rw_per_sec), true);
                 // let old_rewards_store =
-                //     old_rewards_read(&mock_store.wrap(), &old_staker).may_load(&old_key);
+                //     old_rewards_read(mock_store, &old_staker).may_load(&old_key);
                 // println!("old rewards store: {:?}", old_rewards_store);
                 // assert_eq!(
-                //     rewards_read(&mock_store.wrap(), &old_staker)
+                //     rewards_read(mock_store, &old_staker)
                 //         .may_load(&pool_info.staking_token),
                 //     old_rewards_store
                 // );
