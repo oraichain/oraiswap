@@ -121,8 +121,8 @@ pub enum QueryMsg {
         // so can convert or throw error
         order: Option<i32>,
     },
-    #[returns(Vec<String>)]
-    TotalPoolAssetKeys {},
+    #[returns(Vec<QueryPoolInfoResponse>)]
+    GetPoolsInformation {},
 }
 
 // We define a custom struct for each query response
@@ -173,4 +173,10 @@ pub struct RewardInfoResponseItem {
 pub struct RewardMsg {
     pub staking_token: Addr,
     pub total_accumulation_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct QueryPoolInfoResponse {
+    pub asset_key: String,
+    pub pool_info: PoolInfoResponse,
 }

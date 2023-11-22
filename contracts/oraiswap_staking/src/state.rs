@@ -72,10 +72,9 @@ pub fn read_pool_info(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<Pool
     ReadonlyBucket::new(storage, PREFIX_POOL_INFO).load(asset_key)
 }
 
-pub fn read_all_pool_info_keys(storage: &dyn Storage) -> StdResult<Vec<Vec<u8>>> {
+pub fn read_all_pool_infos(storage: &dyn Storage) -> StdResult<Vec<(Vec<u8>, PoolInfo)>> {
     ReadonlyBucket::<PoolInfo>::new(storage, PREFIX_POOL_INFO)
         .range(None, None, cosmwasm_std::Order::Ascending)
-        .map(|bucket| bucket.map(|b| b.0))
         .collect()
 }
 
