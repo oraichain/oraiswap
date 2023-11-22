@@ -29,6 +29,7 @@ cw20-base = { workspace = true, features = ["library"] }
 
 schemars = "0.8.3"
 protobuf = { version = "3.2.0", features = ["with-bytes"] }
+serde = "1.0.193"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # this import is for testing library

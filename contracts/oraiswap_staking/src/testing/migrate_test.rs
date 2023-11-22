@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use crate::contract::instantiate;
 use crate::legacy::v1::{
-    old_read_all_pool_info_keys, old_read_is_migrated, old_read_pool_info, old_stakers_read,
+    old_read_all_pool_info_keys, old_read_is_migrated, old_read_pool_info, old_rewards_read,
+    old_stakers_read,
 };
 use crate::migration::validate_migrate_store_status;
 use crate::state::{
@@ -130,14 +131,12 @@ fn test_forked_mainnet() {
                 for old_staker_data in old_stakers {
                     assert_eq!(new_stakers.contains(&old_staker_data), true);
                     let old_staker = old_staker_data.0;
-                    // let old_rewards_store =
-                    //     old_rewards_read(mock_store, &old_staker).may_load(&old_key);
-                    // println!("old rewards store: {:?}", old_rewards_store);
-                    // assert_eq!(
-                    //     rewards_read(mock_store, &old_staker)
-                    //         .may_load(&pool_info.staking_token),
-                    //     old_rewards_store
-                    // );
+                    let old_rewards_store =
+                        old_rewards_read(mock_store, &old_staker).may_load(&old_key);
+                    assert_eq!(
+                        rewards_read(mock_store, &old_staker).may_load(&pool_info.staking_token),
+                        old_rewards_store
+                    );
 
                     // assert is_migrated. Exhaustive search since old staker list = new staker list.
                     let old_is_migrated = old_read_is_migrated(mock_store, &old_key, &old_staker);
@@ -230,14 +229,6 @@ fn test_forked_mainnet() {
             assert_eq!(old_reward_per_sec.len(), new_reward_per_sec.len());
             for old_rw_per_sec in old_reward_per_sec {
                 assert_eq!(new_reward_per_sec.contains(&old_rw_per_sec), true);
-                // let old_rewards_store =
-                //     old_rewards_read(mock_store, &old_staker).may_load(&old_key);
-                // println!("old rewards store: {:?}", old_rewards_store);
-                // assert_eq!(
-                //     rewards_read(mock_store, &old_staker)
-                //         .may_load(&pool_info.staking_token),
-                //     old_rewards_store
-                // );
             }
             Ok(())
         })
