@@ -124,6 +124,7 @@ fn test_forked_mainnet() {
     let info = contract_instance
         .query::<QueryMsg, AllPoolInfoResponse>(QueryMsg::GetPoolsInformation {})
         .unwrap();
+    println!("query_gas_used {}", info.1);
 
     assert_eq!(info.0.pool_infos.len(), 17);
 
