@@ -2,8 +2,8 @@
 use cosmwasm_std::entry_point;
 
 use crate::legacy::v1::{
-    old_read_all_is_migrated_key_parsed, old_read_all_rewards_per_sec, old_rewards_read_all,
-    old_stakers_read,
+    old_read_all_is_migrated_key_parsed, old_read_all_pool_infos, old_read_all_rewards_per_sec,
+    old_rewards_read_all, old_stakers_read,
 };
 use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
 // use crate::migration::migrate_rewards_store;
@@ -377,10 +377,10 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
 }
 
 pub fn parse_read_all_pool_infos(
-    storage: &dyn Storage,
     api: &dyn Api,
+    pool_infos: Vec<(Vec<u8>, PoolInfo)>,
 ) -> StdResult<Vec<QueryPoolInfoResponse>> {
-    read_all_pool_infos(storage)?
+    pool_infos
         .into_iter()
         .map(|(key, pool_info)| {
             let asset_key = CanonicalAddr::from(key);
@@ -409,13 +409,15 @@ pub fn parse_read_all_pool_infos(
 }
 
 pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResponse>> {
-    parse_read_all_pool_infos(deps.storage, deps.api)
+    let pool_infos = read_all_pool_infos(deps.storage)?;
+    parse_read_all_pool_infos(deps.api, pool_infos)
 }
 
 pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Binary> {
     match old_store_type {
         OldStoreType::Pools {} => {
-            let all_pools = parse_read_all_pool_infos(deps.storage, deps.api)?;
+            let old_pool_infos = old_read_all_pool_infos(deps.storage)?;
+            let all_pools = parse_read_all_pool_infos(deps.api, old_pool_infos)?;
             to_binary(&all_pools)
         }
         OldStoreType::Stakers { asset_info } => {
