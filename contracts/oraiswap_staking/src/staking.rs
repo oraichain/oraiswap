@@ -1,4 +1,4 @@
-use crate::migration::validate_migrate_store_status;
+use crate::contract::validate_migrate_store_status;
 use crate::rewards::before_share_change;
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, stakers_store,

@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::migration::validate_migrate_store_status;
+use crate::contract::validate_migrate_store_status;
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, read_rewards_per_sec, rewards_read,
     rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,

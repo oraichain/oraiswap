@@ -1,28 +1,28 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+use oraiswap::error::ContractError;
 
 use crate::legacy::v1::{
     old_read_all_is_migrated_key_parsed, old_read_all_pool_infos, old_read_all_rewards_per_sec,
     old_rewards_read_all, old_stakers_read,
 };
-use crate::migration::{migrate_single_asset_key_to_lp_token, validate_migrate_store_status};
-// use crate::migration::migrate_rewards_store;
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_all_pool_infos, read_config, read_pool_info, read_rewards_per_sec, remove_pool_info,
-    stakers_read, store_config, store_finish_migrate_store_status, store_pool_info,
-    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
+    read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
+    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
+    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
+    MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Api, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
     MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
     PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
@@ -100,9 +100,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
-        ExecuteMsg::MigrateStore { asset_info } => {
-            migrate_store(deps.storage, deps.api, asset_info)
-        }
     }
 }
 
@@ -459,18 +456,12 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
     Ok(Response::default())
 }
 
-pub fn migrate_store(
-    storage: &mut dyn Storage,
-    api: &dyn Api,
-    asset_info: AssetInfo,
-) -> StdResult<Response> {
-    let asset_key = asset_info.to_vec(api)?;
-
-    let total_staker = migrate_single_asset_key_to_lp_token(storage, api, asset_key.as_slice())?;
-
-    Ok(Response::default().add_attributes(vec![
-        ("action", "migrate_store"),
-        ("asset_info", &asset_info.to_string()),
-        ("staker_count", &total_staker.to_string()),
-    ]))
+pub fn validate_migrate_store_status(storage: &mut dyn Storage) -> StdResult<()> {
+    let migrate_store_status = read_finish_migrate_store_status(storage)?;
+    if migrate_store_status {
+        return Ok(());
+    }
+    Err(StdError::generic_err(
+        ContractError::ContractUpgrade {}.to_string(),
+    ))
 }

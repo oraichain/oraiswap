@@ -74,10 +74,6 @@ pub enum ExecuteMsg {
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
-    MigrateStore {
-        asset_info: AssetInfo,
-        // so can convert or throw error
-    },
 }
 
 #[cw_serde]

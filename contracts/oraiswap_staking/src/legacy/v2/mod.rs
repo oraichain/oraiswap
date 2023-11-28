@@ -1,5 +1,5 @@
-use cosmwasm_std::{Api, Order, StdError, StdResult, Storage};
-use oraiswap::error::ContractError;
+use cosmwasm_std::{Api, Order, Response, StdResult, Storage};
+use oraiswap::asset::AssetInfo;
 
 use crate::{
     legacy::v1::{
@@ -7,8 +7,8 @@ use crate::{
         old_stakers_read,
     },
     state::{
-        read_finish_migrate_store_status, read_is_migrated, rewards_store, stakers_store,
-        store_is_migrated, store_pool_info, store_rewards_per_sec,
+        read_is_migrated, rewards_store, stakers_store, store_is_migrated, store_pool_info,
+        store_rewards_per_sec,
     },
 };
 
@@ -72,12 +72,18 @@ pub fn migrate_single_asset_key_to_lp_token(
     Ok(stakers.len() as u64)
 }
 
-pub fn validate_migrate_store_status(storage: &mut dyn Storage) -> StdResult<()> {
-    let migrate_store_status = read_finish_migrate_store_status(storage)?;
-    if migrate_store_status {
-        return Ok(());
-    }
-    Err(StdError::generic_err(
-        ContractError::ContractUpgrade {}.to_string(),
-    ))
+pub fn migrate_store(
+    storage: &mut dyn Storage,
+    api: &dyn Api,
+    asset_info: AssetInfo,
+) -> StdResult<Response> {
+    let asset_key = asset_info.to_vec(api)?;
+
+    let total_staker = migrate_single_asset_key_to_lp_token(storage, api, asset_key.as_slice())?;
+
+    Ok(Response::default().add_attributes(vec![
+        ("action", "migrate_store"),
+        ("asset_info", &asset_info.to_string()),
+        ("staker_count", &total_staker.to_string()),
+    ]))
 }
