@@ -16,8 +16,6 @@ use oraiswap::rewarder::{
     RewardAmountPerSecondResponse,
 };
 
-use oraiswap::asset::AssetInfo;
-
 // 600 seconds default
 const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
 
@@ -142,8 +140,8 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::DistributionInfo { asset_info } => {
-            to_binary(&query_distribution_info(deps, asset_info)?)
+        QueryMsg::DistributionInfo { staking_token } => {
+            to_binary(&query_distribution_info(deps, staking_token)?)
         }
         QueryMsg::RewardAmountPerSec { staking_token } => {
             to_binary(&query_reward_amount_per_sec(deps, staking_token)?)
@@ -164,9 +162,9 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 pub fn query_distribution_info(
     deps: Deps,
-    asset_info: AssetInfo,
+    staking_token: Addr,
 ) -> StdResult<DistributionInfoResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
     let last_distributed = read_last_distributed(deps.storage, &asset_key)?;
     let resp = DistributionInfoResponse { last_distributed };
 

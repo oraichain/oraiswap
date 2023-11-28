@@ -36,7 +36,7 @@ pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(DistributionInfoResponse)]
-    DistributionInfo { asset_info: AssetInfo },
+    DistributionInfo { staking_token: Addr },
     #[returns(RewardAmountPerSecondResponse)]
     RewardAmountPerSec { staking_token: Addr },
 }
