@@ -183,11 +183,6 @@ pub fn compute_offer_amount(
 
     let commission_amount = before_commission_deduction * commission_rate;
 
-    // check small amount swap
-    if spread_amount.is_zero() || commission_amount.is_zero() {
-        return Err(ContractError::TooSmallOfferAmount {});
-    }
-
     Ok((
         offer_amount.try_into().map_err(|err| StdError::from(err))?,
         spread_amount

@@ -30,9 +30,6 @@ pub enum ContractError {
     #[error("Asset mismatch")]
     AssetMismatch {},
 
-    #[error("Too small offer amount")]
-    TooSmallOfferAmount {},
-
     #[error("Offer pool is zero")]
     OfferPoolIsZero {},
 
