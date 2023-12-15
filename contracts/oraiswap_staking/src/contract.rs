@@ -1,25 +1,31 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+use oraiswap::error::ContractError;
 
-// use crate::migration::migrate_rewards_store;
+use crate::legacy::v1::{
+    old_read_all_is_migrated_key_parsed, old_read_all_pool_infos, old_read_all_rewards_per_sec,
+    old_rewards_read_all, old_stakers_read,
+};
 use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, update_list_stakers};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
 use crate::state::{
-    read_config, read_pool_info, read_rewards_per_sec, stakers_read, store_config, store_pool_info,
-    store_rewards_per_sec, Config, MigrationParams, PoolInfo,
+    read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
+    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
+    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
+    MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Order, Response, StdError, StdResult, Uint128,
+    from_binary, to_binary, Addr, Api, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetRaw, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, PoolInfoResponse,
-    QueryMsg, RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
+    PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -44,6 +50,8 @@ pub fn instantiate(
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
         },
     )?;
+    // set to true to enable normal execute handling when instantiate
+    store_finish_migrate_store_status(deps.storage, true)?;
 
     Ok(Response::default())
 }
@@ -52,33 +60,35 @@ pub fn instantiate(
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
-        ExecuteMsg::UpdateConfig { rewarder, owner } => update_config(deps, info, owner, rewarder),
-        ExecuteMsg::UpdateRewardsPerSec { asset_info, assets } => {
-            update_rewards_per_sec(deps, info, asset_info, assets)
-        }
-        ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
-        ExecuteMsg::RegisterAsset {
-            asset_info,
+        ExecuteMsg::UpdateConfig {
+            rewarder,
+            owner,
+            migrate_store_status,
+        } => update_config(deps, info, owner, rewarder, migrate_store_status),
+        ExecuteMsg::UpdateRewardsPerSec {
             staking_token,
-        } => register_asset(deps, info, asset_info, staking_token),
+            assets,
+        } => update_rewards_per_sec(deps, info, staking_token, assets),
+        ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
+        ExecuteMsg::RegisterAsset { staking_token } => register_asset(deps, info, staking_token),
         ExecuteMsg::DeprecateStakingToken {
-            asset_info,
+            staking_token,
             new_staking_token,
-        } => deprecate_staking_token(deps, info, asset_info, new_staking_token),
-        ExecuteMsg::Unbond { asset_info, amount } => {
-            unbond(deps, env, info.sender, asset_info, amount)
-        }
-        ExecuteMsg::Withdraw { asset_info } => withdraw_reward(deps, env, info, asset_info),
+        } => deprecate_staking_token(deps, info, staking_token, new_staking_token),
+        ExecuteMsg::Unbond {
+            staking_token,
+            amount,
+        } => unbond(deps, env, info.sender, staking_token, amount),
+        ExecuteMsg::Withdraw { staking_token } => withdraw_reward(deps, env, info, staking_token),
         ExecuteMsg::WithdrawOthers {
-            asset_info,
+            staking_token,
             staker_addrs,
-        } => withdraw_reward_others(deps, env, info, staker_addrs, asset_info),
+        } => withdraw_reward_others(deps, env, info, staker_addrs, staking_token),
         ExecuteMsg::AutoStake {
             assets,
             slippage_tolerance,
         } => auto_stake(deps, env, info, assets, slippage_tolerance),
         ExecuteMsg::AutoStakeHook {
-            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
@@ -86,15 +96,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             deps,
             env,
             info,
-            asset_info,
             staking_token,
             staker_addr,
             prev_staking_token_amount,
         ),
-        ExecuteMsg::UpdateListStakers {
-            asset_info,
-            stakers,
-        } => update_list_stakers(deps, env, info, asset_info, stakers),
     }
 }
 
@@ -103,34 +108,30 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Bond { asset_info }) => {
+        Ok(Cw20HookMsg::Bond {}) => {
             // check permission
-            let asset_key = asset_info.to_vec(deps.api)?;
-            let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+            let pool_info = read_pool_info(deps.storage, &token_raw)?;
 
             // only staking token contract can execute this message
-            let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
-            if pool_info.staking_token != token_raw {
-                // if user is trying to bond old token, return friendly error message
-                if let Some(params) = pool_info.migration_params {
-                    if params.deprecated_staking_token == token_raw {
-                        let staking_token_addr =
-                            deps.api.addr_humanize(&pool_info.staking_token)?;
-                        return Err(StdError::generic_err(format!(
-                            "The staking token for this asset has been migrated to {}",
-                            staking_token_addr
-                        )));
-                    }
+            // if user is trying to bond old token, return friendly error message
+            if let Some(params) = pool_info.migration_params {
+                if params.deprecated_staking_token == token_raw {
+                    let staking_token_addr = deps.api.addr_humanize(&pool_info.staking_token)?;
+                    return Err(StdError::generic_err(format!(
+                        "The staking token for this asset has been migrated to {}",
+                        staking_token_addr
+                    )));
                 }
-
-                return Err(StdError::generic_err("unauthorized"));
             }
 
             bond(
                 deps,
                 Addr::unchecked(cw20_msg.sender),
-                asset_info,
+                info.sender,
                 cw20_msg.amount,
             )
         }
@@ -143,6 +144,7 @@ pub fn update_config(
     info: MessageInfo,
     owner: Option<Addr>,
     rewarder: Option<Addr>,
+    migrate_store_status: Option<bool>,
 ) -> StdResult<Response> {
     let mut config: Config = read_config(deps.storage)?;
 
@@ -158,6 +160,10 @@ pub fn update_config(
         config.rewarder = deps.api.addr_canonicalize(rewarder.as_str())?;
     }
 
+    if let Some(migrate_store_status) = migrate_store_status {
+        store_finish_migrate_store_status(deps.storage, migrate_store_status)?;
+    }
+
     store_config(deps.storage, &config)?;
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -167,16 +173,17 @@ pub fn update_config(
 fn update_rewards_per_sec(
     deps: DepsMut,
     info: MessageInfo,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     assets: Vec<Asset>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
     // withdraw all rewards for all stakers from this pool
     let staker_addrs = stakers_read(deps.storage, &asset_key)
@@ -210,12 +217,8 @@ fn update_rewards_per_sec(
     Ok(Response::new().add_attribute("action", "update_rewards_per_sec"))
 }
 
-fn register_asset(
-    deps: DepsMut,
-    info: MessageInfo,
-    asset_info: AssetInfo,
-    staking_token: Addr,
-) -> StdResult<Response> {
+fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -223,16 +226,16 @@ fn register_asset(
     }
 
     // query asset_key from AssetInfo
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
     if read_pool_info(deps.storage, &asset_key).is_ok() {
         return Err(StdError::generic_err("Asset was already registered"));
     }
 
     store_pool_info(
         deps.storage,
-        &asset_key,
+        &asset_key.clone(),
         &PoolInfo {
-            staking_token: deps.api.addr_canonicalize(staking_token.as_str())?,
+            staking_token: asset_key,
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
@@ -242,45 +245,52 @@ fn register_asset(
 
     Ok(Response::new().add_attributes([
         ("action", "register_asset"),
-        ("asset_info", &asset_info.to_string()),
+        ("staking_token", staking_token.as_str()),
     ]))
 }
 
 fn deprecate_staking_token(
     deps: DepsMut,
     info: MessageInfo,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     new_staking_token: Addr,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
+    let mut pool_info = read_pool_info(deps.storage, &asset_key)?;
 
     if pool_info.migration_params.is_some() {
         return Err(StdError::generic_err(
             "This asset LP token has already been migrated",
         ));
     }
+    let deprecated_staking_token = pool_info.staking_token;
+    let deprecated_token_addr = deps.api.addr_humanize(&deprecated_staking_token)?;
 
-    let deprecated_token_addr = deps.api.addr_humanize(&pool_info.staking_token)?;
-
-    pool_info.total_bond_amount = Uint128::zero();
-    pool_info.migration_params = Some(MigrationParams {
-        index_snapshot: pool_info.reward_index,
-        deprecated_staking_token: pool_info.staking_token,
-    });
     pool_info.staking_token = deps.api.addr_canonicalize(new_staking_token.as_str())?;
 
-    store_pool_info(deps.storage, &asset_key, &pool_info)?;
+    // mark old pool as migration
+    pool_info.migration_params = Some(MigrationParams {
+        index_snapshot: pool_info.reward_index,
+        deprecated_staking_token,
+    });
+    let new_asset_key = deps
+        .api
+        .addr_canonicalize(new_staking_token.as_str())?
+        .to_vec();
+    // remove old pool
+    remove_pool_info(deps.storage, &asset_key);
+    store_pool_info(deps.storage, &new_asset_key, &pool_info)?;
 
     Ok(Response::new().add_attributes([
         ("action", "depcrecate_staking_token"),
-        ("asset_info", &asset_info.to_string()),
+        ("staking_token", &staking_token.as_str()),
         (
             "deprecated_staking_token",
             &deprecated_token_addr.to_string(),
@@ -293,26 +303,28 @@ fn deprecate_staking_token(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::PoolInfo { asset_info } => to_binary(&query_pool_info(deps, asset_info)?),
-        QueryMsg::RewardsPerSec { asset_info } => {
-            to_binary(&query_rewards_per_sec(deps, asset_info)?)
+        QueryMsg::PoolInfo { staking_token } => to_binary(&query_pool_info(deps, staking_token)?),
+        QueryMsg::RewardsPerSec { staking_token } => {
+            to_binary(&query_rewards_per_sec(deps, staking_token)?)
         }
         QueryMsg::RewardInfo {
             staker_addr,
-            asset_info,
-        } => to_binary(&query_reward_info(deps, staker_addr, asset_info)?),
+            staking_token,
+        } => to_binary(&query_reward_info(deps, staker_addr, staking_token)?),
         QueryMsg::RewardInfos {
-            asset_info,
+            staking_token,
             start_after,
             limit,
             order,
         } => to_binary(&query_all_reward_infos(
             deps,
-            asset_info,
+            staking_token,
             start_after,
             limit,
             order,
         )?),
+        QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
+        QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
     }
 }
 
@@ -329,11 +341,10 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(resp)
 }
 
-pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
-    let pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
+pub fn query_pool_info(deps: Deps, staking_token: Addr) -> StdResult<PoolInfoResponse> {
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
+    let pool_info = read_pool_info(deps.storage, &asset_key)?;
     Ok(PoolInfoResponse {
-        asset_info,
         staking_token: deps.api.addr_humanize(&pool_info.staking_token)?,
         total_bond_amount: pool_info.total_bond_amount,
         reward_index: pool_info.reward_index,
@@ -349,11 +360,8 @@ pub fn query_pool_info(deps: Deps, asset_info: AssetInfo) -> StdResult<PoolInfoR
     })
 }
 
-pub fn query_rewards_per_sec(
-    deps: Deps,
-    asset_info: AssetInfo,
-) -> StdResult<RewardsPerSecResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
+pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<RewardsPerSecResponse> {
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
     let raw_assets = read_rewards_per_sec(deps.storage, &asset_key)?;
 
@@ -365,28 +373,95 @@ pub fn query_rewards_per_sec(
     Ok(RewardsPerSecResponse { assets })
 }
 
+pub fn parse_read_all_pool_infos(
+    api: &dyn Api,
+    pool_infos: Vec<(Vec<u8>, PoolInfo)>,
+) -> StdResult<Vec<QueryPoolInfoResponse>> {
+    pool_infos
+        .into_iter()
+        .map(|(key, pool_info)| {
+            let asset_key = CanonicalAddr::from(key);
+            let staking_token = api.addr_humanize(&asset_key)?;
+            Ok(QueryPoolInfoResponse {
+                asset_key: staking_token.to_string(),
+                pool_info: PoolInfoResponse {
+                    staking_token,
+                    total_bond_amount: pool_info.total_bond_amount,
+                    reward_index: pool_info.reward_index,
+                    pending_reward: pool_info.pending_reward,
+                    migration_deprecated_staking_token: pool_info
+                        .migration_params
+                        .clone()
+                        .map(|params| -> StdResult<Addr> {
+                            Ok(api.addr_humanize(&params.deprecated_staking_token)?)
+                        })
+                        .transpose()?,
+                    migration_index_snapshot: pool_info
+                        .migration_params
+                        .map(|params| params.index_snapshot),
+                },
+            })
+        })
+        .collect::<StdResult<Vec<QueryPoolInfoResponse>>>()
+}
+
+pub fn query_get_pools_infomation(deps: Deps) -> StdResult<Vec<QueryPoolInfoResponse>> {
+    let pool_infos = read_all_pool_infos(deps.storage)?;
+    parse_read_all_pool_infos(deps.api, pool_infos)
+}
+
+pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Binary> {
+    match old_store_type {
+        OldStoreType::Pools {} => {
+            let old_pool_infos = old_read_all_pool_infos(deps.storage)?;
+            let all_pools = parse_read_all_pool_infos(deps.api, old_pool_infos)?;
+            to_binary(&all_pools)
+        }
+        OldStoreType::Stakers { asset_info } => {
+            let asset_key = asset_info.to_vec(deps.api)?;
+            let all_stakers_given_key = old_stakers_read(deps.storage, &asset_key)
+                .range(None, None, Order::Ascending)
+                .map(|data| {
+                    data.and_then(|da| {
+                        Ok((deps.api.addr_humanize(&CanonicalAddr::from(da.0))?, da.1))
+                    })
+                })
+                .collect::<StdResult<Vec<(Addr, bool)>>>()?;
+            to_binary(&all_stakers_given_key)
+        }
+        OldStoreType::RewardsPerSec {} => {
+            let list_old_rw_per_sec = old_read_all_rewards_per_sec(deps.storage, deps.api);
+            to_binary(&list_old_rw_per_sec)
+        }
+        OldStoreType::IsMigrated { staker } => {
+            let list_is_migrated_given_staker = old_read_all_is_migrated_key_parsed(
+                deps.storage,
+                deps.api,
+                deps.api.addr_canonicalize(&staker)?,
+            );
+            to_binary(&list_is_migrated_given_staker)
+        }
+        OldStoreType::Rewards { staker } => {
+            let list_old_rewards_store =
+                old_rewards_read_all(deps.storage, deps.api, deps.api.addr_canonicalize(&staker)?);
+            to_binary(&list_old_rewards_store)
+        }
+    }
+}
+
 // migrate contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    // migrate_pool_infos(deps.storage)?;
-    // migrate_config(deps.storage)?;
-    // migrate_rewards_store(deps.storage, deps.api, msg.staker_addrs)?;
-    // migrate_total_reward_amount(deps.storage, deps.api, msg.amount_infos)?;
-
-    // when the migration is executed, deprecate directly the MIR pool
-    // let config = read_config(deps.storage)?;
-    // let self_info = MessageInfo {
-    //     sender: deps.api.addr_humanize(&config.owner)?,
-    //     sent_funds: vec![],
-    // };
-
-    // depricate old one
-    // deprecate_staking_token(
-    //     deps,
-    //     self_info,
-    //     msg.asset_info_to_deprecate,
-    //     msg.new_staking_token,
-    // )?;
-
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    store_finish_migrate_store_status(deps.storage, false)?;
     Ok(Response::default())
+}
+
+pub fn validate_migrate_store_status(storage: &mut dyn Storage) -> StdResult<()> {
+    let migrate_store_status = read_finish_migrate_store_status(storage)?;
+    if migrate_store_status {
+        return Ok(());
+    }
+    Err(StdError::generic_err(
+        ContractError::ContractUpgrade {}.to_string(),
+    ))
 }

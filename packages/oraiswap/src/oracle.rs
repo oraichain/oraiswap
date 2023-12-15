@@ -39,18 +39,6 @@ pub enum ExecuteMsg {
 }
 
 /// QueryMsg is defines available query datas
-#[cfg(not(target_arch = "wasm32"))]
-#[cw_serde]
-#[derive(QueryResponses)]
-#[serde(untagged)]
-#[query_responses(nested)]
-pub enum QueryMsg {
-    Treasury(OracleTreasuryQuery),
-    Exchange(OracleExchangeQuery),
-    Contract(OracleContractQuery),
-}
-
-#[cfg(target_arch = "wasm32")]
 #[cw_serde]
 #[derive(QueryResponses)]
 #[query_responses(nested)]

@@ -8,15 +8,13 @@ use crate::state::{
     read_config, read_last_distributed, store_config, store_last_distributed, Config,
 };
 
-use oraiswap::staking::QueryMsg as StakingQueryMsg;
 use oraiswap::staking::{ExecuteMsg as StakingExecuteMsg, RewardsPerSecResponse};
+use oraiswap::staking::{QueryMsg as StakingQueryMsg, RewardMsg};
 
 use oraiswap::rewarder::{
     ConfigResponse, DistributionInfoResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     RewardAmountPerSecondResponse,
 };
-
-use oraiswap::asset::{Asset, AssetInfo};
 
 // 600 seconds default
 const DEFAULT_DISTRIBUTION_INTERVAL: u64 = 600;
@@ -52,7 +50,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             distribution_interval,
         } => update_config(deps, info, owner, staking_contract, distribution_interval),
 
-        ExecuteMsg::Distribute { asset_infos } => distribute(deps, env, asset_infos),
+        ExecuteMsg::Distribute { staking_tokens } => distribute(deps, env, staking_tokens),
     }
 }
 
@@ -92,13 +90,13 @@ pub fn update_config(
 
 /// Distribute
 /// Anyone can execute distribute operation to distribute
-pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdResult<Response> {
+pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     let staking_contract = deps.api.addr_humanize(&config.staking_contract)?;
     let now = env.block.time.seconds();
-    let mut rewards: Vec<Asset> = vec![];
-    for asset_info in asset_infos {
-        let asset_key = asset_info.to_vec(deps.api)?;
+    let mut rewards: Vec<RewardMsg> = vec![];
+    for staking_token in staking_tokens {
+        let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
         // default is init time
         let last_distributed = read_last_distributed(deps.storage, &asset_key)
             .unwrap_or(now - config.distribution_interval - 1);
@@ -110,19 +108,22 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
         }
 
         // store last distributed
-        store_last_distributed(deps.storage, &&asset_key, now)?;
+        store_last_distributed(deps.storage, &asset_key, now)?;
 
         // reward amount per second for a pool
-        let reward_amount =
-            _read_pool_reward_per_sec(&deps.querier, staking_contract.clone(), asset_info.clone())?;
+        let reward_amount = _read_pool_reward_per_sec(
+            &deps.querier,
+            staking_contract.clone(),
+            staking_token.clone(),
+        )?;
 
         // get total reward amount for a pool
         let distribution_amount = Uint128::from(reward_amount.u128() * (last_time_elapsed as u128));
 
-        // update rewards
-        rewards.push(Asset {
-            info: asset_info,
-            amount: distribution_amount,
+        // we will accumulate all rewards of a pool into a reward info pool. After that, we will re-calculate the percent of each reward token later in withdraw reward
+        rewards.push(RewardMsg {
+            staking_token,
+            total_accumulation_amount: distribution_amount,
         });
     }
 
@@ -139,11 +140,11 @@ pub fn distribute(deps: DepsMut, env: Env, asset_infos: Vec<AssetInfo>) -> StdRe
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::DistributionInfo { asset_info } => {
-            to_binary(&query_distribution_info(deps, asset_info)?)
+        QueryMsg::DistributionInfo { staking_token } => {
+            to_binary(&query_distribution_info(deps, staking_token)?)
         }
-        QueryMsg::RewardAmountPerSec { asset_info } => {
-            to_binary(&query_reward_amount_per_sec(deps, asset_info)?)
+        QueryMsg::RewardAmountPerSec { staking_token } => {
+            to_binary(&query_reward_amount_per_sec(deps, staking_token)?)
         }
     }
 }
@@ -161,9 +162,9 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 pub fn query_distribution_info(
     deps: Deps,
-    asset_info: AssetInfo,
+    staking_token: Addr,
 ) -> StdResult<DistributionInfoResponse> {
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?.to_vec();
     let last_distributed = read_last_distributed(deps.storage, &asset_key)?;
     let resp = DistributionInfoResponse { last_distributed };
 
@@ -172,13 +173,13 @@ pub fn query_distribution_info(
 
 pub fn query_reward_amount_per_sec(
     deps: Deps,
-    asset_info: AssetInfo,
+    staking_token: Addr,
 ) -> StdResult<RewardAmountPerSecondResponse> {
     let state = read_config(deps.storage)?;
     let reward_amount = _read_pool_reward_per_sec(
         &deps.querier,
         deps.api.addr_humanize(&state.staking_contract)?,
-        asset_info,
+        staking_token,
     )?;
 
     Ok(RewardAmountPerSecondResponse { reward_amount })
@@ -187,11 +188,11 @@ pub fn query_reward_amount_per_sec(
 fn _read_pool_reward_per_sec(
     querier: &QuerierWrapper,
     staking_contract: Addr,
-    asset_info: AssetInfo,
+    staking_token: Addr,
 ) -> StdResult<Uint128> {
     let res: RewardsPerSecResponse = querier.query_wasm_smart(
         staking_contract,
-        &StakingQueryMsg::RewardsPerSec { asset_info },
+        &StakingQueryMsg::RewardsPerSec { staking_token },
     )?;
 
     Ok(res.assets.iter().map(|a| a.amount).sum())

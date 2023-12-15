@@ -64,6 +64,7 @@ fn update_config() {
     let msg = ExecuteMsg::UpdateConfig {
         owner: Some(Addr::unchecked("owner2")),
         rewarder: None,
+        migrate_store_status: Some(true),
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -88,6 +89,7 @@ fn update_config() {
     let msg = ExecuteMsg::UpdateConfig {
         rewarder: None,
         owner: None,
+        migrate_store_status: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg);
@@ -116,9 +118,6 @@ fn test_register() {
     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -136,7 +135,7 @@ fn test_register() {
         res.attributes,
         vec![
             attr("action", "register_asset"),
-            attr("asset_info", "asset"),
+            attr("staking_token", "staking"),
         ]
     );
 
@@ -144,9 +143,7 @@ fn test_register() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::PoolInfo {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset"),
-            },
+            staking_token: Addr::unchecked("staking"),
         },
     )
     .unwrap();
@@ -154,9 +151,6 @@ fn test_register() {
     assert_eq!(
         pool_info,
         PoolInfoResponse {
-            asset_info: AssetInfo::Token {
-                contract_addr: Addr::unchecked("asset")
-            },
             staking_token: Addr::unchecked("staking"),
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
@@ -186,9 +180,7 @@ fn test_query_staker_pagination() {
     // set rewards per second for asset
     // will also add to the index the pending rewards from before the migration
     let msg = ExecuteMsg::UpdateRewardsPerSec {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
+        staking_token: Addr::unchecked("staking"),
         assets: vec![Asset {
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
@@ -200,9 +192,6 @@ fn test_query_staker_pagination() {
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     let msg = ExecuteMsg::RegisterAsset {
-        asset_info: AssetInfo::Token {
-            contract_addr: Addr::unchecked("asset"),
-        },
         staking_token: Addr::unchecked("staking"),
     };
 
@@ -214,12 +203,7 @@ fn test_query_staker_pagination() {
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: format!("addr{}", i),
             amount: Uint128::from(100u128),
-            msg: to_binary(&Cw20HookMsg::Bond {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
-            })
-            .unwrap(),
+            msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
         });
         let info = mock_info("staking", &[]);
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -232,9 +216,7 @@ fn test_query_staker_pagination() {
             deps.as_ref(),
             mock_env(),
             QueryMsg::RewardInfos {
-                asset_info: AssetInfo::Token {
-                    contract_addr: Addr::unchecked("asset"),
-                },
+                staking_token: Addr::unchecked("staking"),
                 limit: Some(10),
                 order: Some(Order::Ascending.into()),
                 start_after: start_after.clone(),
