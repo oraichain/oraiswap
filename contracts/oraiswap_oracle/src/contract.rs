@@ -299,6 +299,10 @@ fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let mut contract_info = CONTRACT_INFO.load(deps.storage)?;
+    contract_info.min_rate = Decimal::zero();
+    CONTRACT_INFO.save(deps.storage, &contract_info)?;
+    TAX_RATE.save(deps.storage, &Decimal::zero())?;
     Ok(Response::default())
 }
