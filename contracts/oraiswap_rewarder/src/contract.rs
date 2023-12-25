@@ -118,6 +118,10 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
             staking_contract.clone(),
             staking_token.clone(),
         )?;
+        // no need to create a new distribute msg if the reward amount is 0
+        if reward_amount.is_zero() {
+            continue;
+        }
 
         // get total reward amount for a pool
         let distribution_amount = Uint128::from(reward_amount.u128() * (last_time_elapsed as u128));
@@ -192,12 +196,15 @@ fn _read_pool_reward_per_sec(
     staking_contract: Addr,
     staking_token: Addr,
 ) -> StdResult<Uint128> {
-    let res: RewardsPerSecResponse = querier.query_wasm_smart(
+    let res: StdResult<RewardsPerSecResponse> = querier.query_wasm_smart(
         staking_contract,
         &StakingQueryMsg::RewardsPerSec { staking_token },
-    )?;
-
-    Ok(res.assets.iter().map(|a| a.amount).sum())
+    );
+    if let Some(res) = res.ok() {
+        return Ok(res.assets.iter().map(|a| a.amount).sum());
+    } else {
+        Ok(Uint128::zero())
+    }
 }
 
 pub fn read_staking_tokens(
