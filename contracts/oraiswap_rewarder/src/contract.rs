@@ -8,7 +8,9 @@ use crate::state::{
     read_config, read_last_distributed, store_config, store_last_distributed, Config,
 };
 
-use oraiswap::staking::{ExecuteMsg as StakingExecuteMsg, RewardsPerSecResponse};
+use oraiswap::staking::{
+    ExecuteMsg as StakingExecuteMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
+};
 use oraiswap::staking::{QueryMsg as StakingQueryMsg, RewardMsg};
 
 use oraiswap::rewarder::{
@@ -196,4 +198,14 @@ fn _read_pool_reward_per_sec(
     )?;
 
     Ok(res.assets.iter().map(|a| a.amount).sum())
+}
+
+pub fn read_staking_tokens(
+    querier: &QuerierWrapper,
+    staking_contract: Addr,
+) -> StdResult<Vec<String>> {
+    let res: Vec<QueryPoolInfoResponse> =
+        querier.query_wasm_smart(staking_contract, &StakingQueryMsg::GetPoolsInformation {})?;
+
+    Ok(res.into_iter().map(|res| res.asset_key).collect())
 }
