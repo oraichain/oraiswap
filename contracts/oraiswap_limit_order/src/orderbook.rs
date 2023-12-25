@@ -30,6 +30,20 @@ pub struct Order {
 }
 
 #[cw_serde]
+pub struct OrderWithFee {
+    pub order_id: u64,
+    pub status: OrderStatus,
+    pub direction: OrderDirection, // if direction is sell then offer => sell asset, ask => buy asset
+    pub bidder_addr: CanonicalAddr,
+    pub offer_amount: Uint128,
+    pub ask_amount: Uint128,
+    pub filled_offer_amount: Uint128,
+    pub filled_ask_amount: Uint128,
+    pub reward_fee: Uint128,
+    pub relayer_fee: Uint128,
+}
+
+#[cw_serde]
 pub struct Executor {
     pub address: CanonicalAddr,
     pub reward_assets: [Asset; 2],
@@ -67,8 +81,9 @@ impl Order {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if  self.filled_offer_amount == self.offer_amount ||
-            self.filled_ask_amount == self.ask_amount {
+        if self.filled_offer_amount == self.offer_amount
+            || self.filled_ask_amount == self.ask_amount
+        {
             self.status = OrderStatus::Fulfilled;
         } else {
             self.status = OrderStatus::PartialFilled;
@@ -121,6 +136,42 @@ impl Order {
             filled_offer_amount: self.filled_offer_amount,
             filled_ask_amount: self.filled_ask_amount,
         })
+    }
+}
+
+impl OrderWithFee {
+    // create new order given a price and an offer amount
+    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) {
+        self.filled_ask_amount += ask_amount;
+        self.filled_offer_amount += offer_amount;
+
+        if self.filled_offer_amount == self.offer_amount
+            || self.filled_ask_amount == self.ask_amount
+        {
+            self.status = OrderStatus::Fulfilled;
+        } else {
+            self.status = OrderStatus::PartialFilled;
+        }
+    }
+
+    pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
+        let order = Order {
+            order_id: self.order_id,
+            status: self.status,
+            direction: self.direction,
+            bidder_addr: self.bidder_addr.to_owned(),
+            offer_amount: self.offer_amount,
+            ask_amount: self.ask_amount,
+            filled_offer_amount: self.filled_offer_amount,
+            filled_ask_amount: self.filled_ask_amount,
+        };
+        if self.status == OrderStatus::Fulfilled {
+            // When status is Fulfilled, remove order
+            remove_order(storage, pair_key, &order)
+        } else {
+            // update order
+            store_order(storage, pair_key, &order, false)
+        }
     }
 }
 
@@ -468,7 +519,7 @@ impl Executor {
 }
 
 pub struct BulkOrders {
-    pub orders: Vec<Order>,
+    pub orders: Vec<OrderWithFee>,
     pub direction: OrderDirection,
     pub price: Decimal,
     pub volume: Uint128,
@@ -488,14 +539,35 @@ impl BulkOrders {
         let spread_volume = Uint128::zero();
 
         for order in orders {
-            volume += order.offer_amount.checked_sub(order.filled_offer_amount).unwrap();
-            ask_volume += order.ask_amount.checked_sub(order.filled_ask_amount).unwrap();
+            volume += order
+                .offer_amount
+                .checked_sub(order.filled_offer_amount)
+                .unwrap();
+            ask_volume += order
+                .ask_amount
+                .checked_sub(order.filled_ask_amount)
+                .unwrap();
         }
 
         return Self {
             direction,
             price,
-            orders: orders.clone(),
+            orders: orders
+                .clone()
+                .into_iter()
+                .map(|order| OrderWithFee {
+                    order_id: order.order_id,
+                    status: order.status,
+                    direction: order.direction,
+                    bidder_addr: order.bidder_addr,
+                    offer_amount: order.offer_amount,
+                    ask_amount: order.ask_amount,
+                    filled_offer_amount: order.filled_offer_amount,
+                    filled_ask_amount: order.filled_ask_amount,
+                    relayer_fee: Uint128::zero(),
+                    reward_fee: Uint128::zero(),
+                })
+                .collect(),
             volume,
             filled_volume,
             ask_volume,

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use crate::orderbook::{BulkOrders, Executor, Order, OrderBook};
+use crate::orderbook::{BulkOrders, Executor, Order, OrderBook, OrderWithFee};
 use crate::state::{
     increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
     read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
@@ -108,9 +108,11 @@ pub fn cancel_order(
 
     // Build refund msg
     let messages = if left_offer_amount > Uint128::zero() {
-        vec![bidder_refund
-            .clone()
-            .into_msg(None, &deps.querier, deps.api.addr_humanize(&order.bidder_addr)?)?]
+        vec![bidder_refund.clone().into_msg(
+            None,
+            &deps.querier,
+            deps.api.addr_humanize(&order.bidder_addr)?,
+        )?]
     } else {
         vec![]
     };
@@ -140,7 +142,7 @@ pub fn cancel_order(
     ]))
 }
 
-fn to_events(order: &Order, human_bidder: String, fee: String) -> Event {
+fn to_events(order: &OrderWithFee, human_bidder: String) -> Event {
     let attrs: Vec<Attribute> = [
         attr("status", format!("{:?}", order.status)),
         attr("bidder_addr", human_bidder),
@@ -150,7 +152,8 @@ fn to_events(order: &Order, human_bidder: String, fee: String) -> Event {
         attr("filled_offer_amount", order.filled_offer_amount.to_string()),
         attr("ask_amount", order.ask_amount.to_string()),
         attr("filled_ask_amount", order.filled_ask_amount.to_string()),
-        attr("fee", fee),
+        attr("reward_fee", order.reward_fee),
+        attr("relayer_fee", order.relayer_fee),
     ]
     .to_vec();
     Event::new("matched_order").add_attributes(attrs)
@@ -421,15 +424,16 @@ fn execute_bulk_orders(
     return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
 
+// TODO: write test cases for this function
 fn calculate_fee(
     deps: &DepsMut,
     amount: Uint128,
-    relayer_usdt_fee: Uint128,
+    relayer_quote_fee: Uint128,
     direction: OrderDirection,
     trader_ask_asset: &mut Asset,
     reward: &mut Executor,
     relayer: &mut Executor,
-) -> Uint128 {
+) -> (Uint128, Uint128) {
     let reward_fee: Uint128;
     let relayer_fee: Uint128;
     let contract_info = read_config(deps.storage).unwrap();
@@ -445,7 +449,7 @@ fn calculate_fee(
             relayer.reward_assets[0].amount += relayer_fee;
         }
         OrderDirection::Sell => {
-            relayer_fee = Uint128::min(relayer_usdt_fee, amount);
+            relayer_fee = Uint128::min(relayer_quote_fee, amount);
 
             reward.reward_assets[1].amount += reward_fee;
             relayer.reward_assets[1].amount += relayer_fee;
@@ -456,7 +460,7 @@ fn calculate_fee(
         .amount
         .checked_sub(reward_fee + relayer_fee)
         .unwrap();
-    return relayer_fee + reward_fee;
+    return (reward_fee, relayer_fee);
 }
 
 fn process_orders(
@@ -475,7 +479,7 @@ fn process_orders(
             },
             amount: Uint128::zero(),
         };
-        let relayer_usdt_fee = Uint128::from(RELAY_FEE) * bulk.price;
+        let relayer_quote_fee = Uint128::from(RELAY_FEE) * bulk.price;
 
         for order in bulk.orders.iter_mut() {
             let filled_offer = Uint128::min(
@@ -505,15 +509,17 @@ fn process_orders(
 
             if !filled_ask.is_zero() {
                 trader_ask_asset.amount = filled_ask;
-                calculate_fee(
+                let (reward_fee, relayer_fee) = calculate_fee(
                     deps,
                     filled_ask,
-                    relayer_usdt_fee,
+                    relayer_quote_fee,
                     bulk.direction,
                     &mut trader_ask_asset,
                     reward,
                     relayer,
                 );
+                order.reward_fee = reward_fee;
+                order.relayer_fee = relayer_fee;
                 if !trader_ask_asset.amount.is_zero() {
                     let trader_payment: Payment = Payment {
                         address: deps.api.addr_humanize(&order.bidder_addr).unwrap(),
@@ -602,7 +608,6 @@ pub fn execute_matching_orders(
                 ret_events.push(to_events(
                     &buy_order,
                     deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                    format!("{} {}", "1000", &reward.reward_assets[0].info),
                 ));
             }
         }
@@ -616,7 +621,6 @@ pub fn execute_matching_orders(
                 ret_events.push(to_events(
                     &sell_order,
                     deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                    format!("{} {}", "2000", &reward.reward_assets[1].info),
                 ));
             }
         }
