@@ -16,7 +16,7 @@ pub enum SudoMsg {
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
     match msg {
         SudoMsg::ClockEndBlock {} => {
-            if env.block.height % 10 != 0 {
+            if env.block.height % 100 != 0 {
                 return Ok(Response::new());
             }
             // Every 10 blocks this config value increases 1
