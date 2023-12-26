@@ -326,6 +326,7 @@ fn execute_bulk_orders(
 
         let remaining_sell_volume = sell_bulk_orders.remaining_volume;
         let remaining_buy_volume = buy_bulk_orders.remaining_volume;
+        // multiply by decimal atomics because we want to get good round values
         let remaining_buy_ask_volume =
             Uint128::from(remaining_buy_volume * Decimal::one().atomics())
                 .checked_div(match_price.atomics())?;
