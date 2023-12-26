@@ -4804,6 +4804,25 @@ fn simple_matching_test() {
     );
     app.assert_fail(res);
 
+    let res = app
+        .query::<OrderBookMatchableResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBookMatchable {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+    let expected_res = OrderBookMatchableResponse { is_matchable: true };
+    assert_eq!(res, expected_res);
+
     // Excecute all orders
     let msg = ExecuteMsg::ExecuteOrderBookPair {
         asset_infos: [
@@ -4858,6 +4877,24 @@ fn simple_matching_test() {
     ]
     .to_vec();
     assert_eq!(address2_balances, expected_balances);
+    let res = app
+        .query::<OrderBookMatchableResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBookMatchable {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+    let expected_res = OrderBookMatchableResponse { is_matchable: false };
+    assert_eq!(res, expected_res);
 }
 
 fn mock_basic_query_data() -> (MockApp, Addr) {
