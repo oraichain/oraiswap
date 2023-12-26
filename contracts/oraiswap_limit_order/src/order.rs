@@ -318,7 +318,7 @@ fn execute_bulk_orders(
         let sell_bulk_orders = &mut sell_bulk_orders_list[j];
 
         // match price
-        let match_price = if buy_bulk_orders.average_order_id > sell_bulk_orders.average_order_id {
+        let match_price = if buy_bulk_orders.average_order_id >= sell_bulk_orders.average_order_id {
             buy_price
         } else {
             sell_price

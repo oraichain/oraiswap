@@ -4690,7 +4690,7 @@ fn simple_matching_test() {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(750000000u128),
+                amount: Uint128::from(75000000u128),
             },
         ],
     };
@@ -4860,7 +4860,7 @@ fn simple_matching_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(10522454476u128),
+            amount: Uint128::from(10074922750u128),
         },
     ]
     .to_vec();
