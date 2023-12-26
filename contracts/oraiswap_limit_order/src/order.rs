@@ -452,7 +452,8 @@ fn calculate_fee(
 
     trader_ask_asset.amount = trader_ask_asset
         .amount
-        .checked_sub(reward_fee + relayer_fee)?;
+        .checked_sub(reward_fee + relayer_fee)
+        .unwrap_or_default();
     return Ok((reward_fee, relayer_fee));
 }
 
@@ -476,12 +477,18 @@ fn process_orders(
 
         for order in bulk.orders.iter_mut() {
             let filled_offer = Uint128::min(
-                order.offer_amount.checked_sub(order.filled_offer_amount)?,
+                order
+                    .offer_amount
+                    .checked_sub(order.filled_offer_amount)
+                    .unwrap_or_default(),
                 bulk.filled_volume,
             );
 
             let filled_ask = Uint128::min(
-                order.ask_amount.checked_sub(order.filled_ask_amount)?,
+                order
+                    .ask_amount
+                    .checked_sub(order.filled_ask_amount)
+                    .unwrap_or_default(),
                 bulk.filled_ask_volume,
             );
 
@@ -489,8 +496,14 @@ fn process_orders(
                 continue;
             }
 
-            bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer)?;
-            bulk.filled_ask_volume = bulk.filled_ask_volume.checked_sub(filled_ask)?;
+            bulk.filled_volume = bulk
+                .filled_volume
+                .checked_sub(filled_offer)
+                .unwrap_or_default();
+            bulk.filled_ask_volume = bulk
+                .filled_ask_volume
+                .checked_sub(filled_ask)
+                .unwrap_or_default();
 
             order.fill_order(filled_ask, filled_offer);
 

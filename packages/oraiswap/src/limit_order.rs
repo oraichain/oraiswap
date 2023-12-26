@@ -121,10 +121,10 @@ pub enum Cw20HookMsg {
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String),      // filter by bidder
-    Price(Decimal),      // filter by price
-    Tick,                // filter by direction
-    None,                // no filter
+    Bidder(String), // filter by bidder
+    Price(Decimal), // filter by price
+    Tick,           // filter by direction
+    None,           // no filter
 }
 
 #[cw_serde]
