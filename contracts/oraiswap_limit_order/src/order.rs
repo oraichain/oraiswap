@@ -10,7 +10,7 @@ use crate::state::{
 };
 use cosmwasm_std::{
     attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
-    Order as OrderBy, Response, StdResult, Storage, Uint128,
+    Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
@@ -177,22 +177,19 @@ fn transfer_reward(
     executor: &mut Executor,
     total_reward: &mut Vec<String>,
     messages: &mut Vec<CosmosMsg>,
-) {
+) -> StdResult<()> {
     for reward_asset in executor.reward_assets.iter_mut() {
         if Uint128::from(reward_asset.amount) >= Uint128::from(1000000u128) {
-            messages.push(
-                reward_asset
-                    .into_msg(
-                        None,
-                        &deps.querier,
-                        deps.api.addr_humanize(&executor.address).unwrap(),
-                    )
-                    .unwrap(),
-            );
+            messages.push(reward_asset.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_humanize(&executor.address)?,
+            )?);
             total_reward.push(reward_asset.to_string());
             reward_asset.amount = Uint128::zero();
         }
     }
+    Ok(())
 }
 
 fn process_list_trader(
@@ -231,8 +228,8 @@ fn transfer_spread(
     direction: OrderDirection,
     bulk_orders: &mut Vec<BulkOrders>,
     messages: &mut Vec<CosmosMsg>,
-) {
-    let contract_info = read_config(deps.storage).unwrap();
+) -> StdResult<()> {
+    let contract_info = read_config(deps.storage)?;
     let spread_address = contract_info.spread_address;
     let mut total_spread = Uint128::zero();
 
@@ -246,11 +243,11 @@ fn transfer_spread(
     }
 
     let spread_payment: Payment = Payment {
-        address: deps.api.addr_humanize(&spread_address).unwrap(),
+        address: deps.api.addr_humanize(&spread_address)?,
         asset: Asset {
             info: match direction {
-                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api).unwrap(),
-                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api).unwrap(),
+                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
             },
             amount: total_spread,
         },
@@ -258,13 +255,13 @@ fn transfer_spread(
 
     // Build refund msg
     if !total_spread.is_zero() {
-        messages.push(
-            spread_payment
-                .asset
-                .into_msg(None, &deps.querier, spread_payment.address)
-                .unwrap(),
-        );
+        messages.push(spread_payment.asset.into_msg(
+            None,
+            &deps.querier,
+            spread_payment.address,
+        )?);
     }
+    Ok(())
 }
 
 fn execute_bulk_orders(
@@ -298,7 +295,10 @@ fn execute_bulk_orders(
     while i < limit && j < limit {
         if best_sell_price_list.len() <= j {
             if let Some(Ok((k, _))) = sell_cursor.next() {
-                let price = Decimal::raw(u128::from_be_bytes(k.try_into().unwrap()));
+                let price =
+                    Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
+                        StdError::generic_err("Error converting bytes to u128")
+                    })?));
                 best_sell_price_list.push(price);
             } else {
                 break;
@@ -308,7 +308,10 @@ fn execute_bulk_orders(
 
         if best_buy_price_list.len() <= i {
             if let Some(Ok((k, _))) = buy_cursor.next() {
-                let price = Decimal::raw(u128::from_be_bytes(k.try_into().unwrap()));
+                let price =
+                    Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
+                        StdError::generic_err("Error converting bytes to u128")
+                    })?));
                 best_buy_price_list.push(price);
             } else {
                 break;
@@ -364,8 +367,7 @@ fn execute_bulk_orders(
         // multiply by decimal atomics because we want to get good round values
         let sell_offer_amount = Uint128::min(
             Uint128::from(sell_ask_amount * Decimal::one().atomics())
-                .checked_div(match_price.atomics())
-                .unwrap(),
+                .checked_div(match_price.atomics())?,
             lef_sell_offer,
         );
 
@@ -425,11 +427,11 @@ fn calculate_fee(
     trader_ask_asset: &mut Asset,
     reward: &mut Executor,
     relayer: &mut Executor,
-) -> (Uint128, Uint128) {
+) -> StdResult<(Uint128, Uint128)> {
     let reward_fee: Uint128;
     let relayer_fee: Uint128;
-    let contract_info = read_config(deps.storage).unwrap();
-    let commission_rate = Decimal::from_str(&contract_info.commission_rate).unwrap();
+    let contract_info = read_config(deps.storage)?;
+    let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
 
     reward_fee = amount * commission_rate;
 
@@ -450,9 +452,8 @@ fn calculate_fee(
 
     trader_ask_asset.amount = trader_ask_asset
         .amount
-        .checked_sub(reward_fee + relayer_fee)
-        .unwrap();
-    return (reward_fee, relayer_fee);
+        .checked_sub(reward_fee + relayer_fee)?;
+    return Ok((reward_fee, relayer_fee));
 }
 
 fn process_orders(
@@ -462,12 +463,12 @@ fn process_orders(
     bulk_traders: &mut Vec<Payment>,
     reward: &mut Executor,
     relayer: &mut Executor,
-) {
+) -> StdResult<()> {
     for bulk in bulk_orders.iter_mut() {
         let mut trader_ask_asset = Asset {
             info: match bulk.direction {
-                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api).unwrap(),
-                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api).unwrap(),
+                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
             },
             amount: Uint128::zero(),
         };
@@ -475,18 +476,12 @@ fn process_orders(
 
         for order in bulk.orders.iter_mut() {
             let filled_offer = Uint128::min(
-                order
-                    .offer_amount
-                    .checked_sub(order.filled_offer_amount)
-                    .unwrap(),
+                order.offer_amount.checked_sub(order.filled_offer_amount)?,
                 bulk.filled_volume,
             );
 
             let filled_ask = Uint128::min(
-                order
-                    .ask_amount
-                    .checked_sub(order.filled_ask_amount)
-                    .unwrap(),
+                order.ask_amount.checked_sub(order.filled_ask_amount)?,
                 bulk.filled_ask_volume,
             );
 
@@ -494,8 +489,8 @@ fn process_orders(
                 continue;
             }
 
-            bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer).unwrap();
-            bulk.filled_ask_volume = bulk.filled_ask_volume.checked_sub(filled_ask).unwrap();
+            bulk.filled_volume = bulk.filled_volume.checked_sub(filled_offer)?;
+            bulk.filled_ask_volume = bulk.filled_ask_volume.checked_sub(filled_ask)?;
 
             order.fill_order(filled_ask, filled_offer);
 
@@ -509,12 +504,12 @@ fn process_orders(
                     &mut trader_ask_asset,
                     reward,
                     relayer,
-                );
+                )?;
                 order.reward_fee = reward_fee;
                 order.relayer_fee = relayer_fee;
                 if !trader_ask_asset.amount.is_zero() {
                     let trader_payment: Payment = Payment {
-                        address: deps.api.addr_humanize(&order.bidder_addr).unwrap(),
+                        address: deps.api.addr_humanize(&order.bidder_addr)?,
                         asset: Asset {
                             info: trader_ask_asset.info.clone(),
                             amount: trader_ask_asset.amount,
@@ -525,6 +520,7 @@ fn process_orders(
             }
         }
     }
+    Ok(())
 }
 
 pub fn execute_matching_orders(
@@ -581,7 +577,7 @@ pub fn execute_matching_orders(
         &mut list_bidder,
         &mut reward,
         &mut relayer,
-    );
+    )?;
 
     process_orders(
         &deps,
@@ -590,13 +586,13 @@ pub fn execute_matching_orders(
         &mut list_asker,
         &mut reward,
         &mut relayer,
-    );
+    )?;
 
     for bulk in buy_list.iter_mut() {
         for buy_order in bulk.orders.iter_mut() {
             if buy_order.status != OrderStatus::Open {
                 total_orders += 1;
-                buy_order.match_order(deps.storage, &pair_key).unwrap();
+                buy_order.match_order(deps.storage, &pair_key)?;
                 ret_events.push(to_events(
                     &buy_order,
                     deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
@@ -609,7 +605,7 @@ pub fn execute_matching_orders(
         for sell_order in bulk.orders.iter_mut() {
             if sell_order.status != OrderStatus::Open {
                 total_orders += 1;
-                sell_order.match_order(deps.storage, &pair_key).unwrap();
+                sell_order.match_order(deps.storage, &pair_key)?;
                 ret_events.push(to_events(
                     &sell_order,
                     deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
@@ -624,13 +620,13 @@ pub fn execute_matching_orders(
         OrderDirection::Sell,
         &mut sell_list,
         &mut messages,
-    );
+    )?;
 
     process_list_trader(&deps, list_bidder, &mut messages)?;
     process_list_trader(&deps, list_asker, &mut messages)?;
 
-    transfer_reward(&deps, &mut reward, &mut total_reward, &mut messages);
-    transfer_reward(&deps, &mut relayer, &mut total_reward, &mut messages);
+    transfer_reward(&deps, &mut reward, &mut total_reward, &mut messages)?;
+    transfer_reward(&deps, &mut relayer, &mut total_reward, &mut messages)?;
 
     store_reward(deps.storage, &pair_key, &reward)?;
     store_reward(deps.storage, &pair_key, &relayer)?;
