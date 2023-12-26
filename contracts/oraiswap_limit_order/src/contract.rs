@@ -31,7 +31,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
 const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
-const SPREAD_WALLET: &str = "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
