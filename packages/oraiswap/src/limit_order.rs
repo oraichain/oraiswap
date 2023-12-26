@@ -172,6 +172,8 @@ pub enum QueryMsg {
     LastOrderId {},
     #[returns(OrderBookMatchableResponse)]
     OrderBookMatchable { asset_infos: [AssetInfo; 2] },
+    #[returns(Decimal)]
+    MidPrice { asset_infos: [AssetInfo; 2] },
 }
 
 #[cw_serde]

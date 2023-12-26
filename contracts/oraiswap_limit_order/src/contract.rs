@@ -443,6 +443,43 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
         }
+        QueryMsg::MidPrice { asset_infos } => {
+            let best_buy = query_ticks_with_end(
+                deps.storage,
+                &pair_key(&[
+                    asset_infos[0].to_raw(deps.api)?,
+                    asset_infos[1].to_raw(deps.api)?,
+                ]),
+                OrderDirection::Buy,
+                None,
+                None,
+                Some(1),
+                Some(2),
+            )?;
+            let best_sell = query_ticks_with_end(
+                deps.storage,
+                &pair_key(&[
+                    asset_infos[0].to_raw(deps.api)?,
+                    asset_infos[1].to_raw(deps.api)?,
+                ]),
+                OrderDirection::Buy,
+                None,
+                None,
+                Some(1),
+                Some(1),
+            )?;
+            if best_buy.ticks.len() == 0 || best_sell.ticks.len() == 0 {
+                return to_binary(&Decimal::zero());
+            } else {
+                let mid_price = best_buy.ticks[0]
+                    .price
+                    .checked_add(best_sell.ticks[0].price)
+                    .unwrap_or_default()
+                    .checked_div(Decimal::from_ratio(2u128, 1u128))
+                    .unwrap_or_default();
+                to_binary(&mid_price)
+            }
+        }
     }
 }
 
