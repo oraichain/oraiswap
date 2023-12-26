@@ -250,7 +250,7 @@ pub fn read_orders(
 }
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess no need
-static CONTRACT_INFO: &[u8] = b"contract_info_v2"; // contract info
+static CONTRACT_INFO: &[u8] = b"contract_info"; // contract info
 static PREFIX_ORDER_BOOK: &[u8] = b"order_book"; // store config for an order book like min ask amount and min sell amount
 static PREFIX_ORDER: &[u8] = b"order"; // this is orderbook
 static PREFIX_REWARD: &[u8] = b"reward_wallet"; // executor that running matching engine for orderbook pair
