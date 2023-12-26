@@ -384,9 +384,6 @@ impl OrderBook {
             return None;
         }
 
-        let mut best_buy_price_list: Vec<Decimal> = Vec::new();
-        let mut best_sell_price_list: Vec<Decimal> = Vec::new();
-        
         let start_after = if let Some(start_after) = Decimal::from_atomics(
             sell_price_list[0]
                 .atomics()
@@ -401,7 +398,7 @@ impl OrderBook {
             None
         };
         // desc, all items in this list are ge than the first item in sell list
-        best_buy_price_list = query_ticks_prices_with_end(
+        let best_buy_price_list = query_ticks_prices_with_end(
             storage,
             pair_key,
             OrderDirection::Buy,
@@ -411,7 +408,7 @@ impl OrderBook {
             Some(2i32),
         );
         // both price lists are applicable because buy list is always larger than the first item of sell list
-        best_sell_price_list = sell_price_list;
+        let best_sell_price_list = sell_price_list;
 
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
             return None;
@@ -478,11 +475,18 @@ impl Executor {
 
 pub struct BulkOrders {
     pub orders: Vec<OrderWithFee>,
+    pub average_order_id: Uint128,
     pub direction: OrderDirection,
     pub price: Decimal,
+    // offer volume
     pub volume: Uint128,
+    // remaining volume of bulk orders
+    pub remaining_volume: Uint128,
+    // filled volume of bulk orders
     pub filled_volume: Uint128,
+    // offer volume
     pub ask_volume: Uint128,
+    // filled ask volume of bulk orders
     pub filled_ask_volume: Uint128,
     pub spread_volume: Uint128,
 }
@@ -491,22 +495,33 @@ impl BulkOrders {
     /// Calculate sum of orders base on direction
     pub fn from_orders(orders: &Vec<Order>, price: Decimal, direction: OrderDirection) -> Self {
         let mut volume = Uint128::zero();
+        let mut remaining_volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
-        let filled_volume = Uint128::zero();
-        let filled_ask_volume = Uint128::zero();
+        let mut filled_volume = Uint128::zero();
+        let mut filled_ask_volume = Uint128::zero();
+        let mut sum_order_id = Uint128::zero();
+        let mut average_order_id = Uint128::zero();
         let spread_volume = Uint128::zero();
 
         for order in orders {
-            volume += order
+            sum_order_id += Uint128::from(order.order_id);
+            volume += order.offer_amount;
+            ask_volume += order.ask_amount;
+
+            remaining_volume += order
                 .offer_amount
                 .checked_sub(order.filled_offer_amount)
-                .unwrap();
-            ask_volume += order
-                .ask_amount
-                .checked_sub(order.filled_ask_amount)
-                .unwrap();
+                .unwrap_or_default();
+
+            filled_volume += order.filled_offer_amount;
+            filled_ask_volume += order.filled_ask_amount;
         }
 
+        if orders.len() > 0 {
+            average_order_id = sum_order_id
+                .checked_div((orders.len() as u64).into())
+                .unwrap();
+        }
         return Self {
             direction,
             price,
@@ -526,11 +541,13 @@ impl BulkOrders {
                     reward_fee: Uint128::zero(),
                 })
                 .collect(),
-            volume,
+            remaining_volume,
             filled_volume,
-            ask_volume,
             filled_ask_volume,
             spread_volume,
+            volume,
+            ask_volume,
+            average_order_id,
         };
     }
 }

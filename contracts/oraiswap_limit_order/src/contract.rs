@@ -80,9 +80,8 @@ pub fn execute(
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
         ExecuteMsg::UpdateConfig {
             reward_address,
-            spread_address,
             commission_rate,
-        } => execute_update_config(deps, info, reward_address, spread_address, commission_rate),
+        } => execute_update_config(deps, info, reward_address, commission_rate),
         ExecuteMsg::CreateOrderBookPair {
             base_coin_info,
             quote_coin_info,
@@ -211,7 +210,6 @@ pub fn execute_update_config(
     deps: DepsMut,
     info: MessageInfo,
     reward_address: Option<Addr>,
-    spread_address: Option<Addr>,
     commission_rate: Option<String>,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
@@ -227,18 +225,12 @@ pub fn execute_update_config(
         contract_info.reward_address = deps.api.addr_canonicalize(reward_address.as_str())?;
     }
 
-    // update new reward address
-    if let Some(spread_address) = spread_address {
-        contract_info.reward_address = deps.api.addr_canonicalize(spread_address.as_str())?;
-    }
-
     // update new commission rate
     if let Some(commission_rate) = commission_rate {
         contract_info.commission_rate = commission_rate;
     }
 
     store_config(deps.storage, &contract_info)?;
-
     Ok(Response::new().add_attributes(vec![("action", "execute_update_config")]))
 }
 

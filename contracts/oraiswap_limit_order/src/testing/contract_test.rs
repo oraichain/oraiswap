@@ -60,7 +60,6 @@ fn submit_order() {
         admin: None,
         commission_rate: None,
         reward_address: None,
-        spread_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -612,8 +611,7 @@ fn cancel_order_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -951,8 +949,7 @@ fn cancel_order_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1269,8 +1266,7 @@ fn execute_pair_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2275,11 +2271,6 @@ fn execute_pair_native_token() {
             "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
         ))
         .unwrap();
-    let mut spread_balances = app
-        .query_all_balances(Addr::unchecked(
-            "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n",
-        ))
-        .unwrap();
 
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
@@ -2287,10 +2278,6 @@ fn execute_pair_native_token() {
     println!(
         "round 0 - reward_balances's balances: {:?}",
         reward_balances
-    );
-    println!(
-        "round 0 - spread_balances's balances: {:?}\n\n",
-        spread_balances
     );
 
     let mut expected_balances: Vec<Coin> = [
@@ -2329,8 +2316,6 @@ fn execute_pair_native_token() {
     ]
     .to_vec();
     assert_eq!(address2_balances, expected_balances,);
-    expected_balances = [].to_vec();
-    assert_eq!(spread_balances, expected_balances);
 
     // assertion; native asset balance
     let msg = ExecuteMsg::ExecuteOrderBookPair {
@@ -2385,11 +2370,6 @@ fn execute_pair_native_token() {
             "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
         ))
         .unwrap();
-    spread_balances = app
-        .query_all_balances(Addr::unchecked(
-            "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n",
-        ))
-        .unwrap();
 
     println!("round 1 - address0's balances: {:?}", address0_balances);
     println!("round 1 - address1's balances: {:?}", address1_balances);
@@ -2397,10 +2377,6 @@ fn execute_pair_native_token() {
     println!(
         "round 1 - reward_balances's balances: {:?}",
         reward_balances
-    );
-    println!(
-        "round 1 - spread_balances's balances: {:?}\n\n",
-        spread_balances
     );
 
     expected_balances = [
@@ -2410,7 +2386,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(977693u128),
+            amount: Uint128::from(984185u128),
         },
     ]
     .to_vec();
@@ -2422,7 +2398,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(963224u128),
+            amount: Uint128::from(965355u128),
         },
     ]
     .to_vec();
@@ -2501,8 +2477,7 @@ fn execute_pair_cw20_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -3682,8 +3657,7 @@ fn spread_test() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4068,7 +4042,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1019380u128),
+            amount: Uint128::from(1009390u128),
         },
     ]
     .to_vec();
@@ -4080,7 +4054,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1004846u128),
+            amount: Uint128::from(990860u128),
         },
     ]
     .to_vec();
@@ -4135,8 +4109,7 @@ fn reward_to_executor_test() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4375,7 +4348,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000617082u128),
+            amount: Uint128::from(1000102597u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4391,7 +4364,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000101135u128),
+            amount: Uint128::from(1000102799u128),
         },
     ]
     .to_vec();
@@ -4446,8 +4419,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4725,8 +4697,7 @@ fn remove_orderbook_pair() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -5054,8 +5025,7 @@ fn orders_querier() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -5076,7 +5046,7 @@ fn orders_querier() {
         quote_coin_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
-        spread: Some(Decimal::percent(10)),
+        spread: Some(Decimal::percent(1)),
         min_quote_coin_amount: Uint128::from(10u128),
     };
     let _res = app.execute(
