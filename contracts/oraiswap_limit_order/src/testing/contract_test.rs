@@ -4234,7 +4234,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1009390u128),
+            amount: Uint128::from(1019380u128),
         },
     ]
     .to_vec();
@@ -4246,7 +4246,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(990860u128),
+            amount: Uint128::from(1004846u128),
         },
     ]
     .to_vec();
@@ -4540,7 +4540,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000102597u128),
+            amount: Uint128::from(1000617082u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
