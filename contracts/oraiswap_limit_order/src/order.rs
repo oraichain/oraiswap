@@ -363,21 +363,19 @@ fn execute_bulk_orders(
         sell_bulk_orders.remaining_volume = sell_bulk_orders
             .remaining_volume
             .checked_sub(fill_base_volume)?;
-
         // get spread volume in buy side
-        if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.volume {
+        if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.ask_volume {
             buy_bulk_orders.spread_volume += buy_bulk_orders
                 .filled_ask_volume
-                .checked_sub(buy_bulk_orders.volume)?;
-            buy_bulk_orders.filled_ask_volume = buy_bulk_orders.volume;
+                .checked_sub(buy_bulk_orders.ask_volume)?;
+            buy_bulk_orders.filled_ask_volume = buy_bulk_orders.ask_volume;
         }
-
         // get spread volume in sell side
-        if sell_bulk_orders.filled_ask_volume >= sell_bulk_orders.volume {
+        if sell_bulk_orders.filled_ask_volume >= sell_bulk_orders.ask_volume {
             sell_bulk_orders.spread_volume += sell_bulk_orders
                 .filled_ask_volume
-                .checked_sub(sell_bulk_orders.volume)?;
-            sell_bulk_orders.filled_ask_volume = sell_bulk_orders.volume;
+                .checked_sub(sell_bulk_orders.ask_volume)?;
+            sell_bulk_orders.filled_ask_volume = sell_bulk_orders.ask_volume;
         }
 
         if buy_bulk_orders.remaining_volume <= min_vol {
