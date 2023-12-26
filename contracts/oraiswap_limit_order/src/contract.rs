@@ -485,6 +485,8 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         version: info.version,
         name: info.name,
         admin: deps.api.addr_humanize(&info.admin)?,
+        commission_rate: info.commission_rate,
+        reward_address: deps.api.addr_humanize(&info.reward_address)?,
     })
 }
 

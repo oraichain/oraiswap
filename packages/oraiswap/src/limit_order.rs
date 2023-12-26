@@ -181,6 +181,8 @@ pub struct ContractInfoResponse {
 
     // admin can update the parameter, may be multisig
     pub admin: Addr,
+    pub commission_rate: String,
+    pub reward_address: Addr
 }
 
 #[cw_serde]
