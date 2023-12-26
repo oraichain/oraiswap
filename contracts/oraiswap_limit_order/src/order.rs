@@ -324,12 +324,25 @@ fn execute_bulk_orders(
             sell_price
         };
 
+        // remaining_sell_ask_volume = remaining_sell_volume * match_price
         let remaining_sell_volume = sell_bulk_orders.remaining_volume;
+        let remaining_sell_ask_volume = remaining_sell_volume * match_price;
+
         let remaining_buy_volume = buy_bulk_orders.remaining_volume;
         // multiply by decimal atomics because we want to get good round values
+        // remaining_buy_ask_volume = remaining_buy_volume / match_price
         let remaining_buy_ask_volume =
             Uint128::from(remaining_buy_volume * Decimal::one().atomics())
                 .checked_div(match_price.atomics())?;
+
+        if remaining_buy_ask_volume.is_zero() {
+            // buy out
+            i += 1;
+        }
+        if remaining_sell_ask_volume.is_zero() {
+            // sell out
+            j += 1;
+        }
 
         // fill_base_volume = min(remaining_sell_volume, remaining_buy_ask_volume)
         // fill_quote_volume = fill_base_volume * match_price
@@ -364,14 +377,14 @@ fn execute_bulk_orders(
             .remaining_volume
             .checked_sub(fill_base_volume)?;
         // get spread volume in buy side
-        if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.ask_volume {
+        if buy_bulk_orders.filled_ask_volume > buy_bulk_orders.ask_volume {
             buy_bulk_orders.spread_volume += buy_bulk_orders
                 .filled_ask_volume
                 .checked_sub(buy_bulk_orders.ask_volume)?;
             buy_bulk_orders.filled_ask_volume = buy_bulk_orders.ask_volume;
         }
         // get spread volume in sell side
-        if sell_bulk_orders.filled_ask_volume >= sell_bulk_orders.ask_volume {
+        if sell_bulk_orders.filled_ask_volume > sell_bulk_orders.ask_volume {
             sell_bulk_orders.spread_volume += sell_bulk_orders
                 .filled_ask_volume
                 .checked_sub(sell_bulk_orders.ask_volume)?;
