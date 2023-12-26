@@ -386,74 +386,32 @@ impl OrderBook {
 
         let mut best_buy_price_list: Vec<Decimal> = Vec::new();
         let mut best_sell_price_list: Vec<Decimal> = Vec::new();
-
-        // if there is spread, find the best list sell price
-        if let Some(spread) = self.spread {
-            let spread_factor = Decimal::one() + spread;
-            for sell_price in sell_price_list {
-                let sell_price_with_spread =
-                    sell_price.checked_mul(spread_factor).unwrap_or_default();
-                if sell_price_with_spread.is_zero() {
-                    continue;
-                }
-                let start_after = if let Some(start_after) = Decimal::from_atomics(
-                    sell_price
-                        .atomics()
-                        .checked_sub(Uint128::from(1u64))
-                        .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
-                    Decimal::DECIMAL_PLACES,
-                )
-                .ok()
-                {
-                    Some(start_after)
-                } else {
-                    None
-                };
-                let suitable_buy_price_list = query_ticks_prices_with_end(
-                    storage,
-                    pair_key,
-                    OrderDirection::Buy,
-                    start_after,
-                    Some(sell_price_with_spread),
-                    Some(1), // limit 1 because we only need to get the closest buy price possible to the sell price
-                    Some(1),
-                );
-
-                // cannot find suitable buy price list for the given sell price
-                if suitable_buy_price_list.len() == 0 {
-                    continue;
-                }
-                // we loop sell price from smallest to highest, matching buy price must go from highest to lowest => always insert highest into the first element
-                best_buy_price_list.insert(0, suitable_buy_price_list[0]);
-                best_sell_price_list.push(sell_price);
-            }
+        
+        let start_after = if let Some(start_after) = Decimal::from_atomics(
+            sell_price_list[0]
+                .atomics()
+                .checked_sub(Uint128::from(1u64))
+                .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
+            Decimal::DECIMAL_PLACES,
+        )
+        .ok()
+        {
+            Some(start_after)
         } else {
-            let start_after = if let Some(start_after) = Decimal::from_atomics(
-                sell_price_list[0]
-                    .atomics()
-                    .checked_sub(Uint128::from(1u64))
-                    .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
-                Decimal::DECIMAL_PLACES,
-            )
-            .ok()
-            {
-                Some(start_after)
-            } else {
-                None
-            };
-            // desc, all items in this list are ge than the first item in sell list
-            best_buy_price_list = query_ticks_prices_with_end(
-                storage,
-                pair_key,
-                OrderDirection::Buy,
-                None,
-                start_after,
-                limit,
-                Some(2i32),
-            );
-            // both price lists are applicable because buy list is always larger than the first item of sell list
-            best_sell_price_list = sell_price_list;
-        }
+            None
+        };
+        // desc, all items in this list are ge than the first item in sell list
+        best_buy_price_list = query_ticks_prices_with_end(
+            storage,
+            pair_key,
+            OrderDirection::Buy,
+            None,
+            start_after,
+            limit,
+            Some(2i32),
+        );
+        // both price lists are applicable because buy list is always larger than the first item of sell list
+        best_sell_price_list = sell_price_list;
 
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
             return None;
