@@ -480,13 +480,13 @@ pub struct BulkOrders {
     pub price: Decimal,
     // offer volume
     pub volume: Uint128,
-    // remaining volume of bulk orders
+    // remaining volume
     pub remaining_volume: Uint128,
-    // filled volume of bulk orders
+    // filled volume
     pub filled_volume: Uint128,
-    // offer volume
+    // ask volume
     pub ask_volume: Uint128,
-    // filled ask volume of bulk orders
+    // filled ask volume
     pub filled_ask_volume: Uint128,
     pub spread_volume: Uint128,
 }
