@@ -56,7 +56,7 @@ fn basic_fixture() -> (MockApp, Addr) {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -803,7 +803,7 @@ fn cancel_order_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1141,7 +1141,7 @@ fn cancel_order_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -1458,7 +1458,7 @@ fn execute_pair_native_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -2578,7 +2578,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(984185u128),
+            amount: Uint128::from(984184u128),
         },
     ]
     .to_vec();
@@ -2590,7 +2590,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(965355u128),
+            amount: Uint128::from(965356u128),
         },
     ]
     .to_vec();
@@ -2669,7 +2669,7 @@ fn execute_pair_cw20_token() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -3849,7 +3849,7 @@ fn spread_test() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4301,7 +4301,7 @@ fn reward_to_executor_test() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4612,7 +4612,7 @@ fn simple_matching_test() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -4644,8 +4644,8 @@ fn simple_matching_test() {
         &[],
     );
 
-     /* <----------------------------------- order 0 -----------------------------------> */
-     let msg = ExecuteMsg::SubmitOrder {
+    /* <----------------------------------- order 0 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
         assets: [
             Asset {
@@ -4893,7 +4893,9 @@ fn simple_matching_test() {
         )
         .unwrap();
 
-    let expected_res = OrderBookMatchableResponse { is_matchable: false };
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
     assert_eq!(res, expected_res);
 }
 
@@ -4945,7 +4947,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
@@ -5221,7 +5223,7 @@ fn remove_orderbook_pair() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -5549,7 +5551,7 @@ fn orders_querier() {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None
+        reward_address: None,
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app

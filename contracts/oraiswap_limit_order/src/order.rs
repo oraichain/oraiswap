@@ -328,7 +328,8 @@ fn execute_bulk_orders(
         let remaining_sell_volume = sell_bulk_orders.remaining_volume;
         let remaining_sell_ask_volume = remaining_sell_volume * match_price;
 
-        let remaining_buy_volume = buy_bulk_orders.remaining_volume;
+        let remaining_buy_volume =
+            Uint128::min(buy_bulk_orders.remaining_volume, remaining_sell_ask_volume);
         // multiply by decimal atomics because we want to get good round values
         // remaining_buy_ask_volume = remaining_buy_volume / match_price
         let remaining_buy_ask_volume =
@@ -542,9 +543,6 @@ pub fn execute_matching_orders(
         asset_infos[1].to_raw(deps.api)?,
     ]);
     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-
-    let reward_wallet = contract_info.reward_address;
-
     let reward_assets = [
         Asset {
             info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
@@ -558,20 +556,17 @@ pub fn execute_matching_orders(
     let mut reward = process_reward(
         deps.storage,
         &pair_key,
-        reward_wallet,
+        contract_info.reward_address,
         reward_assets.clone(),
     );
 
     let mut relayer = process_reward(deps.storage, &pair_key, relayer_addr, reward_assets);
 
     let mut messages: Vec<CosmosMsg> = vec![];
-
     let mut list_bidder: Vec<Payment> = vec![];
     let mut list_asker: Vec<Payment> = vec![];
-
     let mut ret_events: Vec<Event> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
-
     let mut total_orders: u64 = 0;
 
     let (mut buy_list, mut sell_list) = execute_bulk_orders(&deps, orderbook_pair.clone(), limit)?;
@@ -584,7 +579,6 @@ pub fn execute_matching_orders(
         &mut reward,
         &mut relayer,
     )?;
-
     process_orders(
         &deps,
         &orderbook_pair,
