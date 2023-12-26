@@ -443,6 +443,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
         }
+        // TODO: add test cases
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
