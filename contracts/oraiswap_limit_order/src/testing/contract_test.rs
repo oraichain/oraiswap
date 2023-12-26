@@ -56,8 +56,7 @@ fn basic_fixture() -> (MockApp, Addr) {
         version: None,
         admin: None,
         commission_rate: None,
-        reward_address: None,
-        spread_address: None,
+        reward_address: None
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
     let limit_order_addr = app
