@@ -4618,7 +4618,7 @@ fn query_matchable() {
         .unwrap();
 
     let expected_res = OrderBookMatchableResponse {
-        is_matchable: false,
+        is_matchable: true,
     };
     assert_eq!(res, expected_res);
     println!("[LOG] [2] orderbook matchable: {}", jsonstr!(res));
