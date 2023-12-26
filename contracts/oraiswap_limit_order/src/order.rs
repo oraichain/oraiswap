@@ -222,48 +222,6 @@ fn process_list_trader(
     Ok(())
 }
 
-fn transfer_spread(
-    deps: &DepsMut,
-    orderbook_pair: &OrderBook,
-    direction: OrderDirection,
-    bulk_orders: &mut Vec<BulkOrders>,
-    messages: &mut Vec<CosmosMsg>,
-) -> StdResult<()> {
-    let contract_info = read_config(deps.storage)?;
-    let spread_address = contract_info.spread_address;
-    let mut total_spread = Uint128::zero();
-
-    for orders in bulk_orders.iter_mut() {
-        if !orders.spread_volume.is_zero() {
-            total_spread += orders.spread_volume;
-            orders.spread_volume = Uint128::zero();
-        } else {
-            continue;
-        }
-    }
-
-    let spread_payment: Payment = Payment {
-        address: deps.api.addr_humanize(&spread_address)?,
-        asset: Asset {
-            info: match direction {
-                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-            },
-            amount: total_spread,
-        },
-    };
-
-    // Build refund msg
-    if !total_spread.is_zero() {
-        messages.push(spread_payment.asset.into_msg(
-            None,
-            &deps.querier,
-            spread_payment.address,
-        )?);
-    }
-    Ok(())
-}
-
 fn execute_bulk_orders(
     deps: &DepsMut,
     orderbook_pair: OrderBook,
@@ -626,14 +584,6 @@ pub fn execute_matching_orders(
             }
         }
     }
-
-    transfer_spread(
-        &deps,
-        &orderbook_pair,
-        OrderDirection::Sell,
-        &mut sell_list,
-        &mut messages,
-    )?;
 
     process_list_trader(&deps, list_bidder, &mut messages)?;
     process_list_trader(&deps, list_asker, &mut messages)?;

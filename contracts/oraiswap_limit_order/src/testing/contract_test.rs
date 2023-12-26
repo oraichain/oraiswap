@@ -2440,13 +2440,6 @@ fn execute_pair_native_token() {
     .to_vec();
     assert_eq!(address2_balances, expected_balances);
 
-    expected_balances = [Coin {
-        denom: USDT_DENOM.to_string(),
-        amount: Uint128::from(8400u128),
-    }]
-    .to_vec();
-    assert_eq!(spread_balances, expected_balances);
-
     let res = app
         .query::<OrderBookMatchableResponse, _>(
             limit_order_addr.clone(),

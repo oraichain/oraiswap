@@ -11,7 +11,6 @@ pub struct ContractInfo {
     pub admin: CanonicalAddr,
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
-    pub spread_address: CanonicalAddr,
 }
 
 #[cw_serde]

@@ -42,7 +42,6 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
     let default_reward_address = deps.api.addr_canonicalize(REWARD_WALLET)?;
-    let default_spread_address = deps.api.addr_canonicalize(SPREAD_WALLET)?;
     let config = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
@@ -60,11 +59,6 @@ pub fn instantiate(
             deps.api.addr_canonicalize(reward_address.as_str())?
         } else {
             default_reward_address
-        },
-        spread_address: if let Some(spread_address) = msg.spread_address {
-            deps.api.addr_canonicalize(spread_address.as_str())?
-        } else {
-            default_spread_address
         },
     };
 
