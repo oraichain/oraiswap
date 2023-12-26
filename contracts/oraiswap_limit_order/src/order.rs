@@ -273,23 +273,19 @@ fn execute_bulk_orders(
     limit: Option<u32>,
 ) -> StdResult<(Vec<BulkOrders>, Vec<BulkOrders>)> {
     let pair_key = &orderbook_pair.get_pair_key();
-
     let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
         deps.storage,
         &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
     );
-
     let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
 
     let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
         deps.storage,
         &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
     );
-
     let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-
     let mut i = 0;
     let mut j = 0;
     let min_vol = Uint128::from(10u128);
@@ -318,15 +314,10 @@ fn execute_bulk_orders(
                 break;
             }
         }
-
         let buy_price = best_buy_price_list[i];
-
         if buy_price < sell_price {
             break;
         }
-
-        let match_price = buy_price;
-
         if buy_bulk_orders_list.len() <= i {
             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
                 deps.as_ref().storage,
@@ -364,6 +355,7 @@ fn execute_bulk_orders(
         let buy_bulk_orders = &mut buy_bulk_orders_list[i];
         let sell_bulk_orders = &mut sell_bulk_orders_list[j];
 
+        let match_price = buy_price;
         let lef_sell_offer = sell_bulk_orders.volume;
         let lef_sell_ask = Uint128::from(lef_sell_offer * match_price);
 
