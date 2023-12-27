@@ -409,7 +409,6 @@ impl OrderBook {
         );
         // both price lists are applicable because buy list is always larger than the first item of sell list
         let best_sell_price_list = sell_price_list;
-
         if best_buy_price_list.len() == 0 || best_sell_price_list.len() == 0 {
             return None;
         }
@@ -475,18 +474,11 @@ impl Executor {
 
 pub struct BulkOrders {
     pub orders: Vec<OrderWithFee>,
-    pub average_order_id: Uint128,
     pub direction: OrderDirection,
     pub price: Decimal,
-    // offer volume
     pub volume: Uint128,
-    // remaining volume
-    pub remaining_volume: Uint128,
-    // filled volume
     pub filled_volume: Uint128,
-    // ask volume
     pub ask_volume: Uint128,
-    // filled ask volume
     pub filled_ask_volume: Uint128,
     pub spread_volume: Uint128,
 }
@@ -495,33 +487,22 @@ impl BulkOrders {
     /// Calculate sum of orders base on direction
     pub fn from_orders(orders: &Vec<Order>, price: Decimal, direction: OrderDirection) -> Self {
         let mut volume = Uint128::zero();
-        let mut remaining_volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
-        let mut filled_volume = Uint128::zero();
-        let mut filled_ask_volume = Uint128::zero();
-        let mut sum_order_id = Uint128::zero();
-        let mut average_order_id = Uint128::zero();
+        let filled_volume = Uint128::zero();
+        let filled_ask_volume = Uint128::zero();
         let spread_volume = Uint128::zero();
 
         for order in orders {
-            sum_order_id += Uint128::from(order.order_id);
-            volume += order.offer_amount;
-            ask_volume += order.ask_amount;
-
-            remaining_volume += order
+            volume += order
                 .offer_amount
                 .checked_sub(order.filled_offer_amount)
-                .unwrap_or_default();
-
-            filled_volume += order.filled_offer_amount;
-            filled_ask_volume += order.filled_ask_amount;
-        }
-
-        if orders.len() > 0 {
-            average_order_id = sum_order_id
-                .checked_div((orders.len() as u64).into())
+                .unwrap();
+            ask_volume += order
+                .ask_amount
+                .checked_sub(order.filled_ask_amount)
                 .unwrap();
         }
+
         return Self {
             direction,
             price,
@@ -541,13 +522,11 @@ impl BulkOrders {
                     reward_fee: Uint128::zero(),
                 })
                 .collect(),
-            remaining_volume,
+            volume,
             filled_volume,
+            ask_volume,
             filled_ask_volume,
             spread_volume,
-            volume,
-            ask_volume,
-            average_order_id,
         };
     }
 }
