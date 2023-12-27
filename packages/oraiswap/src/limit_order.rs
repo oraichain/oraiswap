@@ -11,7 +11,6 @@ pub struct ContractInfo {
     pub admin: CanonicalAddr,
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
-    pub spread_address: CanonicalAddr,
 }
 
 #[cw_serde]
@@ -62,7 +61,6 @@ pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub commission_rate: Option<String>,
     pub reward_address: Option<Addr>,
-    pub spread_address: Option<Addr>,
 }
 
 #[cw_serde]
@@ -75,7 +73,6 @@ pub enum ExecuteMsg {
 
     UpdateConfig {
         reward_address: Option<Addr>,
-        spread_address: Option<Addr>,
         commission_rate: Option<String>,
     },
 
@@ -121,10 +118,10 @@ pub enum Cw20HookMsg {
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String),      // filter by bidder
-    Price(Decimal),      // filter by price
-    Tick,                // filter by direction
-    None,                // no filter
+    Bidder(String), // filter by bidder
+    Price(Decimal), // filter by price
+    Tick,           // filter by direction
+    None,           // no filter
 }
 
 #[cw_serde]
@@ -173,6 +170,8 @@ pub enum QueryMsg {
     LastOrderId {},
     #[returns(OrderBookMatchableResponse)]
     OrderBookMatchable { asset_infos: [AssetInfo; 2] },
+    #[returns(Decimal)]
+    MidPrice { asset_infos: [AssetInfo; 2] },
 }
 
 #[cw_serde]
@@ -182,6 +181,8 @@ pub struct ContractInfoResponse {
 
     // admin can update the parameter, may be multisig
     pub admin: Addr,
+    pub commission_rate: String,
+    pub reward_address: Addr,
 }
 
 #[cw_serde]

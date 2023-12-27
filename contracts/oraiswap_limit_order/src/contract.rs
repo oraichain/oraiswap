@@ -31,7 +31,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
 const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
-const SPREAD_WALLET: &str = "orai139tjpfj0h6ld3wff7v2x92ntdewungfss0ml3n";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -42,7 +41,6 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
     let default_reward_address = deps.api.addr_canonicalize(REWARD_WALLET)?;
-    let default_spread_address = deps.api.addr_canonicalize(SPREAD_WALLET)?;
     let config = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
@@ -60,11 +58,6 @@ pub fn instantiate(
             deps.api.addr_canonicalize(reward_address.as_str())?
         } else {
             default_reward_address
-        },
-        spread_address: if let Some(spread_address) = msg.spread_address {
-            deps.api.addr_canonicalize(spread_address.as_str())?
-        } else {
-            default_spread_address
         },
     };
 
@@ -87,9 +80,8 @@ pub fn execute(
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
         ExecuteMsg::UpdateConfig {
             reward_address,
-            spread_address,
             commission_rate,
-        } => execute_update_config(deps, info, reward_address, spread_address, commission_rate),
+        } => execute_update_config(deps, info, reward_address, commission_rate),
         ExecuteMsg::CreateOrderBookPair {
             base_coin_info,
             quote_coin_info,
@@ -218,7 +210,6 @@ pub fn execute_update_config(
     deps: DepsMut,
     info: MessageInfo,
     reward_address: Option<Addr>,
-    spread_address: Option<Addr>,
     commission_rate: Option<String>,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
@@ -234,18 +225,12 @@ pub fn execute_update_config(
         contract_info.reward_address = deps.api.addr_canonicalize(reward_address.as_str())?;
     }
 
-    // update new reward address
-    if let Some(spread_address) = spread_address {
-        contract_info.reward_address = deps.api.addr_canonicalize(spread_address.as_str())?;
-    }
-
     // update new commission rate
     if let Some(commission_rate) = commission_rate {
         contract_info.commission_rate = commission_rate;
     }
 
     store_config(deps.storage, &contract_info)?;
-
     Ok(Response::new().add_attributes(vec![("action", "execute_update_config")]))
 }
 
@@ -450,6 +435,47 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
         }
+        // TODO: add test cases
+        QueryMsg::MidPrice { asset_infos } => {
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+            let best_buy = query_ticks_with_end(
+                deps.storage,
+                &pair_key,
+                OrderDirection::Buy,
+                None,
+                None,
+                Some(1),
+                Some(2),
+            )?;
+            let best_sell = query_ticks_with_end(
+                deps.storage,
+                &pair_key,
+                OrderDirection::Sell,
+                None,
+                None,
+                Some(1),
+                Some(1),
+            )?;
+            let best_buy_price = if best_buy.ticks.len() == 0 {
+                Decimal::zero()
+            } else {
+                best_buy.ticks[0].price
+            };
+            let best_sell_price = if best_sell.ticks.len() == 0 {
+                Decimal::zero()
+            } else {
+                best_sell.ticks[0].price
+            };
+            let mid_price = best_buy_price
+                .checked_add(best_sell_price)
+                .unwrap_or_default()
+                .checked_div(Decimal::from_ratio(2u128, 1u128))
+                .unwrap_or_default();
+            to_binary(&mid_price)
+        }
     }
 }
 
@@ -459,6 +485,8 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         version: info.version,
         name: info.name,
         admin: deps.api.addr_humanize(&info.admin)?,
+        commission_rate: info.commission_rate,
+        reward_address: deps.api.addr_humanize(&info.reward_address)?,
     })
 }
 
