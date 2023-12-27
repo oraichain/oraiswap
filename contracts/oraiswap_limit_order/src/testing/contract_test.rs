@@ -2578,7 +2578,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(984184u128),
+            amount: Uint128::from(977693u128),
         },
     ]
     .to_vec();
@@ -2590,7 +2590,7 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(965356u128),
+            amount: Uint128::from(963224u128),
         },
     ]
     .to_vec();
@@ -4556,7 +4556,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000102799u128),
+            amount: Uint128::from(1000101135u128),
         },
     ]
     .to_vec();

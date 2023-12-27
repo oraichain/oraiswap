@@ -228,19 +228,23 @@ fn execute_bulk_orders(
     limit: Option<u32>,
 ) -> StdResult<(Vec<BulkOrders>, Vec<BulkOrders>)> {
     let pair_key = &orderbook_pair.get_pair_key();
+
     let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
         deps.storage,
         &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
     );
+
     let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
 
     let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
         deps.storage,
         &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
     );
+
     let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
 
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+
     let mut i = 0;
     let mut j = 0;
     let min_vol = Uint128::from(10u128);
@@ -279,6 +283,9 @@ fn execute_bulk_orders(
         if buy_price < sell_price {
             break;
         }
+
+        let match_price = buy_price;
+
         if buy_bulk_orders_list.len() <= i {
             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
                 deps.as_ref().storage,
@@ -313,91 +320,61 @@ fn execute_bulk_orders(
             }
         };
 
-        // list of buy orders and sell orders
         let buy_bulk_orders = &mut buy_bulk_orders_list[i];
         let sell_bulk_orders = &mut sell_bulk_orders_list[j];
 
-        // match price
-        let match_price = if buy_bulk_orders.average_order_id >= sell_bulk_orders.average_order_id {
-            buy_price
-        } else {
-            sell_price
-        };
+        let lef_sell_offer = sell_bulk_orders.volume;
+        let lef_sell_ask = Uint128::from(lef_sell_offer * match_price);
 
-        // remaining_sell_ask_volume = remaining_sell_volume * match_price
-        let remaining_sell_volume = sell_bulk_orders.remaining_volume;
-        let remaining_sell_ask_volume = remaining_sell_volume * match_price;
+        let sell_ask_amount = Uint128::min(buy_bulk_orders.volume, lef_sell_ask);
 
-        let remaining_buy_volume =
-            Uint128::min(buy_bulk_orders.remaining_volume, remaining_sell_ask_volume);
         // multiply by decimal atomics because we want to get good round values
-        // remaining_buy_ask_volume = remaining_buy_volume / match_price
-        let remaining_buy_ask_volume =
-            Uint128::from(remaining_buy_volume * Decimal::one().atomics())
-                .checked_div(match_price.atomics())?;
+        let sell_offer_amount = Uint128::min(
+            Uint128::from(sell_ask_amount * Decimal::one().atomics())
+                .checked_div(match_price.atomics())?,
+            lef_sell_offer,
+        );
 
-        if remaining_buy_ask_volume.is_zero() {
-            // buy out
-            i += 1;
-        }
-        if remaining_sell_ask_volume.is_zero() {
-            // sell out
-            j += 1;
-        }
-
-        // fill_base_volume = min(remaining_sell_volume, remaining_buy_ask_volume)
-        // fill_quote_volume = fill_base_volume * match_price
-        let fill_base_volume = Uint128::min(remaining_sell_volume, remaining_buy_ask_volume);
-        let fill_quote_volume = Uint128::from(fill_base_volume * match_price);
-
-        if fill_base_volume.is_zero() || fill_quote_volume.is_zero() {
+        if sell_ask_amount.is_zero() || sell_offer_amount.is_zero() {
             continue;
         }
 
-        // In sell side
-        // filled_volume = filled_volume + fill_base_volume
-        // filled_ask_volume = filled_ask_volume + fill_quote_volume
-        sell_bulk_orders.filled_volume += fill_base_volume;
-        sell_bulk_orders.filled_ask_volume += fill_quote_volume;
+        sell_bulk_orders.filled_volume += sell_offer_amount;
+        sell_bulk_orders.filled_ask_volume += sell_ask_amount;
 
-        // In buy side
-        // filled_volume = filled_volume + fill_quote_volume
-        // filled_ask_volume = filled_ask_volume + fill_base_volume
-        buy_bulk_orders.filled_volume += fill_quote_volume;
-        buy_bulk_orders.filled_ask_volume += fill_base_volume;
+        buy_bulk_orders.filled_volume += sell_ask_amount;
+        buy_bulk_orders.filled_ask_volume += sell_offer_amount;
 
-        // In buy side
-        // remaining_volume = remaining_volume - fill_quote_volume
-        buy_bulk_orders.remaining_volume = buy_bulk_orders
-            .remaining_volume
-            .checked_sub(fill_quote_volume)?;
+        buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
+        sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
-        // In sell side
-        // remaining_volume = remaining_volume - fill_base_volume
-        sell_bulk_orders.remaining_volume = sell_bulk_orders
-            .remaining_volume
-            .checked_sub(fill_base_volume)?;
-        // get spread volume in buy side
         if buy_bulk_orders.filled_ask_volume > buy_bulk_orders.ask_volume {
-            buy_bulk_orders.spread_volume += buy_bulk_orders
+            buy_bulk_orders.spread_volume = buy_bulk_orders
                 .filled_ask_volume
                 .checked_sub(buy_bulk_orders.ask_volume)?;
-            buy_bulk_orders.filled_ask_volume = buy_bulk_orders.ask_volume;
+            buy_bulk_orders.filled_ask_volume = buy_bulk_orders
+                .filled_ask_volume
+                .checked_sub(buy_bulk_orders.spread_volume)?;
+            buy_bulk_orders.ask_volume = Uint128::zero();
         }
-        // get spread volume in sell side
         if sell_bulk_orders.filled_ask_volume > sell_bulk_orders.ask_volume {
-            sell_bulk_orders.spread_volume += sell_bulk_orders
+            sell_bulk_orders.spread_volume = sell_bulk_orders
                 .filled_ask_volume
                 .checked_sub(sell_bulk_orders.ask_volume)?;
-            sell_bulk_orders.filled_ask_volume = sell_bulk_orders.ask_volume;
+            sell_bulk_orders.filled_ask_volume = sell_bulk_orders
+                .filled_ask_volume
+                .checked_sub(sell_bulk_orders.spread_volume)?;
+            sell_bulk_orders.ask_volume = Uint128::zero();
         }
 
-        if buy_bulk_orders.remaining_volume <= min_vol {
+        if buy_bulk_orders.volume <= min_vol {
             // buy out
+            buy_bulk_orders.ask_volume = Uint128::zero();
             i += 1;
         }
-        if sell_bulk_orders.remaining_volume <= min_vol {
+        if sell_bulk_orders.volume <= min_vol {
             // sell out
+            sell_bulk_orders.ask_volume = Uint128::zero();
             j += 1;
         }
     }
