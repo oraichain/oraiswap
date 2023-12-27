@@ -497,11 +497,8 @@ impl BulkOrders {
         let mut volume = Uint128::zero();
         let mut remaining_volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
-        let mut filled_volume = Uint128::zero();
-        let mut filled_ask_volume = Uint128::zero();
         let mut sum_order_id = Uint128::zero();
         let mut average_order_id = Uint128::zero();
-        let spread_volume = Uint128::zero();
 
         for order in orders {
             sum_order_id += Uint128::from(order.order_id);
@@ -512,9 +509,6 @@ impl BulkOrders {
                 .offer_amount
                 .checked_sub(order.filled_offer_amount)
                 .unwrap_or_default();
-
-            filled_volume += order.filled_offer_amount;
-            filled_ask_volume += order.filled_ask_amount;
         }
 
         if orders.len() > 0 {
@@ -542,9 +536,9 @@ impl BulkOrders {
                 })
                 .collect(),
             remaining_volume,
-            filled_volume,
-            filled_ask_volume,
-            spread_volume,
+            filled_volume: Uint128::zero(),
+            filled_ask_volume: Uint128::zero(),
+            spread_volume: Uint128::zero(),
             volume,
             ask_volume,
             average_order_id,

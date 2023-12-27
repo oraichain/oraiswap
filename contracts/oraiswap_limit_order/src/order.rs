@@ -347,8 +347,14 @@ fn execute_bulk_orders(
 
         // fill_base_volume = min(remaining_sell_volume, remaining_buy_ask_volume)
         // fill_quote_volume = fill_base_volume * match_price
-        let fill_base_volume = Uint128::min(remaining_sell_volume, remaining_buy_ask_volume);
-        let fill_quote_volume = Uint128::from(fill_base_volume * match_price);
+        let mut fill_base_volume = Uint128::min(remaining_sell_volume, remaining_buy_ask_volume);
+        let mut fill_quote_volume = Uint128::from(fill_base_volume * match_price);
+
+        if fill_quote_volume > remaining_buy_volume {
+            fill_quote_volume = remaining_buy_volume;
+            fill_base_volume = Uint128::from(fill_quote_volume * Decimal::one().atomics())
+                .checked_div(match_price.atomics())?;
+        }
 
         if fill_base_volume.is_zero() || fill_quote_volume.is_zero() {
             continue;
