@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
-use cosmwasm_std::{Addr, Uint128};
-use cw20::Cw20ReceiveMsg;
+use cosmwasm_std::{coin, to_binary, Addr, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::asset::AssetInfo;
 
@@ -89,4 +89,73 @@ pub struct ConfigResponse {
 #[cw_serde]
 pub struct SimulateSwapOperationsResponse {
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct RouterController(pub String);
+
+impl RouterController {
+    pub fn addr(&self) -> String {
+        self.0.clone()
+    }
+
+    /////////////////////////
+    ///  Execute Messages ///
+    /////////////////////////
+    pub fn execute_operations(
+        &self,
+        swap_asset_info: AssetInfo,
+        amount: Uint128,
+        operations: Vec<SwapOperation>,
+        minimum_receive: Option<Uint128>,
+        swap_to: Option<Addr>,
+    ) -> StdResult<CosmosMsg> {
+        let cosmos_msg: CosmosMsg = match swap_asset_info {
+            AssetInfo::Token { contract_addr } => WasmMsg::Execute {
+                contract_addr: contract_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Send {
+                    contract: self.addr(),
+                    amount,
+                    msg: to_binary(&Cw20HookMsg::ExecuteSwapOperations {
+                        operations,
+                        minimum_receive,
+                        to: swap_to.map(|to| to.into_string()),
+                    })?,
+                })?,
+                funds: vec![],
+            }
+            .into(),
+            AssetInfo::NativeToken { denom } => WasmMsg::Execute {
+                contract_addr: self.addr(),
+                msg: to_binary(&ExecuteMsg::ExecuteSwapOperations {
+                    operations,
+                    minimum_receive,
+                    to: swap_to,
+                })?,
+                funds: vec![coin(amount.u128(), denom)],
+            }
+            .into(),
+        };
+        Ok(cosmos_msg)
+    }
+
+    /////////////////////////
+    ///  Query Messages   ///
+    /////////////////////////
+
+    /// query if the given vamm is actually stored
+    pub fn simulate_swap(
+        &self,
+        querier: &QuerierWrapper,
+        offer_amount: Uint128,
+        operations: Vec<SwapOperation>,
+    ) -> StdResult<SimulateSwapOperationsResponse> {
+        querier.query_wasm_smart(
+            self.addr(),
+            &QueryMsg::SimulateSwapOperations {
+                offer_amount,
+                operations,
+            },
+        )
+    }
 }

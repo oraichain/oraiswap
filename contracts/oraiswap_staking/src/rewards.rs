@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use crate::contract::validate_migrate_store_status;
 use crate::state::{
     read_config, read_is_migrated, read_pool_info, read_rewards_per_sec, rewards_read,
     rewards_store, stakers_read, store_pool_info, PoolInfo, RewardInfo,
@@ -8,9 +9,9 @@ use cosmwasm_std::{
     Addr, Api, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response,
     StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetInfo, AssetRaw};
+use oraiswap::asset::{Asset, AssetRaw};
 use oraiswap::querier::calc_range_start;
-use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem};
+use oraiswap::staking::{RewardInfoResponse, RewardInfoResponseItem, RewardMsg};
 
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
@@ -19,8 +20,9 @@ const MAX_LIMIT: u32 = 30;
 pub fn deposit_reward(
     deps: DepsMut,
     info: MessageInfo,
-    rewards: Vec<Asset>,
+    rewards: Vec<RewardMsg>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config = read_config(deps.storage)?;
 
     // only rewarder can execute this message, rewarder may be a contract
@@ -30,12 +32,13 @@ pub fn deposit_reward(
 
     let mut rewards_amount = Uint128::zero();
 
-    for asset in rewards.iter() {
-        let asset_key = asset.info.to_vec(deps.api)?;
-
+    for reward_msg in rewards.iter() {
+        let asset_key = deps
+            .api
+            .addr_canonicalize(reward_msg.staking_token.as_str())?;
         let mut pool_info: PoolInfo = read_pool_info(deps.storage, &asset_key)?;
 
-        let mut normal_reward = asset.amount;
+        let mut normal_reward = reward_msg.total_accumulation_amount;
 
         // normal rewards are array of Assets
         if pool_info.total_bond_amount.is_zero() {
@@ -50,7 +53,7 @@ pub fn deposit_reward(
 
         store_pool_info(deps.storage, &asset_key, &pool_info)?;
 
-        rewards_amount += asset.amount;
+        rewards_amount += reward_msg.total_accumulation_amount;
     }
 
     Ok(Response::new().add_attributes([
@@ -64,10 +67,16 @@ pub fn withdraw_reward(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    asset_info: Option<AssetInfo>,
+    staking_token: Option<Addr>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let staker_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
+    let asset_key = staking_token.map_or(None, |a| {
+        deps.api
+            .addr_canonicalize(a.as_str())
+            .map(|a| a.to_vec())
+            .ok()
+    });
 
     let reward_assets = process_reward_assets(deps.storage, &staker_addr, &asset_key, true)?;
 
@@ -90,8 +99,9 @@ pub fn withdraw_reward_others(
     _env: Env,
     info: MessageInfo,
     staker_addrs: Vec<Addr>,
-    asset_info: Option<AssetInfo>,
+    staker_addr: Option<Addr>,
 ) -> StdResult<Response> {
+    validate_migrate_store_status(deps.storage)?;
     let config = read_config(deps.storage)?;
 
     // only admin can execute this message
@@ -99,13 +109,18 @@ pub fn withdraw_reward_others(
         return Err(StdError::generic_err("unauthorized"));
     }
 
-    let asset_key = asset_info.map_or(None, |a| a.to_vec(deps.api).ok());
+    let asset_key = staker_addr.map_or(None, |a| {
+        deps.api
+            .addr_canonicalize(a.as_str())
+            .map(|a| a.to_vec())
+            .ok()
+    });
     // let mut messages: Vec<CosmosMsg> = vec![];
 
     // withdraw reward for each staker
     for staker_addr in staker_addrs {
         let staker_addr_raw = deps.api.addr_canonicalize(staker_addr.as_str())?;
-        process_reward_assets(deps.storage, &staker_addr_raw, &asset_key.clone(), false)?;
+        process_reward_assets(deps.storage, &staker_addr_raw, &asset_key, false)?;
     }
 
     Ok(Response::new().add_attribute("action", "withdraw_reward_others"))
@@ -221,12 +236,12 @@ pub fn before_share_change(pool_index: Decimal, reward_info: &mut RewardInfo) ->
 pub fn query_reward_info(
     deps: Deps,
     staker_addr: Addr,
-    asset_info: Option<AssetInfo>,
+    staking_token: Option<Addr>,
 ) -> StdResult<RewardInfoResponse> {
     let staker_addr_raw = deps.api.addr_canonicalize(staker_addr.as_str())?;
 
     let reward_infos: Vec<RewardInfoResponseItem> =
-        _read_reward_infos_response(deps.api, deps.storage, &staker_addr_raw, &asset_info)?;
+        _read_reward_infos_response(deps.api, deps.storage, &staker_addr_raw, &staking_token)?;
 
     Ok(RewardInfoResponse {
         staker_addr,
@@ -236,14 +251,15 @@ pub fn query_reward_info(
 
 pub fn query_all_reward_infos(
     deps: Deps,
-    asset_info: AssetInfo,
+    staking_token: Addr,
     start_after: Option<Addr>,
     limit: Option<u32>,
     order: Option<i32>,
 ) -> StdResult<Vec<RewardInfoResponse>> {
     // default is Ascending
     let order_by = Order::try_from(order.unwrap_or(1))?;
-    let asset_key = asset_info.to_vec(deps.api)?;
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
+
     let start_after = start_after
         .map_or(None, |a| deps.api.addr_canonicalize(a.as_str()).ok())
         .map(|c| c.to_vec());
@@ -265,7 +281,7 @@ pub fn query_all_reward_infos(
                 deps.api,
                 deps.storage,
                 &staker_addr_raw,
-                &Some(asset_info.clone()),
+                &Some(staking_token.clone()),
             )?;
             let staker_addr = deps.api.addr_humanize(&staker_addr_raw)?;
             Ok(RewardInfoResponse {
@@ -282,13 +298,13 @@ fn _read_reward_infos_response(
     api: &dyn Api,
     storage: &dyn Storage,
     staker_addr: &CanonicalAddr,
-    asset_info: &Option<AssetInfo>,
+    staking_token: &Option<Addr>,
 ) -> StdResult<Vec<RewardInfoResponseItem>> {
-    let results = _read_reward_infos(api, storage, staker_addr, asset_info)?;
+    let results = _read_reward_infos(api, storage, staker_addr, staking_token)?;
     let reward_infos: Vec<RewardInfoResponseItem> = results
         .into_iter()
-        .map(|(asset_info, mut reward_info)| {
-            let asset_key = asset_info.to_vec(api)?;
+        .map(|(staking_token, mut reward_info)| {
+            let asset_key = api.addr_canonicalize(staking_token.as_str())?.to_vec();
             let pool_info = read_pool_info(storage, &asset_key)?;
 
             let (pool_index, should_migrate) = if pool_info.migration_params.is_some()
@@ -311,7 +327,7 @@ fn _read_reward_infos_response(
                 .collect::<StdResult<Vec<Asset>>>()?;
 
             Ok(RewardInfoResponseItem {
-                asset_info: asset_info.to_owned(),
+                staking_token,
                 bond_amount: reward_info.bond_amount,
                 pending_reward: reward_info.pending_reward,
                 pending_withdraw,
@@ -327,14 +343,14 @@ fn _read_reward_infos(
     api: &dyn Api,
     storage: &dyn Storage,
     staker_addr: &CanonicalAddr,
-    asset_info: &Option<AssetInfo>,
-) -> StdResult<Vec<(AssetInfo, RewardInfo)>> {
+    staking_token: &Option<Addr>,
+) -> StdResult<Vec<(Addr, RewardInfo)>> {
     let rewards_bucket = rewards_read(storage, staker_addr);
-    let results: Vec<(AssetInfo, RewardInfo)> = if let Some(asset_info) = asset_info {
-        let asset_key = asset_info.to_vec(api)?;
+    let results = if let Some(staking_token) = staking_token {
+        let asset_key = api.addr_canonicalize(staking_token.as_str())?.to_vec();
 
         if let Some(reward_info) = rewards_bucket.may_load(&asset_key)? {
-            vec![(asset_info.clone(), reward_info)]
+            vec![(staking_token.clone(), reward_info)]
         } else {
             vec![]
         }
@@ -345,19 +361,11 @@ fn _read_reward_infos(
                 let (asset_key, reward_info) = item?;
 
                 // try convert to AssetInfo based on reward info
-                let asset_info = if reward_info.native_token {
-                    AssetInfo::NativeToken {
-                        denom: String::from_utf8(asset_key)?,
-                    }
-                } else {
-                    AssetInfo::Token {
-                        contract_addr: api.addr_humanize(&asset_key.into())?,
-                    }
-                };
-
-                Ok((asset_info, reward_info))
+                let staking_token = api.addr_humanize(&CanonicalAddr::from(asset_key))?;
+                api.debug(staking_token.as_str());
+                Ok((staking_token, reward_info))
             })
-            .collect::<StdResult<Vec<(AssetInfo, RewardInfo)>>>()?
+            .collect::<StdResult<Vec<(Addr, RewardInfo)>>>()?
     };
 
     Ok(results)

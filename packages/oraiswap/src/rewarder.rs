@@ -2,8 +2,6 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{Addr, Uint128};
 
-use crate::asset::AssetInfo;
-
 #[cw_serde]
 pub struct InstantiateMsg {
     pub staking_contract: Addr,
@@ -23,7 +21,7 @@ pub enum ExecuteMsg {
 
     // distribute for a list of pools
     Distribute {
-        asset_infos: Vec<AssetInfo>,
+        staking_tokens: Vec<Addr>,
     },
 }
 
@@ -36,9 +34,9 @@ pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(DistributionInfoResponse)]
-    DistributionInfo { asset_info: AssetInfo },
+    DistributionInfo { staking_token: Addr },
     #[returns(RewardAmountPerSecondResponse)]
-    RewardAmountPerSec { asset_info: AssetInfo },
+    RewardAmountPerSec { staking_token: Addr },
 }
 
 // We define a custom struct for each query response

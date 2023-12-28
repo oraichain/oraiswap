@@ -1,5 +1,5 @@
 pub mod contract;
-mod migration;
+mod legacy;
 mod rewards;
 mod staking;
 mod state;

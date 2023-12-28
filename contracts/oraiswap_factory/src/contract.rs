@@ -61,7 +61,37 @@ pub fn execute(
             pair_admin,
         } => execute_create_pair(deps, env, info, asset_infos, pair_admin),
         ExecuteMsg::AddPair { pair_info } => execute_add_pair_manually(deps, env, info, pair_info),
+        ExecuteMsg::MigrateContract {
+            contract_addr,
+            new_code_id,
+            msg,
+        } => migrate_pair(deps, env, info, contract_addr, new_code_id, msg),
     }
+}
+
+pub fn migrate_pair(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    contract_addr: String,
+    new_code_id: u64,
+    msg: Binary,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+
+    // permission check
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let wasm_msg = WasmMsg::Migrate {
+        contract_addr,
+        new_code_id,
+        msg,
+    };
+    Ok(Response::new()
+        .add_attribute("action", "migrate_factory_contract")
+        .add_message(wasm_msg))
 }
 
 // Only owner can execute it

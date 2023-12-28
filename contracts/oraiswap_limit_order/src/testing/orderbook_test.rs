@@ -10,7 +10,7 @@ use oraiswap::{
 use crate::{
     orderbook::{Order, OrderBook},
     state::{increase_last_order_id, init_last_order_id},
-    tick::query_ticks,
+    tick::query_ticks_prices,
 };
 
 #[test]
@@ -101,26 +101,24 @@ fn initialize() {
     }
     let pair_key = &ob.get_pair_key();
 
-    let buy_ticks = query_ticks(
+    let buy_ticks = query_ticks_prices(
         deps.as_ref().storage,
         pair_key,
         OrderDirection::Buy,
         None,
         None,
         Some(1),
-    )
-    .unwrap();
+    );
     println!("buy ticks: {:?}", buy_ticks);
 
-    let sell_ticks = query_ticks(
+    let sell_ticks = query_ticks_prices(
         deps.as_ref().storage,
         pair_key,
         OrderDirection::Sell,
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
     println!("sell ticks: {:?}", sell_ticks);
 
     let (highest, found, _) = ob.highest_price(deps.as_ref().storage, OrderDirection::Buy);
@@ -292,8 +290,8 @@ fn sell_orders_at() {
             None,
         )
         .unwrap();
-    
-    println!("sell_orders: {:?}",sell_orders);
+
+    println!("sell_orders: {:?}", sell_orders);
     assert!(ob
         .orders_at(
             deps.as_ref().storage,
@@ -433,7 +431,10 @@ fn highest_lowest_price() {
 
         if found_buy || found_sell {
             let highest_price = Decimal::max(highest_buy, highest_sell);
-            println!("tc.highest_price: {} - highest_price: {}", tc.highest_price, highest_price);
+            println!(
+                "tc.highest_price: {} - highest_price: {}",
+                tc.highest_price, highest_price
+            );
         }
 
         let (lowest_buy, found_buy, _) = tc
@@ -445,7 +446,10 @@ fn highest_lowest_price() {
 
         if found_buy || found_sell {
             let lowest_price = Decimal::min(lowest_buy, lowest_sell);
-            println!("tc.lowest_price: {} - lowest_price: {}", tc.lowest_price, lowest_price);
+            println!(
+                "tc.lowest_price: {} - lowest_price: {}",
+                tc.lowest_price, lowest_price
+            );
         }
     }
 }

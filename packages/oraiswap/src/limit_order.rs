@@ -60,7 +60,7 @@ pub struct InstantiateMsg {
     pub version: Option<String>,
     pub admin: Option<Addr>,
     pub commission_rate: Option<String>,
-    pub reward_address: Option<Addr>
+    pub reward_address: Option<Addr>,
 }
 
 #[cw_serde]
@@ -118,11 +118,10 @@ pub enum Cw20HookMsg {
 
 #[cw_serde]
 pub enum OrderFilter {
-    Bidder(String),             // filter by bidder
-    Price(Decimal),             // filter by price
-    Status(OrderStatus),        // filter by status
-    Tick,                       // filter by direction
-    None,                       // no filter
+    Bidder(String), // filter by bidder
+    Price(Decimal), // filter by price
+    Tick,           // filter by direction
+    None,           // no filter
 }
 
 #[cw_serde]
@@ -131,9 +130,7 @@ pub enum QueryMsg {
     #[returns(ContractInfoResponse)]
     ContractInfo {},
     #[returns(OrderBookResponse)]
-    OrderBook {
-        asset_infos: [AssetInfo; 2],
-    },
+    OrderBook { asset_infos: [AssetInfo; 2] },
     #[returns(OrderBooksResponse)]
     OrderBooks {
         start_after: Option<Vec<u8>>,
@@ -165,15 +162,16 @@ pub enum QueryMsg {
         asset_infos: [AssetInfo; 2],
         direction: OrderDirection,
         start_after: Option<Decimal>,
+        end: Option<Decimal>,
         limit: Option<u32>,
         order_by: Option<i32>, // convert OrderBy to i32
     },
     #[returns(LastOrderIdResponse)]
     LastOrderId {},
     #[returns(OrderBookMatchableResponse)]
-    OrderBookMatchable {
-        asset_infos: [AssetInfo; 2],
-    },
+    OrderBookMatchable { asset_infos: [AssetInfo; 2] },
+    #[returns(Decimal)]
+    MidPrice { asset_infos: [AssetInfo; 2] },
 }
 
 #[cw_serde]
@@ -183,6 +181,8 @@ pub struct ContractInfoResponse {
 
     // admin can update the parameter, may be multisig
     pub admin: Addr,
+    pub commission_rate: String,
+    pub reward_address: Addr,
 }
 
 #[cw_serde]
@@ -230,7 +230,6 @@ pub struct TicksResponse {
 pub struct LastOrderIdResponse {
     pub last_order_id: u64,
 }
-
 
 #[cw_serde]
 pub struct OrderBookMatchableResponse {

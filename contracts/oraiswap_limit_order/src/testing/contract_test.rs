@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
@@ -11,6 +13,198 @@ use oraiswap::limit_order::{
 
 use crate::jsonstr;
 const USDT_DENOM: &str = "usdt";
+
+fn basic_fixture() -> (MockApp, Addr) {
+    let mut app = MockApp::new(&[
+        (
+            &"addr0000".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0001".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+            ],
+        ),
+    ]);
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_token_balances(&[(
+        &"asset".to_string(),
+        &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
+    )]);
+
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+        commission_rate: None,
+        reward_address: None,
+    };
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+    let limit_order_addr = app
+        .instantiate(
+            code_id,
+            Addr::unchecked("addr0000"),
+            &msg,
+            &[],
+            "limit order",
+        )
+        .unwrap();
+
+    // create order book for pair [orai, usdt]
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+        spread: None,
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+    (app, limit_order_addr)
+}
+
+#[test]
+fn test_query_mid_price() {
+    let (mut app, limit_order_addr) = basic_fixture();
+    let mid_price = app
+        .query::<Decimal, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::MidPrice {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+    assert_eq!(mid_price, Decimal::zero());
+    // paid 300 usdt to get 150 orai -> 1 ORAI = 2 USD
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(150u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(300u128),
+            },
+        ],
+    };
+
+    let _ = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(300u128),
+            }],
+        )
+        .unwrap();
+
+    let mid_price = app
+        .query::<Decimal, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::MidPrice {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+    assert_eq!(mid_price, Decimal::from_ratio(1u128, 1u128));
+    // now we sell to get a different mid price
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(150u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(1500u128),
+            },
+        ],
+    };
+
+    let _ = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(150u128),
+            }],
+        )
+        .unwrap();
+
+    let mid_price = app
+        .query::<Decimal, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::MidPrice {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+    assert_eq!(mid_price, Decimal::from_ratio(6u128, 1u128));
+}
 
 #[test]
 fn submit_order() {
@@ -2264,9 +2458,19 @@ fn execute_pair_native_token() {
     let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
     let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    let mut reward_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
+        ))
+        .unwrap();
+
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
-    println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
+    println!("round 0 - address2's balances: {:?}", address2_balances);
+    println!(
+        "round 0 - reward_balances's balances: {:?}",
+        reward_balances
+    );
 
     let mut expected_balances: Vec<Coin> = [
         Coin {
@@ -2353,18 +2557,28 @@ fn execute_pair_native_token() {
     address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
     address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    reward_balances = app
+        .query_all_balances(Addr::unchecked(
+            "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en",
+        ))
+        .unwrap();
+
     println!("round 1 - address0's balances: {:?}", address0_balances);
     println!("round 1 - address1's balances: {:?}", address1_balances);
-    println!("round 1 - address2's balances: {:?}\n\n", address2_balances);
+    println!("round 1 - address2's balances: {:?}", address2_balances);
+    println!(
+        "round 1 - reward_balances's balances: {:?}",
+        reward_balances
+    );
 
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(978572u128),
+            amount: Uint128::from(969390u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(984421u128),
+            amount: Uint128::from(984184u128),
         },
     ]
     .to_vec();
@@ -2376,11 +2590,11 @@ fn execute_pair_native_token() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(964211u128),
+            amount: Uint128::from(965356u128),
         },
     ]
     .to_vec();
-    assert_eq!(address1_balances, expected_balances,);
+    assert_eq!(address1_balances, expected_balances);
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
@@ -2392,7 +2606,7 @@ fn execute_pair_native_token() {
         },
     ]
     .to_vec();
-    assert_eq!(address2_balances, expected_balances,);
+    assert_eq!(address2_balances, expected_balances);
 
     let res = app
         .query::<OrderBookMatchableResponse, _>(
@@ -3563,13 +3777,13 @@ fn execute_pair_cw20_token() {
 
     expected_balances = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(978572u128),
+        amount: Uint128::from(969390u128),
     }]
     .to_vec();
     assert_eq!(address0_balances, expected_balances,);
     expected_balances = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(986305u128),
+        amount: Uint128::from(986487u128),
     }]
     .to_vec();
     assert_eq!(address1_balances, expected_balances,);
@@ -4020,7 +4234,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1019449u128),
+            amount: Uint128::from(1019380u128),
         },
     ]
     .to_vec();
@@ -4032,7 +4246,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1015312u128),
+            amount: Uint128::from(1004846u128),
         },
     ]
     .to_vec();
@@ -4040,7 +4254,7 @@ fn spread_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1009690u128),
+            amount: Uint128::from(1019380u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4326,7 +4540,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000609084u128),
+            amount: Uint128::from(1000617082u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4342,7 +4556,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000099851u128),
+            amount: Uint128::from(1000102799u128),
         },
     ]
     .to_vec();
@@ -4350,7 +4564,342 @@ fn reward_to_executor_test() {
 }
 
 #[test]
-fn query_matchable() {
+fn simple_matching_test() {
+    let mut app = MockApp::new(&[
+        (
+            &"addr0000".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0001".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0002".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(10000000000u128),
+                },
+            ],
+        ),
+    ]);
+
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+        commission_rate: None,
+        reward_address: None,
+    };
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+    let limit_order_addr = app
+        .instantiate(
+            code_id,
+            Addr::unchecked("addr0000"),
+            &msg,
+            &[],
+            "limit order",
+        )
+        .unwrap();
+
+    // Create pair [orai, usdt] for order book
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+        spread: Some(Decimal::percent(1)),
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
+    /* <----------------------------------- order 0 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(1000000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(261500000u128),
+            },
+        ],
+    };
+
+    // offer usdt, ask for orai
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0002"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(261500000u128),
+            }],
+        )
+        .unwrap();
+
+    /* <----------------------------------- order 1 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(75000000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        )
+        .unwrap();
+
+    /* <----------------------------------- order 2 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(1000000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(261500000u128),
+            },
+        ],
+    };
+
+    // offer usdt, ask for orai
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0002"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(261500000u128),
+            }],
+        )
+        .unwrap();
+
+    let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 0 - address0's balances: {:?}", address0_balances);
+    println!("round 0 - address1's balances: {:?}", address1_balances);
+    println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
+
+    let mut expected_balances: Vec<Coin> = [
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(9990000000u128),
+        },
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(10000000000u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(address0_balances, expected_balances,);
+    expected_balances = [
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(10000000000u128),
+        },
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(10000000000u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(address1_balances, expected_balances,);
+    expected_balances = [
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(10000000000u128),
+        },
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(9477000000u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(address2_balances, expected_balances);
+
+    let msg = ExecuteMsg::ExecuteOrderBookPair {
+        asset_infos: [
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+        ],
+        limit: None,
+    };
+
+    // Native token balance mismatch between the argument and the transferred
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+    app.assert_fail(res);
+
+    let res = app
+        .query::<OrderBookMatchableResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBookMatchable {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+    let expected_res = OrderBookMatchableResponse { is_matchable: true };
+    assert_eq!(res, expected_res);
+
+    // Excecute all orders
+    let msg = ExecuteMsg::ExecuteOrderBookPair {
+        asset_infos: [
+            AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+            AssetInfo::NativeToken {
+                denom: USDT_DENOM.to_string(),
+            },
+        ],
+        limit: None,
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+    println!("[LOG] attribute - round 1 - {:?}", _res);
+
+    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    println!("round 1 - address0's balances: {:?}", address0_balances);
+    println!("round 1 - address1's balances: {:?}", address1_balances);
+    println!("round 1 - address2's balances: {:?}\n\n", address2_balances);
+
+    expected_balances = [
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(9990000000u128),
+        },
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(10074922750u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(address0_balances, expected_balances);
+    expected_balances = [
+        Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(10001997400u128),
+        },
+        Coin {
+            denom: USDT_DENOM.to_string(),
+            amount: Uint128::from(9477000000u128),
+        },
+    ]
+    .to_vec();
+    assert_eq!(address2_balances, expected_balances);
+    let res = app
+        .query::<OrderBookMatchableResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBookMatchable {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
+    assert_eq!(res, expected_res);
+}
+
+fn mock_basic_query_data() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
@@ -4429,6 +4978,12 @@ fn query_matchable() {
         &msg,
         &[],
     );
+    (app, limit_order_addr)
+}
+
+#[test]
+fn query_matchable() {
+    let (mut app, limit_order_addr) = mock_basic_query_data();
 
     /* <----------------------------------- order 1 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
@@ -4562,9 +5117,7 @@ fn query_matchable() {
         )
         .unwrap();
 
-    let expected_res = OrderBookMatchableResponse {
-        is_matchable: false,
-    };
+    let expected_res = OrderBookMatchableResponse { is_matchable: true };
     assert_eq!(res, expected_res);
     println!("[LOG] [2] orderbook matchable: {}", jsonstr!(res));
 
@@ -5019,7 +5572,7 @@ fn orders_querier() {
         quote_coin_info: AssetInfo::NativeToken {
             denom: ORAI_DENOM.to_string(),
         },
-        spread: Some(Decimal::percent(10)),
+        spread: Some(Decimal::percent(1)),
         min_quote_coin_amount: Uint128::from(10u128),
     };
     let _res = app.execute(
@@ -5404,28 +5957,6 @@ fn orders_querier() {
         )
         .unwrap();
     println!("[LOG] [3] - query all order: {}", jsonstr!(test));
-    
-    let test1 = app
-        .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Orders {
-                asset_infos: [
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[1].clone(),
-                    },
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[0].clone(),
-                    },
-                ],
-                direction: None,
-                filter: OrderFilter::Status(OrderStatus::Open),
-                start_after: None,
-                limit: None,
-                order_by: None,
-            },
-        )
-        .unwrap();
-    println!("[LOG] [4] - query all open orders: {}", jsonstr!(test1));
 
     assert_eq!(
         OrdersResponse {
@@ -5565,6 +6096,7 @@ fn orders_querier() {
                 ],
                 direction: OrderDirection::Buy,
                 start_after: None,
+                end: None,
                 limit: None,
                 order_by: Some(1),
             },
@@ -5594,4 +6126,236 @@ fn orders_querier() {
             .unwrap();
         println!("{:?}", res);
     }
+}
+
+#[test]
+fn test_query_ticks_start_after() {
+    let (mut app, limit_order_addr) = mock_basic_query_data();
+
+    /* <----------------------------------- order 1 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(20000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    /* <----------------------------------- order 2 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(30000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("3").unwrap()),
+                end: None,
+                limit: None,
+                order_by: Some(2),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 1);
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("2").unwrap()),
+                end: None,
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 1);
+}
+
+#[test]
+fn test_unwrap_default_check_sub_uint128() {
+    let result = Uint128::from(0u64)
+        .checked_sub(Uint128::from(1u64))
+        .unwrap_or_default();
+    assert_eq!(result, Uint128::from(0u64));
+}
+
+#[test]
+fn test_query_ticks_with_end() {
+    let (mut app, limit_order_addr) = mock_basic_query_data();
+
+    /* <----------------------------------- order 1 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(20000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    /* <----------------------------------- order 2 -----------------------------------> */
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Sell,
+        assets: [
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: Uint128::from(10000u128),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+                amount: Uint128::from(30000u128),
+            },
+        ],
+    };
+
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000u128),
+            }],
+        )
+        .unwrap();
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("3").unwrap()),
+                end: Some(Decimal::from_str("2").unwrap()),
+                limit: None,
+                order_by: Some(2),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 1);
+    assert_eq!(result.ticks[0].price, Decimal::from_str("2").unwrap());
+
+    let result = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::NativeToken {
+                        denom: USDT_DENOM.to_string(),
+                    },
+                ],
+                direction: OrderDirection::Sell,
+                start_after: Some(Decimal::from_str("2").unwrap()),
+                end: Some(Decimal::from_str("3").unwrap()),
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(result.ticks.len(), 1);
+    assert_eq!(result.ticks[0].price, Decimal::from_str("3").unwrap());
 }
