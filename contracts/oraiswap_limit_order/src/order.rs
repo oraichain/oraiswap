@@ -35,8 +35,49 @@ pub fn submit_order(
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
         return Err(ContractError::AssetMustNotBeZero {});
+    }
+
+    let offer_amount = assets[0].to_raw(deps.api)?.amount;
+    let ask_amount = assets[1].to_raw(deps.api)?.amount;
+
+    let price = match direction {
+        OrderDirection::Buy => Decimal::from_ratio(offer_amount, ask_amount),
+        OrderDirection::Sell => Decimal::from_ratio(ask_amount, offer_amount),
+    };
+
+    let (highest_buy_price, buy_found, _) =
+        orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
+    let (lowest_sell_price, sell_found, _) =
+        orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
+
+    // check spread for submit order
+    if let Some(spread) = orderbook_pair.spread {
+        let spread_factor = Decimal::one() + spread;
+        if buy_found && sell_found {
+            match direction {
+                OrderDirection::Buy => {
+                    let spread_price = lowest_sell_price * spread_factor;
+                    if price.ge(&(spread_price)) {
+                        return Err(ContractError::PriceOutOfSpread {
+                            price,
+                            spread_price,
+                        });
+                    }
+                }
+                OrderDirection::Sell => {
+                    let spread_price = price * spread_factor;
+                    if highest_buy_price.ge(&spread_price) {
+                        return Err(ContractError::PriceOutOfSpread {
+                            price,
+                            spread_price,
+                        });
+                    }
+                }
+            };
+        }
     }
 
     let order_id = increase_last_order_id(deps.storage)?;
@@ -48,8 +89,8 @@ pub fn submit_order(
             order_id,
             direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_amount: assets[0].to_raw(deps.api)?.amount,
-            ask_amount: assets[1].to_raw(deps.api)?.amount,
+            offer_amount,
+            ask_amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             status: OrderStatus::Open,

@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError, Uint128};
+use cosmwasm_std::{OverflowError, StdError, Uint128, Decimal};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -72,6 +72,11 @@ pub enum ContractError {
     TooSmallQuoteAsset {
         quote_coin: String,
         min_quote_amount: Uint128,
+    },
+    #[error("Price {price} is out of spread limit {spread_price}")]
+    PriceOutOfSpread {
+        price: Decimal,
+        spread_price: Decimal,
     },
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},

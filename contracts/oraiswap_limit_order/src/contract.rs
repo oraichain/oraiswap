@@ -106,29 +106,30 @@ pub fn execute(
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
-            let paid_asset: &Asset;
+            let paid_assets: [Asset; 2];
             let quote_asset: &Asset;
 
+            // assign paid assets
             if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[1],
-                    OrderDirection::Sell => &assets[0],
+                paid_assets = match direction {
+                    OrderDirection::Buy => [assets[1].clone(), assets[0].clone()],
+                    OrderDirection::Sell => [assets[0].clone(), assets[1].clone()],
                 };
                 quote_asset = &assets[1];
             } else {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[0],
-                    OrderDirection::Sell => &assets[1],
+                paid_assets = match direction {
+                    OrderDirection::Buy => [assets[0].clone(), assets[1].clone()],
+                    OrderDirection::Sell => [assets[1].clone(), assets[0].clone()],
                 };
                 quote_asset = &assets[0];
             }
 
             // if paid asset is cw20, we check it in Cw20HookMessage
-            if !paid_asset.is_native_token() {
+            if !paid_assets[0].is_native_token() {
                 return Err(ContractError::MustProvideNativeToken {});
             }
 
-            paid_asset.assert_sent_native_token_balance(&info)?;
+            paid_assets[0].assert_sent_native_token_balance(&info)?;
 
             // require minimum amount for quote asset
             if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
@@ -139,41 +140,7 @@ pub fn execute(
             }
 
             // then submit order
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                }
-            } else {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                }
-            }
+            submit_order(deps, info.sender, &pair_key, direction, paid_assets)
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -300,24 +267,24 @@ pub fn receive_cw20(
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-            let paid_asset: &Asset;
+            let paid_assets: [Asset; 2];
             let quote_asset: &Asset;
 
             if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[1],
-                    OrderDirection::Sell => &assets[0],
+                paid_assets = match direction {
+                    OrderDirection::Buy => [assets[1].clone(), assets[0].clone()],
+                    OrderDirection::Sell => [assets[0].clone(), assets[1].clone()],
                 };
                 quote_asset = &assets[1];
             } else {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[0],
-                    OrderDirection::Sell => &assets[1],
+                paid_assets = match direction {
+                    OrderDirection::Buy => [assets[0].clone(), assets[1].clone()],
+                    OrderDirection::Sell => [assets[1].clone(), assets[0].clone()],
                 };
                 quote_asset = &assets[0];
             }
 
-            if paid_asset.amount != provided_asset.amount {
+            if paid_assets[0].amount != provided_asset.amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
@@ -329,41 +296,8 @@ pub fn receive_cw20(
                 });
             }
 
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                }
-            } else {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                }
-            }
+            // then submit order
+            submit_order(deps, sender, &pair_key, direction, paid_assets)
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }
