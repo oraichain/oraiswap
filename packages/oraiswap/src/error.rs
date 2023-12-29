@@ -73,11 +73,6 @@ pub enum ContractError {
         quote_coin: String,
         min_quote_amount: Uint128,
     },
-    #[error("Price {price} is out of spread limit {spread_price}")]
-    PriceOutOfSpread {
-        price: Decimal,
-        spread_price: Decimal,
-    },
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
 }

@@ -904,8 +904,7 @@ fn submit_order_with_spread_native_token() {
             }],
         )
         .unwrap();
-    
-    // failure case
+
     // buy with price = 6.7 (out of spread = 6.6)
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -914,29 +913,29 @@ fn submit_order_with_spread_native_token() {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(670u128),
+                amount: Uint128::from(67000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(10000u128),
             },
         ],
     };
 
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[Coin {
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(670u128),
-        }],
-    );
-    app.assert_fail(res);
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(67000u128),
+            }],
+        )
+        .unwrap();
 
-    // failure case
     // sell with price = 4.5 (out of spread = 4.6)
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Sell,
@@ -945,29 +944,29 @@ fn submit_order_with_spread_native_token() {
                 info: AssetInfo::NativeToken {
                     denom: ORAI_DENOM.to_string(),
                 },
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(10000u128),
             },
             Asset {
                 info: AssetInfo::NativeToken {
                     denom: USDT_DENOM.to_string(),
                 },
-                amount: Uint128::from(450u128),
+                amount: Uint128::from(45000u128),
             },
         ],
     };
 
-    let res = app
+    let _ = app
         .execute(
             Addr::unchecked("addr0000"),
             limit_order_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(100u128),
+                amount: Uint128::from(10000u128),
             }],
-        );
-    app.assert_fail(res);
-    
+        )
+        .unwrap();
+
     // pass case
     // buy with price = 6.5 (in spread = 6.6)
     let msg = ExecuteMsg::SubmitOrder {
@@ -988,15 +987,17 @@ fn submit_order_with_spread_native_token() {
         ],
     };
 
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[Coin {
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(650u128),
-        }],
-    ).unwrap();
+    let _ = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(650u128),
+            }],
+        )
+        .unwrap();
 
     // sell with price = 6 (in spread = 5.9)
     let msg = ExecuteMsg::SubmitOrder {
@@ -1026,7 +1027,8 @@ fn submit_order_with_spread_native_token() {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(100u128),
             }],
-        ).unwrap();
+        )
+        .unwrap();
 
     let order_1 = OrderResponse {
         order_id: 1u64,
@@ -1074,13 +1076,13 @@ fn submit_order_with_spread_native_token() {
         order_id: 3u64,
         bidder_addr: "addr0000".to_string(),
         offer_asset: Asset {
-            amount: Uint128::from(650u128),
+            amount: Uint128::from(67000u128),
             info: AssetInfo::NativeToken {
                 denom: USDT_DENOM.to_string(),
             },
         },
         ask_asset: Asset {
-            amount: Uint128::from(100u128),
+            amount: Uint128::from(10151u128),
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
@@ -1095,13 +1097,13 @@ fn submit_order_with_spread_native_token() {
         order_id: 4u64,
         bidder_addr: "addr0000".to_string(),
         offer_asset: Asset {
-            amount: Uint128::from(100u128),
+            amount: Uint128::from(10000u128),
             info: AssetInfo::NativeToken {
                 denom: ORAI_DENOM.to_string(),
             },
         },
         ask_asset: Asset {
-            amount: Uint128::from(600u128),
+            amount: Uint128::from(49500u128),
             info: AssetInfo::NativeToken {
                 denom: USDT_DENOM.to_string(),
             },
@@ -5041,7 +5043,6 @@ fn simple_matching_test() {
     };
     assert_eq!(res, expected_res);
 }
-
 
 #[test]
 fn reward_to_executor_test() {

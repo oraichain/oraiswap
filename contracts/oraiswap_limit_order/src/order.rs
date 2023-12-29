@@ -41,12 +41,7 @@ pub fn submit_order(
     }
 
     let offer_amount = assets[0].to_raw(deps.api)?.amount;
-    let ask_amount = assets[1].to_raw(deps.api)?.amount;
-
-    let price = match direction {
-        OrderDirection::Buy => Decimal::from_ratio(offer_amount, ask_amount),
-        OrderDirection::Sell => Decimal::from_ratio(ask_amount, offer_amount),
-    };
+    let mut ask_amount = assets[1].to_raw(deps.api)?.amount;
 
     let (highest_buy_price, buy_found, _) =
         orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
@@ -59,21 +54,27 @@ pub fn submit_order(
         if buy_found && sell_found {
             match direction {
                 OrderDirection::Buy => {
+                    let mut price = Decimal::from_ratio(offer_amount, ask_amount);
                     let spread_price = lowest_sell_price * spread_factor;
                     if price.ge(&(spread_price)) {
-                        return Err(ContractError::PriceOutOfSpread {
-                            price,
-                            spread_price,
-                        });
+                        price = spread_price;
+                        ask_amount = Uint128::from(offer_amount * Decimal::one().atomics())
+                            .checked_div(price.atomics())
+                            .unwrap_or_default();
+                        if ask_amount.is_zero() {
+                            return Err(ContractError::TooSmallQuoteAsset {
+                                quote_coin: assets[0].info.to_string(),
+                                min_quote_amount: orderbook_pair.min_quote_coin_amount,
+                            });
+                        }
                     }
                 }
                 OrderDirection::Sell => {
+                    let mut price = Decimal::from_ratio(ask_amount, offer_amount);
                     let spread_price = price * spread_factor;
                     if highest_buy_price.ge(&spread_price) {
-                        return Err(ContractError::PriceOutOfSpread {
-                            price,
-                            spread_price,
-                        });
+                        price = spread_price;
+                        ask_amount = Uint128::from(offer_amount * price);
                     }
                 }
             };
