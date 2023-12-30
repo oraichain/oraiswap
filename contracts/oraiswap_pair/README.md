@@ -4,7 +4,7 @@
 
 ### Initialize
 
-This is mainly used from oraiswap factory contract to create new oraiswap pair. It initialize all swap created parameters which can be updated later with owner key.
+This is mainly used from oraiswap factory contract to create new oraiswap pair. It initializes all swap created parameters which can be updated later with owner key.
 
 It creates liquidity token contract as init response, and execute reply on success to register created liquidity token contract to self.
 
@@ -12,7 +12,7 @@ It creates liquidity token contract as init response, and execute reply on succe
 {
     /// Asset infos
     pub asset_infos: [AssetInfo; 2],
-    /// Token code ID for liqudity token creation
+    /// Token code ID for liquidity token creation
     pub token_code_id: u64,
     /// Oracle contract address for global parameters
     pub oracle_addr: Addr,
@@ -32,7 +32,7 @@ When providing liquidity from a smart contract, the most important thing to keep
 
 #### Slippage Tolerance
 
-If a user specify the slippage tolerance at provide liquidity msg, the contract restricts the operation when the exchange rate is dropped more than the tolerance.
+If a user specifies the slippage tolerance at provide liquidity msg, the contract restricts the operation when the exchange rate is dropped more than the tolerance.
 
 So, at a 1% tolerance level, if a user sends a transaction with 200 UST and 1 ASSET, amountUSTMin should be set to e.g. 198 UST, and amountASSETMin should be set to .99 ASSET. This means that, at worst, liquidity will be added at a rate between 198 ASSET/1 UST and 202.02 UST/1 ASSET (200 UST/.99 ASSET).
 
