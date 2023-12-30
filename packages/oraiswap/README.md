@@ -6,8 +6,8 @@ This is a collection of common types and the queriers which are commonly used in
 
 ### AssetInfo
 
-AssetInfo is a convience wrapper to represent the native token and the contract token as a single type.
-Currently there only Orai native token in Oraichain blockchain.
+AssetInfo is a convenience wrapper to represent the native token and the contract token as a single type.
+Currently there is only Orai native token in Oraichain blockchain.
 
 ```rust
 #[cw_serde]
@@ -55,7 +55,7 @@ pub fn query_balance(
 
 ### Token Balance Querier
 
-It provides simliar query interface with [Native-Token-Balance-Querier](Native-Token-Balance-Querier) for CW20 token balance.
+It provides similar query interface with [Native-Token-Balance-Querier](Native-Token-Balance-Querier) for CW20 token balance.
 
 ```rust
 pub fn query_token_balance(
@@ -78,7 +78,7 @@ pub fn query_supply(
 
 ### Pair Info Querier
 
-It also provides the query interface to query avaliable oraiswap pair contract info. Any contract can query pair info to oraiswap factory contract.
+It also provides the query interface to query available oraiswap pair contract info. Any contract can query pair info to oraiswap factory contract.
 
 ```rust
 pub fn query_pair_info(
