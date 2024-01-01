@@ -61,12 +61,6 @@ pub fn submit_order(
                         ask_amount = Uint128::from(offer_amount * Decimal::one().atomics())
                             .checked_div(price.atomics())
                             .unwrap_or_default();
-                        if ask_amount.is_zero() {
-                            return Err(ContractError::TooSmallQuoteAsset {
-                                quote_coin: assets[0].info.to_string(),
-                                min_quote_amount: orderbook_pair.min_quote_coin_amount,
-                            });
-                        }
                     }
                 }
                 OrderDirection::Sell => {
@@ -79,6 +73,13 @@ pub fn submit_order(
                 }
             };
         }
+    }
+
+    if ask_amount.is_zero() {
+        return Err(ContractError::TooSmallQuoteAsset {
+            quote_coin: assets[0].info.to_string(),
+            min_quote_amount: orderbook_pair.min_quote_coin_amount,
+        });
     }
 
     let order_id = increase_last_order_id(deps.storage)?;
