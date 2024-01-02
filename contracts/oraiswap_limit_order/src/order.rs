@@ -50,12 +50,13 @@ pub fn submit_order(
 
     // check spread for submit order
     if let Some(spread) = orderbook_pair.spread {
-        let spread_factor = Decimal::one() + spread;
-        if buy_found && sell_found {
+        let buy_spread_factor = Decimal::one() + spread;
+        let sell_spread_factor = Decimal::one() - spread;
+        if buy_found && sell_found && spread < Decimal::one() {
             match direction {
                 OrderDirection::Buy => {
                     let mut price = Decimal::from_ratio(offer_amount, ask_amount);
-                    let spread_price = lowest_sell_price * spread_factor;
+                    let spread_price = lowest_sell_price * buy_spread_factor;
                     if price.ge(&(spread_price)) {
                         price = spread_price;
                         ask_amount = Uint128::from(offer_amount * Decimal::one().atomics())
@@ -65,8 +66,13 @@ pub fn submit_order(
                 }
                 OrderDirection::Sell => {
                     let mut price = Decimal::from_ratio(ask_amount, offer_amount);
-                    let spread_price = price * spread_factor;
-                    if highest_buy_price.ge(&spread_price) {
+                    let spread_price = highest_buy_price * sell_spread_factor;
+                    if spread_price.is_zero() {
+                        return Err(ContractError::PriceMustNotBeZero {
+                            price: spread_price,
+                        });
+                    }
+                    if spread_price.ge(&price) {
                         price = spread_price;
                         ask_amount = Uint128::from(offer_amount * price);
                     }
