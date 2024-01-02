@@ -354,39 +354,25 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
         }
-        // TODO: add test cases
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
                 asset_infos[1].to_raw(deps.api)?,
             ]);
-            let best_buy = query_ticks_with_end(
-                deps.storage,
-                &pair_key,
-                OrderDirection::Buy,
-                None,
-                None,
-                Some(1),
-                Some(2),
-            )?;
-            let best_sell = query_ticks_with_end(
-                deps.storage,
-                &pair_key,
-                OrderDirection::Sell,
-                None,
-                None,
-                Some(1),
-                Some(1),
-            )?;
-            let best_buy_price = if best_buy.ticks.len() == 0 {
-                Decimal::zero()
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            let (highest_buy_price, buy_found, _) =
+                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
+            let (lowest_sell_price, sell_found, _) =
+                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
+            let best_buy_price = if buy_found {
+                highest_buy_price
             } else {
-                best_buy.ticks[0].price
+                Decimal::zero()
             };
-            let best_sell_price = if best_sell.ticks.len() == 0 {
-                Decimal::zero()
+            let best_sell_price = if sell_found {
+                lowest_sell_price
             } else {
-                best_sell.ticks[0].price
+                Decimal::zero()
             };
             let mid_price = best_buy_price
                 .checked_add(best_sell_price)
