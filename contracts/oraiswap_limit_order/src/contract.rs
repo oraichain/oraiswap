@@ -8,8 +8,9 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, query_last_order_id, query_order, query_orderbook,
-    query_orderbook_is_matchable, query_orderbooks, query_orders, remove_pair, submit_order,
+    cancel_order, execute_matching_orders, get_paid_and_quote_assets, query_last_order_id,
+    query_order, query_orderbook, query_orderbook_is_matchable, query_orderbooks, query_orders,
+    remove_pair, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{
@@ -106,23 +107,8 @@ pub fn execute(
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
-            let paid_assets: [Asset; 2];
-            let quote_asset: &Asset;
-
-            // assign paid assets
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_assets = match direction {
-                    OrderDirection::Buy => [assets[1].clone(), assets[0].clone()],
-                    OrderDirection::Sell => [assets[0].clone(), assets[1].clone()],
-                };
-                quote_asset = &assets[1];
-            } else {
-                paid_assets = match direction {
-                    OrderDirection::Buy => [assets[0].clone(), assets[1].clone()],
-                    OrderDirection::Sell => [assets[1].clone(), assets[0].clone()],
-                };
-                quote_asset = &assets[0];
-            }
+            let (paid_assets, quote_asset) =
+                get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
             // if paid asset is cw20, we check it in Cw20HookMessage
             if !paid_assets[0].is_native_token() {
@@ -140,7 +126,14 @@ pub fn execute(
             }
 
             // then submit order
-            submit_order(deps, info.sender, &pair_key, direction, paid_assets)
+            submit_order(
+                deps,
+                &orderbook_pair,
+                info.sender,
+                &pair_key,
+                direction,
+                paid_assets,
+            )
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -266,23 +259,8 @@ pub fn receive_cw20(
                 assets[1].to_raw(deps.api)?.info,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-
-            let paid_assets: [Asset; 2];
-            let quote_asset: &Asset;
-
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_assets = match direction {
-                    OrderDirection::Buy => [assets[1].clone(), assets[0].clone()],
-                    OrderDirection::Sell => [assets[0].clone(), assets[1].clone()],
-                };
-                quote_asset = &assets[1];
-            } else {
-                paid_assets = match direction {
-                    OrderDirection::Buy => [assets[0].clone(), assets[1].clone()],
-                    OrderDirection::Sell => [assets[1].clone(), assets[0].clone()],
-                };
-                quote_asset = &assets[0];
-            }
+            let (paid_assets, quote_asset) =
+                get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
             if paid_assets[0].amount != provided_asset.amount {
                 return Err(ContractError::AssetMismatch {});
@@ -297,7 +275,14 @@ pub fn receive_cw20(
             }
 
             // then submit order
-            submit_order(deps, sender, &pair_key, direction, paid_assets)
+            submit_order(
+                deps,
+                &orderbook_pair,
+                sender,
+                &pair_key,
+                direction,
+                paid_assets,
+            )
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }

@@ -9,8 +9,8 @@ use crate::state::{
     PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    attr, Addr, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event, MessageInfo,
-    Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
+    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event,
+    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
@@ -30,18 +30,18 @@ struct Payment {
 
 pub fn submit_order(
     deps: DepsMut,
+    orderbook_pair: &OrderBook,
     sender: Addr,
     pair_key: &[u8],
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
-    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
     if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
         return Err(ContractError::AssetMustNotBeZero {});
     }
 
-    let offer_amount = assets[0].to_raw(deps.api)?.amount;
-    let mut ask_amount = assets[1].to_raw(deps.api)?.amount;
+    let offer_amount = assets[0].amount;
+    let mut ask_amount = assets[1].amount;
 
     let (highest_buy_price, buy_found, _) =
         orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
@@ -50,13 +50,13 @@ pub fn submit_order(
 
     // check spread for submit order
     if let Some(spread) = orderbook_pair.spread {
-        let buy_spread_factor = Decimal::one() + spread;
-        let sell_spread_factor = Decimal::one() - spread;
+        let buy_spread_factor = Decimal::one() - spread;
+        let sell_spread_factor = Decimal::one() + spread;
         if buy_found && sell_found && spread < Decimal::one() {
             match direction {
                 OrderDirection::Buy => {
                     let mut price = Decimal::from_ratio(offer_amount, ask_amount);
-                    let spread_price = lowest_sell_price * buy_spread_factor;
+                    let spread_price = lowest_sell_price * sell_spread_factor;
                     if price.ge(&(spread_price)) {
                         price = spread_price;
                         ask_amount = Uint128::from(offer_amount * Decimal::one().atomics())
@@ -66,7 +66,7 @@ pub fn submit_order(
                 }
                 OrderDirection::Sell => {
                     let mut price = Decimal::from_ratio(ask_amount, offer_amount);
-                    let spread_price = highest_buy_price * sell_spread_factor;
+                    let spread_price = highest_buy_price * buy_spread_factor;
                     if spread_price.is_zero() {
                         return Err(ContractError::PriceMustNotBeZero {
                             price: spread_price,
@@ -837,4 +837,31 @@ pub fn query_orderbook_is_matchable(
     Ok(OrderBookMatchableResponse {
         is_matchable: best_buy_price_list.len() != 0 && best_sell_price_list.len() != 0,
     })
+}
+
+pub fn get_paid_and_quote_assets(
+    api: &dyn Api,
+    orderbook_pair: &OrderBook,
+    assets: [Asset; 2],
+    direction: OrderDirection,
+) -> StdResult<([Asset; 2], Asset)> {
+    let mut assets_reverse = assets.clone();
+    assets_reverse.reverse();
+    let paid_assets: [Asset; 2];
+    let quote_asset: Asset;
+
+    if orderbook_pair.base_coin_info.to_normal(api)? == assets[0].info {
+        paid_assets = match direction {
+            OrderDirection::Buy => assets_reverse,
+            OrderDirection::Sell => assets.clone(),
+        };
+        quote_asset = assets[1].clone();
+    } else {
+        paid_assets = match direction {
+            OrderDirection::Buy => assets.clone(),
+            OrderDirection::Sell => assets_reverse,
+        };
+        quote_asset = assets[0].clone();
+    }
+    Ok((paid_assets, quote_asset))
 }
