@@ -93,6 +93,61 @@ fn basic_fixture() -> (MockApp, Addr) {
 }
 
 #[test]
+fn test_update_orderbook_data() {
+    let (mut app, limit_order_addr) = basic_fixture();
+    // case 1: try to update orderbook spread with non-admin addr => unauthorized
+    let asset_infos = [
+        AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+        asset_infos: asset_infos.clone(),
+        spread: Some(Decimal::from_str("0.1").unwrap()),
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &update_msg,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // case 2: good case, admin should update spread from None to something
+    let spread = Decimal::from_str("0.1").unwrap();
+    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+        asset_infos: asset_infos.clone(),
+        spread: Some(spread),
+    };
+    app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &update_msg,
+        &[],
+    )
+    .unwrap();
+    let orderbook: OrderBookResponse = app
+        .query(
+            limit_order_addr.clone(),
+            &QueryMsg::OrderBook {
+                asset_infos: asset_infos.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(orderbook.spread, Some(spread));
+    // double check, make sure other fields are still the same
+    assert_eq!(orderbook.base_coin_info, asset_infos[0]);
+    assert_eq!(orderbook.quote_coin_info, asset_infos[1]);
+    assert_eq!(orderbook.min_quote_coin_amount, Uint128::from(10u128));
+}
+
+#[test]
 fn test_query_mid_price() {
     let (mut app, limit_order_addr) = basic_fixture();
     let mid_price = app

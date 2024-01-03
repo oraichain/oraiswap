@@ -14,7 +14,7 @@ use crate::order::{
 };
 use crate::orderbook::OrderBook;
 use crate::state::{
-    init_last_order_id, read_config, read_orderbook, store_config, store_orderbook,
+    init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
 };
 use crate::tick::{query_tick, query_ticks_with_end};
 
@@ -96,6 +96,24 @@ pub fn execute(
             spread,
             min_quote_coin_amount,
         ),
+        ExecuteMsg::UpdateOrderbookPair {
+            asset_infos,
+            spread,
+        } => {
+            validate_admin(
+                deps.api,
+                read_config(deps.storage)?.admin,
+                info.sender.as_str(),
+            )?;
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+            let mut orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            orderbook_pair.spread = spread;
+            store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
+            Ok(Response::new().add_attributes(vec![("action", "update_orderbook_data")]))
+        }
         ExecuteMsg::SubmitOrder { direction, assets } => {
             let pair_key = pair_key(&[
                 assets[0].to_raw(deps.api)?.info,
@@ -152,12 +170,7 @@ pub fn execute_update_admin(
     admin: Addr,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-
-    // check authorized
-    if contract_info.admin.ne(&sender_addr) {
-        return Err(ContractError::Unauthorized {});
-    }
+    validate_admin(deps.api, contract_info.admin, info.sender.as_str())?;
 
     // update new admin
     contract_info.admin = deps.api.addr_canonicalize(admin.as_str())?;

@@ -1,6 +1,7 @@
-use cosmwasm_std::{CanonicalAddr, Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Api, CanonicalAddr, Order as OrderBy, StdError, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{
+    error::ContractError,
     limit_order::{ContractInfo, OrderDirection},
     querier::calc_range_start,
 };
@@ -247,6 +248,17 @@ pub fn read_orders(
         .take(limit)
         .map(|item| item.map(|item| item.1))
         .collect()
+}
+
+pub fn validate_admin(api: &dyn Api, admin: CanonicalAddr, sender: &str) -> StdResult<()> {
+    let sender_addr = api.addr_canonicalize(sender)?;
+    // check authorized
+    if admin.ne(&sender_addr) {
+        return Err(StdError::generic_err(
+            ContractError::Unauthorized {}.to_string(),
+        ));
+    }
+    Ok(())
 }
 
 static KEY_LAST_ORDER_ID: &[u8] = b"last_order_id"; // should use big int? guess no need
