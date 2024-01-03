@@ -8,12 +8,13 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, query_last_order_id, query_order, query_orderbook,
-    query_orderbook_is_matchable, query_orderbooks, query_orders, remove_pair, submit_order,
+    cancel_order, execute_matching_orders, get_paid_and_quote_assets, query_last_order_id,
+    query_order, query_orderbook, query_orderbook_is_matchable, query_orderbooks, query_orders,
+    remove_pair, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{
-    init_last_order_id, read_config, read_orderbook, store_config, store_orderbook,
+    init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
 };
 use crate::tick::{query_tick, query_ticks_with_end};
 
@@ -95,6 +96,24 @@ pub fn execute(
             spread,
             min_quote_coin_amount,
         ),
+        ExecuteMsg::UpdateOrderbookPair {
+            asset_infos,
+            spread,
+        } => {
+            validate_admin(
+                deps.api,
+                read_config(deps.storage)?.admin,
+                info.sender.as_str(),
+            )?;
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+            let mut orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            orderbook_pair.spread = spread;
+            store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
+            Ok(Response::new().add_attributes(vec![("action", "update_orderbook_data")]))
+        }
         ExecuteMsg::SubmitOrder { direction, assets } => {
             let pair_key = pair_key(&[
                 assets[0].to_raw(deps.api)?.info,
@@ -106,29 +125,15 @@ pub fn execute(
             // for execute order, it is direct match(user has known it is buy or sell) so no order is needed
             // Buy: wanting ask asset(orai) => paid offer asset(usdt)
             // Sell: paid ask asset(orai) => wating offer asset(usdt)
-            let paid_asset: &Asset;
-            let quote_asset: &Asset;
-
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[1],
-                    OrderDirection::Sell => &assets[0],
-                };
-                quote_asset = &assets[1];
-            } else {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[0],
-                    OrderDirection::Sell => &assets[1],
-                };
-                quote_asset = &assets[0];
-            }
+            let (paid_assets, quote_asset) =
+                get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
             // if paid asset is cw20, we check it in Cw20HookMessage
-            if !paid_asset.is_native_token() {
+            if !paid_assets[0].is_native_token() {
                 return Err(ContractError::MustProvideNativeToken {});
             }
 
-            paid_asset.assert_sent_native_token_balance(&info)?;
+            paid_assets[0].assert_sent_native_token_balance(&info)?;
 
             // require minimum amount for quote asset
             if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
@@ -139,41 +144,14 @@ pub fn execute(
             }
 
             // then submit order
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                }
-            } else {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        info.sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                }
-            }
+            submit_order(
+                deps,
+                &orderbook_pair,
+                info.sender,
+                &pair_key,
+                direction,
+                paid_assets,
+            )
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -192,12 +170,7 @@ pub fn execute_update_admin(
     admin: Addr,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
-    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-
-    // check authorized
-    if contract_info.admin.ne(&sender_addr) {
-        return Err(ContractError::Unauthorized {});
-    }
+    validate_admin(deps.api, contract_info.admin, info.sender.as_str())?;
 
     // update new admin
     contract_info.admin = deps.api.addr_canonicalize(admin.as_str())?;
@@ -299,25 +272,10 @@ pub fn receive_cw20(
                 assets[1].to_raw(deps.api)?.info,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            let (paid_assets, quote_asset) =
+                get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
-            let paid_asset: &Asset;
-            let quote_asset: &Asset;
-
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[1],
-                    OrderDirection::Sell => &assets[0],
-                };
-                quote_asset = &assets[1];
-            } else {
-                paid_asset = match direction {
-                    OrderDirection::Buy => &assets[0],
-                    OrderDirection::Sell => &assets[1],
-                };
-                quote_asset = &assets[0];
-            }
-
-            if paid_asset.amount != provided_asset.amount {
+            if paid_assets[0].amount != provided_asset.amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
@@ -329,41 +287,15 @@ pub fn receive_cw20(
                 });
             }
 
-            if orderbook_pair.base_coin_info.to_normal(deps.api)? == assets[0].info {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                }
-            } else {
-                match direction {
-                    OrderDirection::Buy => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[0].clone(), assets[1].clone()],
-                    ),
-                    OrderDirection::Sell => submit_order(
-                        deps,
-                        sender,
-                        &pair_key,
-                        direction,
-                        [assets[1].clone(), assets[0].clone()],
-                    ),
-                }
-            }
+            // then submit order
+            submit_order(
+                deps,
+                &orderbook_pair,
+                sender,
+                &pair_key,
+                direction,
+                paid_assets,
+            )
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }
@@ -435,39 +367,25 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
         }
-        // TODO: add test cases
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
                 asset_infos[1].to_raw(deps.api)?,
             ]);
-            let best_buy = query_ticks_with_end(
-                deps.storage,
-                &pair_key,
-                OrderDirection::Buy,
-                None,
-                None,
-                Some(1),
-                Some(2),
-            )?;
-            let best_sell = query_ticks_with_end(
-                deps.storage,
-                &pair_key,
-                OrderDirection::Sell,
-                None,
-                None,
-                Some(1),
-                Some(1),
-            )?;
-            let best_buy_price = if best_buy.ticks.len() == 0 {
-                Decimal::zero()
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            let (highest_buy_price, buy_found, _) =
+                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
+            let (lowest_sell_price, sell_found, _) =
+                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
+            let best_buy_price = if buy_found {
+                highest_buy_price
             } else {
-                best_buy.ticks[0].price
+                Decimal::zero()
             };
-            let best_sell_price = if best_sell.ticks.len() == 0 {
-                Decimal::zero()
+            let best_sell_price = if sell_found {
+                lowest_sell_price
             } else {
-                best_sell.ticks[0].price
+                Decimal::zero()
             };
             let mid_price = best_buy_price
                 .checked_add(best_sell_price)
