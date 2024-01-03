@@ -1,11 +1,12 @@
 use std::str::FromStr;
 
+use cosmwasm_std::testing::mock_dependencies;
 use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::math::DecimalPlaces;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
-use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
+use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderBookMatchableResponse,
     OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus,
@@ -13,6 +14,8 @@ use oraiswap::limit_order::{
 };
 
 use crate::jsonstr;
+use crate::order::get_paid_and_quote_assets;
+use crate::orderbook::OrderBook;
 const USDT_DENOM: &str = "usdt";
 
 fn basic_fixture() -> (MockApp, Addr) {
@@ -90,6 +93,80 @@ fn basic_fixture() -> (MockApp, Addr) {
         )
         .unwrap();
     (app, limit_order_addr)
+}
+
+#[test]
+fn test_get_paid_and_quote_assets() {
+    let deps = mock_dependencies();
+    let asset_infos_raw = [
+        AssetInfoRaw::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfoRaw::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let assets = asset_infos_raw.clone().map(|info| Asset {
+        info: info.to_normal(deps.as_ref().api).unwrap(),
+        amount: Uint128::zero(),
+    });
+    let orderbook: OrderBook = OrderBook {
+        base_coin_info: asset_infos_raw[0].clone(),
+        quote_coin_info: asset_infos_raw[1].clone(),
+        spread: None,
+        min_quote_coin_amount: Uint128::zero(),
+    };
+    // case 1: buy with base coin = asset_infos[0]
+    let (paid_assets, quote_asset) = get_paid_and_quote_assets(
+        deps.as_ref().api,
+        &orderbook,
+        assets.clone(),
+        OrderDirection::Buy,
+    )
+    .unwrap();
+    assert_eq!(paid_assets[0].info, assets[1].info);
+    assert_eq!(paid_assets[1].info, assets[0].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // case 2: sell with base coin = assets[0]
+    let (paid_assets, quote_asset) = get_paid_and_quote_assets(
+        deps.as_ref().api,
+        &orderbook,
+        assets.clone(),
+        OrderDirection::Sell,
+    )
+    .unwrap();
+    assert_eq!(paid_assets[0].info, assets[0].info);
+    assert_eq!(paid_assets[1].info, assets[1].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // case 3: buy with base coin = asset_infos[1]
+    let mut reverse_assets = assets.clone();
+    reverse_assets.reverse();
+    let (paid_assets, quote_asset) = get_paid_and_quote_assets(
+        deps.as_ref().api,
+        &orderbook,
+        reverse_assets.clone(),
+        OrderDirection::Buy,
+    )
+    .unwrap();
+    assert_eq!(paid_assets[0].info, reverse_assets[0].info);
+    assert_eq!(paid_assets[1].info, reverse_assets[1].info);
+    assert_eq!(quote_asset.info, reverse_assets[0].info);
+
+    // case 4: sell with base coin = asset_infos[1]
+    let mut reverse_assets = assets.clone();
+    reverse_assets.reverse();
+    let (paid_assets, quote_asset) = get_paid_and_quote_assets(
+        deps.as_ref().api,
+        &orderbook,
+        reverse_assets.clone(),
+        OrderDirection::Sell,
+    )
+    .unwrap();
+    assert_eq!(paid_assets[0].info, reverse_assets[1].info);
+    assert_eq!(paid_assets[1].info, reverse_assets[0].info);
+    assert_eq!(quote_asset.info, reverse_assets[0].info);
 }
 
 #[test]
