@@ -83,6 +83,11 @@ pub enum ExecuteMsg {
         min_quote_coin_amount: Uint128,
     },
 
+    UpdateOrderbookPair {
+        asset_infos: [AssetInfo; 2],
+        spread: Option<Decimal>,
+    },
+
     ///////////////////////
     /// User Operations ///
     ///////////////////////

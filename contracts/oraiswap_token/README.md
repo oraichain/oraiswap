@@ -4,7 +4,7 @@
 
 This is a basic implementation of a cw20 contract. It implements
 the [CW20 spec](https://github.com/CosmWasm/cosmwasm-plus/tree/master/packages/cw20) and is designed to
-be deloyed as is, or imported into other contracts to easily build
+be deployed as is, or imported into other contracts to easily build
 cw20-compatible tokens with custom logic.
 
 Implements:

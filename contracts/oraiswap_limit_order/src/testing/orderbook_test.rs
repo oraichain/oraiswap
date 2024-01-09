@@ -4,6 +4,7 @@ use cosmwasm_std::{testing::mock_dependencies, Api, Decimal};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
     limit_order::OrderDirection,
+    math::DecimalPlaces,
     testing::ATOM_DENOM,
 };
 
@@ -12,6 +13,28 @@ use crate::{
     state::{increase_last_order_id, init_last_order_id},
     tick::query_ticks_prices,
 };
+
+#[test]
+fn test_limit_decimal_places() {
+    let value = Decimal::from_ratio(6655325443433u128, 1000000000000u128);
+    assert_eq!(
+        value.limit_decimal_places(Some(2)).unwrap(),
+        Decimal::from_str("6.65").unwrap()
+    );
+    assert_eq!(
+        value.limit_decimal_places(Some(10)).unwrap(),
+        Decimal::from_str("6.655325").unwrap()
+    );
+    assert_eq!(
+        value.limit_decimal_places(None).unwrap(),
+        Decimal::from_str("6.655325").unwrap()
+    );
+
+    assert_eq!(
+        value.limit_decimal_places(Some(0)).unwrap(),
+        Decimal::from_str("6").unwrap()
+    )
+}
 
 #[test]
 fn initialize() {
