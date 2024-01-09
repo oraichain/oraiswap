@@ -130,7 +130,7 @@ pub fn compute_swap(
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
     let cp = offer_pool * ask_pool;
 
-    let return_amount = ask_pool - cp / (offer_pool + offer_amount);
+    let return_amount = (ask_pool * offer_amount) / (offer_pool + offer_amount);
 
     // calculate spread & commission
     let spread_amount = offer_amount.multiply_ratio(ask_pool, offer_pool) - return_amount;
@@ -184,11 +184,6 @@ pub fn compute_offer_amount(
         .unwrap_or_default();
 
     let commission_amount = before_commission_deduction * commission_rate;
-
-    // check small amount swap
-    if spread_amount.is_zero() || commission_amount.is_zero() {
-        return Err(ContractError::TooSmallOfferAmount {});
-    }
 
     Ok((
         offer_amount.try_into().map_err(|err| StdError::from(err))?,

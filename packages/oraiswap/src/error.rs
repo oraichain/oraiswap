@@ -1,4 +1,4 @@
-use cosmwasm_std::{OverflowError, StdError, Uint128, Decimal};
+use cosmwasm_std::{Decimal, OverflowError, StdError, Uint128};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -29,9 +29,6 @@ pub enum ContractError {
 
     #[error("Asset mismatch")]
     AssetMismatch {},
-
-    #[error("Too small offer amount")]
-    TooSmallOfferAmount {},
 
     #[error("Offer pool is zero")]
     OfferPoolIsZero {},
@@ -74,9 +71,7 @@ pub enum ContractError {
         min_quote_amount: Uint128,
     },
     #[error("Price {price} must not be zero")]
-    PriceMustNotBeZero {
-        price: Decimal
-    },
+    PriceMustNotBeZero { price: Decimal },
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
 }
