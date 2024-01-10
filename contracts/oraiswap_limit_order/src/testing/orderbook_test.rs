@@ -11,7 +11,7 @@ use oraiswap::{
 use crate::{
     orderbook::{Order, OrderBook},
     state::{increase_last_order_id, init_last_order_id},
-    tick::query_ticks_prices,
+    query::query_ticks_prices,
 };
 
 #[test]

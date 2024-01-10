@@ -8,15 +8,17 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, get_paid_and_quote_assets, query_last_order_id,
-    query_order, query_orderbook, query_orderbook_is_matchable, query_orderbooks, query_orders,
-    remove_pair, submit_market_order, submit_order,
+    cancel_order, execute_matching_orders, get_paid_and_quote_assets, remove_pair,
+    submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
+use crate::query::{
+    query_last_order_id, query_order, query_orderbook, query_orderbook_is_matchable,
+    query_orderbooks, query_orders, query_tick, query_ticks_with_end
+};
 use crate::state::{
     init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
 };
-use crate::tick::{query_tick, query_ticks_with_end};
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};

@@ -1,15 +1,13 @@
-use std::convert::TryFrom;
 use std::str::FromStr;
 
 use crate::orderbook::{BulkOrders, Executor, Order, OrderBook, OrderWithFee};
 use crate::state::{
-    increase_last_order_id, read_config, read_last_order_id, read_order, read_orderbook,
-    read_orderbooks, read_orders, read_orders_with_indexer, read_reward, remove_order,
-    remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_ORDER_BY_BIDDER,
-    PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
+    increase_last_order_id, read_config, read_order, read_orderbook,
+    read_reward, remove_order,
+    remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event,
+    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event,
     MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
 };
 
@@ -17,8 +15,7 @@ use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
-    LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse,
-    OrderDirection, OrderFilter, OrderResponse, OrderStatus, OrdersResponse,
+    OrderDirection, OrderStatus,
 };
 
 const RELAY_FEE: u128 = 300u128;
@@ -721,168 +718,6 @@ pub fn remove_pair(
             &format!("{} - {}", &asset_infos[0], &asset_infos[1]),
         ),
     ]))
-}
-
-pub fn query_order(
-    deps: Deps,
-    asset_infos: [AssetInfo; 2],
-    order_id: u64,
-) -> StdResult<OrderResponse> {
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-    let order = read_order(deps.storage, &pair_key, order_id)?;
-
-    order.to_response(
-        deps.api,
-        orderbook_pair.base_coin_info.to_normal(deps.api)?,
-        orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-    )
-}
-
-pub fn query_orders(
-    deps: Deps,
-    asset_infos: [AssetInfo; 2],
-    direction: Option<OrderDirection>,
-    filter: OrderFilter,
-    start_after: Option<u64>,
-    limit: Option<u32>,
-    order_by: Option<i32>,
-) -> StdResult<OrdersResponse> {
-    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-
-    let (direction_filter, direction_key): (Box<dyn Fn(&OrderDirection) -> bool>, Vec<u8>) =
-        match direction {
-            // copy value to closure
-            Some(d) => (Box::new(move |x| d.eq(x)), d.as_bytes().to_vec()),
-            None => (Box::new(|_| true), OrderDirection::Buy.as_bytes().to_vec()),
-        };
-
-    let orders: Option<Vec<Order>> = match filter {
-        OrderFilter::Bidder(bidder_addr) => {
-            let bidder_addr_raw = deps.api.addr_canonicalize(&bidder_addr)?;
-            read_orders_with_indexer::<OrderDirection>(
-                deps.storage,
-                &[
-                    PREFIX_ORDER_BY_BIDDER,
-                    &pair_key,
-                    bidder_addr_raw.as_slice(),
-                ],
-                direction_filter,
-                start_after,
-                limit,
-                order_by,
-            )?
-        }
-        OrderFilter::Tick {} => read_orders_with_indexer::<u64>(
-            deps.storage,
-            &[PREFIX_TICK, &pair_key, &direction_key],
-            Box::new(|_| true),
-            start_after,
-            limit,
-            order_by,
-        )?,
-        OrderFilter::Price(price) => {
-            let price_key = price.atomics().to_be_bytes();
-            read_orders_with_indexer::<OrderDirection>(
-                deps.storage,
-                &[PREFIX_ORDER_BY_PRICE, &pair_key, &price_key],
-                direction_filter,
-                start_after,
-                limit,
-                order_by,
-            )?
-        }
-        OrderFilter::None => match direction {
-            Some(_) => read_orders_with_indexer::<OrderDirection>(
-                deps.storage,
-                &[PREFIX_ORDER_BY_DIRECTION, &pair_key, &direction_key],
-                direction_filter,
-                start_after,
-                limit,
-                order_by,
-            )?,
-            None => Some(read_orders(
-                deps.storage,
-                &pair_key,
-                start_after,
-                limit,
-                order_by,
-            )?),
-        },
-    };
-
-    let resp = OrdersResponse {
-        orders: orders
-            .unwrap_or_default()
-            .iter()
-            .map(|order| {
-                order.to_response(
-                    deps.api,
-                    orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                    orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                )
-            })
-            .collect::<StdResult<Vec<OrderResponse>>>()?,
-    };
-
-    Ok(resp)
-}
-
-pub fn query_last_order_id(deps: Deps) -> StdResult<LastOrderIdResponse> {
-    let last_order_id = read_last_order_id(deps.storage)?;
-    let resp = LastOrderIdResponse { last_order_id };
-
-    Ok(resp)
-}
-
-pub fn query_orderbooks(
-    deps: Deps,
-    start_after: Option<Vec<u8>>,
-    limit: Option<u32>,
-    order_by: Option<i32>,
-) -> StdResult<OrderBooksResponse> {
-    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
-    let order_books = read_orderbooks(deps.storage, start_after, limit, order_by)?;
-    order_books
-        .into_iter()
-        .map(|ob| ob.to_response(deps.api))
-        .collect::<StdResult<Vec<OrderBookResponse>>>()
-        .map(|order_books| OrderBooksResponse { order_books })
-}
-
-pub fn query_orderbook(deps: Deps, asset_infos: [AssetInfo; 2]) -> StdResult<OrderBookResponse> {
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
-    ob.to_response(deps.api)
-}
-
-pub fn query_orderbook_is_matchable(
-    deps: Deps,
-    asset_infos: [AssetInfo; 2],
-) -> StdResult<OrderBookMatchableResponse> {
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price_list, best_sell_price_list) = ob
-        .find_list_match_price(deps.storage, Some(30))
-        .unwrap_or_default();
-
-    Ok(OrderBookMatchableResponse {
-        is_matchable: best_buy_price_list.len() != 0 && best_sell_price_list.len() != 0,
-    })
 }
 
 pub fn get_paid_and_quote_assets(

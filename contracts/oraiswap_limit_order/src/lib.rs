@@ -3,7 +3,7 @@ pub mod orderbook;
 pub mod state;
 
 mod order;
-mod tick;
+mod query;
 
 #[cfg(test)]
 mod testing;

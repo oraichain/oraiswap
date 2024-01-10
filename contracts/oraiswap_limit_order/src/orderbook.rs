@@ -14,7 +14,7 @@ use crate::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
     },
-    tick::{query_ticks_prices, query_ticks_prices_with_end},
+    query::{query_ticks_prices, query_ticks_prices_with_end},
 };
 
 #[cw_serde]
