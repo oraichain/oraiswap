@@ -36,9 +36,8 @@ pub fn submit_order(
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
-    if assets[0].amount.is_zero() || assets[1].amount.is_zero() {
-        return Err(ContractError::AssetMustNotBeZero {});
-    }
+    assets[0].assert_if_asset_is_zero()?;
+    assets[1].assert_if_asset_is_zero()?;
 
     let offer_amount = assets[0].amount;
     let mut ask_amount = assets[1].amount;
@@ -125,6 +124,20 @@ pub fn submit_order(
             &format!("{} {}", &assets[1].amount, &assets[1].info),
         ),
     ]))
+}
+
+pub fn submit_market_order(
+    deps: DepsMut,
+    orderbook_pair: &OrderBook,
+    sender: Addr,
+    pair_key: &[u8],
+    direction: OrderDirection,
+    asset: Asset,
+) -> Result<Response, ContractError> {
+    asset.assert_if_asset_is_zero()?;
+
+    let offer_amount = asset.amount;
+    Ok(Response::new())
 }
 
 pub fn cancel_order(

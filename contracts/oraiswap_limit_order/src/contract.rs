@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
@@ -10,7 +12,7 @@ use oraiswap::error::ContractError;
 use crate::order::{
     cancel_order, execute_matching_orders, get_paid_and_quote_assets, query_last_order_id,
     query_order, query_orderbook, query_orderbook_is_matchable, query_orderbooks, query_orders,
-    remove_pair, submit_order,
+    remove_pair, submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::state::{
@@ -32,6 +34,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
 const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
+const DEFAULT_MARKET_ORDER_SLIPPAGE: &str = "0.01";
+const MAX_MARKET_ORDER_SLIPPAGE: &str = "0.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -128,11 +132,7 @@ pub fn execute(
             let (paid_assets, quote_asset) =
                 get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
-            // if paid asset is cw20, we check it in Cw20HookMessage
-            if !paid_assets[0].is_native_token() {
-                return Err(ContractError::MustProvideNativeToken {});
-            }
-
+            paid_assets[0].assert_if_asset_is_native_token()?;
             paid_assets[0].assert_sent_native_token_balance(&info)?;
 
             // require minimum amount for quote asset
@@ -151,6 +151,47 @@ pub fn execute(
                 &pair_key,
                 direction,
                 paid_assets,
+            )
+        }
+        ExecuteMsg::SubmitMarketOrder {
+            direction,
+            assets,
+            offer_asset_index,
+            slippage,
+        } => {
+            let pair_key = pair_key(&[
+                assets[0].to_raw(deps.api)?.info,
+                assets[1].to_raw(deps.api)?.info,
+            ]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            let offer_asset = if offer_asset_index == 0 {
+                assets[0].clone()
+            } else {
+                assets[1].clone()
+            };
+
+            offer_asset.assert_if_asset_is_native_token()?;
+            offer_asset.assert_sent_native_token_balance(&info)?;
+
+            // require minimum amount for quote asset
+            if orderbook_pair
+                .quote_coin_info
+                .to_normal(deps.api)?
+                .eq(&offer_asset.info)
+                && offer_asset.amount.lt(&orderbook_pair.min_quote_coin_amount)
+            {
+                return Err(ContractError::TooSmallQuoteAsset {
+                    quote_coin: offer_asset.info.to_string(),
+                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
+                });
+            }
+            submit_market_order(
+                deps,
+                &orderbook_pair,
+                info.sender,
+                &pair_key,
+                direction,
+                offer_asset,
             )
         }
         ExecuteMsg::CancelOrder {

@@ -96,6 +96,16 @@ pub enum ExecuteMsg {
         assets: [Asset; 2],
     },
 
+    ///////////////////////
+    /// User Operations ///
+    ///////////////////////
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        assets: [Asset; 2],
+        offer_asset_index: u8, // which asset in the assets array is the offer asset
+        slippage: Option<Decimal>,
+    },
+
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
