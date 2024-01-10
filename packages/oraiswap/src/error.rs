@@ -70,8 +70,19 @@ pub enum ContractError {
         quote_coin: String,
         min_quote_amount: Uint128,
     },
+
     #[error("Price {price} must not be zero")]
     PriceMustNotBeZero { price: Decimal },
+
+    #[error("Offer amount {offer_amount} is too small")]
+    OfferAmountTooSmall { offer_amount: Uint128 },
+
+    #[error("Slippage {slippage} must be less than one")]
+    SlippageMustLessThanOne { slippage: Decimal },
+
+    #[error("Unable to find matching order")]
+    UnableToFindMatchingOrder {},
+
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
 }

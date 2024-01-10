@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
@@ -144,14 +142,7 @@ pub fn execute(
             }
 
             // then submit order
-            submit_order(
-                deps,
-                &orderbook_pair,
-                info.sender,
-                &pair_key,
-                direction,
-                paid_assets,
-            )
+            submit_order(deps, &orderbook_pair, info.sender, direction, paid_assets)
         }
         ExecuteMsg::SubmitMarketOrder {
             direction,
@@ -185,13 +176,14 @@ pub fn execute(
                     min_quote_amount: orderbook_pair.min_quote_coin_amount,
                 });
             }
+            // submit market order
             submit_market_order(
                 deps,
                 &orderbook_pair,
                 info.sender,
-                &pair_key,
                 direction,
                 offer_asset,
+                slippage,
             )
         }
         ExecuteMsg::CancelOrder {
@@ -329,13 +321,49 @@ pub fn receive_cw20(
             }
 
             // then submit order
-            submit_order(
+            submit_order(deps, &orderbook_pair, sender, direction, paid_assets)
+        }
+        Ok(Cw20HookMsg::SubmitMarketOrder {
+            direction,
+            assets,
+            offer_asset_index,
+            slippage,
+        }) => {
+            let pair_key = pair_key(&[
+                assets[0].to_raw(deps.api)?.info,
+                assets[1].to_raw(deps.api)?.info,
+            ]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            let offer_asset = if offer_asset_index == 0 {
+                assets[0].clone()
+            } else {
+                assets[1].clone()
+            };
+
+            if offer_asset.amount != provided_asset.amount {
+                return Err(ContractError::AssetMismatch {});
+            }
+
+            // require minimum amount for quote asset
+            if orderbook_pair
+                .quote_coin_info
+                .to_normal(deps.api)?
+                .eq(&offer_asset.info)
+                && offer_asset.amount.lt(&orderbook_pair.min_quote_coin_amount)
+            {
+                return Err(ContractError::TooSmallQuoteAsset {
+                    quote_coin: offer_asset.info.to_string(),
+                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
+                });
+            }
+            // submit market order
+            submit_market_order(
                 deps,
                 &orderbook_pair,
                 sender,
-                &pair_key,
                 direction,
-                paid_assets,
+                offer_asset,
+                slippage,
             )
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),

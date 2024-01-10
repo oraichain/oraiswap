@@ -129,6 +129,12 @@ pub enum Cw20HookMsg {
         direction: OrderDirection,
         assets: [Asset; 2],
     },
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        assets: [Asset; 2],
+        offer_asset_index: u8, // which asset in the assets array is the offer asset
+        slippage: Option<Decimal>,
+    },
 }
 
 #[cw_serde]

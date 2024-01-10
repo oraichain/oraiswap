@@ -32,7 +32,6 @@ pub fn submit_order(
     deps: DepsMut,
     orderbook_pair: &OrderBook,
     sender: Addr,
-    pair_key: &[u8],
     direction: OrderDirection,
     assets: [Asset; 2],
 ) -> Result<Response, ContractError> {
@@ -49,9 +48,12 @@ pub fn submit_order(
 
     // check spread for submit order
     if let Some(spread) = orderbook_pair.spread {
+        if spread >= Decimal::one() {
+            return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
+        }
         let buy_spread_factor = Decimal::one() - spread;
         let sell_spread_factor = Decimal::one() + spread;
-        if buy_found && sell_found && spread < Decimal::one() {
+        if buy_found && sell_found {
             match direction {
                 OrderDirection::Buy => {
                     let mut price = Decimal::from_ratio(offer_amount, ask_amount);
@@ -81,17 +83,14 @@ pub fn submit_order(
     }
 
     if ask_amount.is_zero() {
-        return Err(ContractError::TooSmallQuoteAsset {
-            quote_coin: assets[0].info.to_string(),
-            min_quote_amount: orderbook_pair.min_quote_coin_amount,
-        });
+        return Err(ContractError::AssetMustNotBeZero {});
     }
 
     let order_id = increase_last_order_id(deps.storage)?;
 
     store_order(
         deps.storage,
-        &pair_key,
+        &orderbook_pair.get_pair_key(),
         &Order {
             order_id,
             direction,
@@ -130,13 +129,47 @@ pub fn submit_market_order(
     deps: DepsMut,
     orderbook_pair: &OrderBook,
     sender: Addr,
-    pair_key: &[u8],
     direction: OrderDirection,
-    asset: Asset,
+    offer_asset: Asset,
+    slippage: Option<Decimal>,
 ) -> Result<Response, ContractError> {
-    asset.assert_if_asset_is_zero()?;
+    offer_asset.assert_if_asset_is_zero()?;
 
-    let offer_amount = asset.amount;
+    let offer_amount = offer_asset.amount;
+
+    let (best_price, found, _) = match direction {
+        OrderDirection::Buy => orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell),
+        OrderDirection::Sell => orderbook_pair.highest_price(deps.storage, OrderDirection::Buy),
+    };
+
+    if !found {
+        return Err(ContractError::UnableToFindMatchingOrder {});
+    }
+
+    let ask_amount = get_market_ask_amount(direction, best_price, offer_amount, slippage)?;
+
+    if ask_amount.is_zero() {
+        return Err(ContractError::AssetMustNotBeZero {});
+    }
+
+    let order_id = increase_last_order_id(deps.storage)?;
+
+    store_order(
+        deps.storage,
+        &orderbook_pair.get_pair_key(),
+        &Order {
+            order_id,
+            direction,
+            bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
+            offer_amount,
+            ask_amount,
+            filled_offer_amount: Uint128::zero(),
+            filled_ask_amount: Uint128::zero(),
+            status: OrderStatus::Open,
+        },
+        true,
+    )?;
+
     Ok(Response::new())
 }
 
@@ -877,4 +910,33 @@ pub fn get_paid_and_quote_assets(
         quote_asset = assets[0].clone();
     }
     Ok((paid_assets, quote_asset))
+}
+
+pub fn get_market_ask_amount(
+    direction: OrderDirection,
+    best_price: Decimal,
+    offer_amount: Uint128,
+    slippage: Option<Decimal>,
+) -> StdResult<Uint128> {
+    let slippage_price = if let Some(slippage) = slippage {
+        if slippage >= Decimal::one() {
+            return Err(StdError::generic_err(
+                ContractError::SlippageMustLessThanOne { slippage }.to_string(),
+            ));
+        }
+        match direction {
+            OrderDirection::Buy => best_price * (Decimal::one() + slippage),
+            OrderDirection::Sell => best_price * (Decimal::one() - slippage),
+        }
+    } else {
+        best_price
+    };
+
+    let ask_amount = match direction {
+        OrderDirection::Buy => Uint128::from(offer_amount * Decimal::one().atomics())
+            .checked_div(slippage_price.atomics())
+            .unwrap_or_default(),
+        OrderDirection::Sell => Uint128::from(offer_amount * slippage_price),
+    };
+    Ok(ask_amount)
 }
