@@ -16,45 +16,31 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 
 - oraiswap_factory
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai167r4ut7avvgpp3rlzksz6vw5spmykluzagvmj3ht845fjschwugqjsqhst`](https://scan.orai.io/smart-contract/orai167r4ut7avvgpp3rlzksz6vw5spmykluzagvmj3ht845fjschwugqjsqhst)
 
 - oraiswap_oracle
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m`](https://scan.orai.io/smart-contract/orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m)
 
 - oraiswap_pair
 
-  Mainnet (CodeID): 4
-
-  Testnet (CodeID): 7869
+  Mainnet (CodeID): 288
 
 - oraiswap_route
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai1j0r67r9k8t34pnhy00x3ftuxuwg0r6r4p8p6rrc8az0ednzr8y9s3sj2sf`](https://scan.orai.io/smart-contract/orai1j0r67r9k8t34pnhy00x3ftuxuwg0r6r4p8p6rrc8az0ednzr8y9s3sj2sf)
 
 - oraiswap_limit_order
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai1nt58gcu4e63v7k55phnr3gaym9tvk3q4apqzqccjuwppgjuyjy6sxk8yzp`](https://scan.orai.io/smart-contract/orai1nt58gcu4e63v7k55phnr3gaym9tvk3q4apqzqccjuwppgjuyjy6sxk8yzp)
 
 - oraiswap_staking
 
-  Mainnet: `orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu`
-
-  Testnet: `orai1yzncqj7f8sculc3849w9hg9r4f4u79e3swnlr7`
+  Mainnet: [`orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu`](https://scan.orai.io/smart-contract/orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu)
 
 - oraiswap_token
 
-  Mainnet (CodeID): 3
-
-  Testnet (CodeID): 148
+  Mainnet (CodeID): 582
 
 ## Running this contract
 
