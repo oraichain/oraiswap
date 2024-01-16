@@ -8,13 +8,13 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, get_paid_and_quote_assets, remove_pair,
-    submit_market_order, submit_order,
+    cancel_order, execute_matching_orders, get_market_asset, get_paid_and_quote_assets,
+    remove_pair, submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::query::{
     query_last_order_id, query_order, query_orderbook, query_orderbook_is_matchable,
-    query_orderbooks, query_orders, query_tick, query_ticks_with_end
+    query_orderbooks, query_orders, query_price_by_base_amount, query_tick, query_ticks_with_end,
 };
 use crate::state::{
     init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
@@ -103,6 +103,7 @@ pub fn execute(
         ExecuteMsg::UpdateOrderbookPair {
             asset_infos,
             spread,
+            min_quote_coin_amount,
         } => {
             validate_admin(
                 deps.api,
@@ -115,6 +116,12 @@ pub fn execute(
             ]);
             let mut orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
             orderbook_pair.spread = spread;
+
+            // update new minium quote amount threshold
+            if let Some(min_quote_coin_amount) = min_quote_coin_amount {
+                orderbook_pair.min_quote_coin_amount = min_quote_coin_amount;
+            }
+
             store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
             Ok(Response::new().add_attributes(vec![("action", "update_orderbook_data")]))
         }
@@ -148,45 +155,39 @@ pub fn execute(
         }
         ExecuteMsg::SubmitMarketOrder {
             direction,
-            assets,
-            offer_asset_index,
+            asset_infos,
+            base_amount,
             slippage,
         } => {
             let pair_key = pair_key(&[
-                assets[0].to_raw(deps.api)?.info,
-                assets[1].to_raw(deps.api)?.info,
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-            let offer_asset = if offer_asset_index == 0 {
-                assets[0].clone()
-            } else {
-                assets[1].clone()
-            };
 
-            offer_asset.assert_if_asset_is_native_token()?;
-            offer_asset.assert_sent_native_token_balance(&info)?;
+            let base_amount_response =
+                query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+            let (paid_assets, quote_asset) = get_market_asset(
+                deps.api,
+                &orderbook_pair,
+                direction,
+                base_amount_response.market_price,
+                base_amount,
+                slippage,
+            )?;
+
+            paid_assets[0].assert_if_asset_is_native_token()?;
+            paid_assets[0].assert_sent_native_token_balance(&info)?;
 
             // require minimum amount for quote asset
-            if orderbook_pair
-                .quote_coin_info
-                .to_normal(deps.api)?
-                .eq(&offer_asset.info)
-                && offer_asset.amount.lt(&orderbook_pair.min_quote_coin_amount)
-            {
+            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
                 return Err(ContractError::TooSmallQuoteAsset {
-                    quote_coin: offer_asset.info.to_string(),
+                    quote_coin: quote_asset.info.to_string(),
                     min_quote_amount: orderbook_pair.min_quote_coin_amount,
                 });
             }
             // submit market order
-            submit_market_order(
-                deps,
-                &orderbook_pair,
-                info.sender,
-                direction,
-                offer_asset,
-                slippage,
-            )
+            submit_market_order(deps, &orderbook_pair, info.sender, direction, paid_assets)
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -327,46 +328,42 @@ pub fn receive_cw20(
         }
         Ok(Cw20HookMsg::SubmitMarketOrder {
             direction,
-            assets,
-            offer_asset_index,
+            asset_infos,
+            base_amount,
             slippage,
         }) => {
             let pair_key = pair_key(&[
-                assets[0].to_raw(deps.api)?.info,
-                assets[1].to_raw(deps.api)?.info,
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-            let offer_asset = if offer_asset_index == 0 {
-                assets[0].clone()
-            } else {
-                assets[1].clone()
-            };
 
-            if offer_asset.amount != provided_asset.amount {
+            let base_amount_response =
+                query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+            let (paid_assets, quote_asset) = get_market_asset(
+                deps.api,
+                &orderbook_pair,
+                direction,
+                base_amount_response.market_price,
+                base_amount_response.expected_base_amount,
+                slippage,
+            )?;
+
+            if paid_assets[0].amount != provided_asset.amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
             // require minimum amount for quote asset
-            if orderbook_pair
-                .quote_coin_info
-                .to_normal(deps.api)?
-                .eq(&offer_asset.info)
-                && offer_asset.amount.lt(&orderbook_pair.min_quote_coin_amount)
-            {
+            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
                 return Err(ContractError::TooSmallQuoteAsset {
-                    quote_coin: offer_asset.info.to_string(),
+                    quote_coin: quote_asset.info.to_string(),
                     min_quote_amount: orderbook_pair.min_quote_coin_amount,
                 });
             }
+
+            let return_offer = base_amount.checked_div(base_amount_response.expected_base_amount).unwrap_or_default();
             // submit market order
-            submit_market_order(
-                deps,
-                &orderbook_pair,
-                sender,
-                direction,
-                offer_asset,
-                slippage,
-            )
+            submit_market_order(deps, &orderbook_pair, sender, direction, paid_assets)
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }
@@ -464,6 +461,23 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 .checked_div(Decimal::from_ratio(2u128, 1u128))
                 .unwrap_or_default();
             to_binary(&mid_price)
+        }
+        QueryMsg::PriceByBaseAmount {
+            asset_infos,
+            base_amount,
+            direction,
+        } => {
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            to_binary(&query_price_by_base_amount(
+                deps,
+                &orderbook_pair,
+                direction,
+                base_amount,
+            )?)
         }
     }
 }

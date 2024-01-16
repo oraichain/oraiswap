@@ -1,10 +1,11 @@
-use crate::orderbook::Order;
+use crate::orderbook::{Order, OrderBook};
 use crate::state::{
     read_last_order_id, read_order, read_orderbook, read_orderbooks, read_orders,
     read_orders_with_indexer, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
-use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage, Uint128};
+use oraiswap::limit_order::BaseAmountResponse;
 use std::convert::{TryFrom, TryInto};
 
 use oraiswap::asset::{pair_key, AssetInfo};
@@ -133,10 +134,58 @@ pub fn query_orders(
     Ok(resp)
 }
 
+pub fn query_price_by_base_amount(
+    deps: Deps,
+    orderbook_pair: &OrderBook,
+    direction: OrderDirection,
+    base_amount: Uint128,
+) -> StdResult<BaseAmountResponse> {
+    // We have to query opposite direction to fill order
+    let price_direction = match direction {
+        OrderDirection::Buy => OrderDirection::Sell,
+        OrderDirection::Sell => OrderDirection::Buy,
+    };
+
+    let order_by = match price_direction {
+        OrderDirection::Buy => Some(2i32),
+        OrderDirection::Sell => Some(1i32),
+    };
+    // get best price list base on direction
+    let best_price_list = query_ticks_prices_with_end(
+        deps.storage,
+        &orderbook_pair.get_pair_key(),
+        price_direction,
+        None,
+        None,
+        None,
+        order_by,
+    );
+
+    let mut total_base_amount_by_price = Uint128::zero();
+    let mut market_price = Decimal::zero();
+    let mut expected_base_amount = base_amount;
+    for price in &best_price_list {
+        let base_amount_by_price =
+            orderbook_pair.find_base_amount_at_price(deps.storage, *price, price_direction);
+        total_base_amount_by_price =
+            total_base_amount_by_price.checked_add(base_amount_by_price)?;
+        market_price = *price;
+        if total_base_amount_by_price >= base_amount {
+            break;
+        }
+    }
+    if total_base_amount_by_price < base_amount {
+        expected_base_amount = total_base_amount_by_price;
+    }
+    Ok(BaseAmountResponse {
+        market_price,
+        expected_base_amount,
+    })
+}
+
 pub fn query_last_order_id(deps: Deps) -> StdResult<LastOrderIdResponse> {
     let last_order_id = read_last_order_id(deps.storage)?;
     let resp = LastOrderIdResponse { last_order_id };
-
     Ok(resp)
 }
 

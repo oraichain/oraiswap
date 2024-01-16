@@ -86,6 +86,7 @@ pub enum ExecuteMsg {
     UpdateOrderbookPair {
         asset_infos: [AssetInfo; 2],
         spread: Option<Decimal>,
+        min_quote_coin_amount: Option<Uint128>,
     },
 
     ///////////////////////
@@ -101,8 +102,8 @@ pub enum ExecuteMsg {
     ///////////////////////
     SubmitMarketOrder {
         direction: OrderDirection, // default is buy, with sell then it is reversed
-        assets: [Asset; 2],
-        offer_asset_index: u8, // which asset in the assets array is the offer asset
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
         slippage: Option<Decimal>,
     },
 
@@ -131,8 +132,8 @@ pub enum Cw20HookMsg {
     },
     SubmitMarketOrder {
         direction: OrderDirection, // default is buy, with sell then it is reversed
-        assets: [Asset; 2],
-        offer_asset_index: u8, // which asset in the assets array is the offer asset
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
         slippage: Option<Decimal>,
     },
 }
@@ -193,6 +194,8 @@ pub enum QueryMsg {
     OrderBookMatchable { asset_infos: [AssetInfo; 2] },
     #[returns(Decimal)]
     MidPrice { asset_infos: [AssetInfo; 2] },
+    #[returns(BaseAmountResponse)]
+    PriceByBaseAmount { asset_infos: [AssetInfo; 2], base_amount: Uint128, direction: OrderDirection },
 }
 
 #[cw_serde]
@@ -255,6 +258,12 @@ pub struct LastOrderIdResponse {
 #[cw_serde]
 pub struct OrderBookMatchableResponse {
     pub is_matchable: bool,
+}
+
+#[cw_serde]
+pub struct BaseAmountResponse {
+    pub market_price: Decimal,
+    pub expected_base_amount: Uint128,
 }
 
 /// We currently take no arguments for migrations

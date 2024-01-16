@@ -10,11 +10,11 @@ use oraiswap::{
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 
 use crate::{
+    query::{query_ticks_prices, query_ticks_prices_with_end},
     state::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
     },
-    query::{query_ticks_prices, query_ticks_prices_with_end},
 };
 
 #[cw_serde]
@@ -435,6 +435,38 @@ impl OrderBook {
                 .into();
         }
 
+        Uint128::zero()
+    }
+
+    /// return the largest base amount of orders at price
+    pub fn find_base_amount_at_price(
+        &self,
+        storage: &dyn Storage,
+        price: Decimal,
+        direction: OrderDirection,
+    ) -> Uint128 {
+        if let Some(orders) =
+            self.query_orders_by_price_and_direction(storage, price, direction, None)
+        {
+            // Buy -> base_amount = ask_amount - filled_ask_amount
+            // Sell -> base_amount = offer_amount - filled_offer_amount
+            return orders
+                .iter()
+                .map(|order| match direction {
+                    OrderDirection::Buy => order
+                        .ask_amount
+                        .checked_sub(order.filled_ask_amount)
+                        .unwrap_or_default()
+                        .u128(),
+                    OrderDirection::Sell => order
+                        .offer_amount
+                        .checked_sub(order.filled_offer_amount)
+                        .unwrap_or_default()
+                        .u128(),
+                })
+                .sum::<u128>()
+                .into();
+        }
         Uint128::zero()
     }
 

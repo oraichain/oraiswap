@@ -2,21 +2,18 @@ use std::str::FromStr;
 
 use crate::orderbook::{BulkOrders, Executor, Order, OrderBook, OrderWithFee};
 use crate::state::{
-    increase_last_order_id, read_config, read_order, read_orderbook,
-    read_reward, remove_order,
+    increase_last_order_id, read_config, read_order, read_orderbook, read_reward, remove_order,
     remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event,
-    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
+    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event, MessageInfo,
+    Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{
-    OrderDirection, OrderStatus,
-};
+use oraiswap::limit_order::{OrderDirection, OrderStatus};
 
 const RELAY_FEE: u128 = 300u128;
 
@@ -103,6 +100,7 @@ pub fn submit_order(
 
     Ok(Response::new().add_attributes(vec![
         ("action", "submit_order"),
+        ("order_type", "limit"),
         (
             "pair",
             &format!("{} - {}", &assets[0].info, &assets[1].info),
@@ -127,30 +125,10 @@ pub fn submit_market_order(
     orderbook_pair: &OrderBook,
     sender: Addr,
     direction: OrderDirection,
-    offer_asset: Asset,
-    slippage: Option<Decimal>,
+    assets: [Asset; 2],
+    return_offer: Uint128
 ) -> Result<Response, ContractError> {
-    offer_asset.assert_if_asset_is_zero()?;
-
-    let offer_amount = offer_asset.amount;
-
-    let (best_price, found, _) = match direction {
-        OrderDirection::Buy => orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell),
-        OrderDirection::Sell => orderbook_pair.highest_price(deps.storage, OrderDirection::Buy),
-    };
-
-    if !found {
-        return Err(ContractError::UnableToFindMatchingOrder {});
-    }
-
-    let ask_amount = get_market_ask_amount(direction, best_price, offer_amount, slippage)?;
-
-    if ask_amount.is_zero() {
-        return Err(ContractError::AssetMustNotBeZero {});
-    }
-
     let order_id = increase_last_order_id(deps.storage)?;
-
     store_order(
         deps.storage,
         &orderbook_pair.get_pair_key(),
@@ -158,8 +136,8 @@ pub fn submit_market_order(
             order_id,
             direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_amount,
-            ask_amount,
+            offer_amount: assets[0].amount,
+            ask_amount: assets[1].amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             status: OrderStatus::Open,
@@ -167,7 +145,30 @@ pub fn submit_market_order(
         true,
     )?;
 
-    Ok(Response::new())
+    Ok(Response::new().add_attributes(vec![
+        ("action", "submit_order"),
+        ("order_type", "market"),
+        (
+            "pair",
+            &format!(
+                "{} - {}",
+                &orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                &orderbook_pair.quote_coin_info.to_normal(deps.api)?
+            ),
+        ),
+        ("order_id", &order_id.to_string()),
+        ("status", &format!("{:?}", OrderStatus::Open)),
+        ("direction", &format!("{:?}", direction)),
+        ("bidder_addr", sender.as_str()),
+        (
+            "offer_asset",
+            &format!("{} {}", &assets[0].amount, &assets[0].info),
+        ),
+        (
+            "ask_asset",
+            &format!("{} {}", &assets[1].amount, &assets[1].info),
+        ),
+    ]))
 }
 
 pub fn cancel_order(
@@ -747,12 +748,14 @@ pub fn get_paid_and_quote_assets(
     Ok((paid_assets, quote_asset))
 }
 
-pub fn get_market_ask_amount(
+pub fn get_market_asset(
+    api: &dyn Api,
+    orderbook_pair: &OrderBook,
     direction: OrderDirection,
-    best_price: Decimal,
-    offer_amount: Uint128,
+    market_price: Decimal,
+    base_amount: Uint128,
     slippage: Option<Decimal>,
-) -> StdResult<Uint128> {
+) -> StdResult<([Asset; 2], Asset)> {
     let slippage_price = if let Some(slippage) = slippage {
         if slippage >= Decimal::one() {
             return Err(StdError::generic_err(
@@ -760,18 +763,38 @@ pub fn get_market_ask_amount(
             ));
         }
         match direction {
-            OrderDirection::Buy => best_price * (Decimal::one() + slippage),
-            OrderDirection::Sell => best_price * (Decimal::one() - slippage),
+            OrderDirection::Buy => market_price * (Decimal::one() + slippage),
+            OrderDirection::Sell => market_price * (Decimal::one() - slippage),
         }
     } else {
-        best_price
+        market_price
     };
-
-    let ask_amount = match direction {
-        OrderDirection::Buy => Uint128::from(offer_amount * Decimal::one().atomics())
-            .checked_div(slippage_price.atomics())
-            .unwrap_or_default(),
-        OrderDirection::Sell => Uint128::from(offer_amount * slippage_price),
+    let quote_amount = Uint128::from(base_amount * slippage_price);
+    let quote_asset = Asset {
+        info: orderbook_pair.quote_coin_info.to_normal(api)?,
+        amount: quote_amount,
     };
-    Ok(ask_amount)
+    let paid_assets = match direction {
+        OrderDirection::Buy => [
+            Asset {
+                info: orderbook_pair.quote_coin_info.to_normal(api)?,
+                amount: quote_amount,
+            },
+            Asset {
+                info: orderbook_pair.base_coin_info.to_normal(api)?,
+                amount: base_amount,
+            },
+        ],
+        OrderDirection::Sell => [
+            Asset {
+                info: orderbook_pair.base_coin_info.to_normal(api)?,
+                amount: base_amount,
+            },
+            Asset {
+                info: orderbook_pair.quote_coin_info.to_normal(api)?,
+                amount: quote_amount,
+            },
+        ],
+    };
+    Ok((paid_assets, quote_asset))
 }

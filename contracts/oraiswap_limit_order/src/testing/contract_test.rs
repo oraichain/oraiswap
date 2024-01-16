@@ -3,6 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::testing::mock_dependencies;
 use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
+use oraiswap::error::ContractError;
 use oraiswap::math::DecimalPlaces;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -14,7 +15,7 @@ use oraiswap::limit_order::{
 };
 
 use crate::jsonstr;
-use crate::order::get_paid_and_quote_assets;
+use crate::order::{get_paid_and_quote_assets, get_market_asset};
 use crate::orderbook::OrderBook;
 const USDT_DENOM: &str = "usdt";
 
@@ -170,6 +171,236 @@ fn test_get_paid_and_quote_assets() {
 }
 
 #[test]
+fn test_get_market_assets_buy_side() {
+    let deps = mock_dependencies();
+    let asset_infos_raw = [
+        AssetInfoRaw::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfoRaw::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let assets = asset_infos_raw.clone().map(|info| Asset {
+        info: info.to_normal(deps.as_ref().api).unwrap(),
+        amount: Uint128::zero(),
+    });
+    let orderbook: OrderBook = OrderBook {
+        base_coin_info: asset_infos_raw[0].clone(),
+        quote_coin_info: asset_infos_raw[1].clone(),
+        spread: None,
+        min_quote_coin_amount: Uint128::zero(),
+    };
+
+    // case 1: failure case - slippage >= 1
+    let market_price = Decimal::from_str("1.0").unwrap();
+    let base_amount = Uint128::from(100_000u128);
+    let slippage = Decimal::from_str("1").unwrap();
+
+    let err = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Buy,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap_err();
+    assert_eq!(err, StdError::generic_err(
+        ContractError::SlippageMustLessThanOne { slippage }.to_string(),
+    ));
+
+
+    // case 2: buy with base_amount = 100_000, market_price = 1.0, slippage = 0.1%
+    let market_price = Decimal::from_str("1.0").unwrap();
+    let base_amount = Uint128::from(100_000u128);
+    let slippage = Decimal::from_str("0.001").unwrap();
+    let slippage_price = market_price * (Decimal::one() + slippage);
+    let expected_quote_amount = Uint128::from(base_amount * slippage_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Buy,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[1].info);
+    assert_eq!(paid_assets[1].info, assets[0].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[1].amount);
+
+
+    // case 3: buy with base_amount = 123_456_789, market_price = 1.234, slippage = 0.22%
+    let market_price = Decimal::from_str("1.234").unwrap();
+    let base_amount = Uint128::from(123_456_789u128);
+    let slippage_price = market_price * (Decimal::one() + slippage);
+    let expected_quote_amount = Uint128::from(base_amount * slippage_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Buy,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[1].info);
+    assert_eq!(paid_assets[1].info, assets[0].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[1].amount);
+
+
+    // case 4: buy with base_amount = 111_222, market_price = 2.0, slippage = none
+    let market_price = Decimal::from_str("2.0").unwrap();
+    let base_amount = Uint128::from(111_222u128);
+    let expected_quote_amount = Uint128::from(base_amount * market_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Buy,
+        market_price,
+        base_amount,
+        None,
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[1].info);
+    assert_eq!(paid_assets[1].info, assets[0].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[1].amount);
+}
+
+#[test]
+fn test_get_market_assets_sell_side() {
+    let deps = mock_dependencies();
+    let asset_infos_raw = [
+        AssetInfoRaw::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfoRaw::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let assets = asset_infos_raw.clone().map(|info| Asset {
+        info: info.to_normal(deps.as_ref().api).unwrap(),
+        amount: Uint128::zero(),
+    });
+    let orderbook: OrderBook = OrderBook {
+        base_coin_info: asset_infos_raw[0].clone(),
+        quote_coin_info: asset_infos_raw[1].clone(),
+        spread: None,
+        min_quote_coin_amount: Uint128::zero(),
+    };
+
+    // case 1: failure case - slippage >= 1
+    let market_price = Decimal::from_str("1.0").unwrap();
+    let base_amount = Uint128::from(100_000u128);
+    let slippage = Decimal::from_str("1").unwrap();
+
+    let err = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Sell,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap_err();
+    assert_eq!(err, StdError::generic_err(
+        ContractError::SlippageMustLessThanOne { slippage }.to_string(),
+    ));
+
+    // case 2: sell with base_amount = 100_000, market_price = 1.0, slippage = 0.1%
+    let market_price = Decimal::from_str("1.0").unwrap();
+    let base_amount = Uint128::from(100_000u128);
+    let slippage = Decimal::from_str("0.001").unwrap();
+    let slippage_price = market_price * (Decimal::one() - slippage);
+    let expected_quote_amount = Uint128::from(base_amount * slippage_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Sell,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[0].info);
+    assert_eq!(paid_assets[1].info, assets[1].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[0].amount);
+
+    // case 3: buy with base_amount = 123_456_789, market_price = 1.234, slippage = 0.22%
+    let market_price = Decimal::from_str("1.234").unwrap();
+    let base_amount = Uint128::from(123_456_789u128);
+    let slippage_price = market_price * (Decimal::one() - slippage);
+    let expected_quote_amount = Uint128::from(base_amount * slippage_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Sell,
+        market_price,
+        base_amount,
+        Some(slippage),
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[0].info);
+    assert_eq!(paid_assets[1].info, assets[1].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[0].amount);
+
+
+    // case 4: buy with base_amount = 111_222, market_price = 2.0, slippage = none
+    let market_price = Decimal::from_str("2.0").unwrap();
+    let base_amount = Uint128::from(111_222u128);
+    let expected_quote_amount = Uint128::from(base_amount * market_price);
+
+    let (paid_assets, quote_asset) = get_market_asset(
+        deps.as_ref().api,
+        &orderbook,
+        OrderDirection::Sell,
+        market_price,
+        base_amount,
+        None,
+    )
+    .unwrap();
+    // assert info
+    assert_eq!(paid_assets[0].info, assets[0].info);
+    assert_eq!(paid_assets[1].info, assets[1].info);
+    assert_eq!(quote_asset.info, assets[1].info);
+
+    // assert quote and base amount
+    assert_eq!(quote_asset.amount, expected_quote_amount);
+    assert_eq!(base_amount, paid_assets[0].amount);
+}
+
+#[test]
 fn test_update_orderbook_data() {
     let (mut app, limit_order_addr) = basic_fixture();
     // case 1: try to update orderbook spread with non-admin addr => unauthorized
@@ -184,6 +415,7 @@ fn test_update_orderbook_data() {
     let update_msg = ExecuteMsg::UpdateOrderbookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(Decimal::from_str("0.1").unwrap()),
+        min_quote_coin_amount: None
     };
     assert_eq!(
         app.execute(
@@ -201,6 +433,7 @@ fn test_update_orderbook_data() {
     let update_msg = ExecuteMsg::UpdateOrderbookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(spread),
+        min_quote_coin_amount: None
     };
     app.execute(
         Addr::unchecked("addr0000"),
