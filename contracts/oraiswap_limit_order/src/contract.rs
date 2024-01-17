@@ -167,6 +167,12 @@ pub fn execute(
 
             let base_amount_response =
                 query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+
+            // Return error if cannot find opposite side market order
+            if base_amount_response.market_price.is_zero() {
+                return Err(ContractError::UnableToFindMarketOrder {});
+            }
+
             let (paid_assets, quote_asset) = get_market_asset(
                 deps.api,
                 &orderbook_pair,
@@ -362,6 +368,12 @@ pub fn receive_cw20(
 
             let base_amount_response =
                 query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+            
+            // Return error if cannot find opposite side market order
+            if base_amount_response.market_price.is_zero() {
+                return Err(ContractError::UnableToFindMarketOrder {});
+            }
+
             let (paid_assets, quote_asset) = get_market_asset(
                 deps.api,
                 &orderbook_pair,

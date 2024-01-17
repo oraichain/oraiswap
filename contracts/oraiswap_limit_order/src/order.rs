@@ -128,6 +128,8 @@ pub fn submit_market_order(
     assets: [Asset; 2],
     refund_amount: Uint128,
 ) -> Result<Response, ContractError> {
+    assets[0].assert_if_asset_is_zero()?;
+    assets[1].assert_if_asset_is_zero()?;
     let order_id = increase_last_order_id(deps.storage)?;
     store_order(
         deps.storage,
