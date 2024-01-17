@@ -172,7 +172,7 @@ pub fn execute(
                 &orderbook_pair,
                 direction,
                 base_amount_response.market_price,
-                base_amount,
+                base_amount_response.expected_base_amount,
                 slippage,
             )?;
 
@@ -186,8 +186,30 @@ pub fn execute(
                     min_quote_amount: orderbook_pair.min_quote_coin_amount,
                 });
             }
+
+            // calculate refund_amount
+            let refund_amount = match direction {
+                OrderDirection::Buy => paid_assets[0]
+                    .amount
+                    .checked_sub(Uint128::from(
+                        base_amount_response.expected_base_amount
+                            * base_amount_response.market_price,
+                    ))
+                    .unwrap_or_default(),
+                OrderDirection::Sell => paid_assets[0]
+                    .amount
+                    .checked_sub(base_amount_response.expected_base_amount)
+                    .unwrap_or_default(),
+            };
             // submit market order
-            submit_market_order(deps, &orderbook_pair, info.sender, direction, paid_assets)
+            submit_market_order(
+                deps,
+                &orderbook_pair,
+                info.sender,
+                direction,
+                paid_assets,
+                refund_amount,
+            )
         }
         ExecuteMsg::CancelOrder {
             order_id,
@@ -361,9 +383,29 @@ pub fn receive_cw20(
                 });
             }
 
-            let return_offer = base_amount.checked_div(base_amount_response.expected_base_amount).unwrap_or_default();
+            // calculate refund_amount
+            let refund_amount = match direction {
+                OrderDirection::Buy => paid_assets[0]
+                    .amount
+                    .checked_sub(Uint128::from(
+                        base_amount_response.expected_base_amount
+                            * base_amount_response.market_price,
+                    ))
+                    .unwrap_or_default(),
+                OrderDirection::Sell => paid_assets[0]
+                    .amount
+                    .checked_sub(base_amount_response.expected_base_amount)
+                    .unwrap_or_default(),
+            };
             // submit market order
-            submit_market_order(deps, &orderbook_pair, sender, direction, paid_assets)
+            submit_market_order(
+                deps,
+                &orderbook_pair,
+                sender,
+                direction,
+                paid_assets,
+                refund_amount,
+            )
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }

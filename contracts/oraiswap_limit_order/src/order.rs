@@ -126,7 +126,7 @@ pub fn submit_market_order(
     sender: Addr,
     direction: OrderDirection,
     assets: [Asset; 2],
-    return_offer: Uint128
+    refund_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let order_id = increase_last_order_id(deps.storage)?;
     store_order(
@@ -145,7 +145,25 @@ pub fn submit_market_order(
         true,
     )?;
 
-    Ok(Response::new().add_attributes(vec![
+    // prepare refund message
+    let bidder_refund = Asset {
+        info: match direction {
+            OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+            OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+        },
+        amount: refund_amount,
+    };
+
+    // Build refund msg
+    let messages = if refund_amount > Uint128::zero() {
+        vec![bidder_refund
+            .clone()
+            .into_msg(None, &deps.querier, sender.clone())?]
+    } else {
+        vec![]
+    };
+
+    Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "submit_order"),
         ("order_type", "market"),
         (
