@@ -818,3 +818,23 @@ pub fn get_market_asset(
     };
     Ok((paid_assets, quote_asset))
 }
+
+pub fn get_native_asset(info: &MessageInfo, asset_info: AssetInfo) -> StdResult<Asset> {
+    if let AssetInfo::NativeToken { denom } = asset_info.clone() {
+        //check funds includes To token
+        if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
+            let amount = native_coin.amount;
+            let asset = Asset {
+                info: asset_info.clone(),
+                amount: amount.clone(),
+            };
+            return Ok(asset);
+        } else {
+            return Err(StdError::generic_err(
+                "Cannot find the native token that matches the input",
+            ));
+        };
+    } else {
+        return Err(StdError::generic_err("invalid cw20 hook message"));
+    }
+}

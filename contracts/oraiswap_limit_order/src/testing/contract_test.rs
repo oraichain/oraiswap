@@ -9,13 +9,13 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse, OrderBookMatchableResponse,
-    OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus,
-    OrdersResponse, QueryMsg, TicksResponse,
+    BaseAmountResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
+    OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
+    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, TicksResponse,
 };
 
 use crate::jsonstr;
-use crate::order::{get_paid_and_quote_assets, get_market_asset};
+use crate::order::{get_market_asset, get_paid_and_quote_assets};
 use crate::orderbook::OrderBook;
 const USDT_DENOM: &str = "usdt";
 
@@ -206,10 +206,10 @@ fn test_get_market_assets_buy_side() {
         Some(slippage),
     )
     .unwrap_err();
-    assert_eq!(err, StdError::generic_err(
-        ContractError::SlippageMustLessThanOne { slippage }.to_string(),
-    ));
-
+    assert_eq!(
+        err,
+        StdError::generic_err(ContractError::SlippageMustLessThanOne { slippage }.to_string(),)
+    );
 
     // case 2: buy with base_amount = 100_000, market_price = 1.0, slippage = 0.1%
     let market_price = Decimal::from_str("1.0").unwrap();
@@ -236,7 +236,6 @@ fn test_get_market_assets_buy_side() {
     assert_eq!(quote_asset.amount, expected_quote_amount);
     assert_eq!(base_amount, paid_assets[1].amount);
 
-
     // case 3: buy with base_amount = 123_456_789, market_price = 1.234, slippage = 0.22%
     let market_price = Decimal::from_str("1.234").unwrap();
     let base_amount = Uint128::from(123_456_789u128);
@@ -260,7 +259,6 @@ fn test_get_market_assets_buy_side() {
     // assert quote and base amount
     assert_eq!(quote_asset.amount, expected_quote_amount);
     assert_eq!(base_amount, paid_assets[1].amount);
-
 
     // case 4: buy with base_amount = 111_222, market_price = 2.0, slippage = none
     let market_price = Decimal::from_str("2.0").unwrap();
@@ -322,9 +320,10 @@ fn test_get_market_assets_sell_side() {
         Some(slippage),
     )
     .unwrap_err();
-    assert_eq!(err, StdError::generic_err(
-        ContractError::SlippageMustLessThanOne { slippage }.to_string(),
-    ));
+    assert_eq!(
+        err,
+        StdError::generic_err(ContractError::SlippageMustLessThanOne { slippage }.to_string(),)
+    );
 
     // case 2: sell with base_amount = 100_000, market_price = 1.0, slippage = 0.1%
     let market_price = Decimal::from_str("1.0").unwrap();
@@ -375,7 +374,6 @@ fn test_get_market_assets_sell_side() {
     assert_eq!(quote_asset.amount, expected_quote_amount);
     assert_eq!(base_amount, paid_assets[0].amount);
 
-
     // case 4: buy with base_amount = 111_222, market_price = 2.0, slippage = none
     let market_price = Decimal::from_str("2.0").unwrap();
     let base_amount = Uint128::from(111_222u128);
@@ -415,7 +413,7 @@ fn test_update_orderbook_data() {
     let update_msg = ExecuteMsg::UpdateOrderbookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(Decimal::from_str("0.1").unwrap()),
-        min_quote_coin_amount: None
+        min_quote_coin_amount: None,
     };
     assert_eq!(
         app.execute(
@@ -433,7 +431,7 @@ fn test_update_orderbook_data() {
     let update_msg = ExecuteMsg::UpdateOrderbookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(spread),
-        min_quote_coin_amount: None
+        min_quote_coin_amount: None,
     };
     app.execute(
         Addr::unchecked("addr0000"),
@@ -2199,6 +2197,245 @@ fn submit_order_with_spread_cw20_token() {
         .unwrap();
     // assert order
     assert_eq!(order_6.clone(), orders.orders[1]);
+}
+
+#[test]
+fn submit_market_order_native_token() {
+    let mut app = MockApp::new(&[
+        (
+            &"addr0000".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+            ],
+        ),
+        (
+            &"addr0001".to_string(),
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+                Coin {
+                    denom: USDT_DENOM.to_string(),
+                    amount: Uint128::from(1000000000u128),
+                },
+            ],
+        ),
+    ]);
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    app.set_token_balances(&[(
+        &"asset".to_string(),
+        &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
+    )]);
+
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+        commission_rate: None,
+        reward_address: None,
+    };
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+    let limit_order_addr = app
+        .instantiate(
+            code_id,
+            Addr::unchecked("addr0000"),
+            &msg,
+            &[],
+            "limit order",
+        )
+        .unwrap();
+
+    // create order book for pair [orai, usdt]
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+        spread: Some(Decimal::percent(10)),
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+    let _res = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap();
+
+    let base_amount = Uint128::from(100u128);
+    let quote_amount = Uint128::from(500u128);
+    let assets = [
+        Asset {
+            info: AssetInfo::NativeToken {
+                denom: ORAI_DENOM.to_string(),
+            },
+            amount: base_amount,
+        },
+        Asset {
+            info: AssetInfo::NativeToken {
+                denom: USDT_DENOM.to_string(),
+            },
+            amount: quote_amount,
+        },
+    ];
+    let asset_infos = assets.clone().map(|asset| asset.info);
+
+    // CASE 1: submit first order on buy side => no check spread price, buy_price = 5
+    let msg = ExecuteMsg::SubmitOrder {
+        direction: OrderDirection::Buy,
+        assets: assets.clone(),
+    };
+
+    let _ = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: assets[1].info.to_string(),
+                amount: assets[1].amount.clone(),
+            }],
+        )
+        .unwrap();
+
+    // query buy ticks - buy side has one tick = 5
+    let ticks = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: asset_infos.clone(),
+                direction: OrderDirection::Buy,
+                start_after: None,
+                end: None,
+                limit: None,
+                order_by: Some(1),
+            },
+        )
+        .unwrap();
+    println!("ticks: {:?}", ticks);
+
+    // assert price
+    assert_eq!(
+        ticks.ticks[0].price,
+        Decimal::from_ratio(quote_amount, base_amount)
+    );
+
+    // query price with base_amount
+    let base_amount_res = app
+        .query::<BaseAmountResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::PriceByBaseAmount {
+                asset_infos: asset_infos.clone(),
+                base_amount,
+                direction: OrderDirection::Buy,
+            },
+        )
+        .unwrap();
+
+    // Order book has 1 limit buy order -> BaseAmountResponse.market_price = 0 & BaseAmountResponse.expected_base_amount = 0
+    assert_eq!(
+        base_amount_res,
+        BaseAmountResponse {
+            market_price: Decimal::zero(),
+            expected_base_amount: Uint128::zero()
+        }
+    );
+
+    // query price with base_amount
+    let base_amount_res = app
+        .query::<BaseAmountResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::PriceByBaseAmount {
+                asset_infos: asset_infos.clone(),
+                base_amount,
+                direction: OrderDirection::Sell,
+            },
+        )
+        .unwrap();
+
+    // Order book has 1 limit buy order -> BaseAmountResponse.market_price = 5 & BaseAmountResponse.expected_base_amount = 100
+    assert_eq!(
+        base_amount_res,
+        BaseAmountResponse {
+            market_price: Decimal::from_ratio(quote_amount, base_amount),
+            expected_base_amount: base_amount
+        }
+    );
+
+    // CASE 2: submit market sell order
+    let msg = ExecuteMsg::SubmitMarketOrder {
+        direction: OrderDirection::Sell,
+        asset_infos: asset_infos.clone(),
+        base_amount,
+        slippage: None,
+    };
+
+    let _ = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: asset_infos[0].to_string(),
+                amount: base_amount,
+            }],
+        )
+        .unwrap();
+
+    // query sell ticks - sell side has one tick = 5
+    let ticks = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: asset_infos.clone(),
+                direction: OrderDirection::Sell,
+                start_after: None,
+                end: None,
+                limit: None,
+                order_by: Some(2),
+            },
+        )
+        .unwrap();
+
+    // assert price
+    assert_eq!(
+        ticks.ticks[0].price,
+        Decimal::from_ratio(quote_amount, base_amount)
+    );
+
+    // query price with base_amount
+    let base_amount_res = app
+        .query::<BaseAmountResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::PriceByBaseAmount {
+                asset_infos: asset_infos.clone(),
+                base_amount,
+                direction: OrderDirection::Buy,
+            },
+        )
+        .unwrap();
+
+    // Order book has 1 limit buy order -> BaseAmountResponse.market_price = 5 & BaseAmountResponse.expected_base_amount = 100
+    assert_eq!(
+        base_amount_res,
+        BaseAmountResponse {
+            market_price: Decimal::from_ratio(quote_amount, base_amount),
+            expected_base_amount: base_amount
+        }
+    );
 }
 
 #[test]

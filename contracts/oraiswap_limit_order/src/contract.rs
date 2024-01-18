@@ -9,7 +9,7 @@ use oraiswap::error::ContractError;
 
 use crate::order::{
     cancel_order, execute_matching_orders, get_market_asset, get_paid_and_quote_assets,
-    remove_pair, submit_market_order, submit_order,
+    remove_pair, submit_market_order, submit_order, get_native_asset,
 };
 use crate::orderbook::OrderBook;
 use crate::query::{
@@ -34,7 +34,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
 const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
-const DEFAULT_MARKET_ORDER_SLIPPAGE: &str = "0.01";
+const DEFAULT_MARKET_ORDER_SLIPPAGE: &str = "0.005";
 const MAX_MARKET_ORDER_SLIPPAGE: &str = "0.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -165,6 +165,12 @@ pub fn execute(
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
+            let offer_asset_info = match direction {
+                OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+            };
+            let provided_asset = get_native_asset(&info, offer_asset_info)?;
+
             let base_amount_response =
                 query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
 
@@ -182,8 +188,9 @@ pub fn execute(
                 slippage,
             )?;
 
-            paid_assets[0].assert_if_asset_is_native_token()?;
-            paid_assets[0].assert_sent_native_token_balance(&info)?;
+            if paid_assets[0].amount != provided_asset.amount {
+                return Err(ContractError::AssetMismatch {});
+            }
 
             // require minimum amount for quote asset
             if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
@@ -194,19 +201,11 @@ pub fn execute(
             }
 
             // calculate refund_amount
-            let refund_amount = match direction {
-                OrderDirection::Buy => paid_assets[0]
-                    .amount
-                    .checked_sub(Uint128::from(
-                        base_amount_response.expected_base_amount
-                            * base_amount_response.market_price,
-                    ))
-                    .unwrap_or_default(),
-                OrderDirection::Sell => paid_assets[0]
-                    .amount
-                    .checked_sub(base_amount_response.expected_base_amount)
-                    .unwrap_or_default(),
-            };
+            let refund_amount = provided_asset
+                .amount
+                .checked_sub(paid_assets[0].amount)
+                .unwrap_or_default();
+
             // submit market order
             submit_market_order(
                 deps,
@@ -396,19 +395,11 @@ pub fn receive_cw20(
             }
 
             // calculate refund_amount
-            let refund_amount = match direction {
-                OrderDirection::Buy => paid_assets[0]
-                    .amount
-                    .checked_sub(Uint128::from(
-                        base_amount_response.expected_base_amount
-                            * base_amount_response.market_price,
-                    ))
-                    .unwrap_or_default(),
-                OrderDirection::Sell => paid_assets[0]
-                    .amount
-                    .checked_sub(base_amount_response.expected_base_amount)
-                    .unwrap_or_default(),
-            };
+            let refund_amount = provided_asset
+                .amount
+                .checked_sub(paid_assets[0].amount)
+                .unwrap_or_default();
+
             // submit market order
             submit_market_order(
                 deps,
