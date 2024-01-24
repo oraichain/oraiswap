@@ -139,6 +139,7 @@ pub fn query_price_by_base_amount(
     orderbook_pair: &OrderBook,
     direction: OrderDirection,
     base_amount: Uint128,
+    slippage: Option<Decimal>,
 ) -> StdResult<BaseAmountResponse> {
     // We have to query opposite direction to fill order
     let price_direction = match direction {
@@ -177,6 +178,17 @@ pub fn query_price_by_base_amount(
     if total_base_amount_by_price < base_amount {
         expected_base_amount = total_base_amount_by_price;
     }
+
+    if let Some(slippage) = slippage {
+        if slippage >= Decimal::one() {
+            market_price = Decimal::zero();
+        }
+        market_price = match direction {
+            OrderDirection::Buy => market_price * (Decimal::one() + slippage),
+            OrderDirection::Sell => market_price * (Decimal::one() - slippage),
+        };
+    }
+
     Ok(BaseAmountResponse {
         market_price,
         expected_base_amount,

@@ -195,7 +195,12 @@ pub enum QueryMsg {
     #[returns(Decimal)]
     MidPrice { asset_infos: [AssetInfo; 2] },
     #[returns(BaseAmountResponse)]
-    PriceByBaseAmount { asset_infos: [AssetInfo; 2], base_amount: Uint128, direction: OrderDirection },
+    PriceByBaseAmount {
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
+        direction: OrderDirection,
+        slippage: Option<Decimal>,
+    },
 }
 
 #[cw_serde]

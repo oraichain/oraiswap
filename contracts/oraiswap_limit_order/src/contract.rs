@@ -8,8 +8,8 @@ use cosmwasm_std::{
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, get_market_asset, get_paid_and_quote_assets,
-    remove_pair, submit_market_order, submit_order, get_native_asset,
+    cancel_order, execute_matching_orders, get_market_asset, get_native_asset,
+    get_paid_and_quote_assets, remove_pair, submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::query::{
@@ -171,8 +171,13 @@ pub fn execute(
             };
             let provided_asset = get_native_asset(&info, offer_asset_info)?;
 
-            let base_amount_response =
-                query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+            let base_amount_response = query_price_by_base_amount(
+                deps.as_ref(),
+                &orderbook_pair,
+                direction,
+                base_amount,
+                slippage,
+            )?;
 
             // Return error if cannot find opposite side market order
             if base_amount_response.market_price.is_zero() {
@@ -185,7 +190,6 @@ pub fn execute(
                 direction,
                 base_amount_response.market_price,
                 base_amount_response.expected_base_amount,
-                slippage,
             )?;
 
             if paid_assets[0].amount != provided_asset.amount {
@@ -365,8 +369,13 @@ pub fn receive_cw20(
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-            let base_amount_response =
-                query_price_by_base_amount(deps.as_ref(), &orderbook_pair, direction, base_amount)?;
+            let base_amount_response = query_price_by_base_amount(
+                deps.as_ref(),
+                &orderbook_pair,
+                direction,
+                base_amount,
+                slippage,
+            )?;
             
             // Return error if cannot find opposite side market order
             if base_amount_response.market_price.is_zero() {
@@ -379,7 +388,6 @@ pub fn receive_cw20(
                 direction,
                 base_amount_response.market_price,
                 base_amount_response.expected_base_amount,
-                slippage,
             )?;
 
             if paid_assets[0].amount != provided_asset.amount {
@@ -511,6 +519,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             asset_infos,
             base_amount,
             direction,
+            slippage,
         } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
@@ -522,6 +531,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 &orderbook_pair,
                 direction,
                 base_amount,
+                slippage,
             )?)
         }
     }

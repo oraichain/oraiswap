@@ -774,22 +774,8 @@ pub fn get_market_asset(
     direction: OrderDirection,
     market_price: Decimal,
     base_amount: Uint128,
-    slippage: Option<Decimal>,
 ) -> StdResult<([Asset; 2], Asset)> {
-    let slippage_price = if let Some(slippage) = slippage {
-        if slippage >= Decimal::one() {
-            return Err(StdError::generic_err(
-                ContractError::SlippageMustLessThanOne { slippage }.to_string(),
-            ));
-        }
-        match direction {
-            OrderDirection::Buy => market_price * (Decimal::one() + slippage),
-            OrderDirection::Sell => market_price * (Decimal::one() - slippage),
-        }
-    } else {
-        market_price
-    };
-    let quote_amount = Uint128::from(base_amount * slippage_price);
+    let quote_amount = Uint128::from(base_amount * market_price);
     let quote_asset = Asset {
         info: orderbook_pair.quote_coin_info.to_normal(api)?,
         amount: quote_amount,
