@@ -104,6 +104,7 @@ pub enum ExecuteMsg {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         asset_infos: [AssetInfo; 2],
         base_amount: Uint128,
+        quote_amount: Uint128,
         slippage: Option<Decimal>,
     },
 
@@ -134,6 +135,7 @@ pub enum Cw20HookMsg {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         asset_infos: [AssetInfo; 2],
         base_amount: Uint128,
+        quote_amount: Uint128,
         slippage: Option<Decimal>,
     },
 }
