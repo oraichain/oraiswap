@@ -172,11 +172,16 @@ pub fn execute(
             };
             let provided_asset = get_native_asset(&info, offer_asset_info)?;
 
-            let actual_offer_amount = match direction {
+            let expected_offer_amount = match direction {
                 OrderDirection::Buy => quote_amount,
                 OrderDirection::Sell => base_amount,
             };
 
+            if let Some(slippage) = slippage {
+                if slippage >= Decimal::one() {
+                    return Err(ContractError::SlippageMustLessThanOne { slippage });
+                }
+            }
 
             let base_amount_response = query_price_by_base_amount(
                 deps.as_ref(),
@@ -199,7 +204,7 @@ pub fn execute(
                 base_amount_response.expected_base_amount,
             )?;
 
-            if provided_asset.amount < actual_offer_amount {
+            if provided_asset.amount < expected_offer_amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
@@ -377,10 +382,16 @@ pub fn receive_cw20(
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-            let actual_offer_amount = match direction {
+            let expected_offer_amount = match direction {
                 OrderDirection::Buy => quote_amount,
                 OrderDirection::Sell => base_amount,
             };
+
+            if let Some(slippage) = slippage {
+                if slippage >= Decimal::one() {
+                    return Err(ContractError::SlippageMustLessThanOne { slippage });
+                }
+            }
 
             let base_amount_response = query_price_by_base_amount(
                 deps.as_ref(),
@@ -403,7 +414,7 @@ pub fn receive_cw20(
                 base_amount_response.expected_base_amount,
             )?;
 
-            if provided_asset.amount < actual_offer_amount {
+            if provided_asset.amount < expected_offer_amount {
                 return Err(ContractError::AssetMismatch {});
             }
 
