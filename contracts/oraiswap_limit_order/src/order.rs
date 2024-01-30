@@ -30,6 +30,32 @@ struct Payment {
     asset: Asset,
 }
 
+pub fn will_trigger_matching_orders(
+    direction: OrderDirection,
+    sell_found: bool,
+    buy_found: bool,
+    lowest_sell_price: Decimal,
+    highest_buy_price: Decimal,
+    offer_amount: Uint128,
+    ask_amount: Uint128,
+) -> bool {
+    match direction {
+        OrderDirection::Buy => {
+            let original_price = Decimal::from_ratio(offer_amount, ask_amount);
+            if sell_found && original_price.ge(&lowest_sell_price) {
+                return true;
+            }
+        }
+        OrderDirection::Sell => {
+            let original_price = Decimal::from_ratio(ask_amount, offer_amount);
+            if buy_found && original_price.le(&highest_buy_price) {
+                return true;
+            }
+        }
+    };
+    false
+}
+
 pub fn submit_order(
     deps: DepsMut,
     orderbook_addr: Addr,
@@ -51,23 +77,17 @@ pub fn submit_order(
     let (lowest_sell_price, sell_found, _) =
         orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
 
-    let mut will_trigger_matching_orders = false;
+    let will_trigger = will_trigger_matching_orders(
+        direction,
+        sell_found,
+        buy_found,
+        lowest_sell_price,
+        highest_buy_price,
+        offer_amount,
+        ask_amount,
+    );
     let mut cosmos_msgs: Vec<CosmosMsg> = vec![];
-    match direction {
-        OrderDirection::Buy => {
-            let original_price = Decimal::from_ratio(offer_amount, ask_amount);
-            if sell_found && original_price.ge(&lowest_sell_price) {
-                will_trigger_matching_orders = true;
-            }
-        }
-        OrderDirection::Sell => {
-            let original_price = Decimal::from_ratio(ask_amount, offer_amount);
-            if buy_found && original_price.le(&highest_buy_price) {
-                will_trigger_matching_orders = true;
-            }
-        }
-    };
-    if will_trigger_matching_orders {
+    if will_trigger {
         cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: orderbook_addr.into_string(),
             msg: to_binary(&ExecuteMsg::ExecuteOrderBookPair {

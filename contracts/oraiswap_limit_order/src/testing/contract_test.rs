@@ -14,7 +14,7 @@ use oraiswap::limit_order::{
 };
 
 use crate::jsonstr;
-use crate::order::get_paid_and_quote_assets;
+use crate::order::{get_paid_and_quote_assets, will_trigger_matching_orders};
 use crate::orderbook::{Order, OrderBook};
 const USDT_DENOM: &str = "usdt";
 
@@ -93,6 +93,126 @@ fn basic_fixture() -> (MockApp, Addr) {
         )
         .unwrap();
     (app, limit_order_addr)
+}
+
+#[test]
+fn test_will_trigger_matching_orders_buy_order() {
+    // case 1: buy order, sell not found -> wont trigger matching
+    let direction = OrderDirection::Buy;
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            false,
+            false,
+            Decimal::zero(),
+            Decimal::zero(),
+            Uint128::one(),
+            Uint128::one()
+        ),
+        false
+    );
+
+    // case 2: buy order, sell found, but original buy price smaller than smallest sell price -> wont trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            true,
+            false,
+            Decimal::MAX,
+            Decimal::zero(),
+            Uint128::one(),
+            Uint128::one()
+        ),
+        false
+    );
+
+    // case 3: buy order, sell found, original buy price equal -> trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            true,
+            false,
+            Decimal::one(),
+            Decimal::zero(),
+            Uint128::one(),
+            Uint128::one()
+        ),
+        true
+    );
+
+    // case 4: buy order, sell found, original buy price > smallest sell price -> trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            true,
+            false,
+            Decimal::zero(),
+            Decimal::zero(),
+            Uint128::MAX,
+            Uint128::MAX
+        ),
+        true
+    );
+}
+
+#[test]
+fn test_will_trigger_matching_orders_sell_order() {
+    // case 1: sell order, buy not found -> wont trigger matching
+    let direction = OrderDirection::Sell;
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            false,
+            false,
+            Decimal::one(),
+            Decimal::one(),
+            Uint128::one(),
+            Uint128::one()
+        ),
+        false
+    );
+
+    // case 2: sell order, buy found, but original sell price larger than highest sell price -> wont trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            false,
+            true,
+            Decimal::one(),
+            Decimal::one(),
+            Uint128::from(1u128),
+            Uint128::from(2u128)
+        ),
+        false
+    );
+
+    // case 3: sell order, buy found, original sell price equal -> trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            false,
+            true,
+            Decimal::one(),
+            Decimal::one(),
+            Uint128::one(),
+            Uint128::one()
+        ),
+        true
+    );
+
+    // case 4: sell order, buy found, original sell price < highest buy price -> trigger
+    assert_eq!(
+        will_trigger_matching_orders(
+            direction,
+            false,
+            true,
+            Decimal::one(),
+            Decimal::MAX,
+            Uint128::one(),
+            Uint128::one()
+        ),
+        true
+    );
 }
 
 #[test]
