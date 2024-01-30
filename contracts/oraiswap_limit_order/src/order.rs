@@ -16,6 +16,7 @@ use oraiswap::error::ContractError;
 use oraiswap::limit_order::{OrderDirection, OrderStatus};
 
 const RELAY_FEE: u128 = 300u128;
+const MIN_VOLUME: u128 = 10u128;
 
 struct Payment {
     address: Addr,
@@ -356,7 +357,6 @@ fn execute_bulk_orders(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let mut i = 0;
     let mut j = 0;
-    let min_vol = Uint128::from(10u128);
 
     let mut best_buy_price_list = vec![];
     let mut best_sell_price_list = vec![];
@@ -455,12 +455,12 @@ fn execute_bulk_orders(
         buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
         sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
-        if buy_bulk_orders.volume <= RELAY_FEE.into() {
+        if buy_bulk_orders.volume <= MIN_VOLUME.into() {
             // buy out
             // buy_bulk_orders.ask_volume = Uint128::zero();
             i += 1;
         }
-        if sell_bulk_orders.volume <= RELAY_FEE.into() {
+        if sell_bulk_orders.volume <= MIN_VOLUME.into() {
             // sell out
             // sell_bulk_orders.ask_volume = Uint128::zero();
             j += 1;
@@ -628,6 +628,10 @@ pub fn execute_matching_orders(
     let mut total_orders: u64 = 0;
 
     let (mut buy_list, mut sell_list) = execute_bulk_orders(&deps, orderbook_pair.clone(), limit)?;
+
+    if buy_list.len() == 0 || sell_list.len() == 0 {
+        return Err(ContractError::UnableToExecuteMatching {});
+    }
 
     process_orders(
         &deps,

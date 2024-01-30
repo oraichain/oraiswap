@@ -83,6 +83,9 @@ pub enum ContractError {
     #[error("Unable to find market order")]
     UnableToFindMarketOrder {},
 
+    #[error("Unable to excute matching orders")]
+    UnableToExecuteMatching {},
+
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
 }
