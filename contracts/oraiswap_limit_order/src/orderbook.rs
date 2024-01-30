@@ -17,6 +17,8 @@ use crate::{
     },
 };
 
+const MIN_VOLUME: u128 = 10u128;
+
 #[cw_serde]
 pub struct Order {
     pub order_id: u64,
@@ -143,8 +145,8 @@ impl OrderWithFee {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_offer_amount == self.offer_amount
-            || self.filled_ask_amount == self.ask_amount
+        if self.offer_amount.checked_sub(self.filled_offer_amount).unwrap() < MIN_VOLUME.into()
+            || self.ask_amount.checked_sub(self.filled_ask_amount).unwrap() < MIN_VOLUME.into()
         {
             self.status = OrderStatus::Fulfilled;
         } else {

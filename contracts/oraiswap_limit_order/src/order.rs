@@ -442,10 +442,6 @@ fn execute_bulk_orders(
             lef_sell_offer,
         );
 
-        if sell_ask_amount.is_zero() || sell_offer_amount.is_zero() {
-            continue;
-        }
-
         sell_bulk_orders.filled_volume += sell_offer_amount;
         sell_bulk_orders.filled_ask_volume += sell_ask_amount;
 
@@ -544,10 +540,6 @@ fn process_orders(
                 bulk.filled_ask_volume,
             );
 
-            if filled_offer.is_zero() || filled_ask.is_zero() {
-                continue;
-            }
-
             bulk.filled_volume = bulk
                 .filled_volume
                 .checked_sub(filled_offer)
@@ -559,7 +551,7 @@ fn process_orders(
 
             order.fill_order(filled_ask, filled_offer);
 
-            if !filled_ask.is_zero() {
+            if !filled_ask.is_zero() && !filled_offer.is_zero() {
                 trader_ask_asset.amount = filled_ask;
                 let (reward_fee, relayer_fee) = calculate_fee(
                     deps,
