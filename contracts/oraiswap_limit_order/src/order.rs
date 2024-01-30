@@ -166,7 +166,7 @@ pub fn submit_market_order(
     };
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        ("action", "submit_order"),
+        ("action", "submit_market_order"),
         ("order_type", "market"),
         (
             "pair",
@@ -455,33 +455,14 @@ fn execute_bulk_orders(
         buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
         sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
 
-        if buy_bulk_orders.filled_ask_volume >= buy_bulk_orders.ask_volume {
-            buy_bulk_orders.spread_volume = buy_bulk_orders
-                .filled_ask_volume
-                .checked_sub(buy_bulk_orders.ask_volume)?;
-            buy_bulk_orders.filled_ask_volume = buy_bulk_orders
-                .filled_ask_volume
-                .checked_sub(buy_bulk_orders.spread_volume)?;
-            buy_bulk_orders.ask_volume = Uint128::zero();
-        }
-        if sell_bulk_orders.filled_ask_volume >= sell_bulk_orders.ask_volume {
-            sell_bulk_orders.spread_volume = sell_bulk_orders
-                .filled_ask_volume
-                .checked_sub(sell_bulk_orders.ask_volume)?;
-            sell_bulk_orders.filled_ask_volume = sell_bulk_orders
-                .filled_ask_volume
-                .checked_sub(sell_bulk_orders.spread_volume)?;
-            sell_bulk_orders.ask_volume = Uint128::zero();
-        }
-
-        if buy_bulk_orders.volume <= min_vol {
+        if buy_bulk_orders.volume <= RELAY_FEE.into() {
             // buy out
-            buy_bulk_orders.ask_volume = Uint128::zero();
+            // buy_bulk_orders.ask_volume = Uint128::zero();
             i += 1;
         }
-        if sell_bulk_orders.volume <= min_vol {
+        if sell_bulk_orders.volume <= RELAY_FEE.into() {
             // sell out
-            sell_bulk_orders.ask_volume = Uint128::zero();
+            // sell_bulk_orders.ask_volume = Uint128::zero();
             j += 1;
         }
     }
