@@ -202,7 +202,7 @@ fn test_get_market_assets_buy_side() {
         &orderbook,
         OrderDirection::Buy,
         market_price,
-        base_amount
+        base_amount,
     )
     .unwrap();
     // assert info
@@ -224,7 +224,7 @@ fn test_get_market_assets_buy_side() {
         &orderbook,
         OrderDirection::Buy,
         market_price,
-        base_amount
+        base_amount,
     )
     .unwrap();
     // assert info

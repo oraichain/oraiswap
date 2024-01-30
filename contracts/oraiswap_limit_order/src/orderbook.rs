@@ -10,14 +10,11 @@ use oraiswap::{
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 
 use crate::{
-    query::{query_ticks_prices, query_ticks_prices_with_end},
-    state::{
+    order::MIN_VOLUME, query::{query_ticks_prices, query_ticks_prices_with_end}, state::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
-    },
+    }
 };
-
-const MIN_VOLUME: u128 = 10u128;
 
 #[cw_serde]
 pub struct Order {

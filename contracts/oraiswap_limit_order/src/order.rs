@@ -15,8 +15,9 @@ use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{OrderDirection, OrderStatus};
 
-const RELAY_FEE: u128 = 300u128;
-const MIN_VOLUME: u128 = 10u128;
+pub const RELAY_FEE: u128 = 300u128;
+pub const MIN_VOLUME: u128 = 10u128;
+const MIN_FEE: u128 = 1_000_000u128;
 
 struct Payment {
     address: Addr,
@@ -293,7 +294,7 @@ fn transfer_reward(
     messages: &mut Vec<CosmosMsg>,
 ) -> StdResult<()> {
     for reward_asset in executor.reward_assets.iter_mut() {
-        if Uint128::from(reward_asset.amount) >= Uint128::from(1000000u128) {
+        if Uint128::from(reward_asset.amount) >= Uint128::from(MIN_FEE) {
             messages.push(reward_asset.into_msg(
                 None,
                 &deps.querier,
@@ -466,32 +467,26 @@ fn execute_bulk_orders(
     return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
 
-// TODO: write test cases for this function
-fn calculate_fee(
-    deps: &DepsMut,
-    amount: Uint128,
+pub fn calculate_fee(
+    commission_rate: Decimal,
     relayer_quote_fee: Uint128,
     direction: OrderDirection,
     trader_ask_asset: &mut Asset,
     reward: &mut Executor,
     relayer: &mut Executor,
 ) -> StdResult<(Uint128, Uint128)> {
-    let reward_fee: Uint128;
     let relayer_fee: Uint128;
-    let contract_info = read_config(deps.storage)?;
-    let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
-
-    reward_fee = amount * commission_rate;
-
+    let reward_fee = trader_ask_asset.amount * commission_rate;
+    let remaining_amount = trader_ask_asset.amount.checked_sub(reward_fee)?;
     match direction {
         OrderDirection::Buy => {
-            relayer_fee = Uint128::min(Uint128::from(RELAY_FEE), amount);
+            relayer_fee = Uint128::min(Uint128::from(RELAY_FEE), remaining_amount);
 
             reward.reward_assets[0].amount += reward_fee;
             relayer.reward_assets[0].amount += relayer_fee;
         }
         OrderDirection::Sell => {
-            relayer_fee = Uint128::min(relayer_quote_fee, amount);
+            relayer_fee = Uint128::min(relayer_quote_fee, remaining_amount);
 
             reward.reward_assets[1].amount += reward_fee;
             relayer.reward_assets[1].amount += relayer_fee;
@@ -507,6 +502,7 @@ fn calculate_fee(
 
 fn process_orders(
     deps: &DepsMut,
+    commission_rate: Decimal,
     orderbook_pair: &OrderBook,
     bulk_orders: &mut Vec<BulkOrders>,
     bulk_traders: &mut Vec<Payment>,
@@ -554,8 +550,7 @@ fn process_orders(
             if !filled_ask.is_zero() && !filled_offer.is_zero() {
                 trader_ask_asset.amount = filled_ask;
                 let (reward_fee, relayer_fee) = calculate_fee(
-                    deps,
-                    filled_ask,
+                    commission_rate,
                     relayer_quote_fee,
                     bulk.direction,
                     &mut trader_ask_asset,
@@ -587,6 +582,8 @@ pub fn execute_matching_orders(
     limit: Option<u32>,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
+    let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
+
     let relayer_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
     let pair_key = pair_key(&[
         asset_infos[0].to_raw(deps.api)?,
@@ -627,6 +624,7 @@ pub fn execute_matching_orders(
 
     process_orders(
         &deps,
+        commission_rate,
         &orderbook_pair,
         &mut buy_list,
         &mut list_bidder,
@@ -635,6 +633,7 @@ pub fn execute_matching_orders(
     )?;
     process_orders(
         &deps,
+        commission_rate,
         &orderbook_pair,
         &mut sell_list,
         &mut list_asker,
