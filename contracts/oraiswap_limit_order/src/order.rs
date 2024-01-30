@@ -8,21 +8,23 @@ use crate::state::{
     remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_ORDER_BY_BIDDER,
     PREFIX_ORDER_BY_DIRECTION, PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event,
-    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
+    attr, to_binary, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event,
+    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::limit_order::{
-    LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse,
-    OrderDirection, OrderFilter, OrderResponse, OrderStatus, OrdersResponse,
+    ExecuteMsg, LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse,
+    OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus, OrdersResponse,
 };
 
 const RELAY_FEE: u128 = 300u128;
 
+#[cw_serde]
 struct Payment {
     address: Addr,
     asset: Asset,
@@ -30,6 +32,7 @@ struct Payment {
 
 pub fn submit_order(
     deps: DepsMut,
+    orderbook_addr: Addr,
     orderbook_pair: &OrderBook,
     sender: Addr,
     pair_key: &[u8],
@@ -47,6 +50,33 @@ pub fn submit_order(
         orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
     let (lowest_sell_price, sell_found, _) =
         orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
+
+    let mut will_trigger_matching_orders = false;
+    let mut cosmos_msgs: Vec<CosmosMsg> = vec![];
+    match direction {
+        OrderDirection::Buy => {
+            let original_price = Decimal::from_ratio(offer_amount, ask_amount);
+            if sell_found && original_price.ge(&lowest_sell_price) {
+                will_trigger_matching_orders = true;
+            }
+        }
+        OrderDirection::Sell => {
+            let original_price = Decimal::from_ratio(ask_amount, offer_amount);
+            if buy_found && original_price.le(&highest_buy_price) {
+                will_trigger_matching_orders = true;
+            }
+        }
+    };
+    if will_trigger_matching_orders {
+        cosmos_msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: orderbook_addr.into_string(),
+            msg: to_binary(&ExecuteMsg::ExecuteOrderBookPair {
+                asset_infos: assets.clone().map(|asset| asset.info),
+                limit: None, // no need to set limit because we match during submit orders -> there wont be any remaining orders to match except this one -> no need to care about missed orders when matching
+            })?,
+            funds: vec![],
+        }))
+    }
 
     // check spread for submit order
     if let Some(spread) = orderbook_pair.spread {
@@ -106,25 +136,27 @@ pub fn submit_order(
         true,
     )?;
 
-    Ok(Response::new().add_attributes(vec![
-        ("action", "submit_order"),
-        (
-            "pair",
-            &format!("{} - {}", &assets[0].info, &assets[1].info),
-        ),
-        ("order_id", &order_id.to_string()),
-        ("status", &format!("{:?}", OrderStatus::Open)),
-        ("direction", &format!("{:?}", direction)),
-        ("bidder_addr", sender.as_str()),
-        (
-            "offer_asset",
-            &format!("{} {}", &assets[0].amount, &assets[0].info),
-        ),
-        (
-            "ask_asset",
-            &format!("{} {}", &assets[1].amount, &assets[1].info),
-        ),
-    ]))
+    Ok(Response::new()
+        .add_messages(cosmos_msgs)
+        .add_attributes(vec![
+            ("action", "submit_order"),
+            (
+                "pair",
+                &format!("{} - {}", &assets[0].info, &assets[1].info),
+            ),
+            ("order_id", &order_id.to_string()),
+            ("status", &format!("{:?}", OrderStatus::Open)),
+            ("direction", &format!("{:?}", direction)),
+            ("bidder_addr", sender.as_str()),
+            (
+                "offer_asset",
+                &format!("{} {}", &assets[0].amount, &assets[0].info),
+            ),
+            (
+                "ask_asset",
+                &format!("{} {}", &assets[1].amount, &assets[1].info),
+            ),
+        ]))
 }
 
 pub fn cancel_order(

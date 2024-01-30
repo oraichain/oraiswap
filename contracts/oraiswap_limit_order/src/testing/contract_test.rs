@@ -15,7 +15,7 @@ use oraiswap::limit_order::{
 
 use crate::jsonstr;
 use crate::order::get_paid_and_quote_assets;
-use crate::orderbook::OrderBook;
+use crate::orderbook::{Order, OrderBook};
 const USDT_DENOM: &str = "usdt";
 
 fn basic_fixture() -> (MockApp, Addr) {
@@ -618,27 +618,6 @@ fn submit_order() {
         .unwrap();
     println!("submit 3 {:?}", res);
 
-    let order_1 = OrderResponse {
-        order_id: 1u64,
-        bidder_addr: "addr0000".to_string(),
-        offer_asset: Asset {
-            amount: Uint128::from(150u128),
-            info: AssetInfo::NativeToken {
-                denom: USDT_DENOM.to_string(),
-            },
-        },
-        ask_asset: Asset {
-            amount: Uint128::from(150u128),
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-        },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
-        direction: OrderDirection::Buy,
-        status: OrderStatus::Open,
-    };
-
     let order_2 = OrderResponse {
         order_id: 2u64,
         bidder_addr: "addr0000".to_string(),
@@ -654,51 +633,49 @@ fn submit_order() {
                 denom: ORAI_DENOM.to_string(),
             },
         },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
+        filled_offer_amount: Uint128::from(62865u128),
+        filled_ask_amount: Uint128::from(69849u128),
         direction: OrderDirection::Buy,
-        status: OrderStatus::Open,
+        status: OrderStatus::PartialFilled,
     };
 
-    let order_3 = OrderResponse {
-        order_id: 3u64,
-        bidder_addr: "addr0000".to_string(),
-        offer_asset: Asset {
-            amount: Uint128::from(70000u128),
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-        },
-        ask_asset: Asset {
-            amount: Uint128::from(20000u128),
-            info: AssetInfo::NativeToken {
-                denom: USDT_DENOM.to_string(),
-            },
-        },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
-        direction: OrderDirection::Sell,
-        status: OrderStatus::Open,
-    };
+    // let order_3 = OrderResponse {
+    //     order_id: 3u64,
+    //     bidder_addr: "addr0000".to_string(),
+    //     offer_asset: Asset {
+    //         amount: Uint128::from(70000u128),
+    //         info: AssetInfo::NativeToken {
+    //             denom: ORAI_DENOM.to_string(),
+    //         },
+    //     },
+    //     ask_asset: Asset {
+    //         amount: Uint128::from(20000u128),
+    //         info: AssetInfo::NativeToken {
+    //             denom: USDT_DENOM.to_string(),
+    //         },
+    //     },
+    //     filled_offer_amount: Uint128::zero(),
+    //     filled_ask_amount: Uint128::zero(),
+    //     direction: OrderDirection::Sell,
+    //     status: OrderStatus::Open,
+    // };
 
-    assert_eq!(
-        order_3.clone(),
-        app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Order {
-                order_id: 3,
-                asset_infos: [
-                    AssetInfo::NativeToken {
-                        denom: ORAI_DENOM.to_string(),
-                    },
-                    AssetInfo::NativeToken {
-                        denom: USDT_DENOM.to_string(),
-                    },
-                ],
-            }
-        )
-        .unwrap()
-    );
+    // should get order not found because we have matched it with order id 3 sell already
+    app.query::<OrderResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Order {
+            order_id: 3,
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ],
+        },
+    )
+    .unwrap_err();
 
     assert_eq!(
         order_2.clone(),
@@ -719,24 +696,22 @@ fn submit_order() {
         .unwrap()
     );
 
-    assert_eq!(
-        order_1.clone(),
-        app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Order {
-                order_id: 1,
-                asset_infos: [
-                    AssetInfo::NativeToken {
-                        denom: ORAI_DENOM.to_string(),
-                    },
-                    AssetInfo::NativeToken {
-                        denom: USDT_DENOM.to_string(),
-                    },
-                ],
-            }
-        )
-        .unwrap()
-    );
+    // also order not found because we have filled it all with order id 3 sell
+    app.query::<OrderResponse, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Order {
+            order_id: 1,
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::NativeToken {
+                    denom: USDT_DENOM.to_string(),
+                },
+            ],
+        },
+    )
+    .unwrap_err();
 
     // create order book for pair [orai, token_addr]
     let msg = ExecuteMsg::CreateOrderBookPair {
@@ -1112,6 +1087,24 @@ fn submit_order_with_spread_native_token() {
         Decimal::from_ratio(66u128, 10u128)
     );
 
+    // query sell ticks - should fill all sell ticks due to out of spread buy order:
+    let ticks = app
+        .query::<TicksResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::Ticks {
+                asset_infos: asset_infos.clone(),
+                direction: OrderDirection::Sell,
+                start_after: None,
+                end: None,
+                limit: None,
+                order_by: Some(2),
+            },
+        )
+        .unwrap();
+
+    // should already match all ticks that are
+    assert_eq!(ticks.ticks.len(), 0);
+
     // CASE 4: submit sell order out of spread
     // sell with price = 4.5 (out of spread = 5.97) => submit price ~ 5.97
     assets[1].amount = Uint128::from(450u128);
@@ -1130,31 +1123,6 @@ fn submit_order_with_spread_native_token() {
             }],
         )
         .unwrap();
-
-    // query sell ticks - buy side has:
-    // 1. tick = 6
-    // 2. tick ~ 5.97
-    let ticks = app
-        .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Ticks {
-                asset_infos: asset_infos.clone(),
-                direction: OrderDirection::Sell,
-                start_after: None,
-                end: None,
-                limit: None,
-                order_by: Some(2),
-            },
-        )
-        .unwrap();
-
-    assert_eq!(ticks.ticks.len(), 2);
-
-    // Second price ~ 5.94 because submit price = 4.5 is out of spread, price = lowest_sell_price * (1 + spread) = 5.94
-    assert_eq!(
-        ticks.ticks[1].price.limit_decimal_places(Some(2)).unwrap(),
-        Decimal::from_ratio(597u128, 100u128)
-    );
 
     // CASE 5: submit sell order in spread
     // buy with price = 6.5 (in spread = 6.6)
@@ -1192,16 +1160,12 @@ fn submit_order_with_spread_native_token() {
             },
         )
         .unwrap();
-    assert_eq!(ticks.ticks.len(), 3);
+    assert_eq!(ticks.ticks.len(), 2);
     // Fisrt price = 5
     assert_eq!(ticks.ticks[0].price, Decimal::from_ratio(500u128, 100u128));
     // Second price = 6.5 because of submit price in spread range
     assert_eq!(ticks.ticks[1].price, Decimal::from_ratio(650u128, 100u128));
-    // Third price ~ 6.6
-    assert_eq!(
-        ticks.ticks[2].price.limit_decimal_places(Some(1)).unwrap(),
-        Decimal::from_ratio(66u128, 10u128)
-    );
+    // Third price ~ 6.6 is doesnt exist because we filled it all with matching order
 
     // CASE 6: submit sell order in spread
     // sell with price = 6 (in spread = 5.97)
@@ -1240,14 +1204,7 @@ fn submit_order_with_spread_native_token() {
         )
         .unwrap();
 
-    assert_eq!(ticks.ticks.len(), 2);
-    // first price
-    assert_eq!(ticks.ticks[0].price, Decimal::from_ratio(600u128, 100u128));
-    // Second price
-    assert_eq!(
-        ticks.ticks[1].price.limit_decimal_places(Some(2)).unwrap(),
-        Decimal::from_ratio(597u128, 100u128)
-    );
+    assert_eq!(ticks.ticks.len(), 0);
 }
 
 #[test]
@@ -1610,10 +1567,10 @@ fn submit_order_with_spread_cw20_token() {
                 denom: ORAI_DENOM.to_string(),
             },
         },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
+        filled_offer_amount: Uint128::from(660u128),
+        filled_ask_amount: Uint128::from(99u128),
         direction: OrderDirection::Buy,
-        status: OrderStatus::Open,
+        status: OrderStatus::PartialFilled,
     };
 
     let orders = app
@@ -1695,56 +1652,8 @@ fn submit_order_with_spread_cw20_token() {
         )
         .unwrap();
 
-    // first price
-    assert_eq!(ticks.ticks[0].price, Decimal::from_ratio(600u128, 100u128));
-    // Second price ~ 5.94 because submit price = 6.7 is out of spread, price = lowest_sell_price * (1 + spread) = 6.6
-    assert_eq!(
-        ticks.ticks[1].price,
-        Decimal::from_ratio(59403u128, 10000u128)
-    );
-
-    let order_4 = OrderResponse {
-        order_id: 4u64,
-        bidder_addr: "addr0001".to_string(),
-        offer_asset: Asset {
-            amount: Uint128::from(10000u128),
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-        },
-        ask_asset: Asset {
-            amount: Uint128::from(59403u128),
-            info: AssetInfo::Token {
-                contract_addr: usdt_token[0].clone(),
-            },
-        },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
-        direction: OrderDirection::Sell,
-        status: OrderStatus::Open,
-    };
-    let orders = app
-        .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Orders {
-                asset_infos: [
-                    AssetInfo::NativeToken {
-                        denom: ORAI_DENOM.to_string(),
-                    },
-                    AssetInfo::Token {
-                        contract_addr: usdt_token[0].clone(),
-                    },
-                ],
-                direction: None,
-                filter: OrderFilter::Price(ticks.ticks[1].price),
-                start_after: None,
-                limit: None,
-                order_by: Some(1),
-            },
-        )
-        .unwrap();
-    // assert order
-    assert_eq!(order_4.clone(), orders.orders[0]);
+    // found no ticks because we filled all
+    assert_eq!(ticks.ticks.len(), 0usize);
 
     // CASE 5: submit sell order in spread
     // buy with price = 6.5 (in spread = 6.6)
@@ -1916,56 +1825,8 @@ fn submit_order_with_spread_cw20_token() {
         )
         .unwrap();
 
-    // first price
-    assert_eq!(ticks.ticks[0].price, Decimal::from_ratio(600u128, 100u128));
-    // Second price
-    assert_eq!(
-        ticks.ticks[1].price,
-        Decimal::from_ratio(59403u128, 10000u128)
-    );
-
-    let order_6 = OrderResponse {
-        order_id: 6u64,
-        bidder_addr: "addr0001".to_string(),
-        offer_asset: Asset {
-            amount: Uint128::from(100u128),
-            info: AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-        },
-        ask_asset: Asset {
-            amount: Uint128::from(600u128),
-            info: AssetInfo::Token {
-                contract_addr: usdt_token[0].clone(),
-            },
-        },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
-        direction: OrderDirection::Sell,
-        status: OrderStatus::Open,
-    };
-    let orders = app
-        .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Orders {
-                asset_infos: [
-                    AssetInfo::NativeToken {
-                        denom: ORAI_DENOM.to_string(),
-                    },
-                    AssetInfo::Token {
-                        contract_addr: usdt_token[0].clone(),
-                    },
-                ],
-                direction: None,
-                filter: OrderFilter::Price(ticks.ticks[0].price),
-                start_after: None,
-                limit: None,
-                order_by: Some(1),
-            },
-        )
-        .unwrap();
-    // assert order
-    assert_eq!(order_6.clone(), orders.orders[1]);
+    // 0 because we filled it all
+    assert_eq!(ticks.ticks.len(), 0usize);
 }
 
 #[test]
@@ -3682,14 +3543,15 @@ fn execute_pair_native_token() {
         spread_balances
     );
 
+    // already match orders in submit orders, so expected balances should be after matching
     let mut expected_balances: Vec<Coin> = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(960000u128),
+            amount: Uint128::from(969390u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(971200u128),
+            amount: Uint128::from(977693u128),
         },
     ]
     .to_vec();
@@ -3697,11 +3559,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128),
+            amount: Uint128::from(978792u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(960000u128),
+            amount: Uint128::from(972624u128),
         },
     ]
     .to_vec();
@@ -3807,11 +3669,11 @@ fn execute_pair_native_token() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(973800u128),
+            amount: Uint128::from(978792u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(963224u128),
+            amount: Uint128::from(972624u128),
         },
     ]
     .to_vec();
@@ -4921,22 +4783,22 @@ fn execute_pair_cw20_token() {
         )
         .unwrap();
 
-    let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    let address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    let address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    let address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
     println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
 
     let mut expected_balances: Vec<Coin> = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(960000u128),
+        amount: Uint128::from(971788u128),
     }]
     .to_vec();
     assert_eq!(address0_balances, expected_balances,);
     expected_balances = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(973800u128),
+        amount: Uint128::from(990281u128),
     }]
     .to_vec();
     assert_eq!(address1_balances, expected_balances,);
@@ -4968,52 +4830,6 @@ fn execute_pair_cw20_token() {
         &[],
     );
     app.assert_fail(res);
-
-    // Excecute all orders
-    let msg = ExecuteMsg::ExecuteOrderBookPair {
-        asset_infos: [
-            AssetInfo::NativeToken {
-                denom: ORAI_DENOM.to_string(),
-            },
-            AssetInfo::Token {
-                contract_addr: token_addrs[0].clone(),
-            },
-        ],
-        limit: None,
-    };
-
-    let _ = app.execute(
-        Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
-        &msg,
-        &[],
-    );
-
-    address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
-    println!("round 1 - address0's balances: {:?}", address0_balances);
-    println!("round 1 - address1's balances: {:?}", address1_balances);
-    println!("round 1 - address2's balances: {:?}\n\n", address2_balances);
-
-    expected_balances = [Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(969390u128),
-    }]
-    .to_vec();
-    assert_eq!(address0_balances, expected_balances,);
-    expected_balances = [Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(986487u128),
-    }]
-    .to_vec();
-    assert_eq!(address1_balances, expected_balances,);
-    expected_balances = [Coin {
-        denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(1000000u128),
-    }]
-    .to_vec();
-    assert_eq!(address2_balances, expected_balances,);
 }
 
 /// Test for spread parameter of orderbook pair
@@ -5366,7 +5182,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000000u128),
+            amount: Uint128::from(1037861u128),
         },
     ]
     .to_vec();
@@ -5374,11 +5190,11 @@ fn spread_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(970000u128),
+            amount: Uint128::from(983686u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(971900u128),
+            amount: Uint128::from(1004846u128),
         },
     ]
     .to_vec();
@@ -5386,7 +5202,7 @@ fn spread_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000u128),
+            amount: Uint128::from(1019380u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -5455,7 +5271,7 @@ fn spread_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1019380u128),
+            amount: Uint128::from(1037861u128),
         },
     ]
     .to_vec();
@@ -5463,7 +5279,7 @@ fn spread_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(979690u128),
+            amount: Uint128::from(983686u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -5644,7 +5460,7 @@ fn simple_matching_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(10000000000u128),
+            amount: Uint128::from(10075046024u128),
         },
     ]
     .to_vec();
@@ -5653,7 +5469,7 @@ fn simple_matching_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(10000000000u128),
+            amount: Uint128::from(10009989700u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -5700,7 +5516,9 @@ fn simple_matching_test() {
         )
         .unwrap();
 
-    let expected_res = OrderBookMatchableResponse { is_matchable: true };
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
     assert_eq!(res, expected_res);
 
     // Excecute all orders
@@ -6021,7 +5839,7 @@ fn reward_to_executor_test() {
     let mut expected_balances: Vec<Coin> = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000000000u128),
+            amount: Uint128::from(1001207884u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -6037,7 +5855,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000000000u128),
+            amount: Uint128::from(1000199702u128),
         },
     ]
     .to_vec();
@@ -6096,7 +5914,7 @@ fn reward_to_executor_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1000617082u128),
+            amount: Uint128::from(1001207884u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -6112,7 +5930,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000101135u128),
+            amount: Uint128::from(1000199702u128),
         },
     ]
     .to_vec();
@@ -6337,7 +6155,10 @@ fn query_matchable() {
         )
         .unwrap();
 
-    let expected_res = OrderBookMatchableResponse { is_matchable: true };
+    // should not matchable because every matchable order has been handled when submitting limit orders
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
     assert_eq!(res, expected_res);
     println!("[LOG] [2] orderbook matchable: {}", jsonstr!(res));
 
@@ -6389,7 +6210,9 @@ fn query_matchable() {
         )
         .unwrap();
 
-    let expected_res = OrderBookMatchableResponse { is_matchable: true };
+    let expected_res = OrderBookMatchableResponse {
+        is_matchable: false,
+    };
     assert_eq!(res, expected_res);
     println!("[LOG] [3] orderbook matchable: {}", jsonstr!(res));
 }
@@ -6616,10 +6439,10 @@ fn remove_orderbook_pair() {
                 denom: ATOM_DENOM.to_string(),
             },
         },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
+        filled_offer_amount: Uint128::from(11348u128),
+        filled_ask_amount: Uint128::from(12220u128),
         direction: OrderDirection::Buy,
-        status: OrderStatus::Open,
+        status: OrderStatus::PartialFilled,
     };
 
     assert_eq!(
@@ -6718,17 +6541,18 @@ fn remove_orderbook_pair() {
 
 #[test]
 fn orders_querier() {
+    let initial_native_balances = Uint128::from(100000000000000u128);
     let mut app = MockApp::new(&[
         (
             &"addr0000".to_string(),
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
+                    amount: initial_native_balances.clone(),
                 },
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
+                    amount: initial_native_balances.clone(),
                 },
             ],
         ),
@@ -6737,11 +6561,11 @@ fn orders_querier() {
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
+                    amount: initial_native_balances.clone(),
                 },
                 Coin {
                     denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
+                    amount: initial_native_balances.clone(),
                 },
             ],
         ),
@@ -6749,19 +6573,21 @@ fn orders_querier() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
+    let initial_cw20_balances = Uint128::from(10000000000000u128);
+
     let token_addrs = app.set_token_balances(&[
         (
             &"assetA".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), &initial_cw20_balances.clone()),
+                (&"addr0001".to_string(), &initial_cw20_balances.clone()),
             ],
         ),
         (
             &"assetB".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), &initial_cw20_balances.clone()),
+                (&"addr0001".to_string(), &initial_cw20_balances.clone()),
             ],
         ),
     ]);
@@ -6783,6 +6609,23 @@ fn orders_querier() {
             "limit order",
         )
         .unwrap();
+
+    app.set_token_balances(&[
+        (
+            &"assetA".to_string(),
+            &[(
+                &limit_order_addr.to_string(),
+                &initial_cw20_balances.clone(),
+            )],
+        ),
+        (
+            &"assetB".to_string(),
+            &[(
+                &limit_order_addr.to_string(),
+                &initial_cw20_balances.clone(),
+            )],
+        ),
+    ]);
 
     // create order book for pair [orai, atom]
     let msg = ExecuteMsg::CreateOrderBookPair {
@@ -7000,26 +6843,26 @@ fn orders_querier() {
         status: OrderStatus::Open,
     };
 
-    let order_2 = OrderResponse {
-        order_id: 2u64,
-        bidder_addr: "addr0000".to_string(),
-        offer_asset: Asset {
-            amount: Uint128::from(1000000u128),
-            info: AssetInfo::Token {
-                contract_addr: token_addrs[0].clone(),
-            },
-        },
-        ask_asset: Asset {
-            amount: Uint128::from(1000000u128),
-            info: AssetInfo::Token {
-                contract_addr: token_addrs[1].clone(),
-            },
-        },
-        filled_offer_amount: Uint128::zero(),
-        filled_ask_amount: Uint128::zero(),
-        direction: OrderDirection::Buy,
-        status: OrderStatus::Open,
-    };
+    // let order_2 = OrderResponse {
+    //     order_id: 2u64,
+    //     bidder_addr: "addr0000".to_string(),
+    //     offer_asset: Asset {
+    //         amount: Uint128::from(1000000u128),
+    //         info: AssetInfo::Token {
+    //             contract_addr: token_addrs[0].clone(),
+    //         },
+    //     },
+    //     ask_asset: Asset {
+    //         amount: Uint128::from(1000000u128),
+    //         info: AssetInfo::Token {
+    //             contract_addr: token_addrs[1].clone(),
+    //         },
+    //     },
+    //     filled_offer_amount: Uint128::zero(),
+    //     filled_ask_amount: Uint128::zero(),
+    //     direction: OrderDirection::Buy,
+    //     status: OrderStatus::Open,
+    // };
 
     let all_order = OrdersResponse {
         orders: [
@@ -7059,58 +6902,30 @@ fn orders_querier() {
                     },
                     amount: Uint128::from(11223344u128),
                 },
-                filled_offer_amount: Uint128::zero(),
-                filled_ask_amount: Uint128::zero(),
-                status: OrderStatus::Open,
-            },
-            OrderResponse {
-                order_id: 2u64,
-                direction: OrderDirection::Buy,
-                bidder_addr: "addr0000".to_string(),
-                offer_asset: Asset {
-                    amount: Uint128::from(1000000u128),
-                    info: AssetInfo::Token {
-                        contract_addr: token_addrs[0].clone(),
-                    },
-                },
-                ask_asset: Asset {
-                    amount: Uint128::from(1000000u128),
-                    info: AssetInfo::Token {
-                        contract_addr: token_addrs[1].clone(),
-                    },
-                },
-                filled_offer_amount: Uint128::zero(),
-                filled_ask_amount: Uint128::zero(),
-                status: OrderStatus::Open,
+                filled_offer_amount: Uint128::from(1000000u128),
+                filled_ask_amount: Uint128::from(1000000u128),
+                status: OrderStatus::PartialFilled,
             },
         ]
         .to_vec(),
     };
 
-    assert_eq!(
-        OrdersResponse {
-            orders: vec![order_2.clone(),],
+    // should have no orders because we have matched when placing orders
+    app.query::<Order, _>(
+        limit_order_addr.clone(),
+        &QueryMsg::Order {
+            order_id: 2,
+            asset_infos: [
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[1].clone(),
+                },
+            ],
         },
-        app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::Orders {
-                asset_infos: [
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[0].clone(),
-                    },
-                    AssetInfo::Token {
-                        contract_addr: token_addrs[1].clone(),
-                    },
-                ],
-                direction: None,
-                filter: OrderFilter::Bidder("addr0000".to_string()),
-                start_after: None,
-                limit: None,
-                order_by: Some(1),
-            }
-        )
-        .unwrap()
-    );
+    )
+    .unwrap_err();
 
     let test = app
         .query::<OrdersResponse, _>(
