@@ -60,9 +60,7 @@ impl Order {
     ) -> Self {
         let offer_amount = match direction {
             OrderDirection::Buy => ask_amount * price,
-            OrderDirection::Sell => Uint128::from(ask_amount * Uint128::from(1000000u128))
-                .checked_div(price * Uint128::from(1000000u128))
-                .unwrap(),
+            OrderDirection::Sell => ask_amount * (Decimal::one() / price),
         };
 
         Order {
