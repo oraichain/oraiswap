@@ -76,12 +76,12 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
         ExecuteMsg::UpdateConfig {
             reward_address,
@@ -225,6 +225,7 @@ pub fn execute(
             // submit market order
             submit_market_order(
                 deps,
+                env.contract.address,
                 &orderbook_pair,
                 info.sender,
                 direction,
@@ -332,6 +333,7 @@ pub fn execute_create_pair(
 
 pub fn receive_cw20(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
@@ -435,6 +437,7 @@ pub fn receive_cw20(
             // submit market order
             submit_market_order(
                 deps,
+                env.contract.address,
                 &orderbook_pair,
                 sender,
                 direction,

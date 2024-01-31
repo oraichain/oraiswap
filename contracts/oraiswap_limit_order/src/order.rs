@@ -6,14 +6,14 @@ use crate::state::{
     remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event, MessageInfo,
-    Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
+    attr, to_binary, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event,
+    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{OrderDirection, OrderStatus};
+use oraiswap::limit_order::{ExecuteMsg, OrderDirection, OrderStatus};
 
 pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
@@ -124,6 +124,7 @@ pub fn submit_order(
 
 pub fn submit_market_order(
     deps: DepsMut,
+    orderbook_addr: Addr,
     orderbook_pair: &OrderBook,
     sender: Addr,
     direction: OrderDirection,
@@ -158,14 +159,23 @@ pub fn submit_market_order(
         amount: refund_amount,
     };
 
-    // Build refund msg
-    let messages = if refund_amount > Uint128::zero() {
+    // Build msg
+    let mut messages = if refund_amount > Uint128::zero() {
         vec![bidder_refund
             .clone()
             .into_msg(None, &deps.querier, sender.clone())?]
     } else {
         vec![]
     };
+
+    messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: orderbook_addr.into_string(),
+        msg: to_binary(&ExecuteMsg::ExecuteOrderBookPair {
+            asset_infos: assets.clone().map(|asset| asset.info),
+            limit: None, // no need to set limit because we match during submit orders -> there wont be any remaining orders to match except this one -> no need to care about missed orders when matching
+        })?,
+        funds: vec![],
+    }));
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         ("action", "submit_market_order"),
