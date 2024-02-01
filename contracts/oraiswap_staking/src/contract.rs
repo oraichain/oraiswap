@@ -255,11 +255,8 @@ fn register_asset(
         },
     )?;
 
-    match unbonding_period {
-        Some(unbonding_period) => {
-            store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
-        }
-        None => {}
+    if let Some(unbonding_period) = unbonding_period {
+        store_unbonding_period(deps.storage, staking_token.as_bytes(), unbonding_period)?;
     }
 
     Ok(Response::new().add_attributes([

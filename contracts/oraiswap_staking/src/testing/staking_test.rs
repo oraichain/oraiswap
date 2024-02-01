@@ -82,6 +82,7 @@ fn test_bond_tokens() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -215,6 +216,7 @@ fn test_unbond() {
     // register asset
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -348,11 +350,8 @@ fn test_unbond() {
 #[test]
 fn test_auto_stake() {
     let mut app = MockApp::new(&[(&"addr".to_string(), &[coin(10000000000u128, ORAI_DENOM)])]);
-
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
-
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
-
     app.set_factory_and_pair_contract(
         Box::new(
             create_entry_points_testing!(oraiswap_factory)
@@ -469,6 +468,7 @@ fn test_auto_stake() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: pair_info.liquidity_token.clone(),
+        unbonding_period: None,
     };
 
     let _res = app
@@ -618,4 +618,100 @@ fn test_auto_stake() {
             migration_index_snapshot: None,
         }
     );
+}
+
+#[test]
+fn test_unbonding_period_register() {
+    let mut deps = mock_dependencies_with_balance(&[
+        coin(10000000000u128, ORAI_DENOM),
+        coin(20000000000u128, ATOM_DENOM),
+    ]);
+
+    let msg = InstantiateMsg {
+        owner: Some(Addr::unchecked("owner")),
+        rewarder: Addr::unchecked("rewarder"),
+        minter: Some(Addr::unchecked("mint")),
+        oracle_addr: Addr::unchecked("oracle"),
+        factory_addr: Addr::unchecked("factory"),
+        base_denom: None,
+    };
+
+    let info = mock_info("addr", &[]);
+    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // will also add to the index the pending rewards from before the migration
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
+        staking_token: Addr::unchecked("staking"),
+        assets: vec![
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                amount: 200u128.into(),
+            },
+        ],
+    };
+
+    let info = mock_info("owner", &[]);
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // register asset
+    let msg = ExecuteMsg::RegisterAsset {
+        staking_token: Addr::unchecked("staking"),
+        unbonding_period: Some(100),
+    };
+
+    let info = mock_info("owner", &[]);
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // bond 100 tokens
+    let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "addr".to_string(),
+        amount: Uint128::from(100u128),
+        msg: to_binary(&Cw20HookMsg::Bond {}).unwrap(),
+    });
+    let info = mock_info("staking", &[]);
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    let msg = ExecuteMsg::DepositReward {
+        rewards: vec![RewardMsg {
+            staking_token: Addr::unchecked("staking"),
+            total_accumulation_amount: Uint128::from(300u128),
+        }],
+    };
+    let info = mock_info("rewarder", &[]);
+    let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+    // will also add to the index the pending rewards from before the migration
+    let msg = ExecuteMsg::UpdateRewardsPerSec {
+        staking_token: Addr::unchecked("staking"),
+        assets: vec![
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+            Asset {
+                info: AssetInfo::NativeToken {
+                    denom: ATOM_DENOM.to_string(),
+                },
+                amount: 100u128.into(),
+            },
+        ],
+    };
+    let info = mock_info("owner", &[]);
+    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // unbond 150 tokens; failed
+    let msg = ExecuteMsg::Unbond {
+        staking_token: Addr::unchecked("staking"),
+        amount: Uint128::from(150u128),
+    };
 }
