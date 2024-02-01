@@ -12,8 +12,8 @@ use crate::rewards::{
 };
 use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, unbond_lock};
 use crate::state::{
-    read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
-    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
+    read_all_pool_infos, read_all_user_to_lock_ids, read_config, read_finish_migrate_store_status,
+    read_pool_info, read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
     store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec,
     store_unbonding_period, Config, MigrationParams, PoolInfo,
 };
@@ -24,8 +24,8 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
-    PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockInfosResponse, MigrateMsg,
+    OldStoreType, PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -344,8 +344,47 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             order,
         )?),
         QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
+        QueryMsg::LockInfos {
+            staker_addr,
+            staking_token,
+            start_after,
+            limit,
+            order,
+        } => to_binary(&query_lock_infos(
+            deps,
+            _env,
+            staker_addr,
+            staking_token,
+            start_after,
+            limit,
+            order,
+        )?),
         QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
     }
+}
+
+pub fn query_lock_infos(
+    deps: Deps,
+    _env: Env,
+    staker_addr: Addr,
+    staking_token: Addr,
+    start_after: Option<Uint128>,
+    limit: Option<u32>,
+    order: Option<i32>,
+) -> StdResult<LockInfosResponse> {
+    let lock_infos = read_all_user_to_lock_ids(
+        deps.storage,
+        staking_token.as_bytes(),
+        staker_addr.as_bytes(),
+        start_after,
+        limit,
+        order,
+    )?;
+    Ok(LockInfosResponse {
+        staker_addr,
+        staking_token,
+        lock_infos,
+    })
 }
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {

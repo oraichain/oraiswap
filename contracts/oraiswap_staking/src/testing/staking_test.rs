@@ -1,5 +1,6 @@
 use crate::contract::{execute, instantiate, query, query_get_pools_infomation};
 use crate::state::{store_pool_info, PoolInfo};
+use cosmwasm_schema::serde::Serialize;
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
@@ -12,8 +13,8 @@ use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
 use oraiswap::pair::PairResponse;
 use oraiswap::staking::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
-    RewardInfoResponseItem, RewardMsg,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockInfosResponse, PoolInfoResponse, QueryMsg,
+    RewardInfoResponse, RewardInfoResponseItem, RewardMsg,
 };
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -621,7 +622,8 @@ fn test_auto_stake() {
 }
 
 #[test]
-fn test_unbonding_period_register() {
+fn test_unbonding_period_happy_case() {
+    let unbonding_period = 100;
     let mut deps = mock_dependencies_with_balance(&[
         coin(10000000000u128, ORAI_DENOM),
         coin(20000000000u128, ATOM_DENOM),
@@ -664,12 +666,20 @@ fn test_unbonding_period_register() {
     // register asset
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
-        unbonding_period: Some(100),
+        unbonding_period: Some(unbonding_period),
     };
 
     let info = mock_info("owner", &[]);
-    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("action", "register_asset"),
+            attr("staking_token", "staking"),
+            attr("unbonding_period", "100"),
+        ]
+    );
     // bond 100 tokens
     let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "addr".to_string(),
@@ -712,6 +722,65 @@ fn test_unbonding_period_register() {
     // unbond 150 tokens; failed
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
-        amount: Uint128::from(150u128),
+        amount: Uint128::from(100u128),
     };
+    let info = mock_info("addr", &[]);
+    let mut unbond_env = mock_env();
+    let _res = execute(deps.as_mut(), unbond_env.clone(), info.clone(), msg).unwrap();
+    assert_eq!(
+        _res.attributes,
+        vec![
+            attr("action", "unbonding"),
+            attr("staker_addr", "addr"),
+            attr("amount", Uint128::from(100u128).to_string()),
+            attr("staking_token", "staking"),
+            attr("lock_id", "1"),
+            attr(
+                "unlock_time",
+                unbond_env
+                    .clone()
+                    .block
+                    .time
+                    .plus_seconds(unbonding_period)
+                    .to_string()
+            ),
+        ]
+    );
+
+    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period + 1);
+    let res = query(
+        deps.as_ref(),
+        unbond_env.clone(),
+        QueryMsg::LockInfos {
+            staker_addr: Addr::unchecked("addr"),
+            start_after: None,
+            limit: None,
+            order: None,
+            staking_token: Addr::unchecked("staking"),
+        },
+    )
+    .unwrap();
+    let lock_ids = from_binary::<LockInfosResponse>(&res).unwrap();
+
+    // assert_eq!(lock_ids.lock_infos.len(), 1);
+    assert_eq!(lock_ids.lock_infos.len(), 1);
+    assert_eq!(lock_ids.staking_token, Addr::unchecked("staking"));
+    assert_eq!(lock_ids.staker_addr, Addr::unchecked("addr"));
+
+    let msg = ExecuteMsg::UnbondLock {
+        staking_token: Addr::unchecked("staking"),
+        lock_id: Some(1),
+    };
+
+    let _res = execute(deps.as_mut(), unbond_env.clone(), info, msg).unwrap();
+
+    assert_eq!(
+        _res.attributes,
+        vec![
+            attr("action", "unbond"),
+            attr("staker_addr", "addr"),
+            attr("amount", Uint128::from(100u128).to_string()),
+            attr("staking_token", "staking"),
+        ]
+    );
 }

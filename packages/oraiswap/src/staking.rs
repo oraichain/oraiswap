@@ -127,6 +127,14 @@ pub enum QueryMsg {
     GetPoolsInformation {},
     #[returns(Binary)]
     QueryOldStore { store_type: OldStoreType },
+    #[returns(LockInfosResponse)]
+    LockInfos {
+        staker_addr: Addr,
+        start_after: Option<Uint128>,
+        limit: Option<u32>,
+        order: Option<i32>,
+        staking_token: Addr,
+    },
 }
 
 // We define a custom struct for each query response
@@ -198,4 +206,11 @@ pub enum OldStoreType {
 pub struct LockInfo {
     pub amount: Uint128,
     pub unlock_time: Timestamp,
+}
+
+#[cw_serde]
+pub struct LockInfosResponse {
+    pub staker_addr: Addr,
+    pub staking_token: Addr,
+    pub lock_infos: Vec<(Uint128, LockInfo)>,
 }

@@ -62,7 +62,7 @@ pub fn unbond(
     messages.extend(
         reward_assets
             .into_iter()
-            .map(|ra| Ok(ra.into_msg(None, &deps.querier, staker_addr.clone())?))
+            .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
             .collect::<StdResult<Vec<CosmosMsg>>>()?,
     );
     // checking bonding period
@@ -85,10 +85,10 @@ pub fn unbond(
         Ok(Response::new().add_messages(messages).add_attributes([
             attr("action", "unbonding"),
             attr("staker_addr", staker_addr.as_str()),
-            attr("amount", &amount.to_string()),
+            attr("amount", amount.to_string()),
             attr("staking_token", staking_token_addr.as_str()),
-            attr("lock_id", &lock_id.to_string()),
-            attr("unlock_time", &unlock_time.to_string()),
+            attr("lock_id", lock_id.to_string()),
+            attr("unlock_time", unlock_time.to_string()),
         ]))
     } else {
         _unbond(staker_addr, staking_token_addr, amount, messages)
@@ -424,7 +424,7 @@ fn _unbond(
     Ok(Response::new().add_messages(messages).add_attributes([
         attr("action", "unbond"),
         attr("staker_addr", staker_addr.as_str()),
-        attr("amount", &amount.to_string()),
+        attr("amount", amount.to_string()),
         attr("staking_token", staking_token_addr.as_str()),
     ]))
 }
