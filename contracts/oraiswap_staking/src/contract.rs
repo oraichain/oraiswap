@@ -10,12 +10,12 @@ use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
+use crate::staking::{auto_stake, auto_stake_hook, bond, unbond, unbond_lock};
 use crate::state::{
     read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
     read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
-    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
-    MigrationParams, PoolInfo,
+    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec,
+    store_unbonding_period, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -70,7 +70,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             assets,
         } => update_rewards_per_sec(deps, info, staking_token, assets),
         ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
-        ExecuteMsg::RegisterAsset { staking_token } => register_asset(deps, info, staking_token),
+        ExecuteMsg::RegisterAsset {
+            staking_token,
+            unbonding_period,
+        } => register_asset(deps, info, staking_token, unbonding_period),
         ExecuteMsg::DeprecateStakingToken {
             staking_token,
             new_staking_token,
@@ -100,6 +103,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
+        ExecuteMsg::UnbondLock {
+            staking_token,
+            lock_id,
+        } => unbond_lock(deps, env, info.sender, staking_token, lock_id),
     }
 }
 
@@ -217,7 +224,12 @@ fn update_rewards_per_sec(
     Ok(Response::new().add_attribute("action", "update_rewards_per_sec"))
 }
 
-fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdResult<Response> {
+fn register_asset(
+    deps: DepsMut,
+    info: MessageInfo,
+    staking_token: Addr,
+    unbonding_period: Option<u64>,
+) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
@@ -243,9 +255,20 @@ fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdR
         },
     )?;
 
+    match unbonding_period {
+        Some(unbonding_period) => {
+            store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
+        }
+        None => {}
+    }
+
     Ok(Response::new().add_attributes([
         ("action", "register_asset"),
         ("staking_token", staking_token.as_str()),
+        (
+            "unbonding_period",
+            &unbonding_period.unwrap_or(0).to_string(),
+        ),
     ]))
 }
 

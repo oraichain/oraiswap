@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
-use oraiswap::asset::AssetRaw;
+use oraiswap::{asset::AssetRaw, querier::calc_range_start, staking::LockInfo};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config_v2";
@@ -12,6 +12,14 @@ pub static PREFIX_IS_MIGRATED: &[u8] = b"is_migrated_v3";
 pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec_v3";
 // a key to validate if we have finished migrating the store. Only allow staking functionalities when we have finished migrating
 pub static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
+
+// Unbonded
+pub static UNBONDING_PERIOD: &[u8] = b"unbonding_period";
+pub static LOCK_INFO: &[u8] = b"locking_users";
+pub static LOCK_ID: &[u8] = b"lock_id";
+
+pub const DEFAULT_LIMIT: u32 = 10;
+pub const MAX_LIMIT: u32 = 30;
 
 #[cw_serde]
 pub struct Config {
@@ -137,4 +145,93 @@ pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResul
     let weight_bucket: ReadonlyBucket<Vec<AssetRaw>> =
         ReadonlyBucket::new(storage, PREFIX_REWARDS_PER_SEC);
     weight_bucket.load(asset_key)
+}
+
+pub fn store_unbonding_period(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    period: u64,
+) -> StdResult<()> {
+    Bucket::new(storage, UNBONDING_PERIOD).save(asset_key, &period)
+}
+
+pub fn read_unbonding_period(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<u64> {
+    ReadonlyBucket::new(storage, UNBONDING_PERIOD).load(asset_key)
+}
+
+pub fn increase_unbonding_lock_id(storage: &mut dyn Storage) -> StdResult<u64> {
+    let mut lock_id = singleton(storage, LOCK_ID);
+    let new_lock_id = lock_id.load().unwrap_or(0) + 1;
+    lock_id.save(&new_lock_id)?;
+    Ok(new_lock_id)
+}
+
+pub fn read_unbonding_lock_id(storage: &dyn Storage) -> StdResult<u64> {
+    singleton_read(storage, LOCK_ID).load()
+}
+
+pub fn store_lock_info(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    user: &[u8],
+    unbonding_order_id: Uint128,
+    lock_info: LockInfo,
+) -> StdResult<()> {
+    let mut bucket = Bucket::multilevel(storage, &[LOCK_INFO, asset_key, user]);
+    bucket.save(&unbonding_order_id.to_be_bytes(), &lock_info)
+}
+
+pub fn read_lock_info(
+    storage: &dyn Storage,
+    asset_key: &[u8],
+    user: &[u8],
+    unbonding_order_id: Uint128,
+) -> StdResult<LockInfo> {
+    ReadonlyBucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
+        .load(&unbonding_order_id.to_be_bytes())
+}
+
+pub fn remove_lock_info(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    user: &[u8],
+    unbonding_order_id: Uint128,
+) -> StdResult<()> {
+    Bucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
+        .remove(&unbonding_order_id.to_be_bytes());
+    Ok(())
+}
+
+pub fn read_all_user_to_lock_ids(
+    storage: &dyn Storage,
+    asset_key: &[u8],
+    user: &[u8],
+    start_after: Option<Uint128>,
+    limit: Option<u32>,
+    order: Option<i32>,
+) -> StdResult<Vec<(Uint128, LockInfo)>> {
+    let order_by = Order::try_from(order.unwrap_or(1))?;
+
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+
+    let (start, end) = match order_by {
+        Order::Ascending => (
+            calc_range_start(start_after.map(|id| id.to_be_bytes().to_vec())),
+            None,
+        ),
+        Order::Descending => (None, start_after.map(|id| id.to_be_bytes().to_vec())),
+    };
+    ReadonlyBucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
+        .range(start.as_deref(), end.as_deref(), order_by)
+        .take(limit)
+        .map(|value| -> StdResult<(Uint128, LockInfo)> {
+            let (lock_id, lock_info) = value?;
+            Ok((
+                (Uint128::from(u128::from_be_bytes(<[u8; 16]>::try_from(lock_id).map_err(
+                    |_| cosmwasm_std::StdError::generic_err("Invalid unbonding order id"),
+                )?))),
+                lock_info,
+            ))
+        })
+        .collect::<StdResult<Vec<(Uint128, LockInfo)>>>()
 }

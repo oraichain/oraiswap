@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Addr, Binary, Decimal, Uint128};
+use cosmwasm_std::{Addr, Binary, Decimal, Timestamp, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -29,6 +29,7 @@ pub enum ExecuteMsg {
     },
     RegisterAsset {
         staking_token: Addr,
+        unbonding_period: Option<u64>,
     },
     DeprecateStakingToken {
         staking_token: Addr,
@@ -73,6 +74,11 @@ pub enum ExecuteMsg {
         staking_token: Addr,
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
+    },
+    /// Unbond lock
+    UnbondLock {
+        staking_token: Addr,
+        lock_id: Option<u64>,
     },
 }
 
@@ -186,4 +192,10 @@ pub enum OldStoreType {
     Rewards { staker: String },
     IsMigrated { staker: String },
     RewardsPerSec {},
+}
+
+#[cw_serde]
+pub struct LockInfo {
+    pub amount: Uint128,
+    pub unlock_time: Timestamp,
 }
