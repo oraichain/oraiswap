@@ -48,14 +48,16 @@ pub fn unbond(
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
-    let (staking_token, reward_assets) = _decrease_bond_amount(
+
+    let (staking_token_canonicalize, reward_assets) = _decrease_bond_amount(
         deps.storage,
         deps.api,
         &staker_addr_raw,
         &staking_token,
         amount,
     )?;
-    let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
+
+    let staking_token_addr = deps.api.addr_humanize(&staking_token_canonicalize)?;
 
     let mut messages = vec![];
     // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
@@ -65,34 +67,62 @@ pub fn unbond(
             .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
             .collect::<StdResult<Vec<CosmosMsg>>>()?,
     );
+    let mut response = Response::new();
+
+    // withdraw_avaiable_lock
+    let withdraw_response = _withdraw_lock(deps.storage, &env, &staker_addr, &staking_token, None)?;
+
+    messages.extend(
+        withdraw_response
+            .clone()
+            .messages
+            .into_iter()
+            .map(|msg| msg.msg)
+            .collect::<Vec<CosmosMsg>>(),
+    );
+    let withdraw_attrs = withdraw_response.attributes;
+
     // checking bonding period
     if let Ok(period) = read_unbonding_period(deps.storage, staking_token_addr.as_bytes()) {
-        let lock_id = increase_unbonding_lock_id(deps.storage)?;
+        if amount.gt(&Uint128::from(0u128)) {
+            let lock_id = increase_unbonding_lock_id(deps.storage)?;
 
-        let unlock_time = env.block.time.plus_seconds(period);
+            let unlock_time = env.block.time.plus_seconds(period);
 
-        store_lock_info(
-            deps.storage,
-            staking_token_addr.as_bytes(),
-            staker_addr.as_bytes(),
-            Uint128::from(lock_id),
-            LockInfo {
-                amount,
-                unlock_time,
-            },
-        )?;
+            store_lock_info(
+                deps.storage,
+                staking_token_addr.as_bytes(),
+                staker_addr.as_bytes(),
+                Uint128::from(lock_id),
+                LockInfo {
+                    amount,
+                    unlock_time,
+                },
+            )?;
 
-        Ok(Response::new().add_messages(messages).add_attributes([
-            attr("action", "unbonding"),
-            attr("staker_addr", staker_addr.as_str()),
-            attr("amount", amount.to_string()),
-            attr("staking_token", staking_token_addr.as_str()),
-            attr("lock_id", lock_id.to_string()),
-            attr("unlock_time", unlock_time.to_string()),
-        ]))
+            response = response.add_attributes([
+                attr("action", "unbonding"),
+                attr("staker_addr", staker_addr.as_str()),
+                attr("amount", amount.to_string()),
+                attr("staking_token", staking_token_addr.as_str()),
+                attr("lock_id", lock_id.to_string()),
+                attr("unlock_time", unlock_time.to_string()),
+            ])
+        }
     } else {
-        _unbond(staker_addr, staking_token_addr, amount, messages)
+        let unbond_response = _unbond(&staker_addr, &staking_token_addr, amount)?;
+        messages.extend(
+            unbond_response
+                .messages
+                .into_iter()
+                .map(|msg| msg.msg)
+                .collect::<Vec<CosmosMsg>>(),
+        );
+        response = response.add_attributes(unbond_response.attributes);
     }
+    Ok(response
+        .add_messages(messages)
+        .add_attributes(withdraw_attrs))
 }
 
 pub fn auto_stake(
@@ -219,17 +249,17 @@ pub fn auto_stake_hook(
     bond(deps, staker_addr, staking_token, amount_to_stake)
 }
 
-pub fn unbond_lock(
-    deps: DepsMut,
-    env: Env,
-    staker_addr: Addr,
-    staking_token: Addr,
+pub fn _withdraw_lock(
+    storage: &mut dyn Storage,
+    env: &Env,
+    staker_addr: &Addr,
+    staking_token: &Addr,
     lock_id: Option<u64>,
 ) -> StdResult<Response> {
     match lock_id {
         Some(lock_id) => {
             let lock_info = read_lock_info(
-                deps.storage,
+                storage,
                 staking_token.as_bytes(),
                 staker_addr.as_bytes(),
                 Uint128::from(lock_id),
@@ -239,21 +269,22 @@ pub fn unbond_lock(
                 return Err(StdError::generic_err("Lock period has not expired yet"));
             }
             remove_lock_info(
-                deps.storage,
+                storage,
                 staking_token.as_bytes(),
                 staker_addr.as_bytes(),
                 Uint128::from(lock_id),
             )?;
-            _unbond(staker_addr, staking_token, lock_info.amount, vec![])
+            let response = _unbond(staker_addr, staking_token, lock_info.amount)?;
+            Ok(response.add_attribute("lock_id", lock_id.to_string()))
         }
         None => {
             // execute 10 lock a time
             let list_lock_info = read_all_user_to_lock_ids(
-                deps.storage,
+                storage,
                 staking_token.as_bytes(),
                 staker_addr.as_bytes(),
                 None,
-                None,
+                Some(30), // take maxium 30 lock info
                 None,
             )
             .map_err(|_| StdError::generic_err("No lock info"))?;
@@ -266,20 +297,24 @@ pub fn unbond_lock(
                     continue;
                 }
                 remove_lock_info(
-                    deps.storage,
+                    storage,
                     staking_token.as_bytes(),
                     staker_addr.as_bytes(),
                     lock_id,
                 )?;
-                unbond_responses.push(_unbond(
-                    staker_addr.clone(),
-                    staking_token.clone(),
-                    lock_info.amount,
-                    vec![],
-                )?);
+                let unbond_response = _unbond(staker_addr, staking_token, lock_info.amount)?;
+                let unbond_response = unbond_response.add_attribute("lock_id", lock_id.to_string());
+                unbond_responses.push(unbond_response);
             }
 
             for res in unbond_responses.into_iter() {
+                response = response.add_messages(
+                    res.clone()
+                        .messages
+                        .into_iter()
+                        .map(|sub_msg| sub_msg.msg)
+                        .collect::<Vec<CosmosMsg>>(),
+                );
                 response = response.add_attributes(res.clone().attributes);
             }
             Ok(response)
@@ -386,16 +421,12 @@ fn _decrease_bond_amount(
         // if pending_withdraw is not empty, then return reward_assets to withdraw money
         reward_assets = reward_info
             .pending_withdraw
-            .into_iter()
-            .map(|ra| Ok(ra.to_normal(api)?))
+            .iter()
+            .map(|ra| ra.to_normal(api))
             .collect::<StdResult<Vec<Asset>>>()?;
-
-        rewards_store(storage, staker_addr).remove(&asset_key);
-        // remove staker from the pool
-        stakers_store(storage, &asset_key).remove(staker_addr);
-    } else {
-        rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
+        reward_info.pending_withdraw = vec![];
     }
+    rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
 
     // Update pool info
     store_pool_info(storage, &asset_key, &pool_info)?;
@@ -403,13 +434,8 @@ fn _decrease_bond_amount(
     Ok((staking_token, reward_assets))
 }
 
-fn _unbond(
-    staker_addr: Addr,
-    staking_token_addr: Addr,
-    amount: Uint128,
-    reward_assets: Vec<CosmosMsg>,
-) -> StdResult<Response> {
-    let mut messages = vec![WasmMsg::Execute {
+fn _unbond(staker_addr: &Addr, staking_token_addr: &Addr, amount: Uint128) -> StdResult<Response> {
+    let messages: Vec<CosmosMsg> = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.to_string(),
         msg: to_binary(&Cw20ExecuteMsg::Transfer {
             recipient: staker_addr.to_string(),
@@ -418,8 +444,6 @@ fn _unbond(
         funds: vec![],
     }
     .into()];
-
-    messages.extend(reward_assets);
 
     Ok(Response::new().add_messages(messages).add_attributes([
         attr("action", "unbond"),

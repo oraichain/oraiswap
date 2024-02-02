@@ -1,6 +1,5 @@
 use crate::contract::{execute, instantiate, query, query_get_pools_infomation};
 use crate::state::{store_pool_info, PoolInfo};
-use cosmwasm_schema::serde::Serialize;
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
 };
@@ -288,6 +287,14 @@ fn test_unbond() {
     assert_eq!(
         res.messages,
         vec![
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
+                amount: vec![coin(99u128, ORAI_DENOM)],
+            })),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
+                amount: vec![coin(199u128, ATOM_DENOM)],
+            })),
             SubMsg::new(WasmMsg::Execute {
                 contract_addr: "staking".to_string(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
@@ -297,14 +304,6 @@ fn test_unbond() {
                 .unwrap(),
                 funds: vec![],
             }),
-            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr".to_string(),
-                amount: vec![coin(99u128, ORAI_DENOM)],
-            })),
-            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr".to_string(),
-                amount: vec![coin(199u128, ATOM_DENOM)],
-            }))
         ]
     );
 
@@ -343,7 +342,13 @@ fn test_unbond() {
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
-            reward_infos: vec![],
+            reward_infos: vec![RewardInfoResponseItem {
+                staking_token: Addr::unchecked("staking"),
+                bond_amount: Uint128::from(0u128),
+                pending_reward: Uint128::from(0u128),
+                pending_withdraw: vec![],
+                should_migrate: None
+            }],
         }
     );
 }
@@ -719,7 +724,6 @@ fn test_unbonding_period_happy_case() {
     let info = mock_info("owner", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-    // unbond 150 tokens; failed
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
         amount: Uint128::from(100u128),
@@ -767,11 +771,11 @@ fn test_unbonding_period_happy_case() {
     assert_eq!(lock_ids.staking_token, Addr::unchecked("staking"));
     assert_eq!(lock_ids.staker_addr, Addr::unchecked("addr"));
 
-    let msg = ExecuteMsg::UnbondLock {
+    let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
-        lock_id: Some(1),
+        amount: Uint128::from(0u128),
     };
-
+    //
     let _res = execute(deps.as_mut(), unbond_env.clone(), info, msg).unwrap();
 
     assert_eq!(
@@ -781,6 +785,7 @@ fn test_unbonding_period_happy_case() {
             attr("staker_addr", "addr"),
             attr("amount", Uint128::from(100u128).to_string()),
             attr("staking_token", "staking"),
+            attr("lock_id", "1"),
         ]
     );
 }

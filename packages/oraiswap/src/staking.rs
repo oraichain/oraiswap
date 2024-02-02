@@ -75,11 +75,6 @@ pub enum ExecuteMsg {
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
-    /// Unbond lock
-    UnbondLock {
-        staking_token: Addr,
-        lock_id: Option<u64>,
-    },
 }
 
 #[cw_serde]
