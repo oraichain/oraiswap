@@ -410,7 +410,7 @@ fn execute_bulk_orders(
                 if orders.len() == 0 {
                     continue;
                 }
-                let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy);
+                let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy)?;
                 buy_bulk_orders_list.push(bulk);
             } else {
                 break;
@@ -427,7 +427,7 @@ fn execute_bulk_orders(
                 if orders.len() == 0 {
                     continue;
                 }
-                let bulk = BulkOrders::from_orders(&orders, sell_price, OrderDirection::Sell);
+                let bulk = BulkOrders::from_orders(&orders, sell_price, OrderDirection::Sell)?;
                 sell_bulk_orders_list.push(bulk);
             } else {
                 break;
@@ -552,7 +552,7 @@ fn process_orders(
                 .checked_sub(filled_ask)
                 .unwrap_or_default();
 
-            order.fill_order(filled_ask, filled_offer);
+            order.fill_order(filled_ask, filled_offer)?;
 
             if !filled_ask.is_zero() && !filled_offer.is_zero() {
                 trader_ask_asset.amount = filled_ask;
