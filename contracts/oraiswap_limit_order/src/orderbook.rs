@@ -10,11 +10,12 @@ use oraiswap::{
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 
 use crate::{
+    order::MIN_VOLUME,
+    query::{query_ticks_prices, query_ticks_prices_with_end},
     state::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
         PREFIX_TICK,
     },
-    tick::{query_ticks_prices, query_ticks_prices_with_end},
 };
 
 #[cw_serde]
@@ -60,9 +61,7 @@ impl Order {
     ) -> Self {
         let offer_amount = match direction {
             OrderDirection::Buy => ask_amount * price,
-            OrderDirection::Sell => Uint128::from(ask_amount * Uint128::from(1000000u128))
-                .checked_div(price * Uint128::from(1000000u128))
-                .unwrap(),
+            OrderDirection::Sell => ask_amount * (Decimal::one() / price),
         };
 
         Order {
@@ -141,17 +140,18 @@ impl Order {
 
 impl OrderWithFee {
     // create new order given a price and an offer amount
-    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) {
+    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) -> StdResult<()> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
-        if self.filled_offer_amount == self.offer_amount
-            || self.filled_ask_amount == self.ask_amount
+        if self.offer_amount.checked_sub(self.filled_offer_amount)? < MIN_VOLUME.into()
+            || self.ask_amount.checked_sub(self.filled_ask_amount)? < MIN_VOLUME.into()
         {
             self.status = OrderStatus::Fulfilled;
         } else {
             self.status = OrderStatus::PartialFilled;
         }
+        Ok(())
     }
 
     pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
@@ -438,6 +438,38 @@ impl OrderBook {
         Uint128::zero()
     }
 
+    /// return the largest base amount of orders at price
+    pub fn find_base_amount_at_price(
+        &self,
+        storage: &dyn Storage,
+        price: Decimal,
+        direction: OrderDirection,
+    ) -> Uint128 {
+        if let Some(orders) =
+            self.query_orders_by_price_and_direction(storage, price, direction, None)
+        {
+            // Buy -> base_amount = ask_amount - filled_ask_amount
+            // Sell -> base_amount = offer_amount - filled_offer_amount
+            return orders
+                .iter()
+                .map(|order| match direction {
+                    OrderDirection::Buy => order
+                        .ask_amount
+                        .checked_sub(order.filled_ask_amount)
+                        .unwrap_or_default()
+                        .u128(),
+                    OrderDirection::Sell => order
+                        .offer_amount
+                        .checked_sub(order.filled_offer_amount)
+                        .unwrap_or_default()
+                        .u128(),
+                })
+                .sum::<u128>()
+                .into();
+        }
+        Uint128::zero()
+    }
+
     /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price
     /// The matching continues until there's no more matchable orders.
     pub fn query_orders_by_price_and_direction(
@@ -485,7 +517,11 @@ pub struct BulkOrders {
 
 impl BulkOrders {
     /// Calculate sum of orders base on direction
-    pub fn from_orders(orders: &Vec<Order>, price: Decimal, direction: OrderDirection) -> Self {
+    pub fn from_orders(
+        orders: &Vec<Order>,
+        price: Decimal,
+        direction: OrderDirection,
+    ) -> StdResult<Self> {
         let mut volume = Uint128::zero();
         let mut ask_volume = Uint128::zero();
         let filled_volume = Uint128::zero();
@@ -493,17 +529,11 @@ impl BulkOrders {
         let spread_volume = Uint128::zero();
 
         for order in orders {
-            volume += order
-                .offer_amount
-                .checked_sub(order.filled_offer_amount)
-                .unwrap();
-            ask_volume += order
-                .ask_amount
-                .checked_sub(order.filled_ask_amount)
-                .unwrap();
+            volume += order.offer_amount.checked_sub(order.filled_offer_amount)?;
+            ask_volume += order.ask_amount.checked_sub(order.filled_ask_amount)?;
         }
 
-        return Self {
+        return Ok(Self {
             direction,
             price,
             orders: orders
@@ -527,6 +557,6 @@ impl BulkOrders {
             ask_volume,
             filled_ask_volume,
             spread_volume,
-        };
+        });
     }
 }
