@@ -6,6 +6,7 @@ use crate::state::{
 };
 use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage, Uint128};
 use oraiswap::limit_order::BaseAmountResponse;
+use std::cmp::min;
 use std::convert::{TryFrom, TryInto};
 
 use oraiswap::asset::{pair_key, AssetInfo};
@@ -164,7 +165,6 @@ pub fn query_price_by_base_amount(
 
     let mut total_base_amount_by_price = Uint128::zero();
     let mut market_price = Decimal::zero();
-    let mut expected_base_amount = base_amount;
     for price in &best_price_list {
         let base_amount_by_price =
             orderbook_pair.find_base_amount_at_price(deps.storage, *price, price_direction);
@@ -175,9 +175,7 @@ pub fn query_price_by_base_amount(
             break;
         }
     }
-    if total_base_amount_by_price < base_amount {
-        expected_base_amount = total_base_amount_by_price;
-    }
+    let expected_base_amount = min(total_base_amount_by_price, base_amount);
 
     if let Some(slippage) = slippage {
         if slippage >= Decimal::one() {

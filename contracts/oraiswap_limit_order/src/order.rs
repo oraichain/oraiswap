@@ -763,27 +763,22 @@ pub fn get_market_asset(
         info: orderbook_pair.quote_coin_info.to_normal(api)?,
         amount: quote_amount,
     };
+    let mut assets = [
+        Asset {
+            info: orderbook_pair.quote_coin_info.to_normal(api)?,
+            amount: quote_amount,
+        },
+        Asset {
+            info: orderbook_pair.base_coin_info.to_normal(api)?,
+            amount: base_amount,
+        },
+    ];
     let paid_assets = match direction {
-        OrderDirection::Buy => [
-            Asset {
-                info: orderbook_pair.quote_coin_info.to_normal(api)?,
-                amount: quote_amount,
-            },
-            Asset {
-                info: orderbook_pair.base_coin_info.to_normal(api)?,
-                amount: base_amount,
-            },
-        ],
-        OrderDirection::Sell => [
-            Asset {
-                info: orderbook_pair.base_coin_info.to_normal(api)?,
-                amount: base_amount,
-            },
-            Asset {
-                info: orderbook_pair.quote_coin_info.to_normal(api)?,
-                amount: quote_amount,
-            },
-        ],
+        OrderDirection::Buy => assets.clone(),
+        OrderDirection::Sell => {
+            assets.reverse();
+            assets.clone()
+        }
     };
     Ok((paid_assets, quote_asset))
 }
