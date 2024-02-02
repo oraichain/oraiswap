@@ -726,7 +726,7 @@ fn test_unbonding_period_happy_case() {
 
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
-        amount: Uint128::from(100u128),
+        amount: Uint128::from(50u128),
     };
     let info = mock_info("addr", &[]);
     let mut unbond_env = mock_env();
@@ -736,7 +736,7 @@ fn test_unbonding_period_happy_case() {
         vec![
             attr("action", "unbonding"),
             attr("staker_addr", "addr"),
-            attr("amount", Uint128::from(100u128).to_string()),
+            attr("amount", Uint128::from(50u128).to_string()),
             attr("staking_token", "staking"),
             attr("lock_id", "1"),
             attr(
@@ -752,6 +752,7 @@ fn test_unbonding_period_happy_case() {
     );
 
     unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period + 1);
+
     let res = query(
         deps.as_ref(),
         unbond_env.clone(),
@@ -768,24 +769,91 @@ fn test_unbonding_period_happy_case() {
 
     // assert_eq!(lock_ids.lock_infos.len(), 1);
     assert_eq!(lock_ids.lock_infos.len(), 1);
+    assert_eq!(lock_ids.lock_infos[0].0, Uint128::from(1u128));
     assert_eq!(lock_ids.staking_token, Addr::unchecked("staking"));
     assert_eq!(lock_ids.staker_addr, Addr::unchecked("addr"));
 
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
+        amount: Uint128::from(50u128),
+    };
+    let _res = execute(deps.as_mut(), unbond_env.clone(), info.clone(), msg).unwrap();
+
+    let res = query(
+        deps.as_ref(),
+        unbond_env.clone(),
+        QueryMsg::LockInfos {
+            staker_addr: Addr::unchecked("addr"),
+            start_after: None,
+            limit: None,
+            order: None,
+            staking_token: Addr::unchecked("staking"),
+        },
+    )
+    .unwrap();
+    let lock_ids = from_binary::<LockInfosResponse>(&res).unwrap();
+
+    assert_eq!(lock_ids.lock_infos.len(), 1);
+    assert_eq!(lock_ids.lock_infos[0].0, Uint128::from(2u128));
+    assert_eq!(lock_ids.staking_token, Addr::unchecked("staking"));
+    assert_eq!(lock_ids.staker_addr, Addr::unchecked("addr"));
+    assert_eq!(
+        _res.attributes,
+        vec![
+            attr("action", "unbonding"),
+            attr("staker_addr", "addr"),
+            attr("amount", Uint128::from(50u128).to_string()),
+            attr("staking_token", "staking"),
+            attr("lock_id", "2"),
+            attr(
+                "unlock_time",
+                unbond_env
+                    .clone()
+                    .block
+                    .time
+                    .plus_seconds(unbonding_period)
+                    .to_string()
+            ),
+            attr("action", "unbond"),
+            attr("staker_addr", "addr"),
+            attr("amount", Uint128::from(50u128).to_string()),
+            attr("staking_token", "staking"),
+            attr("lock_id", "1"),
+        ]
+    );
+
+    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period + 1);
+
+    let msg = ExecuteMsg::Unbond {
+        staking_token: Addr::unchecked("staking"),
         amount: Uint128::from(0u128),
     };
-    //
     let _res = execute(deps.as_mut(), unbond_env.clone(), info, msg).unwrap();
+
+    let res = query(
+        deps.as_ref(),
+        unbond_env.clone(),
+        QueryMsg::LockInfos {
+            staker_addr: Addr::unchecked("addr"),
+            start_after: None,
+            limit: None,
+            order: None,
+            staking_token: Addr::unchecked("staking"),
+        },
+    )
+    .unwrap();
+
+    let lock_ids = from_binary::<LockInfosResponse>(&res).unwrap();
+    assert_eq!(lock_ids.lock_infos.len(), 0);
 
     assert_eq!(
         _res.attributes,
         vec![
             attr("action", "unbond"),
             attr("staker_addr", "addr"),
-            attr("amount", Uint128::from(100u128).to_string()),
+            attr("amount", Uint128::from(50u128).to_string()),
             attr("staking_token", "staking"),
-            attr("lock_id", "1"),
+            attr("lock_id", "2"),
         ]
-    );
+    )
 }
