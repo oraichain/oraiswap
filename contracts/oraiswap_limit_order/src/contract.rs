@@ -34,8 +34,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
 const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
-const DEFAULT_MARKET_ORDER_SLIPPAGE: &str = "0.005";
-const MAX_MARKET_ORDER_SLIPPAGE: &str = "0.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -402,7 +400,7 @@ pub fn receive_cw20(
                 base_amount,
                 slippage,
             )?;
-            
+
             // Return error if cannot find opposite side market order
             if base_amount_response.market_price.is_zero() {
                 return Err(ContractError::UnableToFindMarketOrder {});
