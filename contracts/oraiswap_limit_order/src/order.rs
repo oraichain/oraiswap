@@ -44,9 +44,6 @@ pub fn submit_order(
 
     // check spread for submit order
     if let Some(spread) = orderbook_pair.spread {
-        if spread >= Decimal::one() {
-            return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
-        }
         let buy_spread_factor = Decimal::one() - spread;
         let sell_spread_factor = Decimal::one() + spread;
         if buy_found && sell_found {

@@ -113,6 +113,11 @@ pub fn execute(
                 asset_infos[1].to_raw(deps.api)?,
             ]);
             let mut orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            if let Some(spread) = spread {
+                if spread >= Decimal::one() {
+                    return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
+                }
+            }
             orderbook_pair.spread = spread;
 
             // update new minium quote amount threshold
