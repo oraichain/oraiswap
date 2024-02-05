@@ -1,10 +1,9 @@
 use crate::contract::validate_migrate_store_status;
 use crate::rewards::before_share_change;
 use crate::state::{
-    increase_unbonding_lock_id, read_all_user_to_lock_ids, read_config, read_is_migrated,
-    read_lock_info, read_pool_info, read_unbonding_period, remove_lock_info, rewards_read,
-    rewards_store, stakers_store, store_is_migrated, store_lock_info, store_pool_info, Config,
-    PoolInfo, RewardInfo,
+    insert_lock_info, read_config, read_is_migrated, read_pool_info, read_unbonding_period,
+    remove_and_accumulate_lock_info, rewards_read, rewards_store, stakers_store, store_is_migrated,
+    store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
     attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
@@ -70,7 +69,7 @@ pub fn unbond(
     let mut response = Response::new();
 
     // withdraw_avaiable_lock
-    let withdraw_response = _withdraw_lock(deps.storage, &env, &staker_addr, &staking_token, None)?;
+    let withdraw_response = _withdraw_lock(deps.storage, &env, &staker_addr, &staking_token)?;
 
     messages.extend(
         withdraw_response
@@ -85,15 +84,11 @@ pub fn unbond(
     // checking bonding period
     if let Ok(period) = read_unbonding_period(deps.storage, staking_token_addr.as_bytes()) {
         if amount.gt(&Uint128::from(0u128)) {
-            let lock_id = increase_unbonding_lock_id(deps.storage)?;
-
             let unlock_time = env.block.time.plus_seconds(period);
-
-            store_lock_info(
+            insert_lock_info(
                 deps.storage,
                 staking_token_addr.as_bytes(),
                 staker_addr.as_bytes(),
-                Uint128::from(lock_id),
                 LockInfo {
                     amount,
                     unlock_time,
@@ -105,8 +100,7 @@ pub fn unbond(
                 attr("staker_addr", staker_addr.as_str()),
                 attr("amount", amount.to_string()),
                 attr("staking_token", staking_token_addr.as_str()),
-                attr("lock_id", lock_id.to_string()),
-                attr("unlock_time", unlock_time.to_string()),
+                attr("unlock_time", unlock_time.seconds().to_string()),
             ])
         }
     } else {
@@ -254,72 +248,22 @@ pub fn _withdraw_lock(
     env: &Env,
     staker_addr: &Addr,
     staking_token: &Addr,
-    lock_id: Option<u64>,
 ) -> StdResult<Response> {
-    match lock_id {
-        Some(lock_id) => {
-            let lock_info = read_lock_info(
-                storage,
-                staking_token.as_bytes(),
-                staker_addr.as_bytes(),
-                Uint128::from(lock_id),
-            )?;
+    // execute 10 lock a time
+    let unlock_amount = remove_and_accumulate_lock_info(
+        storage,
+        staking_token.as_bytes(),
+        staker_addr.as_bytes(),
+        env.block.time,
+    )?;
 
-            if lock_info.unlock_time > env.block.time {
-                return Err(StdError::generic_err("Lock period has not expired yet"));
-            }
-            remove_lock_info(
-                storage,
-                staking_token.as_bytes(),
-                staker_addr.as_bytes(),
-                Uint128::from(lock_id),
-            )?;
-            let response = _unbond(staker_addr, staking_token, lock_info.amount)?;
-            Ok(response.add_attribute("lock_id", lock_id.to_string()))
-        }
-        None => {
-            // execute 10 lock a time
-            let list_lock_info = read_all_user_to_lock_ids(
-                storage,
-                staking_token.as_bytes(),
-                staker_addr.as_bytes(),
-                None,
-                Some(30), // take maxium 30 lock info
-                None,
-            )
-            .map_err(|_| StdError::generic_err("No lock info"))?;
-
-            let mut unbond_responses = vec![];
-            let mut response = Response::new();
-
-            for (lock_id, lock_info) in list_lock_info {
-                if lock_info.unlock_time > env.block.time {
-                    continue;
-                }
-                remove_lock_info(
-                    storage,
-                    staking_token.as_bytes(),
-                    staker_addr.as_bytes(),
-                    lock_id,
-                )?;
-                let unbond_response = _unbond(staker_addr, staking_token, lock_info.amount)?;
-                let unbond_response = unbond_response.add_attribute("lock_id", lock_id.to_string());
-                unbond_responses.push(unbond_response);
-            }
-
-            for res in unbond_responses.into_iter() {
-                response = response.add_messages(
-                    res.clone()
-                        .messages
-                        .into_iter()
-                        .map(|sub_msg| sub_msg.msg)
-                        .collect::<Vec<CosmosMsg>>(),
-                );
-                response = response.add_attributes(res.clone().attributes);
-            }
-            Ok(response)
-        }
+    if unlock_amount.is_zero() {
+        return Ok(Response::new());
     }
+
+    let unbond_response = _unbond(staker_addr, staking_token, unlock_amount)?;
+
+    Ok(unbond_response)
 }
 
 fn _increase_bond_amount(

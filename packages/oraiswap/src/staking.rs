@@ -125,9 +125,6 @@ pub enum QueryMsg {
     #[returns(LockInfosResponse)]
     LockInfos {
         staker_addr: Addr,
-        start_after: Option<Uint128>,
-        limit: Option<u32>,
-        order: Option<i32>,
         staking_token: Addr,
     },
 }
@@ -204,8 +201,14 @@ pub struct LockInfo {
 }
 
 #[cw_serde]
+pub struct LockInfoResponse {
+    pub amount: Uint128,
+    pub unlock_time: u64,
+}
+
+#[cw_serde]
 pub struct LockInfosResponse {
     pub staker_addr: Addr,
     pub staking_token: Addr,
-    pub lock_infos: Vec<(Uint128, LockInfo)>,
+    pub lock_infos: Vec<LockInfoResponse>,
 }

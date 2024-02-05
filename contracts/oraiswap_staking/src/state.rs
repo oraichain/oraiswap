@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
-use oraiswap::{asset::AssetRaw, querier::calc_range_start, staking::LockInfo};
+use oraiswap::{asset::AssetRaw, staking::LockInfo};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Timestamp, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config_v2";
@@ -16,7 +16,6 @@ pub static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
 // Unbonded
 pub static UNBONDING_PERIOD: &[u8] = b"unbonding_period";
 pub static LOCK_INFO: &[u8] = b"locking_users";
-pub static LOCK_ID: &[u8] = b"lock_id";
 
 pub const DEFAULT_LIMIT: u32 = 10;
 pub const MAX_LIMIT: u32 = 30;
@@ -159,79 +158,74 @@ pub fn read_unbonding_period(storage: &dyn Storage, asset_key: &[u8]) -> StdResu
     ReadonlyBucket::new(storage, UNBONDING_PERIOD).load(asset_key)
 }
 
-pub fn increase_unbonding_lock_id(storage: &mut dyn Storage) -> StdResult<u64> {
-    let mut lock_id = singleton(storage, LOCK_ID);
-    let new_lock_id = lock_id.load().unwrap_or(0) + 1;
-    lock_id.save(&new_lock_id)?;
-    Ok(new_lock_id)
-}
-
-pub fn read_unbonding_lock_id(storage: &dyn Storage) -> StdResult<u64> {
-    singleton_read(storage, LOCK_ID).load()
-}
-
-pub fn store_lock_info(
+pub fn insert_lock_info(
     storage: &mut dyn Storage,
     asset_key: &[u8],
     user: &[u8],
-    unbonding_order_id: Uint128,
     lock_info: LockInfo,
 ) -> StdResult<()> {
-    let mut bucket = Bucket::multilevel(storage, &[LOCK_INFO, asset_key, user]);
-    bucket.save(&unbonding_order_id.to_be_bytes(), &lock_info)
-}
+    let mut lock_info_bucket = Bucket::multilevel(storage, &[LOCK_INFO, user]);
+    match lock_info_bucket.may_load(asset_key) {
+        Ok(Some(locks)) => {
+            let mut locks: Vec<LockInfo> = locks;
+            if locks.len() == MAX_LIMIT as usize {
+                return Err(cosmwasm_std::StdError::generic_err(
+                    "Exceed maximum limit of lock info",
+                ));
+            }
+            // append to front of vector
+            locks.insert(0, lock_info);
+            lock_info_bucket.save(asset_key, &locks);
+        }
+        Ok(None) => {
+            lock_info_bucket.save(asset_key, &vec![lock_info]);
+        }
+        Err(_) => {
+            return Err(cosmwasm_std::StdError::generic_err(
+                "Error while saving lock info",
+            ));
+        }
+    }
 
-pub fn read_lock_info(
-    storage: &dyn Storage,
-    asset_key: &[u8],
-    user: &[u8],
-    unbonding_order_id: Uint128,
-) -> StdResult<LockInfo> {
-    ReadonlyBucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
-        .load(&unbonding_order_id.to_be_bytes())
-}
-
-pub fn remove_lock_info(
-    storage: &mut dyn Storage,
-    asset_key: &[u8],
-    user: &[u8],
-    unbonding_order_id: Uint128,
-) -> StdResult<()> {
-    Bucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
-        .remove(&unbonding_order_id.to_be_bytes());
     Ok(())
 }
 
-pub fn read_all_user_to_lock_ids(
+pub fn read_user_lock_info(
     storage: &dyn Storage,
     asset_key: &[u8],
     user: &[u8],
-    start_after: Option<Uint128>,
-    limit: Option<u32>,
-    order: Option<i32>,
-) -> StdResult<Vec<(Uint128, LockInfo)>> {
-    let order_by = Order::try_from(order.unwrap_or(1))?;
+) -> StdResult<Vec<LockInfo>> {
+    match ReadonlyBucket::multilevel(storage, &[LOCK_INFO, user]).may_load(asset_key) {
+        Ok(Some(locks)) => Ok(locks),
+        Ok(None) => Ok(vec![]),
+        Err(_) => {
+            return Err(cosmwasm_std::StdError::generic_err(
+                "Error while saving lock info",
+            ));
+        }
+    }
+}
 
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-
-    let (start, end) = match order_by {
-        Order::Ascending => (
-            calc_range_start(start_after.map(|id| id.to_be_bytes().to_vec())),
-            None,
-        ),
-        Order::Descending => (None, start_after.map(|id| id.to_be_bytes().to_vec())),
-    };
-    ReadonlyBucket::<LockInfo>::multilevel(storage, &[LOCK_INFO, asset_key, user])
-        .range(start.as_deref(), end.as_deref(), order_by)
-        .take(limit)
-        .map(|value| -> StdResult<(Uint128, LockInfo)> {
-            let (lock_id, lock_info) = value?;
-            Ok((
-                (Uint128::from(u128::from_be_bytes(<[u8; 16]>::try_from(lock_id).map_err(
-                    |_| cosmwasm_std::StdError::generic_err("Invalid unbonding order id"),
-                )?))),
-                lock_info,
-            ))
-        })
-        .collect::<StdResult<Vec<(Uint128, LockInfo)>>>()
+pub fn remove_and_accumulate_lock_info(
+    storage: &mut dyn Storage,
+    asset_key: &[u8],
+    user: &[u8],
+    timestamp: Timestamp,
+) -> StdResult<Uint128> {
+    let mut lock_info = read_user_lock_info(storage, asset_key, user)?;
+    let index = lock_info
+        .iter()
+        .position(|lock| lock.unlock_time < timestamp);
+    match index {
+        Some(index) => {
+            let mut bucket = Bucket::multilevel(storage, &[LOCK_INFO, user]);
+            let mut accumulated_amount = Uint128::zero();
+            for lock in lock_info.drain(0..index + 1) {
+                accumulated_amount += lock.amount;
+            }
+            bucket.save(asset_key, &lock_info);
+            Ok(accumulated_amount)
+        }
+        None => Ok(Uint128::zero()),
+    }
 }
