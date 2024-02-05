@@ -1,5 +1,5 @@
 use crate::contract::{execute, instantiate, query, query_get_pools_infomation};
-use crate::state::{store_pool_info, PoolInfo};
+use crate::state::{store_pool_info, PoolInfo, MAX_LIMIT};
 use cosmwasm_std::testing::{
     mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info, MockApi, MockQuerier,
     MockStorage,
@@ -716,8 +716,82 @@ fn test_unbonding_period_happy_case() {
 
 #[test]
 pub fn test_max_exceed_number_lock() {
-    let unbonding_period = 100;
+    let unbonding_period = 10000;
     let mut deps = _setup_staking(Some(unbonding_period));
+    let info = mock_info("addr", &[]);
+    let mut unbond_env = mock_env();
+
+    for i in 0..MAX_LIMIT {
+        let msg = ExecuteMsg::Unbond {
+            staking_token: Addr::unchecked("staking"),
+            amount: Uint128::from(1u128),
+        };
+        let mut clone_unbonded = unbond_env.clone();
+        clone_unbonded.block.time = clone_unbonded
+            .block
+            .time
+            .plus_seconds((i as u64) * unbonding_period / 50);
+        let _res = execute(deps.as_mut(), clone_unbonded, info.clone(), msg).unwrap();
+    }
+    let binary_response = query(
+        deps.as_ref(),
+        unbond_env.clone(),
+        QueryMsg::LockInfos {
+            staker_addr: Addr::unchecked("addr"),
+            staking_token: Addr::unchecked("staking"),
+        },
+    )
+    .unwrap();
+    let lock_infos = from_binary::<LockInfosResponse>(&binary_response).unwrap();
+    assert_eq!(lock_infos.lock_infos.len(), MAX_LIMIT as usize);
+
+    let msg = ExecuteMsg::Unbond {
+        staking_token: Addr::unchecked("staking"),
+        amount: Uint128::from(1u128),
+    };
+    let mut clone_unbonded = unbond_env.clone();
+    clone_unbonded.block.time = clone_unbonded
+        .block
+        .time
+        .plus_seconds(((MAX_LIMIT + 1) as u64) * unbonding_period / 50);
+    let res = execute(deps.as_mut(), clone_unbonded, info.clone(), msg).unwrap_err();
+    if let StdError::GenericErr { msg, .. } = res {
+        assert_eq!(msg, "Exceed maximum limit of lock info");
+    } else {
+        panic!("Must return generic error");
+    }
+
+    // skip to time have unlock all the lock_info
+    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period + 1);
+    let msg = ExecuteMsg::Unbond {
+        staking_token: Addr::unchecked("staking"),
+        amount: Uint128::from(0u128),
+    };
+
+    let res = execute(deps.as_mut(), unbond_env, info.clone(), msg).unwrap();
+
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("action", "unbond"),
+            attr("staker_addr", "addr"),
+            attr("amount", Uint128::from(MAX_LIMIT as u128).to_string()),
+            attr("staking_token", "staking"),
+        ]
+    );
+
+    assert_eq!(
+        res.messages,
+        vec![SubMsg::new(WasmMsg::Execute {
+            contract_addr: "staking".to_string(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: "addr".to_string(),
+                amount: Uint128::from(MAX_LIMIT as u128),
+            })
+            .unwrap(),
+            funds: vec![],
+        }),]
+    )
 }
 
 fn _setup_staking(unbonding_period: Option<u64>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {

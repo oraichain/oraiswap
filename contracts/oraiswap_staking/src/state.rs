@@ -175,10 +175,10 @@ pub fn insert_lock_info(
             }
             // append to front of vector
             locks.insert(0, lock_info);
-            lock_info_bucket.save(asset_key, &locks);
+            let _ = lock_info_bucket.save(asset_key, &locks);
         }
         Ok(None) => {
-            lock_info_bucket.save(asset_key, &vec![lock_info]);
+            let _ = lock_info_bucket.save(asset_key, &vec![lock_info]);
         }
         Err(_) => {
             return Err(cosmwasm_std::StdError::generic_err(
