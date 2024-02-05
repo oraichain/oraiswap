@@ -198,11 +198,9 @@ pub fn read_user_lock_info(
     match ReadonlyBucket::multilevel(storage, &[LOCK_INFO, user]).may_load(asset_key) {
         Ok(Some(locks)) => Ok(locks),
         Ok(None) => Ok(vec![]),
-        Err(_) => {
-            return Err(cosmwasm_std::StdError::generic_err(
-                "Error while saving lock info",
-            ));
-        }
+        Err(_) => Err(cosmwasm_std::StdError::generic_err(
+            "Error while read lock info",
+        )),
     }
 }
 
