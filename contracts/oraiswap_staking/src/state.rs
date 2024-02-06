@@ -221,7 +221,7 @@ pub fn remove_and_accumulate_lock_info(
             for lock in lock_info.drain(0..index + 1) {
                 accumulated_amount += lock.amount;
             }
-            bucket.save(asset_key, &lock_info);
+            bucket.save(asset_key, &lock_info)?;
             Ok(accumulated_amount)
         }
         None => Ok(Uint128::zero()),
