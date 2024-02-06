@@ -47,25 +47,7 @@ pub fn unbond(
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
-
-    let (staking_token_canonicalize, reward_assets) = _decrease_bond_amount(
-        deps.storage,
-        deps.api,
-        &staker_addr_raw,
-        &staking_token,
-        amount,
-    )?;
-
-    let staking_token_addr = deps.api.addr_humanize(&staking_token_canonicalize)?;
-
     let mut messages = vec![];
-    // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
-    messages.extend(
-        reward_assets
-            .into_iter()
-            .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
-            .collect::<StdResult<Vec<CosmosMsg>>>()?,
-    );
     let mut response = Response::new();
 
     // withdraw_avaiable_lock
@@ -79,15 +61,29 @@ pub fn unbond(
             .map(|msg| msg.msg)
             .collect::<Vec<CosmosMsg>>(),
     );
-    let withdraw_attrs = withdraw_response.attributes;
 
-    // checking bonding period
-    if let Ok(period) = read_unbonding_period(deps.storage, staking_token_addr.as_bytes()) {
-        if amount.gt(&Uint128::from(0u128)) {
+    let withdraw_attrs = withdraw_response.attributes;
+    if !amount.is_zero() {
+        let (_, reward_assets) = _decrease_bond_amount(
+            deps.storage,
+            deps.api,
+            &staker_addr_raw,
+            &staking_token,
+            amount,
+        )?;
+        // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
+        messages.extend(
+            reward_assets
+                .into_iter()
+                .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
+                .collect::<StdResult<Vec<CosmosMsg>>>()?,
+        );
+        // checking bonding period
+        if let Ok(period) = read_unbonding_period(deps.storage, staking_token.as_bytes()) {
             let unlock_time = env.block.time.plus_seconds(period);
             insert_lock_info(
                 deps.storage,
-                staking_token_addr.as_bytes(),
+                staking_token.as_bytes(),
                 staker_addr.as_bytes(),
                 LockInfo {
                     amount,
@@ -99,20 +95,20 @@ pub fn unbond(
                 attr("action", "unbonding"),
                 attr("staker_addr", staker_addr.as_str()),
                 attr("amount", amount.to_string()),
-                attr("staking_token", staking_token_addr.as_str()),
+                attr("staking_token", staking_token.as_str()),
                 attr("unlock_time", unlock_time.seconds().to_string()),
             ])
+        } else {
+            let unbond_response = _unbond(&staker_addr, &staking_token, amount)?;
+            messages.extend(
+                unbond_response
+                    .messages
+                    .into_iter()
+                    .map(|msg| msg.msg)
+                    .collect::<Vec<CosmosMsg>>(),
+            );
+            response = response.add_attributes(unbond_response.attributes);
         }
-    } else {
-        let unbond_response = _unbond(&staker_addr, &staking_token_addr, amount)?;
-        messages.extend(
-            unbond_response
-                .messages
-                .into_iter()
-                .map(|msg| msg.msg)
-                .collect::<Vec<CosmosMsg>>(),
-        );
-        response = response.add_attributes(unbond_response.attributes);
     }
     Ok(response
         .add_messages(messages)

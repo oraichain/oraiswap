@@ -650,14 +650,6 @@ fn test_unbonding_period_happy_case() {
     assert_eq!(
         _res.messages,
         vec![
-            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr".to_string(),
-                amount: vec![coin(99u128, ORAI_DENOM)],
-            })),
-            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr".to_string(),
-                amount: vec![coin(199u128, ATOM_DENOM)],
-            })),
             SubMsg::new(WasmMsg::Execute {
                 contract_addr: "staking".to_string(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
@@ -667,6 +659,14 @@ fn test_unbonding_period_happy_case() {
                 .unwrap(),
                 funds: vec![],
             }),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
+                amount: vec![coin(99u128, ORAI_DENOM)],
+            })),
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
+                to_address: "addr".to_string(),
+                amount: vec![coin(199u128, ATOM_DENOM)],
+            })),
         ]
     );
 
