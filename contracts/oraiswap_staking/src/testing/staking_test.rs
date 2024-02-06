@@ -583,6 +583,9 @@ fn test_unbonding_period_happy_case() {
         QueryMsg::LockInfos {
             staker_addr: Addr::unchecked("addr"),
             staking_token: Addr::unchecked("staking"),
+            start_after: None,
+            limit: None,
+            order: None,
         },
     )
     .unwrap();
@@ -617,6 +620,9 @@ fn test_unbonding_period_happy_case() {
         QueryMsg::LockInfos {
             staker_addr: Addr::unchecked("addr"),
             staking_token: Addr::unchecked("staking"),
+            start_after: None,
+            limit: None,
+            order: None,
         },
     )
     .unwrap();
@@ -684,6 +690,9 @@ fn test_unbonding_period_happy_case() {
         QueryMsg::LockInfos {
             staker_addr: Addr::unchecked("addr"),
             staking_token: Addr::unchecked("staking"),
+            start_after: None,
+            limit: None,
+            order: None,
         },
     )
     .unwrap();
@@ -715,7 +724,7 @@ fn test_unbonding_period_happy_case() {
 }
 
 #[test]
-pub fn test_max_exceed_number_lock() {
+pub fn test_multiple_lock() {
     let unbonding_period = 10000;
     let mut deps = _setup_staking(Some(unbonding_period));
     let info = mock_info("addr", &[]);
@@ -739,36 +748,27 @@ pub fn test_max_exceed_number_lock() {
         QueryMsg::LockInfos {
             staker_addr: Addr::unchecked("addr"),
             staking_token: Addr::unchecked("staking"),
+            start_after: None,
+            limit: Some(30),
+            order: None,
         },
     )
     .unwrap();
     let lock_infos = from_binary::<LockInfosResponse>(&binary_response).unwrap();
     assert_eq!(lock_infos.lock_infos.len(), MAX_LIMIT as usize);
 
-    let msg = ExecuteMsg::Unbond {
-        staking_token: Addr::unchecked("staking"),
-        amount: Uint128::from(1u128),
-    };
-    let mut clone_unbonded = unbond_env.clone();
-    clone_unbonded.block.time = clone_unbonded
-        .block
-        .time
-        .plus_seconds(((MAX_LIMIT + 1) as u64) * unbonding_period / 50);
-    let res = execute(deps.as_mut(), clone_unbonded, info.clone(), msg).unwrap_err();
-    if let StdError::GenericErr { msg, .. } = res {
-        assert_eq!(msg, "Exceed maximum limit of lock info");
-    } else {
-        panic!("Must return generic error");
-    }
+    // Since we anchor the timestamp by unbond_env, so we must add the unbonding_period to the
+    // block_time to get the first unlock timestamp. Then, we plus another unbonding_period to get to the rest
+    // of lock
+    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period);
+    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period);
 
-    // skip to time have unlock all the lock_info
-    unbond_env.block.time = unbond_env.block.time.plus_seconds(unbonding_period + 1);
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
         amount: Uint128::from(0u128),
     };
 
-    let res = execute(deps.as_mut(), unbond_env, info.clone(), msg).unwrap();
+    let res = execute(deps.as_mut(), unbond_env.clone(), info.clone(), msg).unwrap();
 
     assert_eq!(
         res.attributes,
@@ -791,7 +791,23 @@ pub fn test_max_exceed_number_lock() {
             .unwrap(),
             funds: vec![],
         }),]
+    );
+
+    // assert after we withdraw all_lock
+    let binary_response = query(
+        deps.as_ref(),
+        unbond_env.clone(),
+        QueryMsg::LockInfos {
+            staker_addr: Addr::unchecked("addr"),
+            staking_token: Addr::unchecked("staking"),
+            start_after: None,
+            limit: None,
+            order: None,
+        },
     )
+    .unwrap();
+    let lock_infos = from_binary::<LockInfosResponse>(&binary_response).unwrap();
+    assert_eq!(lock_infos.lock_infos.len(), 0);
 }
 
 fn _setup_staking(unbonding_period: Option<u64>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {

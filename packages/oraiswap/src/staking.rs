@@ -126,6 +126,10 @@ pub enum QueryMsg {
     LockInfos {
         staker_addr: Addr,
         staking_token: Addr,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        // so can convert or throw error
+        order: Option<i32>,
     },
 }
 

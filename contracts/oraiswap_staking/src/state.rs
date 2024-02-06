@@ -1,7 +1,9 @@
 use cosmwasm_schema::cw_serde;
-use oraiswap::{asset::AssetRaw, staking::LockInfo};
+use oraiswap::{asset::AssetRaw, querier::calc_range_start, staking::LockInfo};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{
+    CanonicalAddr, Decimal, Order, StdError, StdResult, Storage, Timestamp, Uint128,
+};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 
 pub static KEY_CONFIG: &[u8] = b"config_v2";
@@ -164,44 +166,44 @@ pub fn insert_lock_info(
     user: &[u8],
     lock_info: LockInfo,
 ) -> StdResult<()> {
-    let mut lock_info_bucket = Bucket::multilevel(storage, &[LOCK_INFO, user]);
-    match lock_info_bucket.may_load(asset_key) {
-        Ok(Some(locks)) => {
-            let mut locks: Vec<LockInfo> = locks;
-            if locks.len() == MAX_LIMIT as usize {
-                return Err(cosmwasm_std::StdError::generic_err(
-                    "Exceed maximum limit of lock info",
-                ));
-            }
-            // append to front of vector
-            locks.insert(0, lock_info);
-            let _ = lock_info_bucket.save(asset_key, &locks);
-        }
-        Ok(None) => {
-            let _ = lock_info_bucket.save(asset_key, &vec![lock_info]);
-        }
-        Err(_) => {
-            return Err(cosmwasm_std::StdError::generic_err(
-                "Error while saving lock info",
-            ));
-        }
-    }
-
-    Ok(())
+    Bucket::multilevel(storage, &[LOCK_INFO, asset_key, user]).save(
+        &lock_info.unlock_time.seconds().to_be_bytes(),
+        &lock_info.amount,
+    )
 }
 
 pub fn read_user_lock_info(
     storage: &dyn Storage,
     asset_key: &[u8],
     user: &[u8],
+    start_after: Option<u64>,
+    limit: Option<u32>,
+    order: Option<i32>,
 ) -> StdResult<Vec<LockInfo>> {
-    match ReadonlyBucket::multilevel(storage, &[LOCK_INFO, user]).may_load(asset_key) {
-        Ok(Some(locks)) => Ok(locks),
-        Ok(None) => Ok(vec![]),
-        Err(_) => Err(cosmwasm_std::StdError::generic_err(
-            "Error while read lock info",
-        )),
-    }
+    let order_by = Order::try_from(order.unwrap_or(1))?;
+
+    let start_after = start_after.map(|a| a.to_be_bytes().to_vec());
+
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+
+    let (start, end) = match order_by {
+        Order::Ascending => (calc_range_start(start_after), None),
+        Order::Descending => (None, start_after),
+    };
+    ReadonlyBucket::multilevel(storage, &[LOCK_INFO, asset_key, user])
+        .range(start.as_deref(), end.as_deref(), order_by)
+        .take(limit)
+        .map(|item| {
+            let (time, amount) = item?;
+            Ok(LockInfo {
+                unlock_time: Timestamp::from_seconds(u64::from_be_bytes(
+                    <[u8; 8]>::try_from(time)
+                        .map_err(|_| StdError::generic_err("Casting u64 to timestamp fail"))?,
+                )),
+                amount,
+            })
+        })
+        .collect()
 }
 
 pub fn remove_and_accumulate_lock_info(
@@ -210,20 +212,26 @@ pub fn remove_and_accumulate_lock_info(
     user: &[u8],
     timestamp: Timestamp,
 ) -> StdResult<Uint128> {
-    let mut lock_info = read_user_lock_info(storage, asset_key, user)?;
-    let index = lock_info
-        .iter()
-        .position(|lock| lock.unlock_time < timestamp);
-    match index {
-        Some(index) => {
-            let mut bucket = Bucket::multilevel(storage, &[LOCK_INFO, user]);
-            let mut accumulated_amount = Uint128::zero();
-            for lock in lock_info.drain(0..index + 1) {
-                accumulated_amount += lock.amount;
-            }
-            bucket.save(asset_key, &lock_info)?;
-            Ok(accumulated_amount)
+    let mut bucket = Bucket::<Uint128>::multilevel(storage, &[LOCK_INFO, asset_key, user]);
+    let mut remove_timestamps = vec![];
+    let mut accumulate_amount = Uint128::zero();
+    for item in bucket.range(None, None, Order::Ascending) {
+        let (time, amount) = item?;
+        let seconds = u64::from_be_bytes(
+            <[u8; 8]>::try_from(time.clone())
+                .map_err(|_| StdError::generic_err("Casting vec to be_bytes fail"))?,
+        );
+        if seconds > timestamp.seconds() {
+            break;
         }
-        None => Ok(Uint128::zero()),
+        remove_timestamps.push(time);
+        accumulate_amount += amount;
     }
+
+    // remove timestamp
+    for time in remove_timestamps {
+        bucket.remove(&time);
+    }
+
+    Ok(accumulate_amount)
 }

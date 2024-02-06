@@ -346,7 +346,18 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::LockInfos {
             staker_addr,
             staking_token,
-        } => to_binary(&query_lock_infos(deps, _env, staker_addr, staking_token)?),
+            start_after,
+            limit,
+            order,
+        } => to_binary(&query_lock_infos(
+            deps,
+            _env,
+            staker_addr,
+            staking_token,
+            start_after,
+            limit,
+            order,
+        )?),
         QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
     }
 }
@@ -356,11 +367,17 @@ pub fn query_lock_infos(
     _env: Env,
     staker_addr: Addr,
     staking_token: Addr,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+    order: Option<i32>,
 ) -> StdResult<LockInfosResponse> {
     let lock_infos = read_user_lock_info(
         deps.storage,
         staking_token.as_bytes(),
         staker_addr.as_bytes(),
+        start_after,
+        limit,
+        order,
     )?;
     Ok(LockInfosResponse {
         staker_addr,
