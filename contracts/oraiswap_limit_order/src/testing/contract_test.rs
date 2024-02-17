@@ -8,9 +8,10 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
-    BaseAmountResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
-    OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, TicksResponse,
+    BaseAmountResponse, ContractInfo, ContractInfoResponse, Cw20HookMsg, ExecuteMsg,
+    InstantiateMsg, LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse,
+    OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus, OrdersResponse,
+    QueryMsg, TicksResponse,
 };
 
 use crate::jsonstr;
@@ -345,6 +346,75 @@ fn test_get_market_assets_sell_side() {
     // assert quote and base amount
     assert_eq!(quote_asset.amount, expected_quote_amount);
     assert_eq!(base_amount, paid_assets[0].amount);
+}
+
+#[test]
+fn test_withdraw_token() {
+    let (mut app, limit_order_addr) = basic_fixture();
+    // case 1: try to withdraw tokens using non-admin addr => unauthorized
+    let asset_infos = [
+        AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let asset = Asset {
+        info: asset_infos.first().unwrap().clone(),
+        amount: Uint128::from(10u128),
+    };
+    let update_msg = ExecuteMsg::WithdrawToken {
+        asset: asset.clone(),
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &update_msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10u128), // deposit some tokens into the contract so we can mock withdrawing tokens
+            }]
+        )
+        .is_err(),
+        true
+    );
+
+    // case 2: good case, admin should be able to withdraw tokens
+    let result = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &update_msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10u128), // deposit some tokens into the contract so we can mock withdrawing tokens
+            }],
+        )
+        .unwrap();
+    let info: ContractInfoResponse = app
+        .query(limit_order_addr, &QueryMsg::ContractInfo {})
+        .unwrap();
+    for event in result.events {
+        if event.ty.eq("wasm") {
+            for attr in event.attributes.clone() {
+                if attr.key.eq("action") {
+                    assert_eq!(attr.value, "withdraw_token");
+                }
+                if attr.key.eq("token") {
+                    assert_eq!(attr.value, asset.to_string());
+                }
+            }
+        }
+        if event.ty.eq("transfer") {
+            for attr in event.attributes {
+                if attr.key.eq("recipient") {
+                    assert_eq!(attr.value, info.admin.to_string())
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -2369,7 +2439,6 @@ fn submit_market_order_native_token() {
     );
     app.assert_fail(res);
 
-
     // CASE 4: buy market order with slippage = 0.005
     base_amount = Uint128::from(800_000u128);
     quote_amount = Uint128::from(4_000_000u128);
@@ -2408,7 +2477,9 @@ fn submit_market_order_native_token() {
     assert_eq!(
         base_amount_res_4,
         BaseAmountResponse {
-            market_price: Decimal::from_ratio(quote_amount, base_amount).checked_mul(Decimal::one() + slippage).unwrap(),
+            market_price: Decimal::from_ratio(quote_amount, base_amount)
+                .checked_mul(Decimal::one() + slippage)
+                .unwrap(),
             expected_base_amount: base_amount
         }
     );
@@ -2657,13 +2728,12 @@ fn submit_market_order_cw20_token() {
         .unwrap(),
     };
 
-    let res = app
-        .execute(
-            Addr::unchecked("addr0000"),
-            usdt_token[0].clone(),
-            &msg,
-            &[],
-        );
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        usdt_token[0].clone(),
+        &msg,
+        &[],
+    );
     app.assert_fail(res);
 
     // CASE 4: failure case - no buy depth
@@ -2682,15 +2752,13 @@ fn submit_market_order_cw20_token() {
         .unwrap(),
     };
 
-    let res = app
-        .execute(
-            Addr::unchecked("addr0000"),
-            usdt_token[0].clone(),
-            &msg,
-            &[],
-        );
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        usdt_token[0].clone(),
+        &msg,
+        &[],
+    );
     app.assert_fail(res);
-
 
     // CASE 5: buy market order with slippage = 0.005
     base_amount = Uint128::from(800_000u128);
@@ -2730,7 +2798,9 @@ fn submit_market_order_cw20_token() {
     assert_eq!(
         base_amount_res_5,
         BaseAmountResponse {
-            market_price: Decimal::from_ratio(quote_amount, base_amount).checked_mul(Decimal::one() + slippage).unwrap(),
+            market_price: Decimal::from_ratio(quote_amount, base_amount)
+                .checked_mul(Decimal::one() + slippage)
+                .unwrap(),
             expected_base_amount: base_amount
         }
     );
@@ -2755,7 +2825,8 @@ fn submit_market_order_cw20_token() {
             usdt_token[0].clone(),
             &msg,
             &[],
-        ).unwrap();
+        )
+        .unwrap();
 
     println!("matching result: {:?}", res);
 }
