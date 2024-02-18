@@ -31,6 +31,7 @@ fn test_deprecate() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -236,7 +237,13 @@ fn test_deprecate() {
         res,
         RewardInfoResponse {
             staker_addr: Addr::unchecked("addr"),
-            reward_infos: vec![],
+            reward_infos: vec![RewardInfoResponseItem {
+                staking_token: Addr::unchecked("new_staking"),
+                bond_amount: Uint128::from(0u128),
+                pending_reward: Uint128::from(0u128),
+                pending_withdraw: vec![],
+                should_migrate: None
+            }],
         }
     );
 

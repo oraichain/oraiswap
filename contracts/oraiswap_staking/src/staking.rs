@@ -1,8 +1,9 @@
 use crate::contract::validate_migrate_store_status;
 use crate::rewards::before_share_change;
 use crate::state::{
-    read_config, read_is_migrated, read_pool_info, rewards_read, rewards_store, stakers_store,
-    store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
+    insert_lock_info, read_config, read_is_migrated, read_pool_info, read_unbonding_period,
+    remove_and_accumulate_lock_info, rewards_read, rewards_store, stakers_store, store_is_migrated,
+    store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
     attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
@@ -12,7 +13,7 @@ use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::pair::ExecuteMsg as PairExecuteMsg;
 use oraiswap::querier::{query_pair_info, query_token_balance};
-use oraiswap::staking::ExecuteMsg;
+use oraiswap::staking::{ExecuteMsg, LockInfo};
 
 pub fn bond(
     deps: DepsMut,
@@ -39,46 +40,79 @@ pub fn bond(
 
 pub fn unbond(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     staker_addr: Addr,
     staking_token: Addr,
     amount: Uint128,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
-    let (staking_token, reward_assets) = _decrease_bond_amount(
-        deps.storage,
-        deps.api,
-        &staker_addr_raw,
-        &staking_token,
-        amount,
-    )?;
+    let mut messages = vec![];
+    let mut response = Response::new();
 
-    let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
-    let mut messages = vec![WasmMsg::Execute {
-        contract_addr: staking_token_addr.to_string(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: staker_addr.to_string(),
-            amount,
-        })?,
-        funds: vec![],
-    }
-    .into()];
+    // withdraw_avaiable_lock
+    let withdraw_response = _withdraw_lock(deps.storage, &env, &staker_addr, &staking_token)?;
 
-    // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
     messages.extend(
-        reward_assets
+        withdraw_response
+            .clone()
+            .messages
             .into_iter()
-            .map(|ra| Ok(ra.into_msg(None, &deps.querier, staker_addr.clone())?))
-            .collect::<StdResult<Vec<CosmosMsg>>>()?,
+            .map(|msg| msg.msg)
+            .collect::<Vec<CosmosMsg>>(),
     );
 
-    Ok(Response::new().add_messages(messages).add_attributes([
-        attr("action", "unbond"),
-        attr("staker_addr", staker_addr.as_str()),
-        attr("amount", &amount.to_string()),
-        attr("staking_token", staking_token_addr.as_str()),
-    ]))
+    let withdraw_attrs = withdraw_response.attributes;
+    if !amount.is_zero() {
+        let (_, reward_assets) = _decrease_bond_amount(
+            deps.storage,
+            deps.api,
+            &staker_addr_raw,
+            &staking_token,
+            amount,
+        )?;
+        // withdraw pending_withdraw assets (accumulated when changing reward_per_sec)
+        messages.extend(
+            reward_assets
+                .into_iter()
+                .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
+                .collect::<StdResult<Vec<CosmosMsg>>>()?,
+        );
+        // checking bonding period
+        if let Ok(period) = read_unbonding_period(deps.storage, staking_token.as_bytes()) {
+            let unlock_time = env.block.time.plus_seconds(period);
+            insert_lock_info(
+                deps.storage,
+                staking_token.as_bytes(),
+                staker_addr.as_bytes(),
+                LockInfo {
+                    amount,
+                    unlock_time,
+                },
+            )?;
+
+            response = response.add_attributes([
+                attr("action", "unbonding"),
+                attr("staker_addr", staker_addr.as_str()),
+                attr("amount", amount.to_string()),
+                attr("staking_token", staking_token.as_str()),
+                attr("unlock_time", unlock_time.seconds().to_string()),
+            ])
+        } else {
+            let unbond_response = _unbond(&staker_addr, &staking_token, amount)?;
+            messages.extend(
+                unbond_response
+                    .messages
+                    .into_iter()
+                    .map(|msg| msg.msg)
+                    .collect::<Vec<CosmosMsg>>(),
+            );
+            response = response.add_attributes(unbond_response.attributes);
+        }
+    }
+    Ok(response
+        .add_messages(messages)
+        .add_attributes(withdraw_attrs))
 }
 
 pub fn auto_stake(
@@ -205,6 +239,29 @@ pub fn auto_stake_hook(
     bond(deps, staker_addr, staking_token, amount_to_stake)
 }
 
+pub fn _withdraw_lock(
+    storage: &mut dyn Storage,
+    env: &Env,
+    staker_addr: &Addr,
+    staking_token: &Addr,
+) -> StdResult<Response> {
+    // execute 10 lock a time
+    let unlock_amount = remove_and_accumulate_lock_info(
+        storage,
+        staking_token.as_bytes(),
+        staker_addr.as_bytes(),
+        env.block.time,
+    )?;
+
+    if unlock_amount.is_zero() {
+        return Ok(Response::new());
+    }
+
+    let unbond_response = _unbond(staker_addr, staking_token, unlock_amount)?;
+
+    Ok(unbond_response)
+}
+
 fn _increase_bond_amount(
     storage: &mut dyn Storage,
     api: &dyn Api,
@@ -304,19 +361,34 @@ fn _decrease_bond_amount(
         // if pending_withdraw is not empty, then return reward_assets to withdraw money
         reward_assets = reward_info
             .pending_withdraw
-            .into_iter()
-            .map(|ra| Ok(ra.to_normal(api)?))
+            .iter()
+            .map(|ra| ra.to_normal(api))
             .collect::<StdResult<Vec<Asset>>>()?;
-
-        rewards_store(storage, staker_addr).remove(&asset_key);
-        // remove staker from the pool
-        stakers_store(storage, &asset_key).remove(staker_addr);
-    } else {
-        rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
+        reward_info.pending_withdraw = vec![];
     }
+    rewards_store(storage, staker_addr).save(&asset_key, &reward_info)?;
 
     // Update pool info
     store_pool_info(storage, &asset_key, &pool_info)?;
 
     Ok((staking_token, reward_assets))
+}
+
+fn _unbond(staker_addr: &Addr, staking_token_addr: &Addr, amount: Uint128) -> StdResult<Response> {
+    let messages: Vec<CosmosMsg> = vec![WasmMsg::Execute {
+        contract_addr: staking_token_addr.to_string(),
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: staker_addr.to_string(),
+            amount,
+        })?,
+        funds: vec![],
+    }
+    .into()];
+
+    Ok(Response::new().add_messages(messages).add_attributes([
+        attr("action", "unbond"),
+        attr("staker_addr", staker_addr.as_str()),
+        attr("amount", amount.to_string()),
+        attr("staking_token", staking_token_addr.as_str()),
+    ]))
 }
