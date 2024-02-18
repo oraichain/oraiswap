@@ -244,6 +244,19 @@ pub fn execute(
             execute_matching_orders(deps, info, asset_infos, limit)
         }
         ExecuteMsg::RemoveOrderBookPair { asset_infos } => remove_pair(deps, info, asset_infos),
+        ExecuteMsg::WithdrawToken { asset } => {
+            let contract_info = read_config(deps.storage)?;
+            validate_admin(deps.api, contract_info.admin.clone(), info.sender.as_str())?;
+            let msg = asset.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_humanize(&contract_info.admin)?,
+            )?;
+            Ok(Response::new().add_message(msg).add_attributes(vec![
+                ("action", "withdraw_token"),
+                ("token", &asset.to_string()),
+            ]))
+        }
     }
 }
 

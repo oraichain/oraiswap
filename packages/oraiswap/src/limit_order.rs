@@ -123,6 +123,10 @@ pub enum ExecuteMsg {
     RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
+
+    WithdrawToken {
+        asset: Asset,
+    },
 }
 
 #[cw_serde]
