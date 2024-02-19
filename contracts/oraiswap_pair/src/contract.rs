@@ -119,7 +119,7 @@ pub fn execute(
         }
         ExecuteMsg::EnableWhitelist { status } => {
             // check permission
-
+            assert_admin(deps.as_ref(), info.sender.to_string())?;
             WHITELISTED.save(deps.storage, &status)?;
 
             Ok(Response::default().add_attributes(vec![
