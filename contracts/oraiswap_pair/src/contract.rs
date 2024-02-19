@@ -563,22 +563,15 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
 }
 
 fn query_trader_is_whitelisted(deps: Deps, trader: Addr) -> StdResult<bool> {
-    let is_whitelisted = assert_is_open_for_whitelisted_trader(deps, trader);
-
-    if is_whitelisted.is_err() {
-        return Ok(false);
-    }
-    Ok(true)
+    Ok(assert_is_open_for_whitelisted_trader(deps, trader).is_ok())
 }
 
 fn query_admin(deps: Deps) -> StdResult<String> {
     let admin = ADMIN.may_load(deps.storage)?;
-
-    if admin.is_none() {
-        return Ok(String::default());
-    }
-
-    Ok(deps.api.addr_humanize(&admin.unwrap()).unwrap().to_string())
+    Ok(match admin {
+        None => String::default(),
+        Some(admin) => deps.api.addr_humanize(&admin)?.to_string(),
+    })
 }
 
 pub fn query_pair_info(deps: Deps) -> StdResult<PairResponse> {
@@ -754,6 +747,10 @@ fn assert_slippage_tolerance(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+    if let Some(admin) = msg.admin {
+        let admin_canonical = deps.api.addr_canonicalize(&admin)?;
+        ADMIN.save(deps.storage, &admin_canonical)?;
+    }
     Ok(Response::default())
 }

@@ -128,7 +128,9 @@ pub struct ReverseSimulationResponse {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub admin: Option<String>,
+}
 
 pub fn compute_swap(
     offer_pool: Uint128,
