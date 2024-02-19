@@ -165,13 +165,22 @@ pub fn execute_create_pair(
             WasmMsg::Instantiate {
                 code_id: config.pair_code_id,
                 funds: vec![],
-                admin: Some(pair_admin.unwrap_or(env.contract.address.to_string())),
+                admin: Some(
+                    pair_admin
+                        .clone()
+                        .unwrap_or(env.contract.address.to_string()),
+                ),
                 label: "pair".to_string(),
                 msg: to_binary(&PairInstantiateMsg {
                     oracle_addr: deps.api.addr_humanize(&config.oracle_addr)?,
                     asset_infos: asset_infos.clone(),
                     token_code_id: config.token_code_id,
                     commission_rate: Some(config.commission_rate),
+                    admin: Some(
+                        deps.api.addr_validate(
+                            &pair_admin.unwrap_or(env.contract.address.to_string()),
+                        )?,
+                    ),
                 })?,
             },
             INSTANTIATE_REPLY_ID,
