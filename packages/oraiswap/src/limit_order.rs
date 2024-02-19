@@ -86,6 +86,7 @@ pub enum ExecuteMsg {
     UpdateOrderbookPair {
         asset_infos: [AssetInfo; 2],
         spread: Option<Decimal>,
+        min_quote_coin_amount: Option<Uint128>,
     },
 
     ///////////////////////
@@ -94,6 +95,17 @@ pub enum ExecuteMsg {
     SubmitOrder {
         direction: OrderDirection, // default is buy, with sell then it is reversed
         assets: [Asset; 2],
+    },
+
+    ///////////////////////
+    /// User Operations ///
+    ///////////////////////
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
+        quote_amount: Uint128,
+        slippage: Option<Decimal>,
     },
 
     CancelOrder {
@@ -111,6 +123,10 @@ pub enum ExecuteMsg {
     RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],
     },
+
+    WithdrawToken {
+        asset: Asset,
+    },
 }
 
 #[cw_serde]
@@ -118,6 +134,13 @@ pub enum Cw20HookMsg {
     SubmitOrder {
         direction: OrderDirection,
         assets: [Asset; 2],
+    },
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
+        quote_amount: Uint128,
+        slippage: Option<Decimal>,
     },
 }
 
@@ -177,6 +200,13 @@ pub enum QueryMsg {
     OrderBookMatchable { asset_infos: [AssetInfo; 2] },
     #[returns(Decimal)]
     MidPrice { asset_infos: [AssetInfo; 2] },
+    #[returns(BaseAmountResponse)]
+    PriceByBaseAmount {
+        asset_infos: [AssetInfo; 2],
+        base_amount: Uint128,
+        direction: OrderDirection,
+        slippage: Option<Decimal>,
+    },
 }
 
 #[cw_serde]
@@ -239,6 +269,12 @@ pub struct LastOrderIdResponse {
 #[cw_serde]
 pub struct OrderBookMatchableResponse {
     pub is_matchable: bool,
+}
+
+#[cw_serde]
+pub struct BaseAmountResponse {
+    pub market_price: Decimal,
+    pub expected_base_amount: Uint128,
 }
 
 /// We currently take no arguments for migrations

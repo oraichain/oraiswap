@@ -146,7 +146,7 @@ pub fn update_config(
     rewarder: Option<Addr>,
     migrate_store_status: Option<bool>,
 ) -> StdResult<Response> {
-    let mut config: Config = read_config(deps.storage)?;
+    let mut config = read_config(deps.storage)?;
 
     if deps.api.addr_canonicalize(info.sender.as_str())? != config.owner {
         return Err(StdError::generic_err("unauthorized"));

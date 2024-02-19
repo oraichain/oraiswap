@@ -144,8 +144,8 @@ pub fn compute_swap(
     let offer_amount: Uint256 = offer_amount.into();
 
     // offer => ask
+    // let cp = offer_pool * ask_pool;
     // ask_amount = (ask_pool - cp / (offer_pool + offer_amount)) * (1 - commission_rate)
-    let cp = offer_pool * ask_pool;
 
     let return_amount = (ask_pool * offer_amount) / (offer_pool + offer_amount);
 
