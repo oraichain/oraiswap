@@ -558,6 +558,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
         QueryMsg::TraderIsWhitelisted { trader } => {
             Ok(to_binary(&query_trader_is_whitelisted(deps, trader)?)?)
         }
+        QueryMsg::Admin {} => Ok(to_binary(&query_admin(deps)?)?),
     }
 }
 
@@ -568,6 +569,16 @@ fn query_trader_is_whitelisted(deps: Deps, trader: Addr) -> StdResult<bool> {
         return Ok(false);
     }
     Ok(true)
+}
+
+fn query_admin(deps: Deps) -> StdResult<String> {
+    let admin = ADMIN.may_load(deps.storage)?;
+
+    if admin.is_none() {
+        return Ok(String::default());
+    }
+
+    Ok(deps.api.addr_humanize(&admin.unwrap()).unwrap().to_string())
 }
 
 pub fn query_pair_info(deps: Deps) -> StdResult<PairResponse> {
