@@ -57,9 +57,11 @@ pub fn execute(
             minimum_receive,
             to,
         } => execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
-        ExecuteMsg::ExecuteSwapOperation { operation, to } => {
-            execute_swap_operation(deps, env, info, operation, to)
-        }
+        ExecuteMsg::ExecuteSwapOperation {
+            operation,
+            to,
+            sender,
+        } => execute_swap_operation(deps, env, info, operation, to, sender),
 
         ExecuteMsg::AssertMinimumReceive {
             asset_info,

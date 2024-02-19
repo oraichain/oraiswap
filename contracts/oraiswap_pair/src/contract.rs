@@ -539,7 +539,7 @@ fn assert_is_open_for_whitelisted_trader(deps: Deps, trader: Addr) -> Result<(),
         .unwrap_or(false);
 
     if !trader_whitelisted {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::PoolWhitelisted {});
     }
 
     Ok(())

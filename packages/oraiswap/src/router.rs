@@ -46,6 +46,7 @@ pub enum ExecuteMsg {
     ExecuteSwapOperation {
         operation: SwapOperation,
         to: Option<Addr>,
+        sender: Addr,
     },
     /// Internal use
     /// Check the swap amount is exceed minimum_receive

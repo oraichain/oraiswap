@@ -11,7 +11,7 @@ use crate::state::{Config, CONFIG};
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::oracle::OracleContract;
-use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20};
+use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20, QueryMsg as PairQueryMsg};
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
 use oraiswap::router::{ExecuteMsg, SwapOperation};
 
@@ -23,6 +23,7 @@ pub fn execute_swap_operation(
     info: MessageInfo,
     operation: SwapOperation,
     to: Option<Addr>,
+    sender: Addr,
 ) -> Result<Response, ContractError> {
     if env.contract.address != info.sender {
         return Err(ContractError::Unauthorized {});
@@ -52,6 +53,19 @@ pub fn execute_swap_operation(
                     &[offer_asset_info.clone(), ask_asset_info.clone()],
                 )
             })?;
+
+            // If there is an error, the default is for the pool to be open to everyone
+            let is_whitelisted: bool = match deps.querier.query_wasm_smart(
+                pair_info.contract_addr.to_string(),
+                &PairQueryMsg::TraderIsWhitelisted { trader: sender },
+            ) {
+                Ok(val) => val,
+                Err(_) => true,
+            };
+
+            if !is_whitelisted {
+                return Err(ContractError::PoolWhitelisted {});
+            }
 
             let amount = match offer_asset_info.clone() {
                 AssetInfo::NativeToken { denom } => {
@@ -99,7 +113,7 @@ pub fn execute_swap_operations(
     // Assert the operations are properly set
     assert_operations(&operations)?;
 
-    let to = to.unwrap_or(sender);
+    let to = to.unwrap_or(sender.clone());
     let target_asset_info = operations.last().unwrap().get_target_asset_info();
 
     let mut operation_index = 0;
@@ -117,6 +131,7 @@ pub fn execute_swap_operations(
                     } else {
                         None
                     },
+                    sender: sender.clone(),
                 })?,
             }))
         })
