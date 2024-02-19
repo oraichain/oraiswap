@@ -555,7 +555,19 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
         QueryMsg::ReverseSimulation { ask_asset } => {
             Ok(to_binary(&query_reverse_simulation(deps, ask_asset)?)?)
         }
+        QueryMsg::TraderIsWhitelisted { trader } => {
+            Ok(to_binary(&query_trader_is_whitelisted(deps, trader)?)?)
+        }
     }
+}
+
+fn query_trader_is_whitelisted(deps: Deps, trader: Addr) -> StdResult<bool> {
+    let is_whitelisted = assert_is_open_for_whitelisted_trader(deps, trader);
+
+    if is_whitelisted.is_err() {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 pub fn query_pair_info(deps: Deps) -> StdResult<PairResponse> {

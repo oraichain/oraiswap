@@ -92,6 +92,8 @@ pub enum QueryMsg {
     Simulation { offer_asset: Asset },
     #[returns(ReverseSimulationResponse)]
     ReverseSimulation { ask_asset: Asset },
+    #[returns(bool)]
+    TraderIsWhitelisted { trader: Addr },
 }
 
 // We define a custom struct for each query response
