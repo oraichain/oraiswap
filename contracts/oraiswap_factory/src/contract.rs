@@ -159,28 +159,21 @@ pub fn execute_create_pair(
             commission_rate: config.commission_rate.clone(),
         },
     )?;
+    let pair_admin = pair_admin.unwrap_or(env.contract.address.to_string());
 
     Ok(Response::new()
         .add_submessage(SubMsg::reply_on_success(
             WasmMsg::Instantiate {
                 code_id: config.pair_code_id,
                 funds: vec![],
-                admin: Some(
-                    pair_admin
-                        .clone()
-                        .unwrap_or(env.contract.address.to_string()),
-                ),
+                admin: Some(pair_admin.clone()),
                 label: "pair".to_string(),
                 msg: to_binary(&PairInstantiateMsg {
                     oracle_addr: deps.api.addr_humanize(&config.oracle_addr)?,
                     asset_infos: asset_infos.clone(),
                     token_code_id: config.token_code_id,
                     commission_rate: Some(config.commission_rate),
-                    admin: Some(
-                        deps.api.addr_validate(
-                            &pair_admin.unwrap_or(env.contract.address.to_string()),
-                        )?,
-                    ),
+                    admin: Some(deps.api.addr_validate(&pair_admin)?),
                 })?,
             },
             INSTANTIATE_REPLY_ID,
