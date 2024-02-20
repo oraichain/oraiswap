@@ -1,4 +1,4 @@
-use crate::state::PAIR_INFO;
+use crate::state::{ADMIN, PAIR_INFO, WHITELISTED, WHITELISTED_TRADERS};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
@@ -50,6 +50,10 @@ pub fn instantiate(
             .commission_rate
             .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
     };
+
+    if let Some(admin) = msg.admin {
+        ADMIN.save(deps.storage, &deps.api.addr_canonicalize(admin.as_str())?)?;
+    }
 
     PAIR_INFO.save(deps.storage, pair_info)?;
 
@@ -113,6 +117,18 @@ pub fn execute(
                 to,
             )
         }
+        ExecuteMsg::EnableWhitelist { status } => {
+            // check permission
+            assert_admin(deps.as_ref(), info.sender.to_string())?;
+            WHITELISTED.save(deps.storage, &status)?;
+
+            Ok(Response::default().add_attributes(vec![
+                ("action", "enable_whitelisted"),
+                ("status", &status.to_string()),
+            ]))
+        }
+        ExecuteMsg::RegisterTrader { traders } => execute_register_traders(deps, info, traders),
+        ExecuteMsg::DeregisterTrader { traders } => execute_deregister_traders(deps, info, traders),
     }
 }
 
@@ -209,6 +225,9 @@ pub fn provide_liquidity(
     slippage_tolerance: Option<Decimal>,
     receiver: Option<Addr>,
 ) -> Result<Response, ContractError> {
+    // check pool is only open for whitelisted trader
+    assert_is_open_for_whitelisted_trader(deps.as_ref(), info.sender.clone())?;
+
     for asset in assets.iter() {
         asset.assert_sent_native_token_balance(&info)?;
     }
@@ -305,6 +324,9 @@ pub fn withdraw_liquidity(
     sender: Addr,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    // check pool is only open for whitelisted trader
+    assert_is_open_for_whitelisted_trader(deps.as_ref(), sender.clone())?;
+
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
     let liquidity_addr = deps.api.addr_humanize(&pair_info.liquidity_token)?;
 
@@ -371,6 +393,9 @@ pub fn swap(
     max_spread: Option<Decimal>,
     to: Option<Addr>,
 ) -> Result<Response, ContractError> {
+    // check pool is only open for whitelisted trader
+    assert_is_open_for_whitelisted_trader(deps.as_ref(), sender.clone())?;
+
     offer_asset.assert_sent_native_token_balance(&info)?;
 
     let pair_info: PairInfoRaw = PAIR_INFO.load(deps.storage)?;
@@ -454,6 +479,71 @@ pub fn swap(
     ]))
 }
 
+fn execute_register_traders(
+    deps: DepsMut,
+    info: MessageInfo,
+    traders: Vec<Addr>,
+) -> Result<Response, ContractError> {
+    // check permission
+    assert_admin(deps.as_ref(), info.sender.to_string())?;
+
+    // add traders to whitelist
+    for trader in &traders {
+        WHITELISTED_TRADERS.save(deps.storage, trader, &true)?;
+    }
+
+    Ok(Response::new().add_attributes(vec![("action", "register_trader")]))
+}
+
+fn execute_deregister_traders(
+    deps: DepsMut,
+    info: MessageInfo,
+    traders: Vec<Addr>,
+) -> Result<Response, ContractError> {
+    // check permission
+    assert_admin(deps.as_ref(), info.sender.to_string())?;
+
+    // remove traders from whitelist
+    for trader in &traders {
+        WHITELISTED_TRADERS.save(deps.storage, trader, &false)?;
+    }
+
+    Ok(Response::new().add_attributes(vec![("action", "deregister_trader")]))
+}
+
+fn assert_admin(deps: Deps, sender: String) -> Result<(), ContractError> {
+    let admin = ADMIN.may_load(deps.storage)?;
+
+    if admin.is_none() {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let sender_raw = deps.api.addr_canonicalize(&sender)?;
+
+    if sender_raw != admin.unwrap() {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    Ok(())
+}
+
+fn assert_is_open_for_whitelisted_trader(deps: Deps, trader: Addr) -> Result<(), ContractError> {
+    let is_whitelisted = WHITELISTED.may_load(deps.storage)?.unwrap_or(false);
+
+    if !is_whitelisted {
+        return Ok(());
+    }
+
+    let trader_whitelisted = WHITELISTED_TRADERS
+        .may_load(deps.storage, &trader)?
+        .unwrap_or(false);
+
+    if !trader_whitelisted {
+        return Err(ContractError::PoolWhitelisted {});
+    }
+
+    Ok(())
+}
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
@@ -465,7 +555,23 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
         QueryMsg::ReverseSimulation { ask_asset } => {
             Ok(to_binary(&query_reverse_simulation(deps, ask_asset)?)?)
         }
+        QueryMsg::TraderIsWhitelisted { trader } => {
+            Ok(to_binary(&query_trader_is_whitelisted(deps, trader)?)?)
+        }
+        QueryMsg::Admin {} => Ok(to_binary(&query_admin(deps)?)?),
     }
+}
+
+fn query_trader_is_whitelisted(deps: Deps, trader: Addr) -> StdResult<bool> {
+    Ok(assert_is_open_for_whitelisted_trader(deps, trader).is_ok())
+}
+
+fn query_admin(deps: Deps) -> StdResult<String> {
+    let admin = ADMIN.may_load(deps.storage)?;
+    Ok(match admin {
+        None => String::default(),
+        Some(admin) => deps.api.addr_humanize(&admin)?.to_string(),
+    })
 }
 
 pub fn query_pair_info(deps: Deps) -> StdResult<PairResponse> {
@@ -641,6 +747,10 @@ fn assert_slippage_tolerance(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+    if let Some(admin) = msg.admin {
+        let admin_canonical = deps.api.addr_canonicalize(&admin)?;
+        ADMIN.save(deps.storage, &admin_canonical)?;
+    }
     Ok(Response::default())
 }

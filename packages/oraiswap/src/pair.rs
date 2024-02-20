@@ -25,6 +25,8 @@ pub struct InstantiateMsg {
     pub oracle_addr: Addr,
 
     pub commission_rate: Option<String>,
+    // admin
+    pub admin: Option<Addr>,
 }
 
 #[cw_serde]
@@ -42,6 +44,19 @@ pub enum ExecuteMsg {
         belief_price: Option<Decimal>,
         max_spread: Option<Decimal>,
         to: Option<Addr>,
+    },
+    /// Turn on/off only whitelisted address can interact with pool
+    EnableWhitelist {
+        status: bool,
+    },
+    // Add trader to  whitelist
+    RegisterTrader {
+        traders: Vec<Addr>,
+    },
+
+    // remove trader from whitelist
+    DeregisterTrader {
+        traders: Vec<Addr>,
     },
 }
 
@@ -77,6 +92,10 @@ pub enum QueryMsg {
     Simulation { offer_asset: Asset },
     #[returns(ReverseSimulationResponse)]
     ReverseSimulation { ask_asset: Asset },
+    #[returns(bool)]
+    TraderIsWhitelisted { trader: Addr },
+    #[returns(String)]
+    Admin {},
 }
 
 // We define a custom struct for each query response
@@ -109,7 +128,9 @@ pub struct ReverseSimulationResponse {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub admin: Option<String>,
+}
 
 pub fn compute_swap(
     offer_pool: Uint128,

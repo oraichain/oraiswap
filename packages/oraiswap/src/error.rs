@@ -88,4 +88,7 @@ pub enum ContractError {
 
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
+
+    #[error("This pool is not open to everyone, only whitelisted traders can swap")]
+    PoolWhitelisted {},
 }
