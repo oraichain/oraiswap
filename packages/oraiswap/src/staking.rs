@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Addr, Binary, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -119,7 +119,7 @@ pub enum QueryMsg {
     },
     #[returns(Vec<QueryPoolInfoResponse>)]
     GetPoolsInformation {},
-    #[returns(Binary)]
+    #[returns(cosmwasm_std::Binary)]
     QueryOldStore { store_type: OldStoreType },
 }
 
