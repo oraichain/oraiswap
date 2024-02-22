@@ -224,6 +224,7 @@ pub struct ContractInfoResponse {
     pub admin: Addr,
     pub commission_rate: String,
     pub reward_address: Addr,
+    pub operator: Option<Addr>,
 }
 
 #[cw_serde]
@@ -285,6 +286,4 @@ pub struct BaseAmountResponse {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {
-    pub new_config: ContractInfo,
-}
+pub struct MigrateMsg {}
