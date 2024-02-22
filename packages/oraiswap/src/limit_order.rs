@@ -285,4 +285,6 @@ pub struct BaseAmountResponse {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub new_config: ContractInfo,
+}

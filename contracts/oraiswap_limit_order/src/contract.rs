@@ -609,6 +609,7 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    store_config(deps.storage, &msg.new_config)?;
     Ok(Response::default())
 }
