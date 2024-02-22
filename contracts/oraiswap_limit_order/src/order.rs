@@ -591,7 +591,11 @@ pub fn execute_matching_orders(
     let contract_info = read_config(deps.storage)?;
     let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
 
-    let relayer_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+    // get default operator to receive reward
+    let relayer_addr = match contract_info.operator {
+        Some(addr) => addr,
+        None => deps.api.addr_canonicalize(info.sender.as_str())?,
+    };
     let pair_key = pair_key(&[
         asset_infos[0].to_raw(deps.api)?,
         asset_infos[1].to_raw(deps.api)?,
