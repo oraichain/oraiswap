@@ -33,7 +33,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
-const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -43,11 +42,13 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let default_reward_address = deps.api.addr_canonicalize(REWARD_WALLET)?;
     let config = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
-
+        operator: match msg.operator {
+            Some(addr) => Some(deps.api.addr_canonicalize(&addr)?),
+            None => None,
+        },
         // admin should be multisig
         admin: if let Some(admin) = msg.admin {
             deps.api.addr_canonicalize(admin.as_str())?
@@ -57,11 +58,7 @@ pub fn instantiate(
         commission_rate: msg
             .commission_rate
             .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
-        reward_address: if let Some(reward_address) = msg.reward_address {
-            deps.api.addr_canonicalize(reward_address.as_str())?
-        } else {
-            default_reward_address
-        },
+        reward_address: deps.api.addr_canonicalize(msg.reward_address.as_str())?,
     };
 
     store_config(deps.storage, &config)?;
@@ -81,6 +78,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
+        ExecuteMsg::UpdateOperator { operator } => execute_update_operator(deps, info, operator),
         ExecuteMsg::UpdateConfig {
             reward_address,
             commission_rate,
@@ -105,7 +103,7 @@ pub fn execute(
         } => {
             validate_admin(
                 deps.api,
-                read_config(deps.storage)?.admin,
+                &read_config(deps.storage)?.admin,
                 info.sender.as_str(),
             )?;
             let pair_key = pair_key(&[
@@ -246,7 +244,7 @@ pub fn execute(
         ExecuteMsg::RemoveOrderBookPair { asset_infos } => remove_pair(deps, info, asset_infos),
         ExecuteMsg::WithdrawToken { asset } => {
             let contract_info = read_config(deps.storage)?;
-            validate_admin(deps.api, contract_info.admin.clone(), info.sender.as_str())?;
+            validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
             let msg = asset.into_msg(
                 None,
                 &deps.querier,
@@ -266,13 +264,32 @@ pub fn execute_update_admin(
     admin: Addr,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
-    validate_admin(deps.api, contract_info.admin, info.sender.as_str())?;
+    validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
 
     // update new admin
     contract_info.admin = deps.api.addr_canonicalize(admin.as_str())?;
     store_config(deps.storage, &contract_info)?;
 
     Ok(Response::new().add_attributes(vec![("action", "execute_update_admin")]))
+}
+
+pub fn execute_update_operator(
+    deps: DepsMut,
+    info: MessageInfo,
+    operator: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut contract_info = read_config(deps.storage)?;
+    validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
+
+    // if None then no operator to receive reward
+    contract_info.operator = match operator {
+        Some(addr) => Some(deps.api.addr_canonicalize(&addr)?),
+        None => None,
+    };
+
+    store_config(deps.storage, &contract_info)?;
+
+    Ok(Response::new().add_attributes(vec![("action", "execute_update_operator")]))
 }
 
 pub fn execute_update_config(

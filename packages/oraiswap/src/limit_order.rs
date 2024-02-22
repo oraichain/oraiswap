@@ -11,6 +11,7 @@ pub struct ContractInfo {
     pub admin: CanonicalAddr,
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
+    pub operator: Option<CanonicalAddr>,
 }
 
 #[cw_serde]
@@ -58,9 +59,10 @@ impl Default for OrderDirection {
 pub struct InstantiateMsg {
     pub name: Option<String>,
     pub version: Option<String>,
-    pub admin: Option<Addr>,
+    pub admin: Option<String>,
     pub commission_rate: Option<String>,
-    pub reward_address: Option<Addr>,
+    pub reward_address: String,
+    pub operator: Option<String>,
 }
 
 #[cw_serde]
@@ -74,6 +76,10 @@ pub enum ExecuteMsg {
     UpdateConfig {
         reward_address: Option<Addr>,
         commission_rate: Option<String>,
+    },
+
+    UpdateOperator {
+        operator: Option<String>,
     },
 
     CreateOrderBookPair {

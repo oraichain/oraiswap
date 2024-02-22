@@ -250,7 +250,7 @@ pub fn read_orders(
         .collect()
 }
 
-pub fn validate_admin(api: &dyn Api, admin: CanonicalAddr, sender: &str) -> StdResult<()> {
+pub fn validate_admin(api: &dyn Api, admin: &CanonicalAddr, sender: &str) -> StdResult<()> {
     let sender_addr = api.addr_canonicalize(sender)?;
     // check authorized
     if admin.ne(&sender_addr) {
