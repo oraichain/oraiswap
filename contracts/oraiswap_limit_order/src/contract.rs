@@ -605,11 +605,15 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         admin: deps.api.addr_humanize(&info.admin)?,
         commission_rate: info.commission_rate,
         reward_address: deps.api.addr_humanize(&info.reward_address)?,
+        operator: if let Some(operator) = info.operator {
+            Some(deps.api.addr_humanize(&operator)?)
+        } else {
+            None
+        },
     })
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    store_config(deps.storage, &msg.new_config)?;
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default())
 }
