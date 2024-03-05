@@ -276,6 +276,8 @@ fn to_events(order: &OrderWithFee, human_bidder: String) -> Event {
         attr("filled_ask_amount", order.filled_ask_amount.to_string()),
         attr("reward_fee", order.reward_fee),
         attr("relayer_fee", order.relayer_fee),
+        attr("filled_offer_this_round", order.filled_offer_this_round),
+        attr("filled_ask_this_round", order.filled_ask_this_round),
     ]
     .to_vec();
     Event::new("matched_order").add_attributes(attrs)
