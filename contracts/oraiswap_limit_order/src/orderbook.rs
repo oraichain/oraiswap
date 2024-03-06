@@ -42,6 +42,8 @@ pub struct OrderWithFee {
     pub filled_ask_amount: Uint128,
     pub reward_fee: Uint128,
     pub relayer_fee: Uint128,
+    pub filled_offer_this_round: Uint128,
+    pub filled_ask_this_round: Uint128,
 }
 
 #[cw_serde]
@@ -143,6 +145,9 @@ impl OrderWithFee {
     pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) -> StdResult<()> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
+
+        self.filled_ask_this_round = ask_amount;
+        self.filled_offer_this_round = offer_amount;
 
         if self.offer_amount.checked_sub(self.filled_offer_amount)? < MIN_VOLUME.into()
             || self.ask_amount.checked_sub(self.filled_ask_amount)? < MIN_VOLUME.into()
@@ -550,6 +555,8 @@ impl BulkOrders {
                     filled_ask_amount: order.filled_ask_amount,
                     relayer_fee: Uint128::zero(),
                     reward_fee: Uint128::zero(),
+                    filled_ask_this_round: Uint128::zero(),
+                    filled_offer_this_round: Uint128::zero(),
                 })
                 .collect(),
             volume,

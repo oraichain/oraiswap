@@ -35,7 +35,7 @@ pub fn submit_order(
     assets[1].assert_if_asset_is_zero()?;
 
     let offer_amount = assets[0].amount;
-    let mut ask_amount = assets[1].amount;
+    let ask_amount = assets[1].amount;
 
     let (highest_buy_price, buy_found, _) =
         orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
@@ -49,17 +49,16 @@ pub fn submit_order(
         if buy_found && sell_found {
             match direction {
                 OrderDirection::Buy => {
-                    let mut price = Decimal::from_ratio(offer_amount, ask_amount);
+                    let price = Decimal::from_ratio(offer_amount, ask_amount);
                     let spread_price = lowest_sell_price * sell_spread_factor;
                     if price.ge(&(spread_price)) {
-                        price = spread_price;
-                        ask_amount = Uint128::from(offer_amount * Decimal::one().atomics())
-                            .checked_div(price.atomics())
-                            .unwrap_or_default();
+                        return Err(ContractError::PriceNotGreaterThan {
+                            price: spread_price,
+                        });
                     }
                 }
                 OrderDirection::Sell => {
-                    let mut price = Decimal::from_ratio(ask_amount, offer_amount);
+                    let price = Decimal::from_ratio(ask_amount, offer_amount);
                     let spread_price = highest_buy_price * buy_spread_factor;
                     if spread_price.is_zero() {
                         return Err(ContractError::PriceMustNotBeZero {
@@ -67,8 +66,9 @@ pub fn submit_order(
                         });
                     }
                     if spread_price.ge(&price) {
-                        price = spread_price;
-                        ask_amount = Uint128::from(offer_amount * price);
+                        return Err(ContractError::PriceNotLessThan {
+                            price: spread_price,
+                        });
                     }
                 }
             };
@@ -276,6 +276,8 @@ fn to_events(order: &OrderWithFee, human_bidder: String) -> Event {
         attr("filled_ask_amount", order.filled_ask_amount.to_string()),
         attr("reward_fee", order.reward_fee),
         attr("relayer_fee", order.relayer_fee),
+        attr("filled_offer_this_round", order.filled_offer_this_round),
+        attr("filled_ask_this_round", order.filled_ask_this_round),
     ]
     .to_vec();
     Event::new("matched_order").add_attributes(attrs)
