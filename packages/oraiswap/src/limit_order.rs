@@ -103,16 +103,16 @@ pub enum ExecuteMsg {
         assets: [Asset; 2],
     },
 
-    ///////////////////////
-    /// User Operations ///
-    ///////////////////////
-    SubmitMarketOrder {
-        direction: OrderDirection, // default is buy, with sell then it is reversed
-        asset_infos: [AssetInfo; 2],
-        base_amount: Uint128,
-        quote_amount: Uint128,
-        slippage: Option<Decimal>,
-    },
+    // ///////////////////////
+    // /// User Operations ///
+    // ///////////////////////
+    // SubmitMarketOrder {
+    //     direction: OrderDirection, // default is buy, with sell then it is reversed
+    //     asset_infos: [AssetInfo; 2],
+    //     base_amount: Uint128,
+    //     quote_amount: Uint128,
+    //     slippage: Option<Decimal>,
+    // },
 
     CancelOrder {
         order_id: u64,
@@ -141,13 +141,13 @@ pub enum Cw20HookMsg {
         direction: OrderDirection,
         assets: [Asset; 2],
     },
-    SubmitMarketOrder {
-        direction: OrderDirection, // default is buy, with sell then it is reversed
-        asset_infos: [AssetInfo; 2],
-        base_amount: Uint128,
-        quote_amount: Uint128,
-        slippage: Option<Decimal>,
-    },
+    // SubmitMarketOrder {
+    //     direction: OrderDirection, // default is buy, with sell then it is reversed
+    //     asset_infos: [AssetInfo; 2],
+    //     base_amount: Uint128,
+    //     quote_amount: Uint128,
+    //     slippage: Option<Decimal>,
+    // },
 }
 
 #[cw_serde]
@@ -224,6 +224,7 @@ pub struct ContractInfoResponse {
     pub admin: Addr,
     pub commission_rate: String,
     pub reward_address: Addr,
+    pub operator: Option<Addr>,
 }
 
 #[cw_serde]
@@ -285,6 +286,4 @@ pub struct BaseAmountResponse {
 
 /// We currently take no arguments for migrations
 #[cw_serde]
-pub struct MigrateMsg {
-    pub new_config: ContractInfo,
-}
+pub struct MigrateMsg {}

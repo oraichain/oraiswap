@@ -1,4 +1,5 @@
 mod contract_test;
+mod migrate_test;
 mod orderbook_test;
 
 #[macro_export]

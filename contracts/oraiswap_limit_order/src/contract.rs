@@ -154,86 +154,86 @@ pub fn execute(
             // then submit order
             submit_order(deps, &orderbook_pair, info.sender, direction, paid_assets)
         }
-        ExecuteMsg::SubmitMarketOrder {
-            direction,
-            asset_infos,
-            base_amount,
-            quote_amount,
-            slippage,
-        } => {
-            let pair_key = pair_key(&[
-                asset_infos[0].to_raw(deps.api)?,
-                asset_infos[1].to_raw(deps.api)?,
-            ]);
-            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+        // ExecuteMsg::SubmitMarketOrder {
+        //     direction,
+        //     asset_infos,
+        //     base_amount,
+        //     quote_amount,
+        //     slippage,
+        // } => {
+        //     let pair_key = pair_key(&[
+        //         asset_infos[0].to_raw(deps.api)?,
+        //         asset_infos[1].to_raw(deps.api)?,
+        //     ]);
+        //     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-            let offer_asset_info = match direction {
-                OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-                OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
-            };
-            let provided_asset = get_native_asset(&info, offer_asset_info)?;
+        //     let offer_asset_info = match direction {
+        //         OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+        //         OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+        //     };
+        //     let provided_asset = get_native_asset(&info, offer_asset_info)?;
 
-            let expected_offer_amount = match direction {
-                OrderDirection::Buy => quote_amount,
-                OrderDirection::Sell => base_amount,
-            };
+        //     let expected_offer_amount = match direction {
+        //         OrderDirection::Buy => quote_amount,
+        //         OrderDirection::Sell => base_amount,
+        //     };
 
-            if let Some(slippage) = slippage {
-                if slippage >= Decimal::one() {
-                    return Err(ContractError::SlippageMustLessThanOne { slippage });
-                }
-            }
+        //     if let Some(slippage) = slippage {
+        //         if slippage >= Decimal::one() {
+        //             return Err(ContractError::SlippageMustLessThanOne { slippage });
+        //         }
+        //     }
 
-            let base_amount_response = query_price_by_base_amount(
-                deps.as_ref(),
-                &orderbook_pair,
-                direction,
-                base_amount,
-                slippage,
-            )?;
+        //     let base_amount_response = query_price_by_base_amount(
+        //         deps.as_ref(),
+        //         &orderbook_pair,
+        //         direction,
+        //         base_amount,
+        //         slippage,
+        //     )?;
 
-            // Return error if cannot find opposite side market order
-            if base_amount_response.market_price.is_zero() {
-                return Err(ContractError::UnableToFindMarketOrder {});
-            }
+        //     // Return error if cannot find opposite side market order
+        //     if base_amount_response.market_price.is_zero() {
+        //         return Err(ContractError::UnableToFindMarketOrder {});
+        //     }
 
-            let (paid_assets, quote_asset) = get_market_asset(
-                deps.api,
-                &orderbook_pair,
-                direction,
-                base_amount_response.market_price,
-                base_amount_response.expected_base_amount,
-            )?;
+        //     let (paid_assets, quote_asset) = get_market_asset(
+        //         deps.api,
+        //         &orderbook_pair,
+        //         direction,
+        //         base_amount_response.market_price,
+        //         base_amount_response.expected_base_amount,
+        //     )?;
 
-            if provided_asset.amount < expected_offer_amount {
-                return Err(ContractError::AssetMismatch {});
-            }
+        //     if provided_asset.amount < expected_offer_amount {
+        //         return Err(ContractError::AssetMismatch {});
+        //     }
 
-            // require minimum amount for quote asset
-            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
-                return Err(ContractError::TooSmallQuoteAsset {
-                    quote_coin: quote_asset.info.to_string(),
-                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
-                });
-            }
+        //     // require minimum amount for quote asset
+        //     if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
+        //         return Err(ContractError::TooSmallQuoteAsset {
+        //             quote_coin: quote_asset.info.to_string(),
+        //             min_quote_amount: orderbook_pair.min_quote_coin_amount,
+        //         });
+        //     }
 
-            // calculate refund_amount
-            let refund_amount = provided_asset
-                .amount
-                .checked_sub(paid_assets[0].amount)
-                .unwrap_or_default();
+        //     // calculate refund_amount
+        //     let refund_amount = provided_asset
+        //         .amount
+        //         .checked_sub(paid_assets[0].amount)
+        //         .unwrap_or_default();
 
-            // submit market order
-            submit_market_order(
-                deps,
-                env.contract.address,
-                &orderbook_pair,
-                info.sender,
-                direction,
-                paid_assets,
-                refund_amount,
-            )
-        }
+        //     // submit market order
+        //     submit_market_order(
+        //         deps,
+        //         env.contract.address,
+        //         &orderbook_pair,
+        //         info.sender,
+        //         direction,
+        //         paid_assets,
+        //         refund_amount,
+        //     )
+        // }
         ExecuteMsg::CancelOrder {
             order_id,
             asset_infos,
@@ -404,80 +404,80 @@ pub fn receive_cw20(
             // then submit order
             submit_order(deps, &orderbook_pair, sender, direction, paid_assets)
         }
-        Ok(Cw20HookMsg::SubmitMarketOrder {
-            direction,
-            asset_infos,
-            base_amount,
-            quote_amount,
-            slippage,
-        }) => {
-            let pair_key = pair_key(&[
-                asset_infos[0].to_raw(deps.api)?,
-                asset_infos[1].to_raw(deps.api)?,
-            ]);
-            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+        // Ok(Cw20HookMsg::SubmitMarketOrder {
+        //     direction,
+        //     asset_infos,
+        //     base_amount,
+        //     quote_amount,
+        //     slippage,
+        // }) => {
+        //     let pair_key = pair_key(&[
+        //         asset_infos[0].to_raw(deps.api)?,
+        //         asset_infos[1].to_raw(deps.api)?,
+        //     ]);
+        //     let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
-            let expected_offer_amount = match direction {
-                OrderDirection::Buy => quote_amount,
-                OrderDirection::Sell => base_amount,
-            };
+        //     let expected_offer_amount = match direction {
+        //         OrderDirection::Buy => quote_amount,
+        //         OrderDirection::Sell => base_amount,
+        //     };
 
-            if let Some(slippage) = slippage {
-                if slippage >= Decimal::one() {
-                    return Err(ContractError::SlippageMustLessThanOne { slippage });
-                }
-            }
+        //     if let Some(slippage) = slippage {
+        //         if slippage >= Decimal::one() {
+        //             return Err(ContractError::SlippageMustLessThanOne { slippage });
+        //         }
+        //     }
 
-            let base_amount_response = query_price_by_base_amount(
-                deps.as_ref(),
-                &orderbook_pair,
-                direction,
-                base_amount,
-                slippage,
-            )?;
+        //     let base_amount_response = query_price_by_base_amount(
+        //         deps.as_ref(),
+        //         &orderbook_pair,
+        //         direction,
+        //         base_amount,
+        //         slippage,
+        //     )?;
 
-            // Return error if cannot find opposite side market order
-            if base_amount_response.market_price.is_zero() {
-                return Err(ContractError::UnableToFindMarketOrder {});
-            }
+        //     // Return error if cannot find opposite side market order
+        //     if base_amount_response.market_price.is_zero() {
+        //         return Err(ContractError::UnableToFindMarketOrder {});
+        //     }
 
-            let (paid_assets, quote_asset) = get_market_asset(
-                deps.api,
-                &orderbook_pair,
-                direction,
-                base_amount_response.market_price,
-                base_amount_response.expected_base_amount,
-            )?;
+        //     let (paid_assets, quote_asset) = get_market_asset(
+        //         deps.api,
+        //         &orderbook_pair,
+        //         direction,
+        //         base_amount_response.market_price,
+        //         base_amount_response.expected_base_amount,
+        //     )?;
 
-            if provided_asset.amount < expected_offer_amount {
-                return Err(ContractError::AssetMismatch {});
-            }
+        //     if provided_asset.amount < expected_offer_amount {
+        //         return Err(ContractError::AssetMismatch {});
+        //     }
 
-            // require minimum amount for quote asset
-            if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
-                return Err(ContractError::TooSmallQuoteAsset {
-                    quote_coin: quote_asset.info.to_string(),
-                    min_quote_amount: orderbook_pair.min_quote_coin_amount,
-                });
-            }
+        //     // require minimum amount for quote asset
+        //     if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
+        //         return Err(ContractError::TooSmallQuoteAsset {
+        //             quote_coin: quote_asset.info.to_string(),
+        //             min_quote_amount: orderbook_pair.min_quote_coin_amount,
+        //         });
+        //     }
 
-            // calculate refund_amount
-            let refund_amount = provided_asset
-                .amount
-                .checked_sub(paid_assets[0].amount)
-                .unwrap_or_default();
+        //     // calculate refund_amount
+        //     let refund_amount = provided_asset
+        //         .amount
+        //         .checked_sub(paid_assets[0].amount)
+        //         .unwrap_or_default();
 
-            // submit market order
-            submit_market_order(
-                deps,
-                env.contract.address,
-                &orderbook_pair,
-                sender,
-                direction,
-                paid_assets,
-                refund_amount,
-            )
-        }
+        //     // submit market order
+        //     submit_market_order(
+        //         deps,
+        //         env.contract.address,
+        //         &orderbook_pair,
+        //         sender,
+        //         direction,
+        //         paid_assets,
+        //         refund_amount,
+        //     )
+        // }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
     }
 }
@@ -605,11 +605,15 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         admin: deps.api.addr_humanize(&info.admin)?,
         commission_rate: info.commission_rate,
         reward_address: deps.api.addr_humanize(&info.reward_address)?,
+        operator: if let Some(operator) = info.operator {
+            Some(deps.api.addr_humanize(&operator)?)
+        } else {
+            None
+        },
     })
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
-    store_config(deps.storage, &msg.new_config)?;
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default())
 }
