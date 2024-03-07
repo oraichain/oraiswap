@@ -1,4 +1,5 @@
 use cosmwasm_std::{Decimal, OverflowError, StdError, Uint128};
+use cw_utils::PaymentError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -8,6 +9,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     OverflowError(#[from] OverflowError),
+
+    #[error("{0}")]
+    Payment(#[from] PaymentError),
 
     #[error("Unauthorized")]
     Unauthorized {},
@@ -97,4 +101,10 @@ pub enum ContractError {
 
     #[error("Price cannot be less than {price}")]
     PriceNotLessThan { price: Decimal },
+
+    #[error("Cannot create market order")]
+    CannotCreateMarketOrder {},
+
+    #[error("Invalid funds")]
+    InvalidFunds {},
 }

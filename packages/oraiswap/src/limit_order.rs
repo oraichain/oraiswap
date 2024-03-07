@@ -15,6 +15,25 @@ pub struct ContractInfo {
 }
 
 #[cw_serde]
+pub enum OrderType {
+    Limit,
+    Market,
+}
+
+impl OrderType {
+    pub fn is_limit(&self) -> bool {
+        match self {
+            OrderType::Limit => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_market(&self) -> bool {
+        !self.is_limit()
+    }
+}
+
+#[cw_serde]
 #[derive(Copy)]
 pub enum OrderDirection {
     Buy,
@@ -106,14 +125,11 @@ pub enum ExecuteMsg {
     // ///////////////////////
     // /// User Operations ///
     // ///////////////////////
-    // SubmitMarketOrder {
-    //     direction: OrderDirection, // default is buy, with sell then it is reversed
-    //     asset_infos: [AssetInfo; 2],
-    //     base_amount: Uint128,
-    //     quote_amount: Uint128,
-    //     slippage: Option<Decimal>,
-    // },
-
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        slippage: Option<Decimal>,
+    },
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
@@ -141,13 +157,11 @@ pub enum Cw20HookMsg {
         direction: OrderDirection,
         assets: [Asset; 2],
     },
-    // SubmitMarketOrder {
-    //     direction: OrderDirection, // default is buy, with sell then it is reversed
-    //     asset_infos: [AssetInfo; 2],
-    //     base_amount: Uint128,
-    //     quote_amount: Uint128,
-    //     slippage: Option<Decimal>,
-    // },
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        slippage: Option<Decimal>,
+    },
 }
 
 #[cw_serde]
