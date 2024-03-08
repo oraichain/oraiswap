@@ -874,9 +874,8 @@ pub fn process_matching(
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut list_trader: Vec<Payment> = vec![];
-    let mut ret_events: Vec<Event> = vec![];
+    let mut matched_events: Vec<Event> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
-    let mut total_orders: u64 = 0;
 
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
@@ -907,9 +906,8 @@ pub fn process_matching(
 
     for order_matched in matched_orders.iter_mut() {
         if order_matched.status != OrderStatus::Open {
-            total_orders += 1;
             order_matched.match_order(deps.storage, &pair_key)?;
-            ret_events.push(to_events(
+            matched_events.push(to_events(
                 &order_matched,
                 deps.api
                     .addr_humanize(&order_matched.bidder_addr)?
@@ -929,10 +927,10 @@ pub fn process_matching(
     Ok(Response::new()
         .add_messages(messages)
         .add_attributes(vec![
-            ("total_matched_orders", &total_orders.to_string()),
+            ("total_matched_orders", &matched_events.len().to_string()),
             ("executor_reward", &format!("{:?}", &total_reward)),
         ])
-        .add_events(ret_events))
+        .add_events(matched_events))
 }
 
 pub fn execute_matching_orders(
@@ -1106,56 +1104,4 @@ pub fn get_paid_and_quote_assets(
         quote_asset = assets[0].clone();
     }
     Ok((paid_assets, quote_asset))
-}
-
-pub fn get_market_asset(
-    api: &dyn Api,
-    orderbook_pair: &OrderBook,
-    direction: OrderDirection,
-    market_price: Decimal,
-    base_amount: Uint128,
-) -> StdResult<([Asset; 2], Asset)> {
-    let quote_amount = Uint128::from(base_amount * market_price);
-    let quote_asset = Asset {
-        info: orderbook_pair.quote_coin_info.to_normal(api)?,
-        amount: quote_amount,
-    };
-    let mut assets = [
-        Asset {
-            info: orderbook_pair.quote_coin_info.to_normal(api)?,
-            amount: quote_amount,
-        },
-        Asset {
-            info: orderbook_pair.base_coin_info.to_normal(api)?,
-            amount: base_amount,
-        },
-    ];
-    let paid_assets = match direction {
-        OrderDirection::Buy => assets.clone(),
-        OrderDirection::Sell => {
-            assets.reverse();
-            assets.clone()
-        }
-    };
-    Ok((paid_assets, quote_asset))
-}
-
-pub fn get_native_asset(info: &MessageInfo, asset_info: AssetInfo) -> StdResult<Asset> {
-    if let AssetInfo::NativeToken { denom } = asset_info.clone() {
-        //check funds includes To token
-        if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
-            let amount = native_coin.amount;
-            let asset = Asset {
-                info: asset_info.clone(),
-                amount: amount.clone(),
-            };
-            return Ok(asset);
-        } else {
-            return Err(StdError::generic_err(
-                "Cannot find the native token that matches the input",
-            ));
-        };
-    } else {
-        return Err(StdError::generic_err("invalid cw20 hook message"));
-    }
 }

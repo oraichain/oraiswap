@@ -1,24 +1,54 @@
 use std::str::FromStr;
 
 use cosmwasm_std::testing::mock_dependencies;
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
+use cosmwasm_std::{to_binary, Addr, Api, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
-use oraiswap::math::DecimalPlaces;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
-    BaseAmountResponse, ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg,
-    LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse,
-    OrderDirection, OrderFilter, OrderResponse, OrderStatus, OrdersResponse, QueryMsg,
-    TicksResponse,
+    ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
+    OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
+    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, TicksResponse,
 };
 
 use crate::jsonstr;
-use crate::order::{get_market_asset, get_paid_and_quote_assets};
+use crate::order::get_paid_and_quote_assets;
 use crate::orderbook::OrderBook;
 const USDT_DENOM: &str = "usdt";
 const REWARD_ADDR: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
+
+pub fn get_market_asset(
+    api: &dyn Api,
+    orderbook_pair: &OrderBook,
+    direction: OrderDirection,
+    market_price: Decimal,
+    base_amount: Uint128,
+) -> ([Asset; 2], Asset) {
+    let quote_amount = Uint128::from(base_amount * market_price);
+    let quote_asset = Asset {
+        info: orderbook_pair.quote_coin_info.to_normal(api).unwrap(),
+        amount: quote_amount,
+    };
+    let mut assets = [
+        Asset {
+            info: orderbook_pair.quote_coin_info.to_normal(api).unwrap(),
+            amount: quote_amount,
+        },
+        Asset {
+            info: orderbook_pair.base_coin_info.to_normal(api).unwrap(),
+            amount: base_amount,
+        },
+    ];
+    let paid_assets = match direction {
+        OrderDirection::Buy => assets.clone(),
+        OrderDirection::Sell => {
+            assets.reverse();
+            assets.clone()
+        }
+    };
+    (paid_assets, quote_asset)
+}
 
 fn basic_fixture() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
@@ -205,8 +235,7 @@ fn test_get_market_assets_buy_side() {
         OrderDirection::Buy,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[1].info);
     assert_eq!(paid_assets[1].info, assets[0].info);
@@ -227,8 +256,7 @@ fn test_get_market_assets_buy_side() {
         OrderDirection::Buy,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[1].info);
     assert_eq!(paid_assets[1].info, assets[0].info);
@@ -249,8 +277,7 @@ fn test_get_market_assets_buy_side() {
         OrderDirection::Buy,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[1].info);
     assert_eq!(paid_assets[1].info, assets[0].info);
@@ -294,8 +321,7 @@ fn test_get_market_assets_sell_side() {
         OrderDirection::Sell,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[0].info);
     assert_eq!(paid_assets[1].info, assets[1].info);
@@ -316,8 +342,7 @@ fn test_get_market_assets_sell_side() {
         OrderDirection::Sell,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[0].info);
     assert_eq!(paid_assets[1].info, assets[1].info);
@@ -338,8 +363,7 @@ fn test_get_market_assets_sell_side() {
         OrderDirection::Sell,
         market_price,
         base_amount,
-    )
-    .unwrap();
+    );
     // assert info
     assert_eq!(paid_assets[0].info, assets[0].info);
     assert_eq!(paid_assets[1].info, assets[1].info);
