@@ -617,82 +617,9 @@ fn test_query_mid_price() {
 
 #[test]
 fn submit_order() {
-    let mut app = MockApp::new(&[
-        (
-            &"addr0000".to_string(),
-            &[
-                Coin {
-                    denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
-                },
-                Coin {
-                    denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
-                },
-            ],
-        ),
-        (
-            &"addr0001".to_string(),
-            &[
-                Coin {
-                    denom: ORAI_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
-                },
-                Coin {
-                    denom: USDT_DENOM.to_string(),
-                    amount: Uint128::from(1000000000u128),
-                },
-            ],
-        ),
-    ]);
-
-    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
-
-    app.set_token_balances(&[(
-        &"asset".to_string(),
-        &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
-    )]);
+    let (mut app, limit_order_addr) = basic_fixture();
 
     let token_addr = app.get_token_addr("asset").unwrap();
-
-    let msg = InstantiateMsg {
-        name: None,
-        version: None,
-        admin: None,
-        commission_rate: None,
-        operator: None,
-        reward_address: REWARD_ADDR.to_string(),
-    };
-    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
-        .instantiate(
-            code_id,
-            Addr::unchecked("addr0000"),
-            &msg,
-            &[],
-            "limit order",
-        )
-        .unwrap();
-
-    // create order book for pair [orai, usdt]
-    let msg = ExecuteMsg::CreateOrderBookPair {
-        base_coin_info: AssetInfo::NativeToken {
-            denom: ORAI_DENOM.to_string(),
-        },
-        quote_coin_info: AssetInfo::NativeToken {
-            denom: USDT_DENOM.to_string(),
-        },
-        spread: None,
-        min_quote_coin_amount: Uint128::from(10u128),
-    };
-    let _res = app
-        .execute(
-            Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
-            &msg,
-            &[],
-        )
-        .unwrap();
 
     // Create an existed order book
     let msg = ExecuteMsg::CreateOrderBookPair {
@@ -770,7 +697,10 @@ fn submit_order() {
     );
     app.assert_fail(res);
 
-    // paid 150 usdt to get 150 orai
+    // paid 150 usdt to get 150 orai'
+    // order 1:
+    // - side: buy
+    // - price: 1
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
         assets: [
@@ -831,6 +761,9 @@ fn submit_order() {
     );
     app.assert_fail(res);
 
+    // order 2:
+    // - side: buy
+    // - price: 0.9000000
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
         assets: [
@@ -863,6 +796,9 @@ fn submit_order() {
         .unwrap();
     println!("submit 2 {:?}", res);
 
+    // order 3:
+    // side sell
+    // price 0.2857
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Sell,
         assets: [

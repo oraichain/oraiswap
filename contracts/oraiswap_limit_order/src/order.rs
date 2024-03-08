@@ -75,7 +75,6 @@ pub fn submit_order(
 
             let (highest_buy_price, buy_found, _) =
                 orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-
             (buy_found && highest_buy_price >= price, price)
         }
     };
@@ -708,6 +707,11 @@ pub fn matching_buy_order(
                 let match_price = sell_price;
 
                 for mut sell_order in sell_orders_with_fee {
+                    // remaining ask & offer of buy order
+                    let lef_buy_ask = buy_order.ask_amount.checked_sub(total_ask_filled)?;
+                    let lef_buy_offer = buy_order.offer_amount.checked_sub(total_offer_filled)?;
+
+                    // remaining offer & ask of sell order
                     let lef_sell_offer = sell_order
                         .offer_amount
                         .checked_sub(sell_order.filled_offer_amount)?;
@@ -715,21 +719,24 @@ pub fn matching_buy_order(
                         .ask_amount
                         .checked_sub(sell_order.filled_ask_amount)?;
 
-                    let sell_ask_amount = Uint128::min(
-                        buy_order.offer_amount.checked_sub(total_offer_filled)?,
-                        lef_sell_ask,
-                    );
-                    // multiply by decimal atomics because we want to get good round values
-                    let sell_offer_amount = Uint128::min(
-                        Uint128::from(sell_ask_amount * Decimal::one().atomics())
-                            .checked_div(match_price.atomics())?,
-                        lef_sell_offer,
-                    );
+                    // ask_amount of buy_order <= min(lef_buy_ask, lef_sell_offer)
+                    let mut buy_ask_amount = Uint128::min(lef_buy_ask, lef_sell_offer);
+                    let mut buy_offer_amount = buy_ask_amount * match_price;
 
-                    sell_order.fill_order(sell_ask_amount, sell_offer_amount)?;
+                    // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
+                    if buy_offer_amount > lef_buy_offer {
+                        buy_offer_amount = lef_buy_offer;
+                        buy_ask_amount = Uint128::from(buy_offer_amount * Decimal::one().atomics())
+                            .checked_div(match_price.atomics())?;
+                    }
 
-                    total_offer_filled += sell_ask_amount;
-                    total_ask_filled += sell_offer_amount;
+                    // ask_amount receive of sell order = min(actual, expect)
+                    let sell_ask_amount = Uint128::min(buy_offer_amount, lef_sell_ask);
+
+                    sell_order.fill_order(sell_ask_amount, buy_ask_amount)?;
+
+                    total_offer_filled += buy_offer_amount;
+                    total_ask_filled += buy_ask_amount;
 
                     sell_orders_matched.push(sell_order);
                     if buy_order.is_fulfilled() {
@@ -777,7 +784,7 @@ pub fn matching_sell_order(
                     StdError::generic_err("Error converting bytes to u128")
                 })?));
 
-            if min_sell_price < buy_price {
+            if min_sell_price > buy_price {
                 break;
             }
 
@@ -796,28 +803,39 @@ pub fn matching_sell_order(
                 let match_price = buy_price;
 
                 for mut buy_order in buy_orders_with_fee {
+                    // remaining ask & offer of sell order
+                    let lef_sell_ask = sell_order.ask_amount.checked_sub(total_ask_filled)?;
+                    let lef_sell_offer = sell_order.offer_amount.checked_sub(total_offer_filled)?;
+
+                    // remaining offer & ask of buy order
                     let lef_buy_offer = buy_order
                         .offer_amount
                         .checked_sub(buy_order.filled_offer_amount)?;
-
                     let lef_buy_ask = buy_order
                         .ask_amount
                         .checked_sub(buy_order.filled_ask_amount)?;
 
-                    let buy_ask_amount = Uint128::min(
-                        sell_order.offer_amount.checked_sub(total_offer_filled)?,
-                        lef_buy_ask,
-                    );
-                    // multiply by decimal atomics because we want to get good round values
-                    let buy_offer_amount =
-                        Uint128::min(buy_ask_amount * match_price, lef_buy_offer);
+                    // ask_amount of sell order <= min(lef_sell_ask, lef_buy_offer)
+                    let mut sell_ask_amount = Uint128::min(lef_sell_ask, lef_buy_offer);
+                    let mut sell_offer_amount =
+                        Uint128::from(sell_ask_amount * Decimal::one().atomics())
+                            .checked_div(match_price.atomics())?;
+                    // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
+                    if sell_offer_amount > lef_sell_offer {
+                        sell_offer_amount = lef_sell_offer;
+                        sell_ask_amount = sell_offer_amount * match_price;
+                    }
 
-                    buy_order.fill_order(buy_ask_amount, buy_offer_amount)?;
+                    // ask_amount receive of buy order = min(actual, expect)
+                    let buy_ask_amount = Uint128::min(sell_offer_amount, lef_buy_ask);
 
-                    total_offer_filled += buy_ask_amount;
-                    total_ask_filled += buy_offer_amount;
+                    buy_order.fill_order(buy_ask_amount, sell_ask_amount)?;
+
+                    total_offer_filled += sell_offer_amount;
+                    total_ask_filled += sell_ask_amount;
 
                     buy_orders_matched.push(buy_order);
+
                     if sell_order.is_fulfilled() {
                         break;
                     }
