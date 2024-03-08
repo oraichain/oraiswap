@@ -354,7 +354,7 @@ fn process_list_trader(
     for trader in traders {
         if let Some(existing_payment) = minimalist_trader
             .iter_mut()
-            .find(|p| p.address == trader.address)
+            .find(|p| p.address == trader.address && p.asset.info.eq(&trader.asset.info))
         {
             existing_payment.asset.amount += trader.asset.amount;
         } else {
