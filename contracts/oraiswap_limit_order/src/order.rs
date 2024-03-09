@@ -794,6 +794,7 @@ pub fn matching_sell_order(
                 OrderDirection::Buy,
                 None,
             ) {
+                println!("{:?}", orders);
                 if orders.len() == 0 {
                     continue;
                 }
@@ -849,7 +850,7 @@ pub fn matching_sell_order(
         }
     }
 
-    sell_order.fill_order(total_ask_filled, total_ask_filled)?;
+    sell_order.fill_order(total_ask_filled, total_offer_filled)?;
 
     Ok((sell_order, buy_orders_matched))
 }
