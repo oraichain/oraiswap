@@ -345,12 +345,27 @@ pub fn receive_cw20(
                 assets[1].to_raw(deps.api)?.info,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+            // validate offer asset is valid
+            let is_valid_funds = match direction {
+                OrderDirection::Buy => orderbook_pair
+                    .quote_coin_info
+                    .eq(&provided_asset.info.to_raw(deps.api)?),
+                OrderDirection::Sell => orderbook_pair
+                    .base_coin_info
+                    .eq(&provided_asset.info.to_raw(deps.api)?),
+            };
+
+            if !is_valid_funds {
+                return Err(ContractError::InvalidFunds {});
+            }
+
             let (paid_assets, quote_asset) =
                 get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
-            if paid_assets[0].amount != provided_asset.amount {
-                return Err(ContractError::AssetMismatch {});
-            }
+            if paid_assets[0] != provided_asset {
+                return Err(ContractError::InvalidFunds {});
+            };
 
             // require minimum amount for quote asset
             if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
