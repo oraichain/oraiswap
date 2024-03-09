@@ -127,17 +127,21 @@ pub fn submit_market_order(
         return Err(ContractError::SlippageMustLessThanOne { slippage });
     }
 
-    let (best_price, price_threshold) = match direction {
+    // with market order, ask_amount will be maximum amount can receive
+    let (best_price, price_threshold, max_ask_amount) = match direction {
         OrderDirection::Buy => {
             let (lowest_sell_price, sell_found, _) =
                 orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
 
             if !sell_found {
-                (Decimal::zero(), Decimal::zero())
+                (Decimal::zero(), Decimal::zero(), Uint128::zero())
             } else {
                 (
                     lowest_sell_price,
                     lowest_sell_price * (Decimal::one() + slippage),
+                    (offer_asset.amount * Decimal::one().atomics())
+                        .checked_div(lowest_sell_price.atomics())
+                        .unwrap(),
                 )
             }
         }
@@ -146,11 +150,12 @@ pub fn submit_market_order(
                 orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
 
             if !buy_found {
-                (Decimal::zero(), Decimal::zero())
+                (Decimal::zero(), Decimal::zero(), Uint128::zero())
             } else {
                 (
                     highest_buy_price,
                     highest_buy_price * (Decimal::one() - slippage),
+                    offer_asset.amount * highest_buy_price,
                 )
             }
         }
@@ -159,11 +164,6 @@ pub fn submit_market_order(
     if best_price.is_zero() {
         return Err(ContractError::CannotCreateMarketOrder {});
     }
-
-    // with market order, ask_amount will be maximum amount can receive
-    let max_ask_amount = (offer_asset.amount * Decimal::one().atomics())
-        .checked_div(best_price.atomics())
-        .unwrap();
 
     store_order(
         deps.storage,
@@ -190,6 +190,7 @@ pub fn submit_market_order(
         price_threshold,
     )?;
 
+    // after matching process, if order still exist => not fulfilled => refund
     let order = read_order(deps.storage, &orderbook_pair.get_pair_key(), order_id);
 
     match order {
