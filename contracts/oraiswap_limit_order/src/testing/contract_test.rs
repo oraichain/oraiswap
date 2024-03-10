@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_std::testing::mock_dependencies;
-use cosmwasm_std::{to_binary, Addr, Api, Coin, Decimal, StdError, Uint128};
+use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -17,38 +17,6 @@ use crate::order::get_paid_and_quote_assets;
 use crate::orderbook::OrderBook;
 const USDT_DENOM: &str = "usdt";
 const REWARD_ADDR: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
-
-pub fn get_market_asset(
-    api: &dyn Api,
-    orderbook_pair: &OrderBook,
-    direction: OrderDirection,
-    market_price: Decimal,
-    base_amount: Uint128,
-) -> ([Asset; 2], Asset) {
-    let quote_amount = Uint128::from(base_amount * market_price);
-    let quote_asset = Asset {
-        info: orderbook_pair.quote_coin_info.to_normal(api).unwrap(),
-        amount: quote_amount,
-    };
-    let mut assets = [
-        Asset {
-            info: orderbook_pair.quote_coin_info.to_normal(api).unwrap(),
-            amount: quote_amount,
-        },
-        Asset {
-            info: orderbook_pair.base_coin_info.to_normal(api).unwrap(),
-            amount: base_amount,
-        },
-    ];
-    let paid_assets = match direction {
-        OrderDirection::Buy => assets.clone(),
-        OrderDirection::Sell => {
-            assets.reverse();
-            assets.clone()
-        }
-    };
-    (paid_assets, quote_asset)
-}
 
 fn basic_fixture() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
@@ -200,178 +168,6 @@ fn test_get_paid_and_quote_assets() {
     assert_eq!(paid_assets[0].info, reverse_assets[1].info);
     assert_eq!(paid_assets[1].info, reverse_assets[0].info);
     assert_eq!(quote_asset.info, reverse_assets[0].info);
-}
-
-#[test]
-fn test_get_market_assets_buy_side() {
-    let deps = mock_dependencies();
-    let asset_infos_raw = [
-        AssetInfoRaw::NativeToken {
-            denom: ORAI_DENOM.to_string(),
-        },
-        AssetInfoRaw::NativeToken {
-            denom: USDT_DENOM.to_string(),
-        },
-    ];
-    let assets = asset_infos_raw.clone().map(|info| Asset {
-        info: info.to_normal(deps.as_ref().api).unwrap(),
-        amount: Uint128::zero(),
-    });
-    let orderbook: OrderBook = OrderBook {
-        base_coin_info: asset_infos_raw[0].clone(),
-        quote_coin_info: asset_infos_raw[1].clone(),
-        spread: None,
-        min_quote_coin_amount: Uint128::zero(),
-    };
-
-    // case 1: buy with base_amount = 100_000, market_price = 1.0
-    let market_price = Decimal::from_str("1.0").unwrap();
-    let base_amount = Uint128::from(100_000u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Buy,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[1].info);
-    assert_eq!(paid_assets[1].info, assets[0].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[1].amount);
-
-    // case 3: buy with base_amount = 123_456_789, market_price = 1.234
-    let market_price = Decimal::from_str("1.234").unwrap();
-    let base_amount = Uint128::from(123_456_789u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Buy,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[1].info);
-    assert_eq!(paid_assets[1].info, assets[0].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[1].amount);
-
-    // case 3: buy with base_amount = 111_222, market_price = 2.0,
-    let market_price = Decimal::from_str("2.0").unwrap();
-    let base_amount = Uint128::from(111_222u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Buy,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[1].info);
-    assert_eq!(paid_assets[1].info, assets[0].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[1].amount);
-}
-
-#[test]
-fn test_get_market_assets_sell_side() {
-    let deps = mock_dependencies();
-    let asset_infos_raw = [
-        AssetInfoRaw::NativeToken {
-            denom: ORAI_DENOM.to_string(),
-        },
-        AssetInfoRaw::NativeToken {
-            denom: USDT_DENOM.to_string(),
-        },
-    ];
-    let assets = asset_infos_raw.clone().map(|info| Asset {
-        info: info.to_normal(deps.as_ref().api).unwrap(),
-        amount: Uint128::zero(),
-    });
-    let orderbook: OrderBook = OrderBook {
-        base_coin_info: asset_infos_raw[0].clone(),
-        quote_coin_info: asset_infos_raw[1].clone(),
-        spread: None,
-        min_quote_coin_amount: Uint128::zero(),
-    };
-
-    // case 1: sell with base_amount = 100_000, market_price = 3.0
-    let market_price = Decimal::from_str("3.0").unwrap();
-    let base_amount = Uint128::from(100_000u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Sell,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[0].info);
-    assert_eq!(paid_assets[1].info, assets[1].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[0].amount);
-
-    // case 2: buy with base_amount = 123_456_789, market_price = 1.234
-    let market_price = Decimal::from_str("1.234").unwrap();
-    let base_amount = Uint128::from(123_456_789u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Sell,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[0].info);
-    assert_eq!(paid_assets[1].info, assets[1].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[0].amount);
-
-    // case 3: buy with base_amount = 111_222, market_price = 2.0
-    let market_price = Decimal::from_str("2.0").unwrap();
-    let base_amount = Uint128::from(111_222u128);
-    let expected_quote_amount = Uint128::from(base_amount * market_price);
-
-    let (paid_assets, quote_asset) = get_market_asset(
-        deps.as_ref().api,
-        &orderbook,
-        OrderDirection::Sell,
-        market_price,
-        base_amount,
-    );
-    // assert info
-    assert_eq!(paid_assets[0].info, assets[0].info);
-    assert_eq!(paid_assets[1].info, assets[1].info);
-    assert_eq!(quote_asset.info, assets[1].info);
-
-    // assert quote and base amount
-    assert_eq!(quote_asset.amount, expected_quote_amount);
-    assert_eq!(base_amount, paid_assets[0].amount);
 }
 
 #[test]
@@ -3984,9 +3780,9 @@ fn execute_pair_cw20_token() {
         )
         .unwrap();
 
-    let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
-    let mut address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
+    let address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    let address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    let address2_balances = app.query_all_balances(Addr::unchecked("addr0002")).unwrap();
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}", address1_balances);
     println!("round 0 - address2's balances: {:?}\n\n", address2_balances);
@@ -4457,8 +4253,8 @@ fn reward_to_executor_test() {
         )
         .unwrap();
 
-    let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
-    let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
+    let address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
+    let address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
     println!("round 0 - address0's balances: {:?}", address0_balances);
     println!("round 0 - address1's balances: {:?}\n\n", address1_balances);
 
