@@ -200,6 +200,8 @@ pub fn submit_market_order(
                 info: offer_asset.info.clone(),
                 amount: refund_amount,
             };
+            // remove this order
+            remove_order(deps.storage, &orderbook_pair.get_pair_key(), &order)?;
             response = response
                 .add_attribute("refund_amount", &refund_amount.to_string())
                 .add_message(refund_asset.into_msg(None, &deps.querier, sender.clone())?)
@@ -795,7 +797,6 @@ pub fn matching_sell_order(
                 OrderDirection::Buy,
                 None,
             ) {
-                println!("{:?}", orders);
                 if orders.len() == 0 {
                     continue;
                 }
