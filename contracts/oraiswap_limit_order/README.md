@@ -197,3 +197,9 @@ offer order
   }
 ]
 ```
+
+### Code coverage:
+
+```bash
+cargo tarpaulin --lib --ignore-tests -o html
+```
