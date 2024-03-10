@@ -665,93 +665,219 @@ fn process_payment_list_orders(
     Ok(())
 }
 
-pub fn matching_buy_order(
+// pub fn matching_buy_order(
+//     deps: &DepsMut,
+//     orderbook_pair: OrderBook,
+//     order: &Order,
+//     max_buy_price: Decimal,
+// ) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
+//     let pair_key = &orderbook_pair.get_pair_key();
+
+//     let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+//         deps.storage,
+//         &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
+//     );
+
+//     let mut buy_order = OrderWithFee::from_order(order.to_owned());
+//     let mut sell_orders_matched: Vec<OrderWithFee> = vec![];
+//     let mut total_offer_filled = Uint128::zero();
+//     let mut total_ask_filled = Uint128::zero();
+
+//     let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
+//     loop {
+//         if let Some(Ok((k, _))) = sell_cursor.next() {
+//             let sell_price =
+//                 Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
+//                     StdError::generic_err("Error converting bytes to u128")
+//                 })?));
+
+//             if max_buy_price < sell_price {
+//                 break;
+//             }
+
+//             if buy_order.is_fulfilled() {
+//                 break;
+//             }
+
+//             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
+//                 deps.as_ref().storage,
+//                 sell_price,
+//                 OrderDirection::Sell,
+//                 None,
+//             ) {
+//                 if orders.len() == 0 {
+//                     continue;
+//                 }
+//                 if buy_order.is_fulfilled() {
+//                     break;
+//                 }
+
+//                 let sell_orders_with_fee = OrderWithFee::from_orders(orders);
+
+//                 let match_price = sell_price;
+
+//                 for mut sell_order in sell_orders_with_fee {
+//                     if buy_order.is_fulfilled() {
+//                         break;
+//                     }
+//                     // remaining ask & offer of buy order
+//                     let lef_buy_ask = buy_order.ask_amount.checked_sub(total_ask_filled)?;
+//                     let lef_buy_offer = buy_order.offer_amount.checked_sub(total_offer_filled)?;
+
+//                     // remaining offer & ask of sell order
+//                     let lef_sell_offer = sell_order
+//                         .offer_amount
+//                         .checked_sub(sell_order.filled_offer_amount)?;
+//                     let lef_sell_ask = sell_order
+//                         .ask_amount
+//                         .checked_sub(sell_order.filled_ask_amount)?;
+
+//                     // ask_amount of buy_order <= min(lef_buy_ask, lef_sell_offer)
+//                     let mut buy_ask_amount = Uint128::min(lef_buy_ask, lef_sell_offer);
+//                     let mut buy_offer_amount = buy_ask_amount * match_price;
+
+//                     // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
+//                     if buy_offer_amount > lef_buy_offer {
+//                         buy_offer_amount = lef_buy_offer;
+//                         buy_ask_amount = Uint128::from(buy_offer_amount * Decimal::one().atomics())
+//                             .checked_div(match_price.atomics())?;
+//                     }
+
+//                     // ask_amount receive of sell order = min(actual, expect)
+//                     let sell_ask_amount = Uint128::min(buy_offer_amount, lef_sell_ask);
+
+//                     sell_order.fill_order(sell_ask_amount, buy_ask_amount)?;
+
+//                     total_offer_filled += buy_offer_amount;
+//                     total_ask_filled += buy_ask_amount;
+
+//                     sell_orders_matched.push(sell_order);
+//                 }
+//             }
+//         } else {
+//             break;
+//         }
+//     }
+
+//     buy_order.fill_order(total_ask_filled, total_offer_filled)?;
+
+//     Ok((buy_order, sell_orders_matched))
+// }
+
+pub fn matching_order(
     deps: &DepsMut,
     orderbook_pair: OrderBook,
     order: &Order,
-    max_buy_price: Decimal,
+    order_price: Decimal,
+    direction: OrderDirection,
 ) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
     let pair_key = &orderbook_pair.get_pair_key();
+    let matched_orders_direction = match direction {
+        OrderDirection::Buy => OrderDirection::Sell,
+        OrderDirection::Sell => OrderDirection::Buy,
+    };
 
-    let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+    let positions_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
         deps.storage,
-        &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
+        &[PREFIX_TICK, pair_key, matched_orders_direction.as_bytes()],
     );
 
-    let mut buy_order = OrderWithFee::from_order(order.to_owned());
-    let mut sell_orders_matched: Vec<OrderWithFee> = vec![];
+    let mut user_order = OrderWithFee::from_order(order.to_owned());
+    let mut orders_matched: Vec<OrderWithFee> = vec![];
     let mut total_offer_filled = Uint128::zero();
     let mut total_ask_filled = Uint128::zero();
+    let sort_order = match direction {
+        OrderDirection::Buy => OrderBy::Ascending,
+        OrderDirection::Sell => OrderBy::Descending,
+    };
 
-    let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
+    let mut cursor = positions_bucket.range(None, None, sort_order);
     loop {
-        if let Some(Ok((k, _))) = sell_cursor.next() {
-            let sell_price =
+        if let Some(Ok((k, _))) = cursor.next() {
+            let match_price =
                 Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
                     StdError::generic_err("Error converting bytes to u128")
                 })?));
 
-            if max_buy_price < sell_price {
-                break;
+            match direction {
+                OrderDirection::Buy => {
+                    if order_price < match_price {
+                        break;
+                    }
+                }
+                OrderDirection::Sell => {
+                    if order_price > match_price {
+                        break;
+                    }
+                }
             }
 
-            if buy_order.is_fulfilled() {
+            if user_order.is_fulfilled() {
                 break;
             }
 
             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
                 deps.as_ref().storage,
-                sell_price,
-                OrderDirection::Sell,
+                match_price,
+                matched_orders_direction,
                 None,
             ) {
                 if orders.len() == 0 {
                     continue;
                 }
-                if buy_order.is_fulfilled() {
+                if user_order.is_fulfilled() {
                     break;
                 }
 
-                let sell_orders_with_fee = OrderWithFee::from_orders(orders);
+                let match_orders_with_fees = OrderWithFee::from_orders(orders);
 
-                let match_price = sell_price;
-
-                for mut sell_order in sell_orders_with_fee {
-                    if buy_order.is_fulfilled() {
+                for mut match_order in match_orders_with_fees {
+                    if user_order.is_fulfilled() {
                         break;
                     }
                     // remaining ask & offer of buy order
-                    let lef_buy_ask = buy_order.ask_amount.checked_sub(total_ask_filled)?;
-                    let lef_buy_offer = buy_order.offer_amount.checked_sub(total_offer_filled)?;
+                    let lef_user_ask = user_order.ask_amount.checked_sub(total_ask_filled)?;
+                    let lef_user_offer = user_order.offer_amount.checked_sub(total_offer_filled)?;
 
                     // remaining offer & ask of sell order
-                    let lef_sell_offer = sell_order
+                    let lef_match_offer = match_order
                         .offer_amount
-                        .checked_sub(sell_order.filled_offer_amount)?;
-                    let lef_sell_ask = sell_order
+                        .checked_sub(match_order.filled_offer_amount)?;
+                    let lef_match_ask = match_order
                         .ask_amount
-                        .checked_sub(sell_order.filled_ask_amount)?;
+                        .checked_sub(match_order.filled_ask_amount)?;
 
-                    // ask_amount of buy_order <= min(lef_buy_ask, lef_sell_offer)
-                    let mut buy_ask_amount = Uint128::min(lef_buy_ask, lef_sell_offer);
-                    let mut buy_offer_amount = buy_ask_amount * match_price;
+                    // ask_amount of user_order <= min(lef_buy_ask, lef_sell_offer)
+                    let mut user_ask_amount = Uint128::min(lef_user_ask, lef_match_offer);
+                    let mut user_offer_amount = match direction {
+                        OrderDirection::Buy => user_ask_amount * match_price,
+                        OrderDirection::Sell => {
+                            Uint128::from(user_ask_amount * Decimal::one().atomics())
+                                .checked_div(match_price.atomics())?
+                        }
+                    };
 
                     // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
-                    if buy_offer_amount > lef_buy_offer {
-                        buy_offer_amount = lef_buy_offer;
-                        buy_ask_amount = Uint128::from(buy_offer_amount * Decimal::one().atomics())
-                            .checked_div(match_price.atomics())?;
+                    if user_offer_amount > lef_user_offer {
+                        user_offer_amount = lef_user_offer;
+                        user_ask_amount = match direction {
+                            OrderDirection::Buy => {
+                                Uint128::from(user_offer_amount * Decimal::one().atomics())
+                                    .checked_div(match_price.atomics())?
+                            }
+                            OrderDirection::Sell => user_offer_amount * match_price,
+                        }
                     }
 
                     // ask_amount receive of sell order = min(actual, expect)
-                    let sell_ask_amount = Uint128::min(buy_offer_amount, lef_sell_ask);
+                    let match_ask_amount = Uint128::min(user_offer_amount, lef_match_ask);
 
-                    sell_order.fill_order(sell_ask_amount, buy_ask_amount)?;
+                    match_order.fill_order(match_ask_amount, user_ask_amount)?;
 
-                    total_offer_filled += buy_offer_amount;
-                    total_ask_filled += buy_ask_amount;
+                    total_offer_filled += user_offer_amount;
+                    total_ask_filled += user_ask_amount;
 
-                    sell_orders_matched.push(sell_order);
+                    orders_matched.push(match_order);
                 }
             }
         } else {
@@ -759,107 +885,107 @@ pub fn matching_buy_order(
         }
     }
 
-    buy_order.fill_order(total_ask_filled, total_offer_filled)?;
+    user_order.fill_order(total_ask_filled, total_offer_filled)?;
 
-    Ok((buy_order, sell_orders_matched))
+    Ok((user_order, orders_matched))
 }
 
-pub fn matching_sell_order(
-    deps: &DepsMut,
-    orderbook_pair: OrderBook,
-    order: &Order,
-    min_sell_price: Decimal,
-) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
-    let pair_key = &orderbook_pair.get_pair_key();
+// pub fn matching_sell_order(
+//     deps: &DepsMut,
+//     orderbook_pair: OrderBook,
+//     order: &Order,
+//     min_sell_price: Decimal,
+// ) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
+//     let pair_key = &orderbook_pair.get_pair_key();
 
-    let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
-        deps.storage,
-        &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
-    );
+//     let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+//         deps.storage,
+//         &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
+//     );
 
-    let mut sell_order = OrderWithFee::from_order(order.to_owned());
-    let mut buy_orders_matched: Vec<OrderWithFee> = vec![];
+//     let mut sell_order = OrderWithFee::from_order(order.to_owned());
+//     let mut buy_orders_matched: Vec<OrderWithFee> = vec![];
 
-    let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
-    let mut total_offer_filled = Uint128::zero();
-    let mut total_ask_filled = Uint128::zero();
+//     let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
+//     let mut total_offer_filled = Uint128::zero();
+//     let mut total_ask_filled = Uint128::zero();
 
-    loop {
-        if let Some(Ok((k, _))) = buy_cursor.next() {
-            let buy_price =
-                Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
-                    StdError::generic_err("Error converting bytes to u128")
-                })?));
+//     loop {
+//         if let Some(Ok((k, _))) = buy_cursor.next() {
+//             let buy_price =
+//                 Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
+//                     StdError::generic_err("Error converting bytes to u128")
+//                 })?));
 
-            if min_sell_price > buy_price {
-                break;
-            }
+//             if min_sell_price > buy_price {
+//                 break;
+//             }
 
-            if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
-                deps.as_ref().storage,
-                buy_price,
-                OrderDirection::Buy,
-                None,
-            ) {
-                if orders.len() == 0 {
-                    continue;
-                }
+//             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
+//                 deps.as_ref().storage,
+//                 buy_price,
+//                 OrderDirection::Buy,
+//                 None,
+//             ) {
+//                 if orders.len() == 0 {
+//                     continue;
+//                 }
 
-                let buy_orders_with_fee = OrderWithFee::from_orders(orders);
+//                 let buy_orders_with_fee = OrderWithFee::from_orders(orders);
 
-                let match_price = buy_price;
+//                 let match_price = buy_price;
 
-                for mut buy_order in buy_orders_with_fee {
-                    // remaining ask & offer of sell order
-                    let lef_sell_ask = sell_order.ask_amount.checked_sub(total_ask_filled)?;
-                    let lef_sell_offer = sell_order.offer_amount.checked_sub(total_offer_filled)?;
+//                 for mut buy_order in buy_orders_with_fee {
+//                     // remaining ask & offer of sell order
+//                     let lef_sell_ask = sell_order.ask_amount.checked_sub(total_ask_filled)?;
+//                     let lef_sell_offer = sell_order.offer_amount.checked_sub(total_offer_filled)?;
 
-                    // remaining offer & ask of buy order
-                    let lef_buy_offer = buy_order
-                        .offer_amount
-                        .checked_sub(buy_order.filled_offer_amount)?;
-                    let lef_buy_ask = buy_order
-                        .ask_amount
-                        .checked_sub(buy_order.filled_ask_amount)?;
+//                     // remaining offer & ask of buy order
+//                     let lef_buy_offer = buy_order
+//                         .offer_amount
+//                         .checked_sub(buy_order.filled_offer_amount)?;
+//                     let lef_buy_ask = buy_order
+//                         .ask_amount
+//                         .checked_sub(buy_order.filled_ask_amount)?;
 
-                    // ask_amount of sell order <= min(lef_sell_ask, lef_buy_offer)
-                    let mut sell_ask_amount = Uint128::min(lef_sell_ask, lef_buy_offer);
-                    let mut sell_offer_amount =
-                        Uint128::from(sell_ask_amount * Decimal::one().atomics())
-                            .checked_div(match_price.atomics())?;
-                    // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
-                    if sell_offer_amount > lef_sell_offer {
-                        sell_offer_amount = lef_sell_offer;
-                        sell_ask_amount = sell_offer_amount * match_price;
-                    }
+//                     // ask_amount of sell order <= min(lef_sell_ask, lef_buy_offer)
+//                     let mut sell_ask_amount = Uint128::min(lef_sell_ask, lef_buy_offer);
+//                     let mut sell_offer_amount =
+//                         Uint128::from(sell_ask_amount * Decimal::one().atomics())
+//                             .checked_div(match_price.atomics())?;
+//                     // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
+//                     if sell_offer_amount > lef_sell_offer {
+//                         sell_offer_amount = lef_sell_offer;
+//                         sell_ask_amount = sell_offer_amount * match_price;
+//                     }
 
-                    // ask_amount receive of buy order = min(actual, expect)
-                    let buy_ask_amount = Uint128::min(sell_offer_amount, lef_buy_ask);
+//                     // ask_amount receive of buy order = min(actual, expect)
+//                     let buy_ask_amount = Uint128::min(sell_offer_amount, lef_buy_ask);
 
-                    buy_order.fill_order(buy_ask_amount, sell_ask_amount)?;
+//                     buy_order.fill_order(buy_ask_amount, sell_ask_amount)?;
 
-                    total_offer_filled += sell_offer_amount;
-                    total_ask_filled += sell_ask_amount;
+//                     total_offer_filled += sell_offer_amount;
+//                     total_ask_filled += sell_ask_amount;
 
-                    buy_orders_matched.push(buy_order);
+//                     buy_orders_matched.push(buy_order);
 
-                    if sell_order.is_fulfilled() {
-                        break;
-                    }
-                }
-                if sell_order.is_fulfilled() {
-                    break;
-                }
-            }
-        } else {
-            break;
-        }
-    }
+//                     if sell_order.is_fulfilled() {
+//                         break;
+//                     }
+//                 }
+//                 if sell_order.is_fulfilled() {
+//                     break;
+//                 }
+//             }
+//         } else {
+//             break;
+//         }
+//     }
 
-    sell_order.fill_order(total_ask_filled, total_offer_filled)?;
+//     sell_order.fill_order(total_ask_filled, total_offer_filled)?;
 
-    Ok((sell_order, buy_orders_matched))
-}
+//     Ok((sell_order, buy_orders_matched))
+// }
 
 pub fn process_matching(
     deps: DepsMut,
@@ -904,14 +1030,13 @@ pub fn process_matching(
 
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
-    let (offer_order_with_fee, mut matched_orders) = match order.direction {
-        OrderDirection::Buy => {
-            matching_buy_order(&deps, orderbook_pair.clone(), &order, price_threshold)?
-        }
-        OrderDirection::Sell => {
-            matching_sell_order(&deps, orderbook_pair.clone(), &order, price_threshold)?
-        }
-    };
+    let (offer_order_with_fee, mut matched_orders) = matching_order(
+        &deps,
+        orderbook_pair.clone(),
+        &order,
+        price_threshold,
+        order.direction,
+    )?;
 
     if matched_orders.len() == 0 {
         return Ok(Response::default());
