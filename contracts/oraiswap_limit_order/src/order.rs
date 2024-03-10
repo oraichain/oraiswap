@@ -695,6 +695,10 @@ pub fn matching_buy_order(
                 break;
             }
 
+            if buy_order.is_fulfilled() {
+                break;
+            }
+
             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
                 deps.as_ref().storage,
                 sell_price,
@@ -704,12 +708,18 @@ pub fn matching_buy_order(
                 if orders.len() == 0 {
                     continue;
                 }
+                if buy_order.is_fulfilled() {
+                    break;
+                }
 
                 let sell_orders_with_fee = OrderWithFee::from_orders(orders);
 
                 let match_price = sell_price;
 
                 for mut sell_order in sell_orders_with_fee {
+                    if buy_order.is_fulfilled() {
+                        break;
+                    }
                     // remaining ask & offer of buy order
                     let lef_buy_ask = buy_order.ask_amount.checked_sub(total_ask_filled)?;
                     let lef_buy_offer = buy_order.offer_amount.checked_sub(total_offer_filled)?;
@@ -742,12 +752,6 @@ pub fn matching_buy_order(
                     total_ask_filled += buy_ask_amount;
 
                     sell_orders_matched.push(sell_order);
-                    if buy_order.is_fulfilled() {
-                        break;
-                    }
-                }
-                if buy_order.is_fulfilled() {
-                    break;
                 }
             }
         } else {
