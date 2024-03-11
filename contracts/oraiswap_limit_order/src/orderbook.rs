@@ -220,6 +220,11 @@ impl OrderWithFee {
             || self.ask_amount < self.filled_ask_amount + Uint128::from(MIN_VOLUME)
     }
 
+    pub fn will_fulfilled(&self, ask_amount: Uint128, offer_amount: Uint128) -> bool {
+        self.offer_amount < self.filled_offer_amount + offer_amount + Uint128::from(MIN_VOLUME)
+            || self.ask_amount < self.filled_ask_amount + ask_amount + Uint128::from(MIN_VOLUME)
+    }
+
     pub fn get_price(&self) -> Decimal {
         match self.direction {
             OrderDirection::Buy => Decimal::from_ratio(self.offer_amount, self.ask_amount),

@@ -606,7 +606,7 @@ pub fn matching_order(
                 }
             }
 
-            if user_order.is_fulfilled() {
+            if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
                 break;
             }
 
@@ -619,14 +619,14 @@ pub fn matching_order(
                 if orders.len() == 0 {
                     continue;
                 }
-                if user_order.is_fulfilled() {
+                if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
                     break;
                 }
 
                 let match_orders_with_fees = OrderWithFee::from_orders(orders);
 
                 for mut match_order in match_orders_with_fees {
-                    if user_order.is_fulfilled() {
+                    if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
                         break;
                     }
                     // remaining ask & offer of buy order

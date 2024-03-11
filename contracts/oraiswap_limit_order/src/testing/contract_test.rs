@@ -5701,6 +5701,36 @@ fn test_market_order() {
             .unwrap();
     }
 
+    // Submitting a buy market order failed, (slippage > 1)
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(2500000u128),
+        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+            direction: OrderDirection::Buy,
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+            ],
+            slippage: Some(Decimal::from_str("1.1").unwrap()),
+        })
+        .unwrap(),
+    };
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[0].clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
+    );
+
     // current balances: Addr0 (7000000 Orai, 10000000 usdt);  Addr1 (10000000 Orai, 10000000 usdt)
 
     // create buy order (offer 2500000 usdt, slippage 10%)

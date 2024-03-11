@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{testing::mock_dependencies, Api, Decimal};
+use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Uint128};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
     limit_order::OrderDirection,
@@ -9,9 +9,10 @@ use oraiswap::{
 };
 
 use crate::{
+    order::{matching_order, MIN_VOLUME},
     orderbook::{Order, OrderBook},
-    state::{increase_last_order_id, init_last_order_id},
     query::query_ticks_prices,
+    state::{increase_last_order_id, init_last_order_id},
 };
 
 #[test]
@@ -475,4 +476,170 @@ fn highest_lowest_price() {
             );
         }
     }
+}
+
+#[test]
+fn test_matching_order_process() {
+    let mut deps = mock_dependencies();
+
+    let offer_info = AssetInfoRaw::NativeToken {
+        denom: ATOM_DENOM.to_string(),
+    };
+    let ask_info = AssetInfoRaw::NativeToken {
+        denom: ORAI_DENOM.to_string(),
+    };
+
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    // scenario: 4 sell orders 10000 orai at price 1, 1.1. 1.2, 1.3
+    let orders = vec![
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.1").unwrap(),
+            11000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.2").unwrap(),
+            12000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Sell,
+            Decimal::from_str("1.3").unwrap(),
+            1000u128.into(),
+        ),
+    ];
+
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
+
+    for order in orders.iter() {
+        let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
+        println!(
+            "insert order id: {}, direction: {:?}, price: {}, total orders: {}",
+            order.order_id,
+            order.direction,
+            order.get_price(),
+            total_orders
+        );
+    }
+
+    // case 1: order_price < all sell price, dont match
+    let buy_price = Decimal::from_str("0.9").unwrap();
+    let buy_order = Order::new(
+        increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr.clone(),
+        OrderDirection::Buy,
+        buy_price,
+        25000u128.into(),
+    );
+
+    let (buy_order_with_fee, matched_order) =
+        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+
+    assert_eq!(buy_order_with_fee.filled_ask_amount, Uint128::zero());
+    assert_eq!(buy_order_with_fee.filled_offer_this_round, Uint128::zero());
+    assert_eq!(matched_order.len(), 0);
+
+    // case 2: submit buy order at price 1.15, ask 25000 Orai
+    // - matched 2 sell order at price 1 and 1.1
+    // => buy_order: matched 20000 orai, and 21000 usdt
+    // order at price 1 and 1.1 if fulfilled
+
+    let buy_price = Decimal::from_str("1.15").unwrap();
+    let buy_order = Order::new(
+        increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr.clone(),
+        OrderDirection::Buy,
+        buy_price,
+        25000u128.into(),
+    );
+
+    let (buy_order_with_fee, matched_order) =
+        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+    // Because the number is rounded, we will check it differently from the expected amount
+    assert!(
+        buy_order_with_fee
+            .filled_ask_amount
+            .abs_diff(Uint128::from(20000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
+    assert!(
+        buy_order_with_fee
+            .filled_offer_amount
+            .abs_diff(Uint128::from(21000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
+    assert_eq!(matched_order.len(), 2);
+    for order in matched_order {
+        assert!(order.filled_ask_amount.abs_diff(order.ask_amount) < Uint128::from(MIN_VOLUME));
+        assert!(order.filled_offer_amount.abs_diff(order.offer_amount) < Uint128::from(MIN_VOLUME));
+    }
+
+    // case 3: match all
+    // - order_buy: 25000 orai
+    // - match:
+    //      + sell: order at 1,1.1 fulfilled,
+    //      + sell: order at price 1.2 partial filled (matched 5000 orai, 5000 * 1.2  = 7000 usdt)
+    //      + buy: oder_buy match 25000 orai, with offer 10000 * 1 + 10000 * 1.1 + 5000 * 1.2 = 27000 usdt
+
+    let buy_price = Decimal::from_str("1.5").unwrap();
+    let buy_order = Order::new(
+        increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr.clone(),
+        OrderDirection::Buy,
+        buy_price,
+        25000u128.into(),
+    );
+
+    let (buy_order_with_fee, matched_order) =
+        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+    // Because the number is rounded, we will check it differently from the expected amount
+    assert!(
+        buy_order_with_fee
+            .filled_ask_amount
+            .abs_diff(buy_order.ask_amount)
+            < Uint128::from(MIN_VOLUME)
+    );
+    assert!(
+        buy_order_with_fee
+            .filled_offer_amount
+            .abs_diff(Uint128::from(27000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
+
+    assert_eq!(matched_order.len(), 3);
+    for i in 0..2 {
+        assert!(
+            matched_order[i]
+                .filled_ask_amount
+                .abs_diff(matched_order[i].ask_amount)
+                < Uint128::from(MIN_VOLUME)
+        );
+        assert!(
+            matched_order[i]
+                .filled_offer_amount
+                .abs_diff(matched_order[i].offer_amount)
+                < Uint128::from(MIN_VOLUME)
+        );
+    }
+    assert!(
+        matched_order[2]
+            .filled_ask_amount
+            .abs_diff(Uint128::from(6000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
 }
