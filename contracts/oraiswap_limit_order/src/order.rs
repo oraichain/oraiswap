@@ -564,10 +564,9 @@ pub fn matching_order(
     orderbook_pair: OrderBook,
     order: &Order,
     order_price: Decimal,
-    direction: OrderDirection,
 ) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
     let pair_key = &orderbook_pair.get_pair_key();
-    let matched_orders_direction = match direction {
+    let matched_orders_direction = match order.direction {
         OrderDirection::Buy => OrderDirection::Sell,
         OrderDirection::Sell => OrderDirection::Buy,
     };
@@ -581,7 +580,7 @@ pub fn matching_order(
     let mut orders_matched: Vec<OrderWithFee> = vec![];
     let mut total_offer_filled = Uint128::zero();
     let mut total_ask_filled = Uint128::zero();
-    let sort_order = match direction {
+    let sort_order = match order.direction {
         OrderDirection::Buy => OrderBy::Ascending,
         OrderDirection::Sell => OrderBy::Descending,
     };
@@ -594,7 +593,7 @@ pub fn matching_order(
                     StdError::generic_err("Error converting bytes to u128")
                 })?));
 
-            match direction {
+            match order.direction {
                 OrderDirection::Buy => {
                     if order_price < match_price {
                         break;
@@ -644,7 +643,7 @@ pub fn matching_order(
 
                     // ask_amount of user_order <= min(lef_buy_ask, lef_sell_offer)
                     let mut user_ask_amount = Uint128::min(lef_user_ask, lef_match_offer);
-                    let mut user_offer_amount = match direction {
+                    let mut user_offer_amount = match order.direction {
                         OrderDirection::Buy => user_ask_amount * match_price,
                         OrderDirection::Sell => {
                             Uint128::from(user_ask_amount * Decimal::one().atomics())
@@ -655,7 +654,7 @@ pub fn matching_order(
                     // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
                     if user_offer_amount > lef_user_offer {
                         user_offer_amount = lef_user_offer;
-                        user_ask_amount = match direction {
+                        user_ask_amount = match order.direction {
                             OrderDirection::Buy => {
                                 Uint128::from(user_offer_amount * Decimal::one().atomics())
                                     .checked_div(match_price.atomics())?
@@ -825,13 +824,8 @@ pub fn process_matching(
 
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
-    let (offer_order_with_fee, mut matched_orders) = matching_order(
-        &deps,
-        orderbook_pair.clone(),
-        &order,
-        price_threshold,
-        order.direction,
-    )?;
+    let (offer_order_with_fee, mut matched_orders) =
+        matching_order(&deps, orderbook_pair.clone(), &order, price_threshold)?;
 
     if matched_orders.len() == 0 {
         return Ok(Response::default());
