@@ -341,6 +341,131 @@ fn test_pause_contract() {
 }
 
 #[test]
+fn test_update_admin() {
+    let (mut app, limit_order_addr) = basic_fixture();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+
+    let new_admin = Addr::unchecked("new_admin");
+    let update_admin = ExecuteMsg::UpdateAdmin {
+        admin: new_admin.clone(),
+    };
+
+    // case 1: try to update admin using non-admin addr => unauthorized
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &update_admin,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // update successful
+
+    app.execute(
+        contract_info.admin,
+        limit_order_addr.clone(),
+        &update_admin,
+        &[],
+    )
+    .unwrap();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+    assert_eq!(contract_info.admin, new_admin);
+}
+
+#[test]
+fn test_update_operator() {
+    let (mut app, limit_order_addr) = basic_fixture();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+
+    let new_operator = "new_operator".to_string();
+    let update_executor = ExecuteMsg::UpdateOperator {
+        operator: Some(new_operator.clone()),
+    };
+    // case 1: try to update operator using non-admin addr => unauthorized
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &update_executor,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // update successful
+
+    app.execute(
+        contract_info.admin,
+        limit_order_addr.clone(),
+        &update_executor,
+        &[],
+    )
+    .unwrap();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+    assert_eq!(contract_info.operator, Some(Addr::unchecked(new_operator)));
+}
+
+#[test]
+fn test_update_config() {
+    let (mut app, limit_order_addr) = basic_fixture();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+
+    let new_commission_rate = "0.01".to_string();
+    let update_config = ExecuteMsg::UpdateConfig {
+        reward_address: None,
+        commission_rate: Some(new_commission_rate.clone()),
+    };
+    // case 1: try to update operator using non-admin addr => unauthorized
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &update_config,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // update successful
+
+    app.execute(
+        contract_info.admin,
+        limit_order_addr.clone(),
+        &update_config,
+        &[],
+    )
+    .unwrap();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+    assert_eq!(contract_info.commission_rate, new_commission_rate);
+}
+
+#[test]
 fn test_update_orderbook_data() {
     let (mut app, limit_order_addr) = basic_fixture();
     // case 1: try to update orderbook spread with non-admin addr => unauthorized
