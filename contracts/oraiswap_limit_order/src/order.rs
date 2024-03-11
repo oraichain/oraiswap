@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::orderbook::{Executor, Order, OrderBook, OrderWithFee};
+use crate::query::get_price_info_for_market_order;
 use crate::state::{
     increase_last_order_id, read_config, read_order, read_orderbook, read_reward, remove_order,
     remove_orderbook, store_order, store_reward, PREFIX_TICK,
@@ -18,7 +19,7 @@ use oraiswap::limit_order::{OrderDirection, OrderStatus};
 pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
 const MIN_FEE: u128 = 1_000_000u128;
-const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
+pub const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
 
 struct Payment {
     address: Addr,
@@ -128,38 +129,13 @@ pub fn submit_market_order(
     }
 
     // with market order, ask_amount will be maximum amount can receive
-    let (best_price, price_threshold, max_ask_amount) = match direction {
-        OrderDirection::Buy => {
-            let (lowest_sell_price, sell_found, _) =
-                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
-
-            if !sell_found {
-                (Decimal::zero(), Decimal::zero(), Uint128::zero())
-            } else {
-                (
-                    lowest_sell_price,
-                    lowest_sell_price * (Decimal::one() + slippage),
-                    (offer_asset.amount * Decimal::one().atomics())
-                        .checked_div(lowest_sell_price.atomics())
-                        .unwrap(),
-                )
-            }
-        }
-        OrderDirection::Sell => {
-            let (highest_buy_price, buy_found, _) =
-                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-
-            if !buy_found {
-                (Decimal::zero(), Decimal::zero(), Uint128::zero())
-            } else {
-                (
-                    highest_buy_price,
-                    highest_buy_price * (Decimal::one() - slippage),
-                    offer_asset.amount * highest_buy_price,
-                )
-            }
-        }
-    };
+    let (best_price, price_threshold, max_ask_amount) = get_price_info_for_market_order(
+        deps.storage,
+        direction,
+        orderbook_pair,
+        offer_asset.amount,
+        slippage,
+    );
 
     if best_price.is_zero() {
         return Err(ContractError::CannotCreateMarketOrder {});
@@ -461,7 +437,7 @@ fn process_payment_list_orders(
 }
 
 pub fn matching_order(
-    deps: &DepsMut,
+    deps: Deps,
     orderbook_pair: OrderBook,
     order: &Order,
     order_price: Decimal,
@@ -512,7 +488,7 @@ pub fn matching_order(
             }
 
             if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
-                deps.as_ref().storage,
+                deps.storage,
                 match_price,
                 matched_orders_direction,
                 None,
@@ -625,8 +601,12 @@ pub fn process_matching(
 
     let order = read_order(deps.storage, &pair_key, order_id)?;
 
-    let (offer_order_with_fee, mut matched_orders) =
-        matching_order(&deps, orderbook_pair.clone(), &order, price_threshold)?;
+    let (offer_order_with_fee, mut matched_orders) = matching_order(
+        deps.as_ref(),
+        orderbook_pair.clone(),
+        &order,
+        price_threshold,
+    )?;
 
     if matched_orders.len() == 0 {
         return Ok(Response::default());

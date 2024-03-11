@@ -1,11 +1,14 @@
-use crate::orderbook::Order;
+use crate::order::{matching_order, SLIPPAGE_DEFAULT};
+use crate::orderbook::{Order, OrderBook};
 use crate::state::{
-    read_last_order_id, read_order, read_orderbook, read_orderbooks, read_orders,
+    read_config, read_last_order_id, read_order, read_orderbook, read_orderbooks, read_orders,
     read_orders_with_indexer, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
-use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage};
+use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage, Uint128};
+use oraiswap::limit_order::{OrderStatus, SimulateMarketOrderResponse};
 use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
 
 use oraiswap::asset::{pair_key, AssetInfo};
 use oraiswap::{
@@ -284,5 +287,105 @@ pub fn query_tick(
     Ok(TickResponse {
         price,
         total_orders,
+    })
+}
+
+pub fn get_price_info_for_market_order(
+    storage: &dyn Storage,
+    direction: OrderDirection,
+    orderbook_pair: &OrderBook,
+    offer_amount: Uint128,
+    slippage: Decimal,
+) -> (Decimal, Decimal, Uint128) {
+    let (best_price, price_threshold, max_ask_amount) = match direction {
+        OrderDirection::Buy => {
+            let (lowest_sell_price, sell_found, _) =
+                orderbook_pair.lowest_price(storage, OrderDirection::Sell);
+
+            if !sell_found {
+                (Decimal::zero(), Decimal::zero(), Uint128::zero())
+            } else {
+                (
+                    lowest_sell_price,
+                    lowest_sell_price * (Decimal::one() + slippage),
+                    (offer_amount * Decimal::one().atomics())
+                        .checked_div(lowest_sell_price.atomics())
+                        .unwrap(),
+                )
+            }
+        }
+        OrderDirection::Sell => {
+            let (highest_buy_price, buy_found, _) =
+                orderbook_pair.highest_price(storage, OrderDirection::Buy);
+
+            if !buy_found {
+                (Decimal::zero(), Decimal::zero(), Uint128::zero())
+            } else {
+                (
+                    highest_buy_price,
+                    highest_buy_price * (Decimal::one() - slippage),
+                    offer_amount * highest_buy_price,
+                )
+            }
+        }
+    };
+
+    (best_price, price_threshold, max_ask_amount)
+}
+
+pub fn query_simulate_market_order(
+    deps: Deps,
+    direction: OrderDirection,
+    asset_infos: [AssetInfo; 2],
+    slippage: Option<Decimal>,
+    offer_amount: Uint128,
+) -> StdResult<SimulateMarketOrderResponse> {
+    let config = read_config(deps.storage)?;
+
+    let pair_key = pair_key(&[
+        asset_infos[0].to_raw(deps.api)?,
+        asset_infos[1].to_raw(deps.api)?,
+    ]);
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+    let slippage = slippage.unwrap_or(
+        orderbook_pair
+            .spread
+            .unwrap_or(Decimal::from_str(SLIPPAGE_DEFAULT)?),
+    );
+
+    let (best_price, price_threshold, max_ask_amount) = get_price_info_for_market_order(
+        deps.storage,
+        direction,
+        &orderbook_pair,
+        offer_amount,
+        slippage,
+    );
+
+    if best_price.is_zero() {
+        return Ok(SimulateMarketOrderResponse {
+            receive: Uint128::zero(),
+            refunds: offer_amount,
+        });
+    }
+
+    // fake a order
+    let user_orders = Order {
+        order_id: 0,
+        status: OrderStatus::Open,
+        direction,
+        bidder_addr: config.reward_address,
+        offer_amount,
+        ask_amount: max_ask_amount,
+        filled_ask_amount: Uint128::zero(),
+        filled_offer_amount: Uint128::zero(),
+    };
+
+    let (user_order_with_fee, _) =
+        matching_order(deps, orderbook_pair, &user_orders, price_threshold)?;
+
+    Ok(SimulateMarketOrderResponse {
+        receive: user_order_with_fee.filled_ask_amount,
+        refunds: offer_amount.checked_sub(user_order_with_fee.filled_offer_amount)?,
     })
 }

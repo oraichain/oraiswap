@@ -548,7 +548,7 @@ fn test_matching_order_process() {
     );
 
     let (buy_order_with_fee, matched_order) =
-        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+        matching_order(deps.as_ref(), ob.clone(), &buy_order, buy_price).unwrap();
 
     assert_eq!(buy_order_with_fee.filled_ask_amount, Uint128::zero());
     assert_eq!(buy_order_with_fee.filled_offer_this_round, Uint128::zero());
@@ -569,7 +569,7 @@ fn test_matching_order_process() {
     );
 
     let (buy_order_with_fee, matched_order) =
-        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+        matching_order(deps.as_ref(), ob.clone(), &buy_order, buy_price).unwrap();
     // Because the number is rounded, we will check it differently from the expected amount
     assert!(
         buy_order_with_fee
@@ -606,7 +606,7 @@ fn test_matching_order_process() {
     );
 
     let (buy_order_with_fee, matched_order) =
-        matching_order(&deps.as_mut(), ob.clone(), &buy_order, buy_price).unwrap();
+        matching_order(deps.as_ref(), ob.clone(), &buy_order, buy_price).unwrap();
     // Because the number is rounded, we will check it differently from the expected amount
     assert!(
         buy_order_with_fee
@@ -709,7 +709,7 @@ fn test_matching_order_process() {
     sell_order.offer_amount = Uint128::from(50000u128);
 
     let (sell_order_with_fee, matched_order) =
-        matching_order(&deps.as_mut(), ob.clone(), &sell_order, sell_min_price).unwrap();
+        matching_order(deps.as_ref(), ob.clone(), &sell_order, sell_min_price).unwrap();
     assert!(
         sell_order_with_fee
             .filled_offer_amount
