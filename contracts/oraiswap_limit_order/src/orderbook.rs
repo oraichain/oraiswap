@@ -78,16 +78,6 @@ impl Order {
         }
     }
 
-    pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
-        if self.status == OrderStatus::Fulfilled {
-            // When status is Fulfilled, remove order
-            remove_order(storage, pair_key, self)
-        } else {
-            // update order
-            store_order(storage, pair_key, self, false)
-        }
-    }
-
     // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
         match self.direction {

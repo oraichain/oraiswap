@@ -455,8 +455,6 @@ pub fn matching_order(
 
     let mut user_order = OrderWithFee::from_order(order.to_owned());
     let mut orders_matched: Vec<OrderWithFee> = vec![];
-    let mut total_offer_filled = Uint128::zero();
-    let mut total_ask_filled = Uint128::zero();
     let sort_order = match order.direction {
         OrderDirection::Buy => OrderBy::Ascending,
         OrderDirection::Sell => OrderBy::Descending,
@@ -483,7 +481,7 @@ pub fn matching_order(
                 }
             }
 
-            if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
+            if user_order.is_fulfilled() {
                 break;
             }
 
@@ -500,12 +498,16 @@ pub fn matching_order(
                 let match_orders_with_fees = OrderWithFee::from_orders(orders);
 
                 for mut match_order in match_orders_with_fees {
-                    if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
+                    if user_order.is_fulfilled() {
                         break;
                     }
                     // remaining ask & offer of buy order
-                    let lef_user_ask = user_order.ask_amount.checked_sub(total_ask_filled)?;
-                    let lef_user_offer = user_order.offer_amount.checked_sub(total_offer_filled)?;
+                    let lef_user_ask = user_order
+                        .ask_amount
+                        .checked_sub(user_order.filled_ask_amount)?;
+                    let lef_user_offer = user_order
+                        .offer_amount
+                        .checked_sub(user_order.filled_offer_amount)?;
 
                     // remaining offer & ask of sell order
                     let lef_match_offer = match_order
@@ -541,9 +543,7 @@ pub fn matching_order(
                     let match_ask_amount = Uint128::min(user_offer_amount, lef_match_ask);
 
                     match_order.fill_order(match_ask_amount, user_ask_amount)?;
-
-                    total_offer_filled += user_offer_amount;
-                    total_ask_filled += user_ask_amount;
+                    user_order.fill_order(user_ask_amount, user_offer_amount)?;
 
                     orders_matched.push(match_order);
                 }
@@ -553,7 +553,8 @@ pub fn matching_order(
         }
     }
 
-    user_order.fill_order(total_ask_filled, total_offer_filled)?;
+    user_order.filled_offer_this_round = user_order.filled_offer_amount;
+    user_order.filled_ask_this_round = user_order.filled_ask_amount;
 
     Ok((user_order, orders_matched))
 }
