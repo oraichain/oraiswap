@@ -5586,6 +5586,13 @@ fn test_market_order() {
                 amount: Uint128::from(10000000u128),
             }],
         ),
+        (
+            &"addr0002".to_string(),
+            &[Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        ),
     ]);
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
@@ -5969,6 +5976,21 @@ fn test_market_order() {
         ],
         slippage: Some(Decimal::from_ratio(50u128, 100u128)),
     };
+
+    // Submitting a buy market order failed, (ProvidesAsset if invalid)
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0002"),
+            limit_order_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(2500000u128),
+            }],
+        )
+        .is_err(),
+        true
+    );
 
     let _res = app
         .execute(
