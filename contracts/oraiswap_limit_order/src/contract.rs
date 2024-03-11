@@ -59,6 +59,7 @@ pub fn instantiate(
             .commission_rate
             .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
         reward_address: deps.api.addr_canonicalize(msg.reward_address.as_str())?,
+        is_paused: false,
     };
 
     store_config(deps.storage, &config)?;
@@ -75,8 +76,28 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    if is_paused(deps.as_ref(), &msg) {
+        return Err(ContractError::Paused {});
+    }
+
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::Pause {} => {
+            let mut config = read_config(deps.storage)?;
+            validate_admin(deps.api, &config.admin, info.sender.as_str())?;
+            config.is_paused = true;
+            store_config(deps.storage, &config)?;
+
+            Ok(Response::new().add_attribute("action", "pause"))
+        }
+        ExecuteMsg::Unpause {} => {
+            let mut config = read_config(deps.storage)?;
+            validate_admin(deps.api, &config.admin, info.sender.as_str())?;
+            config.is_paused = false;
+            store_config(deps.storage, &config)?;
+
+            Ok(Response::new().add_attribute("action", "unpause"))
+        }
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
         ExecuteMsg::UpdateOperator { operator } => execute_update_operator(deps, info, operator),
         ExecuteMsg::UpdateConfig {
@@ -210,6 +231,25 @@ pub fn execute(
                 ("token", &asset.to_string()),
             ]))
         }
+    }
+}
+
+fn is_paused(deps: Deps, msg: &ExecuteMsg) -> bool {
+    if let Ok(config) = read_config(deps.storage) {
+        if config.is_paused {
+            match msg {
+                ExecuteMsg::UpdateAdmin { admin: _ } => false,
+                ExecuteMsg::UpdateConfig { .. } => false,
+                ExecuteMsg::Pause {} => false,
+                ExecuteMsg::Unpause {} => false,
+                ExecuteMsg::UpdateOrderbookPair { .. } => false,
+                _ => true,
+            }
+        } else {
+            false
+        }
+    } else {
+        false
     }
 }
 
@@ -531,6 +571,7 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         } else {
             None
         },
+        is_paused: info.is_paused,
     })
 }
 

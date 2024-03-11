@@ -107,4 +107,7 @@ pub enum ContractError {
 
     #[error("Invalid funds")]
     InvalidFunds {},
+
+    #[error("Contract paused")]
+    Paused {},
 }

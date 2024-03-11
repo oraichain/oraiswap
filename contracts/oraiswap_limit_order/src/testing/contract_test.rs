@@ -9,7 +9,8 @@ use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
     ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
     OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, TicksResponse,
+    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, SimulateMarketOrderResponse,
+    TicksResponse,
 };
 
 use crate::jsonstr;
@@ -237,6 +238,106 @@ fn test_withdraw_token() {
             }
         }
     }
+}
+
+#[test]
+fn test_pause_contract() {
+    let (mut app, limit_order_addr) = basic_fixture();
+    // case 1: try to paused contract using non-admin addr => unauthorized
+    let asset_infos = [
+        AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        AssetInfo::NativeToken {
+            denom: USDT_DENOM.to_string(),
+        },
+    ];
+    let asset = Asset {
+        info: asset_infos.first().unwrap().clone(),
+        amount: Uint128::from(10u128),
+    };
+
+    let pause_msg = ExecuteMsg::Pause {};
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &pause_msg,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // pause successful
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &pause_msg,
+        &[],
+    )
+    .unwrap();
+
+    // after pause contract, can execute some funcs
+
+    let update_msg = ExecuteMsg::WithdrawToken {
+        asset: asset.clone(),
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &update_msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10u128), // deposit some tokens into the contract so we can mock withdrawing tokens
+            }],
+        )
+        .is_err(),
+        true
+    );
+
+    // unpause contract failed, non admin
+    let pause_msg = ExecuteMsg::Unpause {};
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &pause_msg,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
+    // unpause successful
+    let pause_msg = ExecuteMsg::Unpause {};
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &pause_msg,
+        &[],
+    )
+    .unwrap();
+
+    // after unpause, can execute contract
+
+    let update_msg = ExecuteMsg::WithdrawToken {
+        asset: asset.clone(),
+    };
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &update_msg,
+        &[Coin {
+            denom: ORAI_DENOM.to_string(),
+            amount: Uint128::from(10u128), // deposit some tokens into the contract so we can mock withdrawing tokens
+        }],
+    )
+    .unwrap();
 }
 
 #[test]
@@ -6034,5 +6135,180 @@ fn test_market_order() {
             denom: USDT_DENOM.to_string(),
             amount: Uint128::from(7696840u128),
         },
+    );
+}
+
+#[test]
+fn test_query_simulate_market_order() {
+    let mut app = MockApp::new(&[
+        (
+            &"addr0000".to_string(),
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        ),
+        (
+            &"addr0001".to_string(),
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        ),
+        (
+            &"addr0002".to_string(),
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        ),
+        (
+            &"addr0002".to_string(),
+            &[Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(10000000u128),
+            }],
+        ),
+    ]);
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    let token_addrs = app.set_token_balances(&[(
+        &"usdt".to_string(),
+        &[
+            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
+        ],
+    )]);
+
+    let msg = InstantiateMsg {
+        name: None,
+        version: None,
+        admin: None,
+        commission_rate: None,
+        operator: None,
+        reward_address: REWARD_ADDR.to_string(),
+    };
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+    let limit_order_addr = app
+        .instantiate(
+            code_id,
+            Addr::unchecked("addr0000"),
+            &msg,
+            &[],
+            "limit order",
+        )
+        .unwrap();
+
+    // Create pair [orai, token_addrs[0]] for order book
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::Token {
+            contract_addr: token_addrs[0].clone(),
+        },
+        spread: Some(Decimal::from_ratio(1u128, 10u128)),
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+
+    let _res = app.execute(
+        Addr::unchecked("addr0000"),
+        limit_order_addr.clone(),
+        &msg,
+        &[],
+    );
+
+    // Simulate market price with sell orders do not exist
+
+    let res = app
+        .query::<SimulateMarketOrderResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::SimulateMarketOrder {
+                direction: OrderDirection::Buy,
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                ],
+                slippage: None,
+                offer_amount: Uint128::from(10000000u128),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        res,
+        SimulateMarketOrderResponse {
+            receive: Uint128::zero(),
+            refunds: Uint128::from(10000000u128)
+        }
+    );
+
+    // scenario: create 3 sell orders at price 1, 1.1, 1.2. Then, crate a buy order with slippage default is  10%
+
+    let offers: Vec<u128> = vec![1000000, 1000000, 1000000];
+    let asks: Vec<u128> = vec![1000000, 1100000, 1200000];
+    for i in 0..3 {
+        let msg = ExecuteMsg::SubmitOrder {
+            direction: OrderDirection::Sell,
+            assets: [
+                Asset {
+                    info: AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    amount: Uint128::from(offers[i]),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(asks[i]),
+                },
+            ],
+        };
+
+        let _res = app
+            .execute(
+                Addr::unchecked("addr0000"),
+                limit_order_addr.clone(),
+                &msg,
+                &[Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(offers[i]),
+                }],
+            )
+            .unwrap();
+    }
+
+    // Submitting a buy market order with slippage default 0.1 => match sell order at price 1 & 1.1
+    // => receive 2000000, with offer 2100000, refund 400000
+    let res = app
+        .query::<SimulateMarketOrderResponse, _>(
+            limit_order_addr.clone(),
+            &QueryMsg::SimulateMarketOrder {
+                direction: OrderDirection::Buy,
+                asset_infos: [
+                    AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                ],
+                slippage: None,
+                offer_amount: Uint128::new(2500000u128),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        res,
+        SimulateMarketOrderResponse {
+            receive: Uint128::from(2000000u128),
+            refunds: Uint128::from(400000u128)
+        }
     );
 }

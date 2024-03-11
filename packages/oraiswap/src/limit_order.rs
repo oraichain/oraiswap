@@ -12,6 +12,8 @@ pub struct ContractInfo {
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
     pub operator: Option<CanonicalAddr>,
+    #[serde(default)]
+    pub is_paused: bool,
 }
 
 #[cw_serde]
@@ -88,6 +90,8 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
 
+    Pause {},
+    Unpause {},
     UpdateAdmin {
         admin: Addr,
     },
@@ -233,6 +237,7 @@ pub struct ContractInfoResponse {
     pub commission_rate: String,
     pub reward_address: Addr,
     pub operator: Option<Addr>,
+    pub is_paused: bool,
 }
 
 #[cw_serde]
