@@ -159,10 +159,7 @@ impl OrderWithFee {
     }
 
     pub fn from_orders(orders: Vec<Order>) -> Vec<Self> {
-        orders
-            .into_iter()
-            .map(|order| Self::from_order(order))
-            .collect()
+        orders.into_iter().map(Self::from_order).collect()
     }
     // create new order given a price and an offer amount
     pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) -> StdResult<()> {
