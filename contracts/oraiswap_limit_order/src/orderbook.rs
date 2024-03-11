@@ -161,20 +161,7 @@ impl OrderWithFee {
     pub fn from_orders(orders: Vec<Order>) -> Vec<Self> {
         orders
             .into_iter()
-            .map(|order| OrderWithFee {
-                order_id: order.order_id,
-                status: order.status,
-                direction: order.direction,
-                bidder_addr: order.bidder_addr,
-                offer_amount: order.offer_amount,
-                ask_amount: order.ask_amount,
-                filled_offer_amount: order.filled_offer_amount,
-                filled_ask_amount: order.filled_ask_amount,
-                relayer_fee: Uint128::zero(),
-                reward_fee: Uint128::zero(),
-                filled_ask_this_round: Uint128::zero(),
-                filled_offer_this_round: Uint128::zero(),
-            })
+            .map(|order| Self::from_order(order))
             .collect()
     }
     // create new order given a price and an offer amount
