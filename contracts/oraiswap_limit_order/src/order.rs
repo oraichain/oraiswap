@@ -619,9 +619,6 @@ pub fn matching_order(
                 if orders.len() == 0 {
                     continue;
                 }
-                if user_order.will_fulfilled(total_ask_filled, total_offer_filled) {
-                    break;
-                }
 
                 let match_orders_with_fees = OrderWithFee::from_orders(orders);
 
