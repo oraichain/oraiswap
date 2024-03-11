@@ -135,12 +135,6 @@ pub enum ExecuteMsg {
         asset_infos: [AssetInfo; 2],
     },
 
-    /// Arbitrager execute order book pair
-    ExecuteOrderBookPair {
-        asset_infos: [AssetInfo; 2],
-        limit: Option<u32>,
-    },
-
     /// Arbitrager remove order book
     RemoveOrderBookPair {
         asset_infos: [AssetInfo; 2],

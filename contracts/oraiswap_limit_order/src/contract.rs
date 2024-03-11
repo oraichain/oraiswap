@@ -9,8 +9,7 @@ use cw_utils::one_coin;
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, get_paid_and_quote_assets, remove_pair,
-    submit_market_order, submit_order,
+    cancel_order, get_paid_and_quote_assets, remove_pair, submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
 use crate::query::{
@@ -197,9 +196,6 @@ pub fn execute(
             order_id,
             asset_infos,
         } => cancel_order(deps, info, order_id, asset_infos),
-        ExecuteMsg::ExecuteOrderBookPair { asset_infos, limit } => {
-            execute_matching_orders(deps, info, asset_infos, limit)
-        }
         ExecuteMsg::RemoveOrderBookPair { asset_infos } => remove_pair(deps, info, asset_infos),
         ExecuteMsg::WithdrawToken { asset } => {
             let contract_info = read_config(deps.storage)?;
