@@ -214,13 +214,6 @@ pub enum QueryMsg {
     OrderBookMatchable { asset_infos: [AssetInfo; 2] },
     #[returns(Decimal)]
     MidPrice { asset_infos: [AssetInfo; 2] },
-    #[returns(BaseAmountResponse)]
-    PriceByBaseAmount {
-        asset_infos: [AssetInfo; 2],
-        base_amount: Uint128,
-        direction: OrderDirection,
-        slippage: Option<Decimal>,
-    },
 }
 
 #[cw_serde]
@@ -284,12 +277,6 @@ pub struct LastOrderIdResponse {
 #[cw_serde]
 pub struct OrderBookMatchableResponse {
     pub is_matchable: bool,
-}
-
-#[cw_serde]
-pub struct BaseAmountResponse {
-    pub market_price: Decimal,
-    pub expected_base_amount: Uint128,
 }
 
 /// We currently take no arguments for migrations

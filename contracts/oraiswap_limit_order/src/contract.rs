@@ -14,7 +14,7 @@ use crate::order::{
 use crate::orderbook::OrderBook;
 use crate::query::{
     query_last_order_id, query_order, query_orderbook, query_orderbook_is_matchable,
-    query_orderbooks, query_orders, query_price_by_base_amount, query_tick, query_ticks_with_end,
+    query_orderbooks, query_orders, query_tick, query_ticks_with_end,
 };
 use crate::state::{
     init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
@@ -502,25 +502,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 .checked_div(Decimal::from_ratio(2u128, 1u128))
                 .unwrap_or_default();
             to_binary(&mid_price)
-        }
-        QueryMsg::PriceByBaseAmount {
-            asset_infos,
-            base_amount,
-            direction,
-            slippage,
-        } => {
-            let pair_key = pair_key(&[
-                asset_infos[0].to_raw(deps.api)?,
-                asset_infos[1].to_raw(deps.api)?,
-            ]);
-            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-            to_binary(&query_price_by_base_amount(
-                deps,
-                &orderbook_pair,
-                direction,
-                base_amount,
-                slippage,
-            )?)
         }
     }
 }
