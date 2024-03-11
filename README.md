@@ -93,7 +93,7 @@ END
 
 ```bash
 # install tarpaulin if needed
-cargo install tarpaulin --locked
+cargo install cargo-tarpaulin --locked
 
 # Run code coverage for all contracts
 cargo tarpaulin --skip-clean --ignore-tests --exclude-files contracts/*/src/bin/schema.rs --frozen --engine llvm --out html --output-dir cov
