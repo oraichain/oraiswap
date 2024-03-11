@@ -520,11 +520,11 @@ fn test_matching_order_process() {
             bidder_addr.clone(),
             OrderDirection::Sell,
             Decimal::from_str("1.3").unwrap(),
-            1000u128.into(),
+            13000u128.into(),
         ),
     ];
 
-    let mut ob = OrderBook::new(ask_info, offer_info, None);
+    let mut ob = OrderBook::new(ask_info.clone(), offer_info.clone(), None);
 
     for order in orders.iter() {
         let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
@@ -642,4 +642,90 @@ fn test_matching_order_process() {
             .abs_diff(Uint128::from(6000u128))
             < Uint128::from(MIN_VOLUME)
     );
+
+    // case 4: test with match sell order
+    //
+    // scenario: 4 buy orders 10000 orai at price 1, 1.1. 1.2, 1.3, and create a market sell order 50000 orai with min price = 1
+    // sell_order matched: offer 50000,filled offer 40000, filled ask (1 + 1.1 + 1.2 + 1.3) * 1000 = 46000
+    // all buy order will fulfilled
+
+    let mut deps = mock_dependencies();
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    let orders = vec![
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.1").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.2").unwrap(),
+            10000u128.into(),
+        ),
+        Order::new(
+            increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr.clone(),
+            OrderDirection::Buy,
+            Decimal::from_str("1.3").unwrap(),
+            10000u128.into(),
+        ),
+    ];
+
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
+
+    for order in orders.iter() {
+        let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
+        println!(
+            "insert order id: {}, direction: {:?}, price: {}, total orders: {}",
+            order.order_id,
+            order.direction,
+            order.get_price(),
+            total_orders
+        );
+    }
+
+    // create market sell order 50000 orai wih min price is 1
+    let sell_min_price = Decimal::from_str("1").unwrap();
+    let sell_price = Decimal::from_str("1.5").unwrap();
+    let mut sell_order = Order::new(
+        increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr.clone(),
+        OrderDirection::Sell,
+        sell_price,
+        50000u128.into(),
+    );
+    sell_order.offer_amount = Uint128::from(50000u128);
+
+    let (sell_order_with_fee, matched_order) =
+        matching_order(&deps.as_mut(), ob.clone(), &sell_order, sell_min_price).unwrap();
+    assert!(
+        sell_order_with_fee
+            .filled_offer_amount
+            .abs_diff(Uint128::from(40000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
+    assert!(
+        sell_order_with_fee
+            .filled_ask_amount
+            .abs_diff(Uint128::from(46000u128))
+            < Uint128::from(MIN_VOLUME)
+    );
+
+    assert_eq!(matched_order.len(), 4);
+    for order in matched_order {
+        assert!(order.filled_ask_amount.abs_diff(order.ask_amount) < Uint128::from(MIN_VOLUME));
+        assert!(order.filled_offer_amount.abs_diff(order.offer_amount) < Uint128::from(MIN_VOLUME));
+    }
 }
