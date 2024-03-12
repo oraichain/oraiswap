@@ -8,9 +8,8 @@ use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::limit_order::{
     ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
-    OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
-    OrderResponse, OrderStatus, OrdersResponse, QueryMsg, SimulateMarketOrderResponse,
-    TicksResponse,
+    OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus,
+    OrdersResponse, QueryMsg, SimulateMarketOrderResponse, TicksResponse,
 };
 
 use crate::jsonstr;
@@ -2914,24 +2913,6 @@ fn execute_pair_native_token() {
     ]
     .to_vec();
     assert_eq!(address2_balances, expected_balances);
-
-    let res = app
-        .query::<OrderBookMatchableResponse, _>(
-            limit_order_addr.clone(),
-            &QueryMsg::OrderBookMatchable {
-                asset_infos: [
-                    AssetInfo::NativeToken {
-                        denom: ORAI_DENOM.to_string(),
-                    },
-                    AssetInfo::NativeToken {
-                        denom: USDT_DENOM.to_string(),
-                    },
-                ],
-            },
-        )
-        .unwrap();
-
-    println!("[LOG] orderbook matchable: {}", jsonstr!(res));
 }
 
 #[test]

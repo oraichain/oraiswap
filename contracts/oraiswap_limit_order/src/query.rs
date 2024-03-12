@@ -14,8 +14,8 @@ use std::str::FromStr;
 use oraiswap::asset::{pair_key, AssetInfo};
 use oraiswap::{
     limit_order::{
-        LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse,
-        OrderDirection, OrderFilter, OrderResponse, OrdersResponse, TickResponse, TicksResponse,
+        LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
+        OrderResponse, OrdersResponse, TickResponse, TicksResponse,
     },
     querier::calc_range_start,
 };
@@ -167,24 +167,6 @@ pub fn query_orderbook(deps: Deps, asset_infos: [AssetInfo; 2]) -> StdResult<Ord
     ob.to_response(deps.api)
 }
 
-pub fn query_orderbook_is_matchable(
-    deps: Deps,
-    asset_infos: [AssetInfo; 2],
-) -> StdResult<OrderBookMatchableResponse> {
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price_list, best_sell_price_list) = ob
-        .find_list_match_price(deps.storage, Some(30))
-        .unwrap_or_default();
-
-    Ok(OrderBookMatchableResponse {
-        is_matchable: best_buy_price_list.len() != 0 && best_sell_price_list.len() != 0,
-    })
-}
-
 pub fn query_ticks_prices(
     storage: &dyn Storage,
     pair_key: &[u8],
@@ -267,7 +249,7 @@ pub fn query_ticks_with_end(
                 total_orders,
             })
         })
-        .collect::<StdResult<Vec<TickResponse>>>()?;
+        .collect::<StdResult<_>>()?;
 
     Ok(TicksResponse { ticks })
 }

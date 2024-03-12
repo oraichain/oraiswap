@@ -13,8 +13,8 @@ use crate::order::{
 };
 use crate::orderbook::OrderBook;
 use crate::query::{
-    query_last_order_id, query_order, query_orderbook, query_orderbook_is_matchable,
-    query_orderbooks, query_orders, query_simulate_market_order, query_tick, query_ticks_with_end,
+    query_last_order_id, query_order, query_orderbook, query_orderbooks, query_orders,
+    query_simulate_market_order, query_tick, query_ticks_with_end,
 };
 use crate::state::{
     init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
@@ -513,9 +513,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
         )?),
-        QueryMsg::OrderBookMatchable { asset_infos } => {
-            to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
-        }
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
