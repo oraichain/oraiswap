@@ -1,19 +1,21 @@
+use crate::order::{matching_order, SLIPPAGE_DEFAULT};
 use crate::orderbook::{Order, OrderBook};
 use crate::state::{
-    read_last_order_id, read_order, read_orderbook, read_orderbooks, read_orders,
+    read_config, read_last_order_id, read_order, read_orderbook, read_orderbooks, read_orders,
     read_orders_with_indexer, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
-use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage, Uint128};
-use oraiswap::limit_order::BaseAmountResponse;
-use std::cmp::min;
+use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdError, StdResult, Storage, Uint128};
+use oraiswap::error::ContractError;
+use oraiswap::limit_order::{OrderStatus, SimulateMarketOrderResponse};
 use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
 
 use oraiswap::asset::{pair_key, AssetInfo};
 use oraiswap::{
     limit_order::{
-        LastOrderIdResponse, OrderBookMatchableResponse, OrderBookResponse, OrderBooksResponse,
-        OrderDirection, OrderFilter, OrderResponse, OrdersResponse, TickResponse, TicksResponse,
+        LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
+        OrderResponse, OrdersResponse, TickResponse, TicksResponse,
     },
     querier::calc_range_start,
 };
@@ -135,64 +137,6 @@ pub fn query_orders(
     Ok(resp)
 }
 
-pub fn query_price_by_base_amount(
-    deps: Deps,
-    orderbook_pair: &OrderBook,
-    direction: OrderDirection,
-    base_amount: Uint128,
-    slippage: Option<Decimal>,
-) -> StdResult<BaseAmountResponse> {
-    // We have to query opposite direction to fill order
-    let price_direction = match direction {
-        OrderDirection::Buy => OrderDirection::Sell,
-        OrderDirection::Sell => OrderDirection::Buy,
-    };
-
-    let order_by = match price_direction {
-        OrderDirection::Buy => Some(2i32),
-        OrderDirection::Sell => Some(1i32),
-    };
-    // get best price list base on direction
-    let best_price_list = query_ticks_prices_with_end(
-        deps.storage,
-        &orderbook_pair.get_pair_key(),
-        price_direction,
-        None,
-        None,
-        None,
-        order_by,
-    );
-
-    let mut total_base_amount_by_price = Uint128::zero();
-    let mut market_price = Decimal::zero();
-    for price in &best_price_list {
-        let base_amount_by_price =
-            orderbook_pair.find_base_amount_at_price(deps.storage, *price, price_direction);
-        total_base_amount_by_price =
-            total_base_amount_by_price.checked_add(base_amount_by_price)?;
-        market_price = *price;
-        if total_base_amount_by_price >= base_amount {
-            break;
-        }
-    }
-    let expected_base_amount = min(total_base_amount_by_price, base_amount);
-
-    if let Some(slippage) = slippage {
-        if slippage >= Decimal::one() {
-            market_price = Decimal::zero();
-        }
-        market_price = match direction {
-            OrderDirection::Buy => market_price * (Decimal::one() + slippage),
-            OrderDirection::Sell => market_price * (Decimal::one() - slippage),
-        };
-    }
-
-    Ok(BaseAmountResponse {
-        market_price,
-        expected_base_amount,
-    })
-}
-
 pub fn query_last_order_id(deps: Deps) -> StdResult<LastOrderIdResponse> {
     let last_order_id = read_last_order_id(deps.storage)?;
     let resp = LastOrderIdResponse { last_order_id };
@@ -223,31 +167,13 @@ pub fn query_orderbook(deps: Deps, asset_infos: [AssetInfo; 2]) -> StdResult<Ord
     ob.to_response(deps.api)
 }
 
-pub fn query_orderbook_is_matchable(
-    deps: Deps,
-    asset_infos: [AssetInfo; 2],
-) -> StdResult<OrderBookMatchableResponse> {
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let ob = read_orderbook(deps.storage, &pair_key)?;
-    let (best_buy_price_list, best_sell_price_list) = ob
-        .find_list_match_price(deps.storage, Some(30))
-        .unwrap_or_default();
-
-    Ok(OrderBookMatchableResponse {
-        is_matchable: best_buy_price_list.len() != 0 && best_sell_price_list.len() != 0,
-    })
-}
-
 pub fn query_ticks_prices(
     storage: &dyn Storage,
     pair_key: &[u8],
     direction: OrderDirection,
     start_after: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> Vec<Decimal> {
     query_ticks_prices_with_end(
         storage,
@@ -267,7 +193,7 @@ pub fn query_ticks_prices_with_end(
     start_after: Option<Decimal>,
     end: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> Vec<Decimal> {
     query_ticks_with_end(
         storage,
@@ -292,10 +218,8 @@ pub fn query_ticks_with_end(
     start_after: Option<Decimal>,
     end: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> StdResult<TicksResponse> {
-    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
-
     let position_bucket: ReadonlyBucket<u64> =
         ReadonlyBucket::multilevel(storage, &[PREFIX_TICK, pair_key, direction.as_bytes()]);
 
@@ -325,7 +249,7 @@ pub fn query_ticks_with_end(
                 total_orders,
             })
         })
-        .collect::<StdResult<Vec<TickResponse>>>()?;
+        .collect::<StdResult<_>>()?;
 
     Ok(TicksResponse { ticks })
 }
@@ -344,5 +268,91 @@ pub fn query_tick(
     Ok(TickResponse {
         price,
         total_orders,
+    })
+}
+
+pub fn get_price_info_for_market_order(
+    storage: &dyn Storage,
+    direction: OrderDirection,
+    orderbook_pair: &OrderBook,
+    offer_amount: Uint128,
+    slippage: Decimal,
+) -> Option<(Decimal, Decimal, Uint128)> {
+    match direction {
+        OrderDirection::Buy => orderbook_pair
+            .lowest_price(storage, OrderDirection::Sell)
+            .map(|(lowest_sell_price, _)| {
+                (
+                    lowest_sell_price,
+                    lowest_sell_price * (Decimal::one() + slippage),
+                    offer_amount * Decimal::one().atomics() / lowest_sell_price.atomics(),
+                )
+            }),
+        OrderDirection::Sell => orderbook_pair
+            .highest_price(storage, OrderDirection::Buy)
+            .map(|(highest_buy_price, _)| {
+                (
+                    highest_buy_price,
+                    highest_buy_price * (Decimal::one() - slippage),
+                    offer_amount * highest_buy_price,
+                )
+            }),
+    }
+}
+
+pub fn query_simulate_market_order(
+    deps: Deps,
+    direction: OrderDirection,
+    asset_infos: [AssetInfo; 2],
+    slippage: Option<Decimal>,
+    offer_amount: Uint128,
+) -> StdResult<SimulateMarketOrderResponse> {
+    let config = read_config(deps.storage)?;
+
+    let pair_key = pair_key(&[
+        asset_infos[0].to_raw(deps.api)?,
+        asset_infos[1].to_raw(deps.api)?,
+    ]);
+    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+    let slippage = slippage.unwrap_or(
+        orderbook_pair
+            .spread
+            .unwrap_or(Decimal::from_str(SLIPPAGE_DEFAULT)?),
+    );
+
+    let (_best_price, price_threshold, max_ask_amount) = match get_price_info_for_market_order(
+        deps.storage,
+        direction,
+        &orderbook_pair,
+        offer_amount,
+        slippage,
+    ) {
+        Some(data) => data,
+        None => {
+            return Err(StdError::generic_err(
+                ContractError::NoMatchedPrice {}.to_string(),
+            ))
+        }
+    };
+
+    // fake a order
+    let user_orders = Order {
+        order_id: 0,
+        status: OrderStatus::Open,
+        direction,
+        bidder_addr: config.reward_address,
+        offer_amount,
+        ask_amount: max_ask_amount,
+        filled_ask_amount: Uint128::zero(),
+        filled_offer_amount: Uint128::zero(),
+    };
+
+    let (user_order_with_fee, _) =
+        matching_order(deps, orderbook_pair, &user_orders, price_threshold)?;
+
+    Ok(SimulateMarketOrderResponse {
+        receive: user_order_with_fee.filled_ask_amount,
+        refunds: offer_amount.checked_sub(user_order_with_fee.filled_offer_amount)?,
     })
 }

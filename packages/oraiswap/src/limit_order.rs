@@ -12,6 +12,27 @@ pub struct ContractInfo {
     pub commission_rate: String,
     pub reward_address: CanonicalAddr,
     pub operator: Option<CanonicalAddr>,
+    #[serde(default)]
+    pub is_paused: bool,
+}
+
+#[cw_serde]
+pub enum OrderType {
+    Limit,
+    Market,
+}
+
+impl OrderType {
+    pub fn is_limit(&self) -> bool {
+        match self {
+            OrderType::Limit => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_market(&self) -> bool {
+        !self.is_limit()
+    }
 }
 
 #[cw_serde]
@@ -69,6 +90,8 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
 
+    Pause {},
+    Unpause {},
     UpdateAdmin {
         admin: Addr,
     },
@@ -106,23 +129,14 @@ pub enum ExecuteMsg {
     // ///////////////////////
     // /// User Operations ///
     // ///////////////////////
-    // SubmitMarketOrder {
-    //     direction: OrderDirection, // default is buy, with sell then it is reversed
-    //     asset_infos: [AssetInfo; 2],
-    //     base_amount: Uint128,
-    //     quote_amount: Uint128,
-    //     slippage: Option<Decimal>,
-    // },
-
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        slippage: Option<Decimal>,
+    },
     CancelOrder {
         order_id: u64,
         asset_infos: [AssetInfo; 2],
-    },
-
-    /// Arbitrager execute order book pair
-    ExecuteOrderBookPair {
-        asset_infos: [AssetInfo; 2],
-        limit: Option<u32>,
     },
 
     /// Arbitrager remove order book
@@ -141,13 +155,11 @@ pub enum Cw20HookMsg {
         direction: OrderDirection,
         assets: [Asset; 2],
     },
-    // SubmitMarketOrder {
-    //     direction: OrderDirection, // default is buy, with sell then it is reversed
-    //     asset_infos: [AssetInfo; 2],
-    //     base_amount: Uint128,
-    //     quote_amount: Uint128,
-    //     slippage: Option<Decimal>,
-    // },
+    SubmitMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
+        asset_infos: [AssetInfo; 2],
+        slippage: Option<Decimal>,
+    },
 }
 
 #[cw_serde]
@@ -202,16 +214,14 @@ pub enum QueryMsg {
     },
     #[returns(LastOrderIdResponse)]
     LastOrderId {},
-    #[returns(OrderBookMatchableResponse)]
-    OrderBookMatchable { asset_infos: [AssetInfo; 2] },
     #[returns(Decimal)]
     MidPrice { asset_infos: [AssetInfo; 2] },
-    #[returns(BaseAmountResponse)]
-    PriceByBaseAmount {
+    #[returns(SimulateMarketOrderResponse)]
+    SimulateMarketOrder {
+        direction: OrderDirection, // default is buy, with sell then it is reversed
         asset_infos: [AssetInfo; 2],
-        base_amount: Uint128,
-        direction: OrderDirection,
         slippage: Option<Decimal>,
+        offer_amount: Uint128,
     },
 }
 
@@ -225,6 +235,7 @@ pub struct ContractInfoResponse {
     pub commission_rate: String,
     pub reward_address: Addr,
     pub operator: Option<Addr>,
+    pub is_paused: bool,
 }
 
 #[cw_serde]
@@ -274,14 +285,9 @@ pub struct LastOrderIdResponse {
 }
 
 #[cw_serde]
-pub struct OrderBookMatchableResponse {
-    pub is_matchable: bool,
-}
-
-#[cw_serde]
-pub struct BaseAmountResponse {
-    pub market_price: Decimal,
-    pub expected_base_amount: Uint128,
+pub struct SimulateMarketOrderResponse {
+    pub receive: Uint128,
+    pub refunds: Uint128,
 }
 
 /// We currently take no arguments for migrations

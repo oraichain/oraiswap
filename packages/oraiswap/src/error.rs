@@ -1,4 +1,5 @@
 use cosmwasm_std::{Decimal, OverflowError, StdError, Uint128};
+use cw_utils::PaymentError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -8,6 +9,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     OverflowError(#[from] OverflowError),
+
+    #[error("{0}")]
+    Payment(#[from] PaymentError),
 
     #[error("Unauthorized")]
     Unauthorized {},
@@ -92,9 +96,21 @@ pub enum ContractError {
     #[error("This pool is not open to everyone, only whitelisted traders can swap")]
     PoolWhitelisted {},
 
+    #[error("Cannot find a matched price")]
+    NoMatchedPrice {},
+
     #[error("Price cannot be greater than {price}")]
     PriceNotGreaterThan { price: Decimal },
 
     #[error("Price cannot be less than {price}")]
     PriceNotLessThan { price: Decimal },
+
+    #[error("Cannot create market order")]
+    CannotCreateMarketOrder {},
+
+    #[error("Invalid funds")]
+    InvalidFunds {},
+
+    #[error("Contract paused")]
+    Paused {},
 }

@@ -78,29 +78,6 @@ impl Order {
         }
     }
 
-    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) {
-        self.filled_ask_amount += ask_amount;
-        self.filled_offer_amount += offer_amount;
-
-        if self.filled_offer_amount == self.offer_amount
-            || self.filled_ask_amount == self.ask_amount
-        {
-            self.status = OrderStatus::Fulfilled;
-        } else {
-            self.status = OrderStatus::PartialFilled;
-        }
-    }
-
-    pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
-        if self.status == OrderStatus::Fulfilled {
-            // When status is Fulfilled, remove order
-            remove_order(storage, pair_key, self)
-        } else {
-            // update order
-            store_order(storage, pair_key, self, false)
-        }
-    }
-
     // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
         match self.direction {
@@ -141,6 +118,26 @@ impl Order {
 }
 
 impl OrderWithFee {
+    pub fn from_order(order: Order) -> Self {
+        Self {
+            order_id: order.order_id,
+            status: order.status,
+            direction: order.direction,
+            bidder_addr: order.bidder_addr,
+            offer_amount: order.offer_amount,
+            ask_amount: order.ask_amount,
+            filled_offer_amount: order.filled_offer_amount,
+            filled_ask_amount: order.filled_ask_amount,
+            relayer_fee: Uint128::zero(),
+            reward_fee: Uint128::zero(),
+            filled_ask_this_round: Uint128::zero(),
+            filled_offer_this_round: Uint128::zero(),
+        }
+    }
+
+    pub fn from_orders(orders: Vec<Order>) -> Vec<Self> {
+        orders.into_iter().map(Self::from_order).collect()
+    }
     // create new order given a price and an offer amount
     pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) -> StdResult<()> {
         self.filled_ask_amount += ask_amount;
@@ -176,6 +173,18 @@ impl OrderWithFee {
         } else {
             // update order
             store_order(storage, pair_key, &order, false)
+        }
+    }
+
+    pub fn is_fulfilled(&self) -> bool {
+        self.offer_amount < self.filled_offer_amount + Uint128::from(MIN_VOLUME)
+            || self.ask_amount < self.filled_ask_amount + Uint128::from(MIN_VOLUME)
+    }
+
+    pub fn get_price(&self) -> Decimal {
+        match self.direction {
+            OrderDirection::Buy => Decimal::from_ratio(self.offer_amount, self.ask_amount),
+            OrderDirection::Sell => Decimal::from_ratio(self.ask_amount, self.offer_amount),
         }
     }
 }
@@ -229,37 +238,28 @@ impl OrderBook {
         storage: &dyn Storage,
         direction: OrderDirection,
         price_increasing: OrderBy,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         let pair_key = &self.get_pair_key();
         // get last tick if price_increasing is true, otherwise get first tick
         let tick_namespaces = &[PREFIX_TICK, pair_key, direction.as_bytes()];
-        let position_bucket: ReadonlyBucket<u64> =
-            ReadonlyBucket::multilevel(storage, tick_namespaces);
+        let position_bucket = ReadonlyBucket::multilevel(storage, tick_namespaces);
 
-        if let Some(item) = position_bucket.range(None, None, price_increasing).next() {
-            if let Ok((price_key, total_orders)) = item {
-                // price is rounded already
-                let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                return (price, true, total_orders);
-            }
+        if let Some(Ok((price_key, total_orders))) =
+            position_bucket.range(None, None, price_increasing).next()
+        {
+            // price is rounded already
+            let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+            return Some((price, total_orders));
         }
 
-        // return default
-        (
-            match price_increasing {
-                OrderBy::Descending => Decimal::MIN, // highest => MIN (so using max will not include)
-                OrderBy::Ascending => Decimal::MAX, // lowest => MAX (so using min will not include)
-            },
-            false,
-            0,
-        )
+        None
     }
 
     pub fn highest_price(
         &self,
         storage: &dyn Storage,
         direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         self.best_price(storage, direction, OrderBy::Descending)
     }
 
@@ -267,7 +267,7 @@ impl OrderBook {
         &self,
         storage: &dyn Storage,
         direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         self.best_price(storage, direction, OrderBy::Ascending)
     }
 
@@ -307,67 +307,6 @@ impl OrderBook {
         read_orders(storage, pair_key, start_after, limit, order_by)
     }
 
-    /// find best buy price and best sell price that matched a spread, currently no spread is set
-    pub fn find_match_price(&self, storage: &dyn Storage) -> Option<(Decimal, Decimal)> {
-        let pair_key = &self.get_pair_key();
-        let (mut best_buy_price, found, _) = self.highest_price(storage, OrderDirection::Buy);
-        if !found {
-            return None;
-        }
-
-        // if there is spread, find the best sell price closest to best buy price
-        if let Some(spread) = self.spread {
-            let spread_factor = Decimal::one() + spread;
-            let buy_price_list = ReadonlyBucket::<u64>::multilevel(
-                storage,
-                &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
-            )
-            .range(None, None, OrderBy::Descending)
-            .filter_map(|item| {
-                if let Ok((price_key, _)) = item {
-                    let buy_price =
-                        Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                    return Some(buy_price);
-                }
-                None
-            })
-            .collect::<Vec<Decimal>>();
-
-            let tick_namespaces = &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()];
-
-            // loop through sell ticks in Order ascending (low to high), if there is sell tick that satisfies formulation: sell <= highest buy <= sell * (1 + spread)
-            if let Some(sell_price) = ReadonlyBucket::<u64>::multilevel(storage, tick_namespaces)
-                .range(None, None, OrderBy::Ascending)
-                .find_map(|item| {
-                    if let Ok((price_key, _)) = item {
-                        let sell_price =
-                            Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-
-                        for buy_price in &buy_price_list {
-                            if buy_price.ge(&sell_price)
-                                && buy_price.le(&(sell_price * spread_factor))
-                            {
-                                best_buy_price = *buy_price;
-                                return Some(sell_price);
-                            }
-                        }
-                    }
-                    None
-                })
-            {
-                return Some((best_buy_price, sell_price));
-            }
-        } else {
-            let (lowest_sell_price, found, _) = self.lowest_price(storage, OrderDirection::Sell);
-            // there is a match, we will find the best price with spread to prevent market fluctuation
-            // we can use spread to convert price to index as well
-            if found && best_buy_price.ge(&lowest_sell_price) {
-                return Some((best_buy_price, lowest_sell_price));
-            }
-        }
-        None
-    }
-
     /// find list best buy / sell prices
     pub fn find_list_match_price(
         &self,
@@ -382,26 +321,21 @@ impl OrderBook {
             OrderDirection::Sell,
             None,
             limit,
-            Some(1i32),
+            Some(OrderBy::Ascending),
         );
         // guard code
         if sell_price_list.len() == 0 {
             return None;
         }
 
-        let start_after = if let Some(start_after) = Decimal::from_atomics(
+        let start_after = Decimal::from_atomics(
             sell_price_list[0]
                 .atomics()
                 .checked_sub(Uint128::from(1u64))
                 .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
             Decimal::DECIMAL_PLACES,
         )
-        .ok()
-        {
-            Some(start_after)
-        } else {
-            None
-        };
+        .ok();
         // desc, all items in this list are ge than the first item in sell list
         let best_buy_price_list = query_ticks_prices_with_end(
             storage,
@@ -410,7 +344,7 @@ impl OrderBook {
             None,
             start_after,
             limit,
-            Some(2i32),
+            Some(OrderBy::Descending),
         );
         // both price lists are applicable because buy list is always larger than the first item of sell list
         let best_sell_price_list = sell_price_list;
@@ -418,61 +352,6 @@ impl OrderBook {
             return None;
         }
         return Some((best_buy_price_list, best_sell_price_list));
-    }
-
-    /// return the largest matchable amount of orders when matching orders at single price, that is total buy volume to sell at that price
-    /// based on best buy price and best sell price, do the filling
-    pub fn find_match_amount_at_price(
-        &self,
-        storage: &dyn Storage,
-        price: Decimal,
-        direction: OrderDirection,
-    ) -> Uint128 {
-        if let Some(orders) =
-            self.query_orders_by_price_and_direction(storage, price, direction, None)
-        {
-            // in Order, ask amount is alway paid amount
-            // in Orderbook, buy order is opposite to sell order
-            return orders
-                .iter()
-                .map(|order| order.ask_amount.u128())
-                .sum::<u128>()
-                .into();
-        }
-
-        Uint128::zero()
-    }
-
-    /// return the largest base amount of orders at price
-    pub fn find_base_amount_at_price(
-        &self,
-        storage: &dyn Storage,
-        price: Decimal,
-        direction: OrderDirection,
-    ) -> Uint128 {
-        if let Some(orders) =
-            self.query_orders_by_price_and_direction(storage, price, direction, None)
-        {
-            // Buy -> base_amount = ask_amount - filled_ask_amount
-            // Sell -> base_amount = offer_amount - filled_offer_amount
-            return orders
-                .iter()
-                .map(|order| match direction {
-                    OrderDirection::Buy => order
-                        .ask_amount
-                        .checked_sub(order.filled_ask_amount)
-                        .unwrap_or_default()
-                        .u128(),
-                    OrderDirection::Sell => order
-                        .offer_amount
-                        .checked_sub(order.filled_offer_amount)
-                        .unwrap_or_default()
-                        .u128(),
-                })
-                .sum::<u128>()
-                .into();
-        }
-        Uint128::zero()
     }
 
     /// matches orders sequentially, starting from buy orders with the highest price, and sell orders with the lowest price
@@ -506,64 +385,5 @@ impl Executor {
             address,
             reward_assets,
         }
-    }
-}
-
-pub struct BulkOrders {
-    pub orders: Vec<OrderWithFee>,
-    pub direction: OrderDirection,
-    pub price: Decimal,
-    pub volume: Uint128,
-    pub filled_volume: Uint128,
-    pub ask_volume: Uint128,
-    pub filled_ask_volume: Uint128,
-    pub spread_volume: Uint128,
-}
-
-impl BulkOrders {
-    /// Calculate sum of orders base on direction
-    pub fn from_orders(
-        orders: &Vec<Order>,
-        price: Decimal,
-        direction: OrderDirection,
-    ) -> StdResult<Self> {
-        let mut volume = Uint128::zero();
-        let mut ask_volume = Uint128::zero();
-        let filled_volume = Uint128::zero();
-        let filled_ask_volume = Uint128::zero();
-        let spread_volume = Uint128::zero();
-
-        for order in orders {
-            volume += order.offer_amount.checked_sub(order.filled_offer_amount)?;
-            ask_volume += order.ask_amount.checked_sub(order.filled_ask_amount)?;
-        }
-
-        return Ok(Self {
-            direction,
-            price,
-            orders: orders
-                .clone()
-                .into_iter()
-                .map(|order| OrderWithFee {
-                    order_id: order.order_id,
-                    status: order.status,
-                    direction: order.direction,
-                    bidder_addr: order.bidder_addr,
-                    offer_amount: order.offer_amount,
-                    ask_amount: order.ask_amount,
-                    filled_offer_amount: order.filled_offer_amount,
-                    filled_ask_amount: order.filled_ask_amount,
-                    relayer_fee: Uint128::zero(),
-                    reward_fee: Uint128::zero(),
-                    filled_ask_this_round: Uint128::zero(),
-                    filled_offer_this_round: Uint128::zero(),
-                })
-                .collect(),
-            volume,
-            filled_volume,
-            ask_volume,
-            filled_ask_volume,
-            spread_volume,
-        });
     }
 }

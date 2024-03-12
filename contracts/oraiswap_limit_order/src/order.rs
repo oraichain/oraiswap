@@ -1,23 +1,25 @@
 use std::str::FromStr;
 
-use crate::orderbook::{BulkOrders, Executor, Order, OrderBook, OrderWithFee};
+use crate::orderbook::{Executor, Order, OrderBook, OrderWithFee};
+use crate::query::get_price_info_for_market_order;
 use crate::state::{
     increase_last_order_id, read_config, read_order, read_orderbook, read_reward, remove_order,
-    remove_orderbook, store_order, store_reward, DEFAULT_LIMIT, MAX_LIMIT, PREFIX_TICK,
+    remove_orderbook, store_order, store_reward, PREFIX_TICK,
 };
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, DepsMut, Event,
-    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, Addr, Api, Attribute, CanonicalAddr, CosmosMsg, Decimal, Deps, DepsMut, Event,
+    MessageInfo, Order as OrderBy, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{ExecuteMsg, OrderDirection, OrderStatus};
+use oraiswap::limit_order::{OrderDirection, OrderStatus};
 
 pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
 const MIN_FEE: u128 = 1_000_000u128;
+pub const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
 
 struct Payment {
     address: Addr,
@@ -36,44 +38,6 @@ pub fn submit_order(
 
     let offer_amount = assets[0].amount;
     let ask_amount = assets[1].amount;
-
-    let (highest_buy_price, buy_found, _) =
-        orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-    let (lowest_sell_price, sell_found, _) =
-        orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
-
-    // check spread for submit order
-    if let Some(spread) = orderbook_pair.spread {
-        let buy_spread_factor = Decimal::one() - spread;
-        let sell_spread_factor = Decimal::one() + spread;
-        if buy_found && sell_found {
-            match direction {
-                OrderDirection::Buy => {
-                    let price = Decimal::from_ratio(offer_amount, ask_amount);
-                    let spread_price = lowest_sell_price * sell_spread_factor;
-                    if price.ge(&(spread_price)) {
-                        return Err(ContractError::PriceNotGreaterThan {
-                            price: spread_price,
-                        });
-                    }
-                }
-                OrderDirection::Sell => {
-                    let price = Decimal::from_ratio(ask_amount, offer_amount);
-                    let spread_price = highest_buy_price * buy_spread_factor;
-                    if spread_price.is_zero() {
-                        return Err(ContractError::PriceMustNotBeZero {
-                            price: spread_price,
-                        });
-                    }
-                    if spread_price.ge(&price) {
-                        return Err(ContractError::PriceNotLessThan {
-                            price: spread_price,
-                        });
-                    }
-                }
-            };
-        }
-    }
 
     if ask_amount.is_zero() {
         return Err(ContractError::AssetMustNotBeZero {});
@@ -97,7 +61,33 @@ pub fn submit_order(
         true,
     )?;
 
-    Ok(Response::new().add_attributes(vec![
+    // check if this order can be matched, then execute matching process
+    let (matched, price) = match direction {
+        OrderDirection::Buy => {
+            let price = Decimal::from_ratio(offer_amount, ask_amount);
+
+            match orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell) {
+                Some((lowest_sell_price, _)) => (lowest_sell_price <= price, price),
+                None => (false, Decimal::zero()),
+            }
+        }
+        OrderDirection::Sell => {
+            let price = Decimal::from_ratio(ask_amount, offer_amount);
+
+            match orderbook_pair.highest_price(deps.storage, OrderDirection::Buy) {
+                Some((highest_buy_price, _)) => (highest_buy_price >= price, price),
+                None => (false, Decimal::zero()),
+            }
+        }
+    };
+
+    let response = if matched {
+        process_matching(deps, sender.clone(), orderbook_pair, order_id, price)?
+    } else {
+        Response::new()
+    };
+
+    Ok(response.add_attributes(vec![
         ("action", "submit_order"),
         ("order_type", "limit"),
         (
@@ -120,17 +110,37 @@ pub fn submit_order(
 }
 
 pub fn submit_market_order(
-    deps: DepsMut,
-    orderbook_addr: Addr,
+    mut deps: DepsMut,
     orderbook_pair: &OrderBook,
     sender: Addr,
     direction: OrderDirection,
-    assets: [Asset; 2],
-    refund_amount: Uint128,
+    offer_asset: Asset,
+    slippage: Option<Decimal>,
 ) -> Result<Response, ContractError> {
-    assets[0].assert_if_asset_is_zero()?;
-    assets[1].assert_if_asset_is_zero()?;
     let order_id = increase_last_order_id(deps.storage)?;
+
+    let slippage = slippage.unwrap_or(
+        orderbook_pair
+            .spread
+            .unwrap_or(Decimal::from_str(SLIPPAGE_DEFAULT)?),
+    );
+
+    if slippage >= Decimal::one() {
+        return Err(ContractError::SlippageMustLessThanOne { slippage });
+    }
+
+    // with market order, ask_amount will be maximum amount can receive
+    let (_best_price, price_threshold, max_ask_amount) = match get_price_info_for_market_order(
+        deps.storage,
+        direction,
+        orderbook_pair,
+        offer_asset.amount,
+        slippage,
+    ) {
+        Some(data) => data,
+        None => return Err(ContractError::CannotCreateMarketOrder {}),
+    };
+
     store_order(
         deps.storage,
         &orderbook_pair.get_pair_key(),
@@ -138,8 +148,8 @@ pub fn submit_market_order(
             order_id,
             direction,
             bidder_addr: deps.api.addr_canonicalize(sender.as_str())?,
-            offer_amount: assets[0].amount,
-            ask_amount: assets[1].amount,
+            offer_amount: offer_asset.amount,
+            ask_amount: max_ask_amount,
             filled_offer_amount: Uint128::zero(),
             filled_ask_amount: Uint128::zero(),
             status: OrderStatus::Open,
@@ -147,34 +157,35 @@ pub fn submit_market_order(
         true,
     )?;
 
-    // prepare refund message
-    let bidder_refund = Asset {
-        info: match direction {
-            OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-            OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
-        },
-        amount: refund_amount,
-    };
+    // matching process
+    let mut response = process_matching(
+        deps.branch(),
+        sender.clone(),
+        orderbook_pair,
+        order_id,
+        price_threshold,
+    )?;
 
-    // Build msg
-    let mut messages = if refund_amount > Uint128::zero() {
-        vec![bidder_refund
-            .clone()
-            .into_msg(None, &deps.querier, sender.clone())?]
-    } else {
-        vec![]
-    };
+    // after matching process, if order still exist => not fulfilled => refund
+    let order = read_order(deps.storage, &orderbook_pair.get_pair_key(), order_id);
 
-    messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: orderbook_addr.into_string(),
-        msg: to_binary(&ExecuteMsg::ExecuteOrderBookPair {
-            asset_infos: assets.clone().map(|asset| asset.info),
-            limit: None, // no need to set limit because we match during submit orders -> there wont be any remaining orders to match except this one -> no need to care about missed orders when matching
-        })?,
-        funds: vec![],
-    }));
+    match order {
+        Ok(order) => {
+            let refund_amount = order.offer_amount.checked_sub(order.filled_offer_amount)?;
+            let refund_asset = Asset {
+                info: offer_asset.info.clone(),
+                amount: refund_amount,
+            };
+            // remove this order
+            remove_order(deps.storage, &orderbook_pair.get_pair_key(), &order)?;
+            response = response
+                .add_attribute("refund_amount", &refund_amount.to_string())
+                .add_message(refund_asset.into_msg(None, &deps.querier, sender.clone())?)
+        }
+        Err(_) => {}
+    }
 
-    Ok(Response::new().add_messages(messages).add_attributes(vec![
+    Ok(response.add_attributes(vec![
         ("action", "submit_market_order"),
         ("order_type", "market"),
         (
@@ -191,11 +202,7 @@ pub fn submit_market_order(
         ("bidder_addr", sender.as_str()),
         (
             "offer_asset",
-            &format!("{} {}", &assets[0].amount, &assets[0].info),
-        ),
-        (
-            "ask_asset",
-            &format!("{} {}", &assets[1].amount, &assets[1].info),
+            &format!("{} {}", &offer_asset.amount, &offer_asset.info),
         ),
     ]))
 }
@@ -325,7 +332,7 @@ fn process_list_trader(
     for trader in traders {
         if let Some(existing_payment) = minimalist_trader
             .iter_mut()
-            .find(|p| p.address == trader.address)
+            .find(|p| p.address == trader.address && p.asset.info.eq(&trader.asset.info))
         {
             existing_payment.asset.amount += trader.asset.amount;
         } else {
@@ -344,136 +351,6 @@ fn process_list_trader(
     }
 
     Ok(())
-}
-
-fn execute_bulk_orders(
-    deps: &DepsMut,
-    orderbook_pair: OrderBook,
-    limit: Option<u32>,
-) -> StdResult<(Vec<BulkOrders>, Vec<BulkOrders>)> {
-    let pair_key = &orderbook_pair.get_pair_key();
-    let buy_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
-        deps.storage,
-        &[PREFIX_TICK, pair_key, OrderDirection::Buy.as_bytes()],
-    );
-    let mut buy_cursor = buy_position_bucket.range(None, None, OrderBy::Descending);
-
-    let sell_position_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
-        deps.storage,
-        &[PREFIX_TICK, pair_key, OrderDirection::Sell.as_bytes()],
-    );
-    let mut sell_cursor = sell_position_bucket.range(None, None, OrderBy::Ascending);
-
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let mut i = 0;
-    let mut j = 0;
-
-    let mut best_buy_price_list = vec![];
-    let mut best_sell_price_list = vec![];
-    let mut buy_bulk_orders_list = vec![];
-    let mut sell_bulk_orders_list = vec![];
-
-    while i < limit && j < limit {
-        if best_sell_price_list.len() <= j {
-            if let Some(Ok((k, _))) = sell_cursor.next() {
-                let price =
-                    Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
-                        StdError::generic_err("Error converting bytes to u128")
-                    })?));
-                best_sell_price_list.push(price);
-            } else {
-                break;
-            }
-        }
-        let sell_price = best_sell_price_list[j];
-
-        if best_buy_price_list.len() <= i {
-            if let Some(Ok((k, _))) = buy_cursor.next() {
-                let price =
-                    Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
-                        StdError::generic_err("Error converting bytes to u128")
-                    })?));
-                best_buy_price_list.push(price);
-            } else {
-                break;
-            }
-        }
-        let buy_price = best_buy_price_list[i];
-        if buy_price < sell_price {
-            break;
-        }
-        if buy_bulk_orders_list.len() <= i {
-            if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
-                deps.as_ref().storage,
-                buy_price,
-                OrderDirection::Buy,
-                None,
-            ) {
-                if orders.len() == 0 {
-                    continue;
-                }
-                let bulk = BulkOrders::from_orders(&orders, buy_price, OrderDirection::Buy)?;
-                buy_bulk_orders_list.push(bulk);
-            } else {
-                break;
-            }
-        };
-
-        if sell_bulk_orders_list.len() <= j {
-            if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
-                deps.as_ref().storage,
-                sell_price,
-                OrderDirection::Sell,
-                None,
-            ) {
-                if orders.len() == 0 {
-                    continue;
-                }
-                let bulk = BulkOrders::from_orders(&orders, sell_price, OrderDirection::Sell)?;
-                sell_bulk_orders_list.push(bulk);
-            } else {
-                break;
-            }
-        };
-
-        let buy_bulk_orders = &mut buy_bulk_orders_list[i];
-        let sell_bulk_orders = &mut sell_bulk_orders_list[j];
-
-        let match_price = buy_price;
-        let lef_sell_offer = sell_bulk_orders.volume;
-        let lef_sell_ask = Uint128::from(lef_sell_offer * match_price);
-
-        let sell_ask_amount = Uint128::min(buy_bulk_orders.volume, lef_sell_ask);
-
-        // multiply by decimal atomics because we want to get good round values
-        let sell_offer_amount = Uint128::min(
-            Uint128::from(sell_ask_amount * Decimal::one().atomics())
-                .checked_div(match_price.atomics())?,
-            lef_sell_offer,
-        );
-
-        sell_bulk_orders.filled_volume += sell_offer_amount;
-        sell_bulk_orders.filled_ask_volume += sell_ask_amount;
-
-        buy_bulk_orders.filled_volume += sell_ask_amount;
-        buy_bulk_orders.filled_ask_volume += sell_offer_amount;
-
-        buy_bulk_orders.volume = buy_bulk_orders.volume.checked_sub(sell_ask_amount)?;
-        sell_bulk_orders.volume = sell_bulk_orders.volume.checked_sub(sell_offer_amount)?;
-
-        if buy_bulk_orders.volume <= MIN_VOLUME.into() {
-            // buy out
-            // buy_bulk_orders.ask_volume = Uint128::zero();
-            i += 1;
-        }
-        if sell_bulk_orders.volume <= MIN_VOLUME.into() {
-            // sell out
-            // sell_bulk_orders.ask_volume = Uint128::zero();
-            j += 1;
-        }
-    }
-
-    return Ok((buy_bulk_orders_list, sell_bulk_orders_list));
 }
 
 pub fn calculate_fee(
@@ -509,86 +386,183 @@ pub fn calculate_fee(
     return Ok((reward_fee, relayer_fee));
 }
 
-fn process_orders(
-    deps: &DepsMut,
+fn process_payment_list_orders(
+    deps: &Deps,
     commission_rate: Decimal,
     orderbook_pair: &OrderBook,
-    bulk_orders: &mut Vec<BulkOrders>,
-    bulk_traders: &mut Vec<Payment>,
+    orders: &mut Vec<OrderWithFee>,
+    traders: &mut Vec<Payment>,
     reward: &mut Executor,
     relayer: &mut Executor,
 ) -> StdResult<()> {
-    for bulk in bulk_orders.iter_mut() {
-        let mut trader_ask_asset = Asset {
-            info: match bulk.direction {
-                OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api)?,
-                OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
-            },
-            amount: Uint128::zero(),
-        };
-        let relayer_quote_fee = Uint128::from(RELAY_FEE) * bulk.price;
+    for order in orders {
+        let filled_offer = order.filled_offer_this_round;
+        let filled_ask = order.filled_ask_this_round;
 
-        for order in bulk.orders.iter_mut() {
-            let filled_offer = Uint128::min(
-                order
-                    .offer_amount
-                    .checked_sub(order.filled_offer_amount)
-                    .unwrap_or_default(),
-                bulk.filled_volume,
-            );
+        let relayer_quote_fee = Uint128::from(RELAY_FEE) * order.get_price();
 
-            let filled_ask = Uint128::min(
-                order
-                    .ask_amount
-                    .checked_sub(order.filled_ask_amount)
-                    .unwrap_or_default(),
-                bulk.filled_ask_volume,
-            );
+        if !filled_ask.is_zero() && !filled_offer.is_zero() {
+            let mut trader_ask_asset = Asset {
+                info: match order.direction {
+                    OrderDirection::Buy => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                    OrderDirection::Sell => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                },
+                amount: filled_ask,
+            };
 
-            bulk.filled_volume = bulk
-                .filled_volume
-                .checked_sub(filled_offer)
-                .unwrap_or_default();
-            bulk.filled_ask_volume = bulk
-                .filled_ask_volume
-                .checked_sub(filled_ask)
-                .unwrap_or_default();
-
-            order.fill_order(filled_ask, filled_offer)?;
-
-            if !filled_ask.is_zero() && !filled_offer.is_zero() {
-                trader_ask_asset.amount = filled_ask;
-                let (reward_fee, relayer_fee) = calculate_fee(
-                    commission_rate,
-                    relayer_quote_fee,
-                    bulk.direction,
-                    &mut trader_ask_asset,
-                    reward,
-                    relayer,
-                )?;
-                order.reward_fee = reward_fee;
-                order.relayer_fee = relayer_fee;
-                if !trader_ask_asset.amount.is_zero() {
-                    let trader_payment: Payment = Payment {
-                        address: deps.api.addr_humanize(&order.bidder_addr)?,
-                        asset: Asset {
-                            info: trader_ask_asset.info.clone(),
-                            amount: trader_ask_asset.amount,
-                        },
-                    };
-                    bulk_traders.push(trader_payment);
-                }
+            let (reward_fee, relayer_fee) = calculate_fee(
+                commission_rate,
+                relayer_quote_fee,
+                order.direction,
+                &mut trader_ask_asset,
+                reward,
+                relayer,
+            )?;
+            order.reward_fee = reward_fee;
+            order.relayer_fee = relayer_fee;
+            if !trader_ask_asset.amount.is_zero() {
+                let trader_payment: Payment = Payment {
+                    address: deps.api.addr_humanize(&order.bidder_addr)?,
+                    asset: Asset {
+                        info: trader_ask_asset.info.clone(),
+                        amount: trader_ask_asset.amount,
+                    },
+                };
+                traders.push(trader_payment);
             }
         }
     }
+
     Ok(())
 }
 
-pub fn execute_matching_orders(
+pub fn matching_order(
+    deps: Deps,
+    orderbook_pair: OrderBook,
+    order: &Order,
+    order_price: Decimal,
+) -> StdResult<(OrderWithFee, Vec<OrderWithFee>)> {
+    let pair_key = &orderbook_pair.get_pair_key();
+    let matched_orders_direction = match order.direction {
+        OrderDirection::Buy => OrderDirection::Sell,
+        OrderDirection::Sell => OrderDirection::Buy,
+    };
+
+    let positions_bucket: ReadonlyBucket<u64> = ReadonlyBucket::multilevel(
+        deps.storage,
+        &[PREFIX_TICK, pair_key, matched_orders_direction.as_bytes()],
+    );
+
+    let mut user_order = OrderWithFee::from_order(order.to_owned());
+    let mut orders_matched: Vec<OrderWithFee> = vec![];
+    let sort_order = match order.direction {
+        OrderDirection::Buy => OrderBy::Ascending,
+        OrderDirection::Sell => OrderBy::Descending,
+    };
+
+    let mut cursor = positions_bucket.range(None, None, sort_order);
+    loop {
+        if let Some(Ok((k, _))) = cursor.next() {
+            let match_price =
+                Decimal::raw(u128::from_be_bytes(k.try_into().map_err(|_| {
+                    StdError::generic_err("Error converting bytes to u128")
+                })?));
+
+            match order.direction {
+                OrderDirection::Buy => {
+                    if order_price < match_price {
+                        break;
+                    }
+                }
+                OrderDirection::Sell => {
+                    if order_price > match_price {
+                        break;
+                    }
+                }
+            }
+
+            if user_order.is_fulfilled() {
+                break;
+            }
+
+            if let Some(orders) = orderbook_pair.query_orders_by_price_and_direction(
+                deps.storage,
+                match_price,
+                matched_orders_direction,
+                None,
+            ) {
+                if orders.len() == 0 {
+                    continue;
+                }
+
+                let match_orders_with_fees = OrderWithFee::from_orders(orders);
+
+                for mut match_order in match_orders_with_fees {
+                    if user_order.is_fulfilled() {
+                        break;
+                    }
+                    // remaining ask & offer of buy order
+                    let lef_user_ask = user_order
+                        .ask_amount
+                        .checked_sub(user_order.filled_ask_amount)?;
+                    let lef_user_offer = user_order
+                        .offer_amount
+                        .checked_sub(user_order.filled_offer_amount)?;
+
+                    // remaining offer & ask of sell order
+                    let lef_match_offer = match_order
+                        .offer_amount
+                        .checked_sub(match_order.filled_offer_amount)?;
+                    let lef_match_ask = match_order
+                        .ask_amount
+                        .checked_sub(match_order.filled_ask_amount)?;
+
+                    // ask_amount of user_order <= min(lef_buy_ask, lef_sell_offer)
+                    let mut user_ask_amount = Uint128::min(lef_user_ask, lef_match_offer);
+                    let mut user_offer_amount = match order.direction {
+                        OrderDirection::Buy => user_ask_amount * match_price,
+                        OrderDirection::Sell => {
+                            user_ask_amount * Decimal::one().atomics() / match_price.atomics()
+                        }
+                    };
+
+                    // if sell_offer_amount > lef_sell_offer, we need re calc ask_amount
+                    if user_offer_amount > lef_user_offer {
+                        user_offer_amount = lef_user_offer;
+                        user_ask_amount = match order.direction {
+                            OrderDirection::Buy => {
+                                user_offer_amount * Decimal::one().atomics() / match_price.atomics()
+                            }
+                            OrderDirection::Sell => user_offer_amount * match_price,
+                        }
+                    }
+
+                    // ask_amount receive of sell order = min(actual, expect)
+                    let match_ask_amount = Uint128::min(user_offer_amount, lef_match_ask);
+
+                    match_order.fill_order(match_ask_amount, user_ask_amount)?;
+                    user_order.fill_order(user_ask_amount, user_offer_amount)?;
+
+                    orders_matched.push(match_order);
+                }
+            }
+        } else {
+            break;
+        }
+    }
+
+    user_order.filled_offer_this_round = user_order.filled_offer_amount;
+    user_order.filled_ask_this_round = user_order.filled_ask_amount;
+
+    Ok((user_order, orders_matched))
+}
+
+pub fn process_matching(
     deps: DepsMut,
-    info: MessageInfo,
-    asset_infos: [AssetInfo; 2],
-    limit: Option<u32>,
+    sender: Addr,
+    orderbook_pair: &OrderBook,
+    order_id: u64,
+    price_threshold: Decimal,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
@@ -596,13 +570,10 @@ pub fn execute_matching_orders(
     // get default operator to receive reward
     let relayer_addr = match contract_info.operator {
         Some(addr) => addr,
-        None => deps.api.addr_canonicalize(info.sender.as_str())?,
+        None => deps.api.addr_canonicalize(sender.as_str())?,
     };
-    let pair_key = pair_key(&[
-        asset_infos[0].to_raw(deps.api)?,
-        asset_infos[1].to_raw(deps.api)?,
-    ]);
-    let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+    let pair_key = orderbook_pair.get_pair_key();
+
     let reward_assets = [
         Asset {
             info: orderbook_pair.base_coin_info.to_normal(deps.api)?,
@@ -623,83 +594,62 @@ pub fn execute_matching_orders(
     let mut relayer = process_reward(deps.storage, &pair_key, relayer_addr, reward_assets);
 
     let mut messages: Vec<CosmosMsg> = vec![];
-    let mut list_bidder: Vec<Payment> = vec![];
-    let mut list_asker: Vec<Payment> = vec![];
-    let mut ret_events: Vec<Event> = vec![];
+    let mut list_trader: Vec<Payment> = vec![];
+    let mut matched_events: Vec<Event> = vec![];
     let mut total_reward: Vec<String> = Vec::new();
-    let mut total_orders: u64 = 0;
 
-    let (mut buy_list, mut sell_list) = execute_bulk_orders(&deps, orderbook_pair.clone(), limit)?;
+    let order = read_order(deps.storage, &pair_key, order_id)?;
 
-    if buy_list.len() == 0 || sell_list.len() == 0 {
-        return Err(ContractError::UnableToExecuteMatching {});
+    let (offer_order_with_fee, mut matched_orders) = matching_order(
+        deps.as_ref(),
+        orderbook_pair.clone(),
+        &order,
+        price_threshold,
+    )?;
+
+    if matched_orders.len() == 0 {
+        return Ok(Response::default());
     }
 
-    process_orders(
-        &deps,
+    // process calc payment and fee
+    matched_orders.push(offer_order_with_fee);
+    process_payment_list_orders(
+        &deps.as_ref(),
         commission_rate,
-        &orderbook_pair,
-        &mut buy_list,
-        &mut list_bidder,
+        orderbook_pair,
+        &mut matched_orders,
+        &mut list_trader,
         &mut reward,
         &mut relayer,
     )?;
-    process_orders(
-        &deps,
-        commission_rate,
-        &orderbook_pair,
-        &mut sell_list,
-        &mut list_asker,
-        &mut reward,
-        &mut relayer,
-    )?;
 
-    for bulk in buy_list.iter_mut() {
-        for buy_order in bulk.orders.iter_mut() {
-            if buy_order.status != OrderStatus::Open {
-                total_orders += 1;
-                buy_order.match_order(deps.storage, &pair_key)?;
-                ret_events.push(to_events(
-                    &buy_order,
-                    deps.api.addr_humanize(&buy_order.bidder_addr)?.to_string(),
-                ));
-            }
+    for order_matched in matched_orders.iter_mut() {
+        if order_matched.status != OrderStatus::Open {
+            order_matched.match_order(deps.storage, &pair_key)?;
+            matched_events.push(to_events(
+                &order_matched,
+                deps.api
+                    .addr_humanize(&order_matched.bidder_addr)?
+                    .to_string(),
+            ));
         }
     }
 
-    for bulk in sell_list.iter_mut() {
-        for sell_order in bulk.orders.iter_mut() {
-            if sell_order.status != OrderStatus::Open {
-                total_orders += 1;
-                sell_order.match_order(deps.storage, &pair_key)?;
-                ret_events.push(to_events(
-                    &sell_order,
-                    deps.api.addr_humanize(&sell_order.bidder_addr)?.to_string(),
-                ));
-            }
-        }
-    }
-
-    process_list_trader(&deps, list_bidder, &mut messages)?;
-    process_list_trader(&deps, list_asker, &mut messages)?;
+    process_list_trader(&deps, list_trader, &mut messages)?;
 
     transfer_reward(&deps, &mut reward, &mut total_reward, &mut messages)?;
     transfer_reward(&deps, &mut relayer, &mut total_reward, &mut messages)?;
 
     store_reward(deps.storage, &pair_key, &reward)?;
     store_reward(deps.storage, &pair_key, &relayer)?;
+
     Ok(Response::new()
         .add_messages(messages)
         .add_attributes(vec![
-            ("action", "execute_orderbook_pair"),
-            (
-                "pair",
-                &format!("{} - {}", &asset_infos[0], &asset_infos[1]),
-            ),
-            ("total_matched_orders", &total_orders.to_string()),
+            ("total_matched_orders", &matched_events.len().to_string()),
             ("executor_reward", &format!("{:?}", &total_reward)),
         ])
-        .add_events(ret_events))
+        .add_events(matched_events))
 }
 
 pub fn remove_pair(
@@ -755,56 +705,4 @@ pub fn get_paid_and_quote_assets(
         quote_asset = assets[0].clone();
     }
     Ok((paid_assets, quote_asset))
-}
-
-pub fn get_market_asset(
-    api: &dyn Api,
-    orderbook_pair: &OrderBook,
-    direction: OrderDirection,
-    market_price: Decimal,
-    base_amount: Uint128,
-) -> StdResult<([Asset; 2], Asset)> {
-    let quote_amount = Uint128::from(base_amount * market_price);
-    let quote_asset = Asset {
-        info: orderbook_pair.quote_coin_info.to_normal(api)?,
-        amount: quote_amount,
-    };
-    let mut assets = [
-        Asset {
-            info: orderbook_pair.quote_coin_info.to_normal(api)?,
-            amount: quote_amount,
-        },
-        Asset {
-            info: orderbook_pair.base_coin_info.to_normal(api)?,
-            amount: base_amount,
-        },
-    ];
-    let paid_assets = match direction {
-        OrderDirection::Buy => assets.clone(),
-        OrderDirection::Sell => {
-            assets.reverse();
-            assets.clone()
-        }
-    };
-    Ok((paid_assets, quote_asset))
-}
-
-pub fn get_native_asset(info: &MessageInfo, asset_info: AssetInfo) -> StdResult<Asset> {
-    if let AssetInfo::NativeToken { denom } = asset_info.clone() {
-        //check funds includes To token
-        if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
-            let amount = native_coin.amount;
-            let asset = Asset {
-                info: asset_info.clone(),
-                amount: amount.clone(),
-            };
-            return Ok(asset);
-        } else {
-            return Err(StdError::generic_err(
-                "Cannot find the native token that matches the input",
-            ));
-        };
-    } else {
-        return Err(StdError::generic_err("invalid cw20 hook message"));
-    }
 }
