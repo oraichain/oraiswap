@@ -321,26 +321,21 @@ impl OrderBook {
             OrderDirection::Sell,
             None,
             limit,
-            Some(1i32),
+            Some(OrderBy::Ascending),
         );
         // guard code
         if sell_price_list.len() == 0 {
             return None;
         }
 
-        let start_after = if let Some(start_after) = Decimal::from_atomics(
+        let start_after = Decimal::from_atomics(
             sell_price_list[0]
                 .atomics()
                 .checked_sub(Uint128::from(1u64))
                 .unwrap_or_default(), // sub 1 because we want to get buy price at the smallest sell price as well, not skip it
             Decimal::DECIMAL_PLACES,
         )
-        .ok()
-        {
-            Some(start_after)
-        } else {
-            None
-        };
+        .ok();
         // desc, all items in this list are ge than the first item in sell list
         let best_buy_price_list = query_ticks_prices_with_end(
             storage,
@@ -349,7 +344,7 @@ impl OrderBook {
             None,
             start_after,
             limit,
-            Some(2i32),
+            Some(OrderBy::Descending),
         );
         // both price lists are applicable because buy list is always larger than the first item of sell list
         let best_sell_price_list = sell_price_list;

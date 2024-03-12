@@ -2,8 +2,8 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Order as OrderBy, Response, StdError, StdResult, Uint128,
 };
 use cw_utils::one_coin;
 use oraiswap::error::ContractError;
@@ -511,7 +511,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             end,
             limit,
-            order_by,
+            order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
         )?),
         QueryMsg::OrderBookMatchable { asset_infos } => {
             to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)

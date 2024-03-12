@@ -191,7 +191,7 @@ pub fn query_ticks_prices(
     direction: OrderDirection,
     start_after: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> Vec<Decimal> {
     query_ticks_prices_with_end(
         storage,
@@ -211,7 +211,7 @@ pub fn query_ticks_prices_with_end(
     start_after: Option<Decimal>,
     end: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> Vec<Decimal> {
     query_ticks_with_end(
         storage,
@@ -236,10 +236,8 @@ pub fn query_ticks_with_end(
     start_after: Option<Decimal>,
     end: Option<Decimal>,
     limit: Option<u32>,
-    order_by: Option<i32>,
+    order_by: Option<OrderBy>,
 ) -> StdResult<TicksResponse> {
-    let order_by = order_by.map_or(None, |val| OrderBy::try_from(val).ok());
-
     let position_bucket: ReadonlyBucket<u64> =
         ReadonlyBucket::multilevel(storage, &[PREFIX_TICK, pair_key, direction.as_bytes()]);
 

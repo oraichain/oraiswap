@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Uint128};
+use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy, Uint128};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
     limit_order::OrderDirection,
@@ -131,7 +131,7 @@ fn initialize() {
         OrderDirection::Buy,
         None,
         None,
-        Some(1),
+        Some(OrderBy::Ascending),
     );
     println!("buy ticks: {:?}", buy_ticks);
 
