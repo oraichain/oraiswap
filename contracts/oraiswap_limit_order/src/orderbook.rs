@@ -78,6 +78,28 @@ impl Order {
         }
     }
 
+    pub fn create(
+        order_id: u64,
+        bidder_addr: CanonicalAddr,
+        direction: OrderDirection,
+        offer_amount: Uint128,
+        ask_amount: Uint128,
+        filled_offer_amount: Uint128,
+        filled_ask_amount: Uint128,
+        status: OrderStatus,
+    ) -> Self {
+        Order {
+            direction,
+            order_id,
+            bidder_addr,
+            offer_amount,
+            ask_amount,
+            filled_offer_amount,
+            filled_ask_amount,
+            status,
+        }
+    }
+
     // The price will be calculated by the number of base coins divided by the number of quote coins
     pub fn get_price(&self) -> Decimal {
         match self.direction {
