@@ -3,7 +3,7 @@ use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Uint128,
+    StdError, StdResult, Uint128,
 };
 use cw_utils::one_coin;
 use oraiswap::error::ContractError;
@@ -522,25 +522,20 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 asset_infos[1].to_raw(deps.api)?,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-            let (highest_buy_price, buy_found, _) =
-                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-            let (lowest_sell_price, sell_found, _) =
-                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
-            let best_buy_price = if buy_found {
-                highest_buy_price
-            } else {
-                Decimal::zero()
+            let mid_price = match (
+                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy),
+                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell),
+            ) {
+                (Some((best_buy_price, _)), Some((best_sell_price, _))) => {
+                    (best_buy_price + best_sell_price) * Decimal::from_ratio(1u128, 2u128)
+                }
+                _ => {
+                    return Err(StdError::generic_err(
+                        ContractError::NoMatchedPrice {}.to_string(),
+                    ))
+                }
             };
-            let best_sell_price = if sell_found {
-                lowest_sell_price
-            } else {
-                Decimal::zero()
-            };
-            let mid_price = best_buy_price
-                .checked_add(best_sell_price)
-                .unwrap_or_default()
-                .checked_div(Decimal::from_ratio(2u128, 1u128))
-                .unwrap_or_default();
+
             to_binary(&mid_price)
         }
         QueryMsg::SimulateMarketOrder {

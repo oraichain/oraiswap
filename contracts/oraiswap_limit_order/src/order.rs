@@ -62,21 +62,22 @@ pub fn submit_order(
     )?;
 
     // check if this order can be matched, then execute matching process
-
     let (matched, price) = match direction {
         OrderDirection::Buy => {
             let price = Decimal::from_ratio(offer_amount, ask_amount);
-            let (lowest_sell_price, sell_found, _) =
-                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
 
-            (sell_found && lowest_sell_price <= price, price)
+            match orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell) {
+                Some((lowest_sell_price, _)) => (lowest_sell_price <= price, price),
+                None => (false, Decimal::zero()),
+            }
         }
         OrderDirection::Sell => {
             let price = Decimal::from_ratio(ask_amount, offer_amount);
 
-            let (highest_buy_price, buy_found, _) =
-                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-            (buy_found && highest_buy_price >= price, price)
+            match orderbook_pair.highest_price(deps.storage, OrderDirection::Buy) {
+                Some((highest_buy_price, _)) => (highest_buy_price >= price, price),
+                None => (false, Decimal::zero()),
+            }
         }
     };
 
@@ -129,17 +130,16 @@ pub fn submit_market_order(
     }
 
     // with market order, ask_amount will be maximum amount can receive
-    let (best_price, price_threshold, max_ask_amount) = get_price_info_for_market_order(
+    let (_best_price, price_threshold, max_ask_amount) = match get_price_info_for_market_order(
         deps.storage,
         direction,
         orderbook_pair,
         offer_asset.amount,
         slippage,
-    );
-
-    if best_price.is_zero() {
-        return Err(ContractError::CannotCreateMarketOrder {});
-    }
+    ) {
+        Some(data) => data,
+        None => return Err(ContractError::CannotCreateMarketOrder {}),
+    };
 
     store_order(
         deps.storage,
@@ -522,8 +522,7 @@ pub fn matching_order(
                     let mut user_offer_amount = match order.direction {
                         OrderDirection::Buy => user_ask_amount * match_price,
                         OrderDirection::Sell => {
-                            Uint128::from(user_ask_amount * Decimal::one().atomics())
-                                .checked_div(match_price.atomics())?
+                            user_ask_amount * Decimal::one().atomics() / match_price.atomics()
                         }
                     };
 
@@ -532,8 +531,7 @@ pub fn matching_order(
                         user_offer_amount = lef_user_offer;
                         user_ask_amount = match order.direction {
                             OrderDirection::Buy => {
-                                Uint128::from(user_offer_amount * Decimal::one().atomics())
-                                    .checked_div(match_price.atomics())?
+                                user_offer_amount * Decimal::one().atomics() / match_price.atomics()
                             }
                             OrderDirection::Sell => user_offer_amount * match_price,
                         }

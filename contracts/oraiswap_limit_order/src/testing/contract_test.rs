@@ -525,7 +525,7 @@ fn test_update_orderbook_data() {
 #[test]
 fn test_query_mid_price() {
     let (mut app, limit_order_addr) = basic_fixture();
-    let mid_price = app
+    let res = app
         .query::<Decimal, _>(
             limit_order_addr.clone(),
             &QueryMsg::MidPrice {
@@ -539,8 +539,10 @@ fn test_query_mid_price() {
                 ],
             },
         )
-        .unwrap();
-    assert_eq!(mid_price, Decimal::zero());
+        .unwrap_err();
+
+    assert!(res.to_string().contains("Cannot find a matched price"));
+
     // paid 300 usdt to get 150 orai -> 1 ORAI = 2 USD
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -572,7 +574,7 @@ fn test_query_mid_price() {
         )
         .unwrap();
 
-    let mid_price = app
+    let res = app
         .query::<Decimal, _>(
             limit_order_addr.clone(),
             &QueryMsg::MidPrice {
@@ -586,8 +588,8 @@ fn test_query_mid_price() {
                 ],
             },
         )
-        .unwrap();
-    assert_eq!(mid_price, Decimal::from_ratio(1u128, 1u128));
+        .unwrap_err();
+    assert!(res.to_string().contains("Cannot find a matched price"));
     // now we sell to get a different mid price
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Sell,
@@ -6364,14 +6366,8 @@ fn test_query_simulate_market_order() {
                 offer_amount: Uint128::from(10000000u128),
             },
         )
-        .unwrap();
-    assert_eq!(
-        res,
-        SimulateMarketOrderResponse {
-            receive: Uint128::zero(),
-            refunds: Uint128::from(10000000u128)
-        }
-    );
+        .unwrap_err();
+    assert!(res.to_string().contains("Cannot find a matched price"));
 
     // scenario: create 3 sell orders at price 1, 1.1, 1.2. Then, crate a buy order with slippage default is  10%
 

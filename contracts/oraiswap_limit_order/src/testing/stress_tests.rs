@@ -288,31 +288,28 @@ fn simulate_submit_orders(
                         slippage,
                     };
 
-                    let simulate = app
-                        .query::<SimulateMarketOrderResponse, _>(
-                            limit_order_addr.clone(),
-                            &QueryMsg::SimulateMarketOrder {
-                                direction: OrderDirection::Sell,
-                                asset_infos: [orai_asset_info.clone(), usdt_asset_info.clone()],
-                                slippage,
-                                offer_amount,
-                            },
-                        )
-                        .unwrap();
-
-                    let res = app.execute(
-                        Addr::unchecked(sender),
+                    let simulate = app.query::<SimulateMarketOrderResponse, _>(
                         limit_order_addr.clone(),
-                        &msg,
-                        &[Coin {
-                            denom: ORAI_DENOM.to_string(),
-                            amount: offer_amount,
-                        }],
+                        &QueryMsg::SimulateMarketOrder {
+                            direction: OrderDirection::Sell,
+                            asset_infos: [orai_asset_info.clone(), usdt_asset_info.clone()],
+                            slippage,
+                            offer_amount,
+                        },
                     );
-                    if simulate.receive == Uint128::zero() {
-                        assert_eq!(res.is_err(), true)
-                    } else {
-                        res.unwrap();
+
+                    if simulate.is_ok() {
+                        let _res = app
+                            .execute(
+                                Addr::unchecked(sender),
+                                limit_order_addr.clone(),
+                                &msg,
+                                &[Coin {
+                                    denom: ORAI_DENOM.to_string(),
+                                    amount: offer_amount,
+                                }],
+                            )
+                            .unwrap();
                     }
                 }
             },

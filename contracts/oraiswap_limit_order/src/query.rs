@@ -5,7 +5,8 @@ use crate::state::{
     read_orders_with_indexer, PREFIX_ORDER_BY_BIDDER, PREFIX_ORDER_BY_DIRECTION,
     PREFIX_ORDER_BY_PRICE, PREFIX_TICK,
 };
-use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdResult, Storage, Uint128};
+use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdError, StdResult, Storage, Uint128};
+use oraiswap::error::ContractError;
 use oraiswap::limit_order::{OrderStatus, SimulateMarketOrderResponse};
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
@@ -296,41 +297,27 @@ pub fn get_price_info_for_market_order(
     orderbook_pair: &OrderBook,
     offer_amount: Uint128,
     slippage: Decimal,
-) -> (Decimal, Decimal, Uint128) {
-    let (best_price, price_threshold, max_ask_amount) = match direction {
-        OrderDirection::Buy => {
-            let (lowest_sell_price, sell_found, _) =
-                orderbook_pair.lowest_price(storage, OrderDirection::Sell);
-
-            if !sell_found {
-                (Decimal::zero(), Decimal::zero(), Uint128::zero())
-            } else {
+) -> Option<(Decimal, Decimal, Uint128)> {
+    match direction {
+        OrderDirection::Buy => orderbook_pair
+            .lowest_price(storage, OrderDirection::Sell)
+            .map(|(lowest_sell_price, _)| {
                 (
                     lowest_sell_price,
                     lowest_sell_price * (Decimal::one() + slippage),
-                    (offer_amount * Decimal::one().atomics())
-                        .checked_div(lowest_sell_price.atomics())
-                        .unwrap(),
+                    offer_amount * Decimal::one().atomics() / lowest_sell_price.atomics(),
                 )
-            }
-        }
-        OrderDirection::Sell => {
-            let (highest_buy_price, buy_found, _) =
-                orderbook_pair.highest_price(storage, OrderDirection::Buy);
-
-            if !buy_found {
-                (Decimal::zero(), Decimal::zero(), Uint128::zero())
-            } else {
+            }),
+        OrderDirection::Sell => orderbook_pair
+            .highest_price(storage, OrderDirection::Buy)
+            .map(|(highest_buy_price, _)| {
                 (
                     highest_buy_price,
                     highest_buy_price * (Decimal::one() - slippage),
                     offer_amount * highest_buy_price,
                 )
-            }
-        }
-    };
-
-    (best_price, price_threshold, max_ask_amount)
+            }),
+    }
 }
 
 pub fn query_simulate_market_order(
@@ -354,20 +341,20 @@ pub fn query_simulate_market_order(
             .unwrap_or(Decimal::from_str(SLIPPAGE_DEFAULT)?),
     );
 
-    let (best_price, price_threshold, max_ask_amount) = get_price_info_for_market_order(
+    let (_best_price, price_threshold, max_ask_amount) = match get_price_info_for_market_order(
         deps.storage,
         direction,
         &orderbook_pair,
         offer_amount,
         slippage,
-    );
-
-    if best_price.is_zero() {
-        return Ok(SimulateMarketOrderResponse {
-            receive: Uint128::zero(),
-            refunds: offer_amount,
-        });
-    }
+    ) {
+        Some(data) => data,
+        None => {
+            return Err(StdError::generic_err(
+                ContractError::NoMatchedPrice {}.to_string(),
+            ))
+        }
+    };
 
     // fake a order
     let user_orders = Order {

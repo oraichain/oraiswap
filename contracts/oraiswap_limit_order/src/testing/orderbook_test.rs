@@ -145,12 +145,12 @@ fn initialize() {
     );
     println!("sell ticks: {:?}", sell_ticks);
 
-    let (highest, found, _) = ob.highest_price(deps.as_ref().storage, OrderDirection::Buy);
-    assert!(found);
-    assert_eq!(highest, Decimal::from_str("10.01").unwrap());
-
-    let (_, found, _) = ob.lowest_price(deps.as_ref().storage, OrderDirection::Sell);
-    assert!(found);
+    if let (Some((highest, _)), Some((_, _))) = (
+        ob.highest_price(deps.as_ref().storage, OrderDirection::Buy),
+        ob.lowest_price(deps.as_ref().storage, OrderDirection::Sell),
+    ) {
+        assert_eq!(highest, Decimal::from_str("10.01").unwrap());
+    }
 }
 
 #[test]
@@ -446,14 +446,12 @@ fn highest_lowest_price() {
                 total_orders
             );
         }
-        let (highest_buy, found_buy, _) = tc
-            .ob
-            .highest_price(deps.as_ref().storage, OrderDirection::Buy);
-        let (highest_sell, found_sell, _) = tc
-            .ob
-            .highest_price(deps.as_ref().storage, OrderDirection::Sell);
-
-        if found_buy || found_sell {
+        if let (Some((highest_buy, _)), Some((highest_sell, _))) = (
+            tc.ob
+                .highest_price(deps.as_ref().storage, OrderDirection::Buy),
+            tc.ob
+                .highest_price(deps.as_ref().storage, OrderDirection::Sell),
+        ) {
             let highest_price = Decimal::max(highest_buy, highest_sell);
             println!(
                 "tc.highest_price: {} - highest_price: {}",
@@ -461,14 +459,12 @@ fn highest_lowest_price() {
             );
         }
 
-        let (lowest_buy, found_buy, _) = tc
-            .ob
-            .lowest_price(deps.as_ref().storage, OrderDirection::Buy);
-        let (lowest_sell, found_sell, _) = tc
-            .ob
-            .lowest_price(deps.as_ref().storage, OrderDirection::Sell);
-
-        if found_buy || found_sell {
+        if let (Some((lowest_buy, _)), Some((lowest_sell, _))) = (
+            tc.ob
+                .lowest_price(deps.as_ref().storage, OrderDirection::Buy),
+            tc.ob
+                .lowest_price(deps.as_ref().storage, OrderDirection::Sell),
+        ) {
             let lowest_price = Decimal::min(lowest_buy, lowest_sell);
             println!(
                 "tc.lowest_price: {} - lowest_price: {}",

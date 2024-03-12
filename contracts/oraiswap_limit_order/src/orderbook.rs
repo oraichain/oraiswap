@@ -238,37 +238,28 @@ impl OrderBook {
         storage: &dyn Storage,
         direction: OrderDirection,
         price_increasing: OrderBy,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         let pair_key = &self.get_pair_key();
         // get last tick if price_increasing is true, otherwise get first tick
         let tick_namespaces = &[PREFIX_TICK, pair_key, direction.as_bytes()];
-        let position_bucket: ReadonlyBucket<u64> =
-            ReadonlyBucket::multilevel(storage, tick_namespaces);
+        let position_bucket = ReadonlyBucket::multilevel(storage, tick_namespaces);
 
-        if let Some(item) = position_bucket.range(None, None, price_increasing).next() {
-            if let Ok((price_key, total_orders)) = item {
-                // price is rounded already
-                let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
-                return (price, true, total_orders);
-            }
+        if let Some(Ok((price_key, total_orders))) =
+            position_bucket.range(None, None, price_increasing).next()
+        {
+            // price is rounded already
+            let price = Decimal::raw(u128::from_be_bytes(price_key.try_into().unwrap()));
+            return Some((price, total_orders));
         }
 
-        // return default
-        (
-            match price_increasing {
-                OrderBy::Descending => Decimal::MIN, // highest => MIN (so using max will not include)
-                OrderBy::Ascending => Decimal::MAX, // lowest => MAX (so using min will not include)
-            },
-            false,
-            0,
-        )
+        None
     }
 
     pub fn highest_price(
         &self,
         storage: &dyn Storage,
         direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         self.best_price(storage, direction, OrderBy::Descending)
     }
 
@@ -276,7 +267,7 @@ impl OrderBook {
         &self,
         storage: &dyn Storage,
         direction: OrderDirection,
-    ) -> (Decimal, bool, u64) {
+    ) -> Option<(Decimal, u64)> {
         self.best_price(storage, direction, OrderBy::Ascending)
     }
 

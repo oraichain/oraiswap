@@ -96,6 +96,9 @@ pub enum ContractError {
     #[error("This pool is not open to everyone, only whitelisted traders can swap")]
     PoolWhitelisted {},
 
+    #[error("Cannot find a matched price")]
+    NoMatchedPrice {},
+
     #[error("Price cannot be greater than {price}")]
     PriceNotGreaterThan { price: Decimal },
 
