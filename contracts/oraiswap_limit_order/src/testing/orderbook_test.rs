@@ -740,6 +740,7 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
 
     init_last_order_id(deps.as_mut().storage).unwrap();
 
+    // base on order id 3820823: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
     let order = Order {
         direction: OrderDirection::Buy,
         order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
