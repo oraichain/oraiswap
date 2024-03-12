@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    from_binary, to_binary, Addr, Binary, ContractResult, Decimal, Deps, DepsMut, Env, MessageInfo,
     Order as OrderBy, Response, StdError, StdResult, Uint128,
 };
 use cw_utils::one_coin;
@@ -76,9 +76,8 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    if is_paused(deps.as_ref(), &msg) {
-        return Err(ContractError::Paused {});
-    }
+    // check has paused
+    check_paused(deps.as_ref(), &msg)?;
 
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
@@ -234,23 +233,22 @@ pub fn execute(
     }
 }
 
-fn is_paused(deps: Deps, msg: &ExecuteMsg) -> bool {
+fn check_paused(deps: Deps, msg: &ExecuteMsg) -> Result<(), ContractError> {
     if let Ok(config) = read_config(deps.storage) {
         if config.is_paused {
             match msg {
-                ExecuteMsg::UpdateAdmin { admin: _ } => false,
-                ExecuteMsg::UpdateConfig { .. } => false,
-                ExecuteMsg::Pause {} => false,
-                ExecuteMsg::Unpause {} => false,
-                ExecuteMsg::UpdateOrderbookPair { .. } => false,
-                _ => true,
+                ExecuteMsg::UpdateAdmin { admin: _ }
+                | ExecuteMsg::UpdateConfig { .. }
+                | ExecuteMsg::Pause {}
+                | ExecuteMsg::Unpause {}
+                | ExecuteMsg::UpdateOrderbookPair { .. } => {
+                    // still not paused
+                }
+                _ => return Err(ContractError::Paused {}),
             }
-        } else {
-            false
         }
-    } else {
-        false
     }
+    Ok(())
 }
 
 pub fn execute_update_admin(
