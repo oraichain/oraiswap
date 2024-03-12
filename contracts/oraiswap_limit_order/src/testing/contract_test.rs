@@ -421,6 +421,20 @@ fn test_update_operator() {
         .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.operator, Some(Addr::unchecked(new_operator)));
+
+    let update_executor = ExecuteMsg::UpdateOperator { operator: None };
+    app.execute(
+        contract_info.admin,
+        limit_order_addr.clone(),
+        &update_executor,
+        &[],
+    )
+    .unwrap();
+
+    let contract_info: ContractInfoResponse = app
+        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .unwrap();
+    assert_eq!(contract_info.operator, None);
 }
 
 #[test]
@@ -432,8 +446,9 @@ fn test_update_config() {
         .unwrap();
 
     let new_commission_rate = "0.01".to_string();
+    let new_reward_address = Addr::unchecked("new_reward_address");
     let update_config = ExecuteMsg::UpdateConfig {
-        reward_address: None,
+        reward_address: Some(new_reward_address.clone()),
         commission_rate: Some(new_commission_rate.clone()),
     };
     // case 1: try to update operator using non-admin addr => unauthorized
@@ -463,11 +478,57 @@ fn test_update_config() {
         .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.commission_rate, new_commission_rate);
+    assert_eq!(contract_info.reward_address, new_reward_address);
 }
 
 #[test]
-fn test_update_orderbook_data() {
+fn test_crate_and_update_orderbook_data() {
     let (mut app, limit_order_addr) = basic_fixture();
+
+    // create other orderbook pair failed, non admin
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: ATOM_DENOM.to_string(),
+        },
+        spread: None,
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("theft"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
+    );
+
+    // create other orderbook pair failed, spread > 1
+    let msg = ExecuteMsg::CreateOrderBookPair {
+        base_coin_info: AssetInfo::NativeToken {
+            denom: ORAI_DENOM.to_string(),
+        },
+        quote_coin_info: AssetInfo::NativeToken {
+            denom: ATOM_DENOM.to_string(),
+        },
+        spread: Some(Decimal::from_str("2").unwrap()),
+        min_quote_coin_amount: Uint128::from(10u128),
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
+    );
+
     // case 1: try to update orderbook spread with non-admin addr => unauthorized
     let asset_infos = [
         AssetInfo::NativeToken {
@@ -493,12 +554,29 @@ fn test_update_orderbook_data() {
         true
     );
 
+    // update failed, spread > 1
+    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+        asset_infos: asset_infos.clone(),
+        spread: Some(Decimal::from_str("1.1").unwrap()),
+        min_quote_coin_amount: None,
+    };
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0000"),
+            limit_order_addr.clone(),
+            &update_msg,
+            &[]
+        )
+        .is_err(),
+        true
+    );
+
     // case 2: good case, admin should update spread from None to something
     let spread = Decimal::from_str("0.1").unwrap();
     let update_msg = ExecuteMsg::UpdateOrderbookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(spread),
-        min_quote_coin_amount: None,
+        min_quote_coin_amount: Some(Uint128::from(100u128)),
     };
     app.execute(
         Addr::unchecked("addr0000"),
@@ -519,7 +597,7 @@ fn test_update_orderbook_data() {
     // double check, make sure other fields are still the same
     assert_eq!(orderbook.base_coin_info, asset_infos[0]);
     assert_eq!(orderbook.quote_coin_info, asset_infos[1]);
-    assert_eq!(orderbook.min_quote_coin_amount, Uint128::from(10u128));
+    assert_eq!(orderbook.min_quote_coin_amount, Uint128::from(100u128));
 }
 
 #[test]
@@ -2962,14 +3040,24 @@ fn execute_pair_cw20_token() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[(
-        &"usdt".to_string(),
-        &[
-            (&"addr0000".to_string(), &Uint128::from(1000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(1000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(1000000u128)),
-        ],
-    )]);
+    let token_addrs = app.set_token_balances(&[
+        (
+            &"usdt".to_string(),
+            &[
+                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
+            ],
+        ),
+        (
+            &"uusd".to_string(),
+            &[
+                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
+            ],
+        ),
+    ]);
 
     let msg = InstantiateMsg {
         name: None,
@@ -3007,6 +3095,76 @@ fn execute_pair_cw20_token() {
         limit_order_addr.clone(),
         &msg,
         &[],
+    );
+
+    // submit order failed, invalid funds
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(13000u128),
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Buy,
+            assets: [
+                Asset {
+                    info: AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    amount: Uint128::from(13000u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(13000u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[1].clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
+    );
+
+    //  submit order failed, TooSmallQuoteAsset
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(9u128),
+        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            direction: OrderDirection::Buy,
+            assets: [
+                Asset {
+                    info: AssetInfo::NativeToken {
+                        denom: ORAI_DENOM.to_string(),
+                    },
+                    amount: Uint128::from(10u128),
+                },
+                Asset {
+                    info: AssetInfo::Token {
+                        contract_addr: token_addrs[0].clone(),
+                    },
+                    amount: Uint128::from(9u128),
+                },
+            ],
+        })
+        .unwrap(),
+    };
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[0].clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
     );
 
     /* <----------------------------------- order 1 -----------------------------------> */
@@ -6263,6 +6421,45 @@ fn test_market_order() {
             amount: Uint128::from(7696840u128),
         },
     );
+
+    // case submit cw20 market order failed, invalid funds
+    let new_tokens = app.set_token_balances(&[(
+        &"uusd".to_string(),
+        &[
+            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
+        ],
+    )]);
+
+    let msg = cw20::Cw20ExecuteMsg::Send {
+        contract: limit_order_addr.to_string(),
+        amount: Uint128::new(3000000u128),
+        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+            direction: OrderDirection::Buy,
+            asset_infos: [
+                AssetInfo::NativeToken {
+                    denom: ORAI_DENOM.to_string(),
+                },
+                AssetInfo::Token {
+                    contract_addr: token_addrs[0].clone(),
+                },
+            ],
+            slippage: Some(Decimal::from_ratio(50u128, 100u128)),
+        })
+        .unwrap(),
+    };
+
+    assert_eq!(
+        app.execute(
+            Addr::unchecked("addr0001"),
+            new_tokens[0].clone(),
+            &msg,
+            &[],
+        )
+        .is_err(),
+        true
+    )
 }
 
 #[test]

@@ -343,6 +343,12 @@ pub fn execute_create_pair(
         return Err(ContractError::OrderBookAlreadyExists {});
     }
 
+    if let Some(spread) = spread {
+        if spread >= Decimal::one() {
+            return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
+        }
+    }
+
     let order_book = OrderBook {
         base_coin_info: base_coin_info.to_raw(deps.api)?,
         quote_coin_info: quote_coin_info.to_raw(deps.api)?,
@@ -423,6 +429,7 @@ pub fn receive_cw20(
                 asset_infos[0].to_raw(deps.api)?,
                 asset_infos[1].to_raw(deps.api)?,
             ]);
+
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
 
             let offer_asset_info = match direction {
