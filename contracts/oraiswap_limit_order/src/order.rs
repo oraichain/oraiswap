@@ -529,20 +529,10 @@ pub fn matching_order(
                         }
                     };
 
-                    // if user_offer_amount > lef_sell_offer, we need re calc ask_amount
-                    if user_offer_amount > lef_user_offer {
-                        user_offer_amount = lef_user_offer;
-                        user_ask_amount = match order.direction {
-                            OrderDirection::Buy => {
-                                user_offer_amount * Decimal::one().atomics() / match_price.atomics()
-                            }
-                            OrderDirection::Sell => user_offer_amount * match_price,
-                        }
-                    }
-
-                    // if user_offer_amount > left_match_ask, we need re calc ask_amount
-                    if user_offer_amount > lef_match_ask {
-                        user_offer_amount = lef_match_ask;
+                    let min_user_offer_amount = Uint128::min(lef_user_offer, lef_match_ask);
+                    // if user_offer_amount > min_user_offer_amount, we need re calc ask_amount
+                    if user_offer_amount > min_user_offer_amount {
+                        user_offer_amount = min_user_offer_amount;
                         user_ask_amount = match order.direction {
                             OrderDirection::Buy => {
                                 user_offer_amount * Decimal::one().atomics() / match_price.atomics()

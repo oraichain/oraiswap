@@ -740,32 +740,20 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
 
     init_last_order_id(deps.as_mut().storage).unwrap();
 
-    let orders = vec![
-        // base on order id 3820823: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
-        Order {
-            direction: OrderDirection::Buy,
-            order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
-            bidder_addr: bidder_addr.clone(),
-            offer_amount: 3502324000u128.into(),
-            ask_amount: 196000000u128.into(),
-            filled_offer_amount: 3499999968u128.into(),
-            filled_ask_amount: 195985264u128.into(),
-            status: OrderStatus::PartialFilled,
-        },
-    ];
+    let order = Order {
+        direction: OrderDirection::Buy,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 3502324000u128.into(),
+        ask_amount: 196000000u128.into(),
+        filled_offer_amount: 3499999968u128.into(),
+        filled_ask_amount: 195985264u128.into(),
+        status: OrderStatus::PartialFilled,
+    };
 
     let mut ob = OrderBook::new(ask_info, offer_info, None);
 
-    for order in orders.iter() {
-        let total_orders = ob.add_order(deps.as_mut().storage, order).unwrap();
-        println!(
-            "insert order id: {}, direction: {:?}, price: {}, total orders: {}",
-            order.order_id,
-            order.direction,
-            order.get_price(),
-            total_orders
-        );
-    }
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
 
     // base on order id 3820824: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
     let ask_amount = 7526882u128;
@@ -785,17 +773,18 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
 
     let (_, matched_orders) =
         matching_order(deps.as_ref(), ob.clone(), &sell_order, sell_price).unwrap();
+    assert_eq!(matched_orders.len(), 1);
 
-    for order in matched_orders {
-        let matched_order_price =
-            Decimal::from_ratio(order.filled_offer_this_round, order.filled_ask_this_round);
-        println!("matched order price: {:?}", matched_order_price);
-        assert_eq!(
-            matched_order_price.lt(&Decimal::from_ratio(
-                Uint128::from(18u128),
-                Uint128::from(1u128)
-            )),
-            true
-        )
-    }
+    let matched_order_price = Decimal::from_ratio(
+        matched_orders[0].filled_offer_this_round,
+        matched_orders[0].filled_ask_this_round,
+    );
+    println!("matched order price: {:?}", matched_order_price);
+    assert_eq!(
+        matched_order_price.lt(&Decimal::from_ratio(
+            Uint128::from(18u128),
+            Uint128::from(1u128)
+        )),
+        true
+    )
 }
