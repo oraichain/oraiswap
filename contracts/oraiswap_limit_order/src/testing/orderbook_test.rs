@@ -12,7 +12,7 @@ use crate::{
     order::{matching_order, MIN_VOLUME},
     orderbook::{Order, OrderBook},
     query::query_ticks_prices,
-    state::{increase_last_order_id, init_last_order_id, store_order},
+    state::{increase_last_order_id, init_last_order_id},
 };
 
 #[test]
@@ -742,16 +742,16 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
 
     let orders = vec![
         // base on order id 3820823: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
-        Order::create(
-            increase_last_order_id(deps.as_mut().storage).unwrap(),
-            bidder_addr.clone(),
-            OrderDirection::Buy,
-            3502324000u128.into(),
-            196000000u128.into(),
-            3499999968u128.into(),
-            195985264u128.into(),
-            OrderStatus::PartialFilled,
-        ),
+        Order {
+            direction: OrderDirection::Buy,
+            order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+            bidder_addr: bidder_addr.clone(),
+            offer_amount: 3502324000u128.into(),
+            ask_amount: 196000000u128.into(),
+            filled_offer_amount: 3499999968u128.into(),
+            filled_ask_amount: 195985264u128.into(),
+            status: OrderStatus::PartialFilled,
+        },
     ];
 
     let mut ob = OrderBook::new(ask_info, offer_info, None);
@@ -767,18 +767,21 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
         );
     }
 
-    let sell_price = Decimal::from_ratio(7526882u128, 423021u128);
+    // base on order id 3820824: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
+    let ask_amount = 7526882u128;
+    let offer_amount = 423021u128;
+    let sell_price = Decimal::from_ratio(ask_amount, offer_amount);
 
-    let sell_order = Order::create(
-        increase_last_order_id(deps.as_mut().storage).unwrap(),
-        bidder_addr.clone(),
-        OrderDirection::Sell,
-        423021u128.into(),
-        7526882u128.into(),
-        0u128.into(),
-        0u128.into(),
-        OrderStatus::PartialFilled,
-    );
+    let sell_order = Order {
+        direction: OrderDirection::Sell,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: offer_amount.into(),
+        ask_amount: ask_amount.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::PartialFilled,
+    };
 
     let (_, matched_orders) =
         matching_order(deps.as_ref(), ob.clone(), &sell_order, sell_price).unwrap();
