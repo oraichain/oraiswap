@@ -81,6 +81,12 @@ pub fn submit_order(
         }
     };
 
+    let pair = format!(
+        "{} - {}",
+        &orderbook_pair.base_coin_info.to_normal(deps.api)?,
+        &orderbook_pair.quote_coin_info.to_normal(deps.api)?
+    );
+
     let response = if matched {
         process_matching(deps, sender.clone(), orderbook_pair, order_id, price)?
     } else {
@@ -90,10 +96,7 @@ pub fn submit_order(
     Ok(response.add_attributes(vec![
         ("action", "submit_order"),
         ("order_type", "limit"),
-        (
-            "pair",
-            &format!("{} - {}", &assets[0].info, &assets[1].info),
-        ),
+        ("pair", &pair),
         ("order_id", &order_id.to_string()),
         ("status", &format!("{:?}", OrderStatus::Open)),
         ("direction", &format!("{:?}", direction)),
