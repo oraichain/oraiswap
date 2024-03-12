@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, ContractResult, Decimal, Deps, DepsMut, Env, MessageInfo,
+    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
     Order as OrderBy, Response, StdError, StdResult, Uint128,
 };
 use cw_utils::one_coin;
