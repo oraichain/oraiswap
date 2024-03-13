@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy, Uint128};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
-    limit_order::OrderDirection,
+    limit_order::{OrderDirection, OrderStatus},
     math::DecimalPlaces,
     testing::ATOM_DENOM,
 };
@@ -724,4 +724,68 @@ fn test_matching_order_process() {
         assert!(order.filled_ask_amount.abs_diff(order.ask_amount) < Uint128::from(MIN_VOLUME));
         assert!(order.filled_offer_amount.abs_diff(order.offer_amount) < Uint128::from(MIN_VOLUME));
     }
+}
+
+#[test]
+fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
+    let offer_info = AssetInfoRaw::NativeToken {
+        denom: ATOM_DENOM.to_string(),
+    };
+    let ask_info = AssetInfoRaw::NativeToken {
+        denom: ORAI_DENOM.to_string(),
+    };
+
+    let mut deps = mock_dependencies();
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    // base on order id 3820823: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
+    let order = Order {
+        direction: OrderDirection::Buy,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 3502324000u128.into(),
+        ask_amount: 196000000u128.into(),
+        filled_offer_amount: 3499999968u128.into(),
+        filled_ask_amount: 195985264u128.into(),
+        status: OrderStatus::PartialFilled,
+    };
+
+    let mut ob = OrderBook::new(ask_info, offer_info, None);
+
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
+
+    // base on order id 3820824: https://lcd.orai.io/cosmos/tx/v1beta1/txs/6D90EA566FC6DE0336D5665111242C4EDABE8BD460A11844618B34335B1E994F
+    let ask_amount = 7526882u128;
+    let offer_amount = 423021u128;
+    let sell_price = Decimal::from_ratio(ask_amount, offer_amount);
+
+    let sell_order = Order {
+        direction: OrderDirection::Sell,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: offer_amount.into(),
+        ask_amount: ask_amount.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::PartialFilled,
+    };
+
+    let (_, matched_orders) =
+        matching_order(deps.as_ref(), ob.clone(), &sell_order, sell_price).unwrap();
+    assert_eq!(matched_orders.len(), 1);
+
+    let matched_order_price = Decimal::from_ratio(
+        matched_orders[0].filled_offer_this_round,
+        matched_orders[0].filled_ask_this_round,
+    );
+    println!("matched order price: {:?}", matched_order_price);
+    assert_eq!(
+        matched_order_price.lt(&Decimal::from_ratio(
+            Uint128::from(18u128),
+            Uint128::from(1u128)
+        )),
+        true
+    )
 }
