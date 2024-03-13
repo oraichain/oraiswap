@@ -14,17 +14,13 @@ use cosmwasm_std::{
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{OrderDirection, OrderStatus};
+use oraiswap::limit_order::{OrderDirection, OrderStatus, Payment};
 
 pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
 const MIN_FEE: u128 = 1_000_000u128;
 pub const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
-
-struct Payment {
-    address: Addr,
-    asset: Asset,
-}
+pub const REFUNDS_THRESHOLD: u128 = 100000u128; // 0.1
 
 pub fn submit_order(
     deps: DepsMut,
@@ -624,9 +620,31 @@ pub fn process_matching(
         &mut relayer,
     )?;
 
+    let refund_threshold = orderbook_pair
+        .refund_threshold
+        .unwrap_or(Uint128::from(REFUNDS_THRESHOLD));
+
     for order_matched in matched_orders.iter_mut() {
         if order_matched.status != OrderStatus::Open {
-            order_matched.match_order(deps.storage, &pair_key)?;
+            let refund_amount =
+                order_matched.match_order(deps.storage, &pair_key, refund_threshold)?;
+
+            if !refund_amount.is_zero() {
+                let offer_asset_info = match order_matched.direction {
+                    OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                    OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+                };
+
+                let trader_refunds: Payment = Payment {
+                    address: deps.api.addr_humanize(&order_matched.bidder_addr)?,
+                    asset: Asset {
+                        info: offer_asset_info,
+                        amount: refund_amount,
+                    },
+                };
+
+                list_trader.push(trader_refunds);
+            }
             matched_events.push(to_events(
                 &order_matched,
                 deps.api

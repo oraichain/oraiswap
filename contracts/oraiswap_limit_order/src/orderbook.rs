@@ -10,7 +10,7 @@ use oraiswap::{
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};
 
 use crate::{
-    order::MIN_VOLUME,
+    order::{MIN_VOLUME, REFUNDS_THRESHOLD},
     query::{query_ticks_prices, query_ticks_prices_with_end},
     state::{
         read_orders, read_orders_with_indexer, remove_order, store_order, PREFIX_ORDER_BY_PRICE,
@@ -156,7 +156,12 @@ impl OrderWithFee {
         Ok(())
     }
 
-    pub fn match_order(&mut self, storage: &mut dyn Storage, pair_key: &[u8]) -> StdResult<u64> {
+    pub fn match_order(
+        &mut self,
+        storage: &mut dyn Storage,
+        pair_key: &[u8],
+        refund_threshold: Uint128,
+    ) -> StdResult<Uint128> {
         let order = Order {
             order_id: self.order_id,
             status: self.status,
@@ -168,11 +173,27 @@ impl OrderWithFee {
             filled_ask_amount: self.filled_ask_amount,
         };
         if self.status == OrderStatus::Fulfilled {
-            // When status is Fulfilled, remove order
-            remove_order(storage, pair_key, &order)
+            // When status is Fulfilled, remove order and refunds offer amount
+            let remaining: Uint128 = order.offer_amount - order.filled_offer_amount;
+            // check refunds amount is less than minimum quote refund amount
+            let min_offer_refund = match order.direction {
+                OrderDirection::Buy => refund_threshold,
+                OrderDirection::Sell => {
+                    refund_threshold * Decimal::one().atomics() / order.get_price().atomics()
+                }
+            };
+
+            let refunds_amount = if remaining >= min_offer_refund {
+                remaining
+            } else {
+                Uint128::zero()
+            };
+            remove_order(storage, pair_key, &order)?;
+            Ok(refunds_amount)
         } else {
             // update order
-            store_order(storage, pair_key, &order, false)
+            store_order(storage, pair_key, &order, false)?;
+            Ok(Uint128::zero())
         }
     }
 
@@ -196,6 +217,7 @@ pub struct OrderBook {
     pub quote_coin_info: AssetInfoRaw,
     pub spread: Option<Decimal>,
     pub min_quote_coin_amount: Uint128,
+    pub refund_threshold: Option<Uint128>,
 }
 
 impl OrderBook {
@@ -209,6 +231,7 @@ impl OrderBook {
             quote_coin_info,
             spread,
             min_quote_coin_amount: Uint128::zero(),
+            refund_threshold: None,
         }
     }
 
@@ -218,6 +241,9 @@ impl OrderBook {
             quote_coin_info: self.quote_coin_info.to_normal(api)?,
             spread: self.spread,
             min_quote_coin_amount: self.min_quote_coin_amount,
+            refund_threshold: self
+                .refund_threshold
+                .unwrap_or(Uint128::from(REFUNDS_THRESHOLD)),
         })
     }
 
