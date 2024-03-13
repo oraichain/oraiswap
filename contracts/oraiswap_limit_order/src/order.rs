@@ -626,10 +626,10 @@ pub fn process_matching(
 
     for order_matched in matched_orders.iter_mut() {
         if order_matched.status != OrderStatus::Open {
-            let (_, refund_amount) =
+            let refund_amount =
                 order_matched.match_order(deps.storage, &pair_key, refund_threshold)?;
 
-            if let Some(refund_amount) = refund_amount {
+            if !refund_amount.is_zero() {
                 let offer_asset_info = match order_matched.direction {
                     OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
                     OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,

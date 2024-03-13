@@ -161,7 +161,7 @@ impl OrderWithFee {
         storage: &mut dyn Storage,
         pair_key: &[u8],
         refund_threshold: Uint128,
-    ) -> StdResult<(u64, Option<Uint128>)> {
+    ) -> StdResult<Uint128> {
         let order = Order {
             order_id: self.order_id,
             status: self.status,
@@ -184,20 +184,16 @@ impl OrderWithFee {
             };
 
             let refunds_amount = if remaining >= min_offer_refund {
-                Some(remaining)
+                remaining
             } else {
-                None
+                Uint128::zero()
             };
-            Ok((
-                remove_order(storage, pair_key, &order).unwrap_or_default(),
-                refunds_amount,
-            ))
+            remove_order(storage, pair_key, &order)?;
+            Ok(refunds_amount)
         } else {
             // update order
-            Ok((
-                store_order(storage, pair_key, &order, false).unwrap_or_default(),
-                None,
-            ))
+            store_order(storage, pair_key, &order, false)?;
+            Ok(Uint128::zero())
         }
     }
 
