@@ -108,6 +108,7 @@ pub fn execute(
             quote_coin_info,
             spread,
             min_quote_coin_amount,
+            refund_threshold,
         } => execute_create_pair(
             deps,
             info,
@@ -115,11 +116,13 @@ pub fn execute(
             quote_coin_info,
             spread,
             min_quote_coin_amount,
+            refund_threshold,
         ),
         ExecuteMsg::UpdateOrderbookPair {
             asset_infos,
             spread,
             min_quote_coin_amount,
+            refund_threshold,
         } => {
             validate_admin(
                 deps.api,
@@ -141,6 +144,11 @@ pub fn execute(
             // update new minium quote amount threshold
             if let Some(min_quote_coin_amount) = min_quote_coin_amount {
                 orderbook_pair.min_quote_coin_amount = min_quote_coin_amount;
+            }
+
+            // update new refunds threshold
+            if let Some(refund_threshold) = refund_threshold {
+                orderbook_pair.refund_threshold = Some(refund_threshold);
             }
 
             store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
@@ -320,6 +328,7 @@ pub fn execute_create_pair(
     quote_coin_info: AssetInfo,
     spread: Option<Decimal>,
     min_quote_coin_amount: Uint128,
+    refund_threshold: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -352,6 +361,7 @@ pub fn execute_create_pair(
         quote_coin_info: quote_coin_info.to_raw(deps.api)?,
         spread,
         min_quote_coin_amount,
+        refund_threshold,
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 

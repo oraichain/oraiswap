@@ -110,12 +110,14 @@ pub enum ExecuteMsg {
         quote_coin_info: AssetInfo,
         spread: Option<Decimal>,
         min_quote_coin_amount: Uint128,
+        refund_threshold: Option<Uint128>,
     },
 
     UpdateOrderbookPair {
         asset_infos: [AssetInfo; 2],
         spread: Option<Decimal>,
         min_quote_coin_amount: Option<Uint128>,
+        refund_threshold: Option<Uint128>,
     },
 
     ///////////////////////
@@ -256,6 +258,7 @@ pub struct OrderBookResponse {
     pub quote_coin_info: AssetInfo,
     pub spread: Option<Decimal>,
     pub min_quote_coin_amount: Uint128,
+    pub refund_threshold: Uint128,
 }
 
 #[cw_serde]
@@ -288,6 +291,12 @@ pub struct LastOrderIdResponse {
 pub struct SimulateMarketOrderResponse {
     pub receive: Uint128,
     pub refunds: Uint128,
+}
+
+#[cw_serde]
+pub struct Payment {
+    pub address: Addr,
+    pub asset: Asset,
 }
 
 /// We currently take no arguments for migrations

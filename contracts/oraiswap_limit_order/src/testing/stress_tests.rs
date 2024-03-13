@@ -181,6 +181,7 @@ fn simulate_submit_orders(
         quote_coin_info: usdt_asset_info.clone(),
         spread: Some(Decimal::from_ratio(1u128, 10u128)),
         min_quote_coin_amount: Uint128::from(10u128),
+        refund_threshold: None,
     };
 
     let _res = app.execute(
