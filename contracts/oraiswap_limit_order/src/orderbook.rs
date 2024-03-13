@@ -183,8 +183,6 @@ impl OrderWithFee {
                 }
             };
 
-            println!("-- {} {}", remaining, min_offer_refund);
-
             let refunds_amount = if remaining >= min_offer_refund {
                 Some(remaining)
             } else {

@@ -20,7 +20,7 @@ pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
 const MIN_FEE: u128 = 1_000_000u128;
 pub const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
-pub const REFUNDS_THRESHOLD: u128 = 100000u128;
+pub const REFUNDS_THRESHOLD: u128 = 100000u128; // 0.1
 
 pub fn submit_order(
     deps: DepsMut,
@@ -636,12 +636,13 @@ pub fn process_matching(
                 };
 
                 let trader_refunds: Payment = Payment {
-                    address: deps.api.addr_humanize(&order.bidder_addr)?,
+                    address: deps.api.addr_humanize(&order_matched.bidder_addr)?,
                     asset: Asset {
                         info: offer_asset_info,
                         amount: refund_amount,
                     },
                 };
+
                 list_trader.push(trader_refunds);
             }
             matched_events.push(to_events(
