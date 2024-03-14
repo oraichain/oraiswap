@@ -6,7 +6,7 @@ use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
-use oraiswap::limit_order::{
+use oraiswap::orderbook::{
     ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastOrderIdResponse,
     OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter, OrderResponse, OrderStatus,
     OrdersResponse, QueryMsg, SimulateMarketOrderResponse, TicksResponse,
@@ -64,7 +64,7 @@ fn basic_fixture() -> (MockApp, Addr) {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -89,12 +89,12 @@ fn basic_fixture() -> (MockApp, Addr) {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
         .unwrap();
-    (app, limit_order_addr)
+    (app, orderbook_addr)
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn test_get_paid_and_quote_assets() {
 
 #[test]
 fn test_withdraw_token() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
     // case 1: try to withdraw tokens using non-admin addr => unauthorized
     let asset_infos = [
         AssetInfo::NativeToken {
@@ -194,7 +194,7 @@ fn test_withdraw_token() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -209,7 +209,7 @@ fn test_withdraw_token() {
     let result = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -218,7 +218,7 @@ fn test_withdraw_token() {
         )
         .unwrap();
     let info: ContractInfoResponse = app
-        .query(limit_order_addr, &QueryMsg::ContractInfo {})
+        .query(orderbook_addr, &QueryMsg::ContractInfo {})
         .unwrap();
     for event in result.events {
         if event.ty.eq("wasm") {
@@ -243,7 +243,7 @@ fn test_withdraw_token() {
 
 #[test]
 fn test_pause_contract() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
     // case 1: try to paused contract using non-admin addr => unauthorized
     let asset_infos = [
         AssetInfo::NativeToken {
@@ -262,7 +262,7 @@ fn test_pause_contract() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &pause_msg,
             &[]
         )
@@ -274,7 +274,7 @@ fn test_pause_contract() {
 
     app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &pause_msg,
         &[],
     )
@@ -288,7 +288,7 @@ fn test_pause_contract() {
     assert_eq!(
         app.execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -304,7 +304,7 @@ fn test_pause_contract() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &pause_msg,
             &[]
         )
@@ -317,7 +317,7 @@ fn test_pause_contract() {
 
     app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &pause_msg,
         &[],
     )
@@ -331,7 +331,7 @@ fn test_pause_contract() {
 
     app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_msg,
         &[Coin {
             denom: ORAI_DENOM.to_string(),
@@ -343,10 +343,10 @@ fn test_pause_contract() {
 
 #[test]
 fn test_update_admin() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
 
     let new_admin = Addr::unchecked("new_admin");
@@ -359,7 +359,7 @@ fn test_update_admin() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_admin,
             &[]
         )
@@ -371,24 +371,24 @@ fn test_update_admin() {
 
     app.execute(
         contract_info.admin,
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_admin,
         &[],
     )
     .unwrap();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.admin, new_admin);
 }
 
 #[test]
 fn test_update_operator() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
 
     let new_operator = "new_operator".to_string();
@@ -400,7 +400,7 @@ fn test_update_operator() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_executor,
             &[]
         )
@@ -412,38 +412,38 @@ fn test_update_operator() {
 
     app.execute(
         contract_info.admin,
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_executor,
         &[],
     )
     .unwrap();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.operator, Some(Addr::unchecked(new_operator)));
 
     let update_executor = ExecuteMsg::UpdateOperator { operator: None };
     app.execute(
         contract_info.admin,
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_executor,
         &[],
     )
     .unwrap();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.operator, None);
 }
 
 #[test]
 fn test_update_config() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
 
     let new_commission_rate = "0.01".to_string();
@@ -457,7 +457,7 @@ fn test_update_config() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_config,
             &[]
         )
@@ -469,14 +469,14 @@ fn test_update_config() {
 
     app.execute(
         contract_info.admin,
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_config,
         &[],
     )
     .unwrap();
 
     let contract_info: ContractInfoResponse = app
-        .query(limit_order_addr.clone(), &QueryMsg::ContractInfo {})
+        .query(orderbook_addr.clone(), &QueryMsg::ContractInfo {})
         .unwrap();
     assert_eq!(contract_info.commission_rate, new_commission_rate);
     assert_eq!(contract_info.reward_address, new_reward_address);
@@ -484,7 +484,7 @@ fn test_update_config() {
 
 #[test]
 fn test_crate_and_update_orderbook_data() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     // create other orderbook pair failed, non admin
     let msg = ExecuteMsg::CreateOrderBookPair {
@@ -499,13 +499,8 @@ fn test_crate_and_update_orderbook_data() {
         refund_threshold: None,
     };
     assert_eq!(
-        app.execute(
-            Addr::unchecked("theft"),
-            limit_order_addr.clone(),
-            &msg,
-            &[],
-        )
-        .is_err(),
+        app.execute(Addr::unchecked("theft"), orderbook_addr.clone(), &msg, &[],)
+            .is_err(),
         true
     );
 
@@ -524,7 +519,7 @@ fn test_crate_and_update_orderbook_data() {
     assert_eq!(
         app.execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -550,7 +545,7 @@ fn test_crate_and_update_orderbook_data() {
     assert_eq!(
         app.execute(
             Addr::unchecked("theft"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_msg,
             &[]
         )
@@ -568,7 +563,7 @@ fn test_crate_and_update_orderbook_data() {
     assert_eq!(
         app.execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &update_msg,
             &[]
         )
@@ -586,14 +581,14 @@ fn test_crate_and_update_orderbook_data() {
     };
     app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &update_msg,
         &[],
     )
     .unwrap();
     let orderbook: OrderBookResponse = app
         .query(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::OrderBook {
                 asset_infos: asset_infos.clone(),
             },
@@ -609,10 +604,10 @@ fn test_crate_and_update_orderbook_data() {
 
 #[test]
 fn test_query_mid_price() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
     let res = app
         .query::<Decimal, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::MidPrice {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -650,7 +645,7 @@ fn test_query_mid_price() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -661,7 +656,7 @@ fn test_query_mid_price() {
 
     let res = app
         .query::<Decimal, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::MidPrice {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -697,7 +692,7 @@ fn test_query_mid_price() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -708,7 +703,7 @@ fn test_query_mid_price() {
 
     let mid_price = app
         .query::<Decimal, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::MidPrice {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -726,7 +721,7 @@ fn test_query_mid_price() {
 
 #[test]
 fn submit_order() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     let token_addr = app.get_token_addr("asset").unwrap();
 
@@ -744,7 +739,7 @@ fn submit_order() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -771,7 +766,7 @@ fn submit_order() {
     // offer asset is null
     let res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -798,7 +793,7 @@ fn submit_order() {
     // Offer ammount 5 usdt (min 10 usdt) is too low
     let res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[Coin {
             denom: ORAI_DENOM.to_string(),
@@ -832,7 +827,7 @@ fn submit_order() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -862,7 +857,7 @@ fn submit_order() {
     // Asset must not be zero
     let res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[Coin {
             denom: USDT_DENOM.to_string(),
@@ -894,7 +889,7 @@ fn submit_order() {
     assert_eq!(
         order_1.clone(),
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 1,
                 asset_infos: [
@@ -935,7 +930,7 @@ fn submit_order() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -968,7 +963,7 @@ fn submit_order() {
     assert_eq!(
         order_2.clone(),
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 2,
                 asset_infos: [
@@ -1009,7 +1004,7 @@ fn submit_order() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -1029,7 +1024,7 @@ fn submit_order() {
 
     assert_eq!(
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 3,
                 asset_infos: [
@@ -1069,7 +1064,7 @@ fn submit_order() {
     assert_eq!(
         order_2.clone(),
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 2,
                 asset_infos: [
@@ -1099,13 +1094,13 @@ fn submit_order() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1212121u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -1153,7 +1148,7 @@ fn submit_order() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -1207,7 +1202,7 @@ fn submit_order() {
     assert_eq!(
         order_4.clone(),
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 4,
                 asset_infos: [
@@ -1226,7 +1221,7 @@ fn submit_order() {
     assert_eq!(
         order_5.clone(),
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 5,
                 asset_infos: [
@@ -1242,7 +1237,7 @@ fn submit_order() {
         .unwrap()
     );
     assert_eq!(
-        app.query::<LastOrderIdResponse, _>(limit_order_addr.clone(), &QueryMsg::LastOrderId {})
+        app.query::<LastOrderIdResponse, _>(orderbook_addr.clone(), &QueryMsg::LastOrderId {})
             .unwrap(),
         LastOrderIdResponse { last_order_id: 5 }
     );
@@ -1288,7 +1283,7 @@ fn cancel_order_native_token() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -1312,7 +1307,7 @@ fn cancel_order_native_token() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1338,7 +1333,7 @@ fn cancel_order_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -1368,7 +1363,7 @@ fn cancel_order_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -1392,7 +1387,7 @@ fn cancel_order_native_token() {
     // verfication failed
     let res = app.execute(
         Addr::unchecked("addr0001"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1401,7 +1396,7 @@ fn cancel_order_native_token() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -1454,7 +1449,7 @@ fn cancel_order_native_token() {
     // failed no order exists
     let res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1475,7 +1470,7 @@ fn cancel_order_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -1517,7 +1512,7 @@ fn cancel_order_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -1556,7 +1551,7 @@ fn cancel_order_native_token() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -1628,7 +1623,7 @@ fn cancel_order_token() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -1652,7 +1647,7 @@ fn cancel_order_token() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1671,13 +1666,13 @@ fn cancel_order_token() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1234567u128), // Fund must be equal to offer amount
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -1700,7 +1695,7 @@ fn cancel_order_token() {
     };
 
     let msg2 = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333335u128), // Fund must be equal to offer amount
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
@@ -1723,7 +1718,7 @@ fn cancel_order_token() {
     };
 
     let msg3 = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333336u128), // Fund must be equal to offer amount
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
@@ -1773,7 +1768,7 @@ fn cancel_order_token() {
     app.assert_fail(res);
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1223344u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
@@ -1819,7 +1814,7 @@ fn cancel_order_token() {
     // failed verfication failed
     let res = app.execute(
         Addr::unchecked("addr0001"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1828,7 +1823,7 @@ fn cancel_order_token() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -1864,7 +1859,7 @@ fn cancel_order_token() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -1888,7 +1883,7 @@ fn cancel_order_token() {
     // failed no order exists
     let res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -1948,7 +1943,7 @@ fn execute_pair_native_token() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -1973,7 +1968,7 @@ fn execute_pair_native_token() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -2000,7 +1995,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2031,7 +2026,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2062,7 +2057,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2094,7 +2089,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2125,7 +2120,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2157,7 +2152,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2188,7 +2183,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2219,7 +2214,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2250,7 +2245,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2281,7 +2276,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2312,7 +2307,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2343,7 +2338,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2374,7 +2369,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2405,7 +2400,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2436,7 +2431,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2467,7 +2462,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2498,7 +2493,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2530,7 +2525,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2561,7 +2556,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2593,7 +2588,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2624,7 +2619,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2655,7 +2650,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2686,7 +2681,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2717,7 +2712,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2748,7 +2743,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2779,7 +2774,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2810,7 +2805,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2841,7 +2836,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2872,7 +2867,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -2903,7 +2898,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -2934,7 +2929,7 @@ fn execute_pair_native_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -3063,7 +3058,7 @@ fn execute_pair_cw20_token() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -3088,14 +3083,14 @@ fn execute_pair_cw20_token() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
 
     // submit order failed, invalid funds
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3130,7 +3125,7 @@ fn execute_pair_cw20_token() {
 
     //  submit order failed, TooSmallQuoteAsset
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(9u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3185,7 +3180,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3216,7 +3211,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3227,7 +3222,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 3 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3258,7 +3253,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 4 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3292,7 +3287,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 5 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3325,7 +3320,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 6 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3379,7 +3374,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3390,7 +3385,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 8 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3423,7 +3418,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 9 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3476,7 +3471,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3487,7 +3482,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 11 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3520,7 +3515,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 12 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3573,7 +3568,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3604,7 +3599,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3635,7 +3630,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3666,7 +3661,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3677,7 +3672,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 17 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3710,7 +3705,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 18 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3744,7 +3739,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 19 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3777,7 +3772,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 20 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3831,7 +3826,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3842,7 +3837,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 22 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3875,7 +3870,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 23 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3928,7 +3923,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -3939,7 +3934,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 25 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -3972,7 +3967,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 26 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -4025,7 +4020,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4056,7 +4051,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4087,7 +4082,7 @@ fn execute_pair_cw20_token() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4098,7 +4093,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 30 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -4131,7 +4126,7 @@ fn execute_pair_cw20_token() {
 
     /* <----------------------------------- order 31 -----------------------------------> */
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -4242,7 +4237,7 @@ fn simple_matching_test() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -4267,7 +4262,7 @@ fn simple_matching_test() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -4295,7 +4290,7 @@ fn simple_matching_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4328,7 +4323,7 @@ fn simple_matching_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -4397,7 +4392,7 @@ fn simple_matching_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4483,7 +4478,7 @@ fn reward_to_executor_test() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -4508,7 +4503,7 @@ fn reward_to_executor_test() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -4535,7 +4530,7 @@ fn reward_to_executor_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -4566,7 +4561,7 @@ fn reward_to_executor_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -4597,7 +4592,7 @@ fn reward_to_executor_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4628,7 +4623,7 @@ fn reward_to_executor_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4720,7 +4715,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -4745,11 +4740,11 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
-    (app, limit_order_addr)
+    (app, orderbook_addr)
 }
 
 #[test]
@@ -4806,7 +4801,7 @@ fn remove_orderbook_pair() {
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -4831,7 +4826,7 @@ fn remove_orderbook_pair() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -4859,7 +4854,7 @@ fn remove_orderbook_pair() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
@@ -4891,7 +4886,7 @@ fn remove_orderbook_pair() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
@@ -4923,7 +4918,7 @@ fn remove_orderbook_pair() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4955,7 +4950,7 @@ fn remove_orderbook_pair() {
     let _res = app
         .execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -4988,7 +4983,7 @@ fn remove_orderbook_pair() {
     assert_eq!(
         order_3,
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 3,
                 asset_infos: [
@@ -5019,7 +5014,7 @@ fn remove_orderbook_pair() {
     let res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[],
         )
@@ -5029,7 +5024,7 @@ fn remove_orderbook_pair() {
 
     let res = app
         .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5050,13 +5045,13 @@ fn remove_orderbook_pair() {
     assert_eq!(
         res,
         StdError::GenericErr {
-            msg: "Querier contract error: oraiswap_limit_order::orderbook::OrderBook not found"
+            msg: "Querier contract error: oraiswap_orderbook::orderbook::OrderBook not found"
                 .to_string()
         }
     );
     let res = app
         .query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 3,
                 asset_infos: [
@@ -5073,7 +5068,7 @@ fn remove_orderbook_pair() {
     assert_eq!(
         res,
         StdError::GenericErr {
-            msg: "Querier contract error: oraiswap_limit_order::orderbook::OrderBook not found"
+            msg: "Querier contract error: oraiswap_orderbook::orderbook::OrderBook not found"
                 .to_string()
         }
     );
@@ -5138,7 +5133,7 @@ fn orders_querier() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -5162,7 +5157,7 @@ fn orders_querier() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -5181,7 +5176,7 @@ fn orders_querier() {
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -5189,7 +5184,7 @@ fn orders_querier() {
     // query orderbooks
     let res = app
         .query::<OrderBookResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::OrderBook {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5207,7 +5202,7 @@ fn orders_querier() {
     // query all orderbooks
     let res = app
         .query::<OrderBooksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::OrderBooks {
                 start_after: None,
                 limit: None,
@@ -5240,7 +5235,7 @@ fn orders_querier() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -5252,7 +5247,7 @@ fn orders_querier() {
     // user sends token therefore no need to set allowance for limit order contract
     // order 2 buy: price 1
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
@@ -5285,7 +5280,7 @@ fn orders_querier() {
 
     // order 3: sell: price 2
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
@@ -5318,7 +5313,7 @@ fn orders_querier() {
 
     // order 4 sell: price 2.1
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
@@ -5462,7 +5457,7 @@ fn orders_querier() {
             orders: vec![order_2.clone(),],
         },
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::Token {
@@ -5484,7 +5479,7 @@ fn orders_querier() {
 
     let test = app
         .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::Token {
@@ -5506,7 +5501,7 @@ fn orders_querier() {
 
     let test = app
         .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::Token {
@@ -5528,7 +5523,7 @@ fn orders_querier() {
 
     let test = app
         .query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::Token {
@@ -5553,7 +5548,7 @@ fn orders_querier() {
             orders: vec![order_1.clone()],
         },
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5577,7 +5572,7 @@ fn orders_querier() {
     assert_eq!(
         all_order.clone(),
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::Token {
@@ -5601,7 +5596,7 @@ fn orders_querier() {
     assert_eq!(
         OrdersResponse { orders: vec![] },
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5627,7 +5622,7 @@ fn orders_querier() {
             orders: vec![order_1],
         },
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5651,7 +5646,7 @@ fn orders_querier() {
     assert_eq!(
         OrdersResponse { orders: vec![] },
         app.query::<OrdersResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Orders {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5674,7 +5669,7 @@ fn orders_querier() {
     // query all ticks
     let res = app
         .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Ticks {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5696,7 +5691,7 @@ fn orders_querier() {
     for tick in res.ticks {
         let res = app
             .query::<OrdersResponse, _>(
-                limit_order_addr.clone(),
+                orderbook_addr.clone(),
                 &QueryMsg::Orders {
                     asset_infos: [
                         AssetInfo::NativeToken {
@@ -5720,7 +5715,7 @@ fn orders_querier() {
 
 #[test]
 fn test_query_ticks_start_after() {
-    let (mut app, limit_order_addr) = mock_basic_query_data();
+    let (mut app, orderbook_addr) = mock_basic_query_data();
 
     /* <----------------------------------- order 1 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
@@ -5744,7 +5739,7 @@ fn test_query_ticks_start_after() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -5775,7 +5770,7 @@ fn test_query_ticks_start_after() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -5786,7 +5781,7 @@ fn test_query_ticks_start_after() {
 
     let result = app
         .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Ticks {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5808,7 +5803,7 @@ fn test_query_ticks_start_after() {
 
     let result = app
         .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Ticks {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5839,7 +5834,7 @@ fn test_unwrap_default_check_sub_uint128() {
 
 #[test]
 fn test_query_ticks_with_end() {
-    let (mut app, limit_order_addr) = mock_basic_query_data();
+    let (mut app, orderbook_addr) = mock_basic_query_data();
 
     /* <----------------------------------- order 1 -----------------------------------> */
     let msg = ExecuteMsg::SubmitOrder {
@@ -5863,7 +5858,7 @@ fn test_query_ticks_with_end() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -5894,7 +5889,7 @@ fn test_query_ticks_with_end() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -5905,7 +5900,7 @@ fn test_query_ticks_with_end() {
 
     let result = app
         .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Ticks {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -5928,7 +5923,7 @@ fn test_query_ticks_with_end() {
 
     let result = app
         .query::<TicksResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Ticks {
                 asset_infos: [
                     AssetInfo::NativeToken {
@@ -6003,7 +5998,7 @@ fn test_market_order() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -6028,7 +6023,7 @@ fn test_market_order() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -6036,7 +6031,7 @@ fn test_market_order() {
     // Submitting a buy market order failed, because any sell orders do not exist
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
@@ -6087,7 +6082,7 @@ fn test_market_order() {
         let _res = app
             .execute(
                 Addr::unchecked("addr0000"),
-                limit_order_addr.clone(),
+                orderbook_addr.clone(),
                 &msg,
                 &[Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -6099,7 +6094,7 @@ fn test_market_order() {
 
     // Submitting a buy market order failed, (slippage > 1)
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
@@ -6140,7 +6135,7 @@ fn test_market_order() {
     // balance after:  Addr0 (7000000 Orai, 12097270 usdt);  Addr1 (11997700 Orai, 7900000 usdt)
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
@@ -6225,7 +6220,7 @@ fn test_market_order() {
         let _res = app
             .execute(
                 Addr::unchecked("addr0000"),
-                limit_order_addr.clone(),
+                orderbook_addr.clone(),
                 &msg,
                 &[Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -6249,7 +6244,7 @@ fn test_market_order() {
     // balance after:  Addr0 (5000000 Orai, 15093160 usdt);  Addr1 (14456477 Orai, 4900000 usdt)
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
@@ -6312,7 +6307,7 @@ fn test_market_order() {
     let asks: Vec<u128> = vec![1000000, 1000000, 1000000];
     for i in 0..3 {
         let msg = cw20::Cw20ExecuteMsg::Send {
-            contract: limit_order_addr.to_string(),
+            contract: orderbook_addr.to_string(),
             amount: Uint128::new(offers[i]),
             msg: to_binary(&Cw20HookMsg::SubmitOrder {
                 direction: OrderDirection::Buy,
@@ -6370,7 +6365,7 @@ fn test_market_order() {
     assert_eq!(
         app.execute(
             Addr::unchecked("addr0002"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
@@ -6384,7 +6379,7 @@ fn test_market_order() {
     let _res = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -6436,7 +6431,7 @@ fn test_market_order() {
     )]);
 
     let msg = cw20::Cw20ExecuteMsg::Send {
-        contract: limit_order_addr.to_string(),
+        contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
@@ -6518,7 +6513,7 @@ fn test_query_simulate_market_order() {
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -6543,7 +6538,7 @@ fn test_query_simulate_market_order() {
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -6552,7 +6547,7 @@ fn test_query_simulate_market_order() {
 
     let res = app
         .query::<SimulateMarketOrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::SimulateMarketOrder {
                 direction: OrderDirection::Buy,
                 asset_infos: [
@@ -6596,7 +6591,7 @@ fn test_query_simulate_market_order() {
         let _res = app
             .execute(
                 Addr::unchecked("addr0000"),
-                limit_order_addr.clone(),
+                orderbook_addr.clone(),
                 &msg,
                 &[Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -6610,7 +6605,7 @@ fn test_query_simulate_market_order() {
     // => receive 2000000, with offer 2100000, refund 400000
     let res = app
         .query::<SimulateMarketOrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::SimulateMarketOrder {
                 direction: OrderDirection::Buy,
                 asset_infos: [
@@ -6637,7 +6632,7 @@ fn test_query_simulate_market_order() {
 
 #[test]
 fn test_submit_order_with_refunds_offer_asset() {
-    let (mut app, limit_order_addr) = basic_fixture();
+    let (mut app, orderbook_addr) = basic_fixture();
 
     // current balance:
     // addr0000: 1000000000 ORAI, 1000000000 USDT
@@ -6666,7 +6661,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -6707,7 +6702,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     let _ = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -6769,7 +6764,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),
@@ -6803,7 +6798,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     let _ = app
         .execute(
             Addr::unchecked("addr0001"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -6849,7 +6844,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     assert_eq!(
         order_4,
         app.query::<OrderResponse, _>(
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &QueryMsg::Order {
                 order_id: 4,
                 asset_infos: [
@@ -6886,7 +6881,7 @@ fn test_submit_order_with_refunds_offer_asset() {
     let _ = app
         .execute(
             Addr::unchecked("addr0000"),
-            limit_order_addr.clone(),
+            orderbook_addr.clone(),
             &msg,
             &[Coin {
                 denom: USDT_DENOM.to_string(),

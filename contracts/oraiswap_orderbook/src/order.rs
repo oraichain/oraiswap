@@ -14,7 +14,7 @@ use cosmwasm_std::{
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{OrderDirection, OrderStatus, Payment};
+use oraiswap::orderbook::{OrderDirection, OrderStatus, Payment};
 
 pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
