@@ -2,7 +2,7 @@ use cosmwasm_std::{Api, CanonicalAddr, Order as OrderBy, StdError, StdResult, St
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{
     error::ContractError,
-    limit_order::{ContractInfo, OrderDirection},
+    orderbook::{ContractInfo, OrderDirection},
     querier::calc_range_start,
 };
 use serde::{de::DeserializeOwned, Serialize};

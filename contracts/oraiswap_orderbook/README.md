@@ -45,7 +45,7 @@ Depends on the offer asset type
 
   ```
   MsgExecuteContract(
-      'limit_order_contract_addr',
+      'orderbook_contract_addr',
       [Coin('denom', 'amount')],
       base64(SubmitOrder {
           direction: OrderDirection::Buy,
@@ -61,7 +61,7 @@ Depends on the offer asset type
       'token_contract',
       [],
       base64(Send {
-          contract_addr: 'limit_order_contract_addr',
+          contract_addr: 'orderbook_contract_addr',
           amount: 'amount',
           msg: Some(base64(SubmitOrder {
               direction: OrderDirection::Buy,
@@ -75,7 +75,7 @@ Depends on the offer asset type
 
 ```
 MsgExecuteContract(
-    'limit_order_contract_addr',
+    'orderbook_contract_addr',
     [],
     base64(CancelOrder {
         order_id: u64,
@@ -93,7 +93,7 @@ Depends on the `ask asset`(= `execute asset`) type
 
   ```
   MsgExecuteContract(
-      'limit_order_contract_addr',
+      'orderbook_contract_addr',
       [Coin('denom', 'amount')],
       base64(ExecuteOrder {
        execute_asset: Asset,
@@ -108,7 +108,7 @@ Depends on the `ask asset`(= `execute asset`) type
       'token_contract',
       [],
       base64(Send {
-          contract_addr: 'limit_order_contract_addr',
+          contract_addr: 'orderbook_contract_addr',
           amount: 'amount',
           msg: Some(base64(ExecuteOrder {
               order_id: u64,

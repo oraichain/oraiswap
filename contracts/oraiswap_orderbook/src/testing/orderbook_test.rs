@@ -3,8 +3,8 @@ use std::str::FromStr;
 use cosmwasm_std::{testing::mock_dependencies, Api, Decimal, Order as OrderBy, Uint128};
 use oraiswap::{
     asset::{AssetInfoRaw, ORAI_DENOM},
-    limit_order::{OrderDirection, OrderStatus},
     math::DecimalPlaces,
+    orderbook::{OrderDirection, OrderStatus},
     testing::ATOM_DENOM,
 };
 

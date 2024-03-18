@@ -1297,20 +1297,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oraiswap-limit-order"
-version = "0.2.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw-utils 0.16.0",
- "cw20",
- "oraiswap",
- "oraiswap-token",
- "serde",
-]
-
-[[package]]
 name = "oraiswap-oracle"
 version = "0.2.0"
 dependencies = [
@@ -1321,6 +1307,20 @@ dependencies = [
  "oraiswap",
  "oraiswap-token",
  "thiserror",
+]
+
+[[package]]
+name = "oraiswap-orderbook"
+version = "0.2.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-utils 0.16.0",
+ "cw20",
+ "oraiswap",
+ "oraiswap-token",
+ "serde",
 ]
 
 [[package]]
