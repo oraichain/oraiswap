@@ -109,6 +109,8 @@ pub fn execute(
             spread,
             min_quote_coin_amount,
             refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         } => execute_create_pair(
             deps,
             info,
@@ -117,12 +119,16 @@ pub fn execute(
             spread,
             min_quote_coin_amount,
             refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         ),
         ExecuteMsg::UpdateOrderbookPair {
             asset_infos,
             spread,
             min_quote_coin_amount,
             refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         } => {
             validate_admin(
                 deps.api,
@@ -149,6 +155,14 @@ pub fn execute(
             // update new refunds threshold
             if let Some(refund_threshold) = refund_threshold {
                 orderbook_pair.refund_threshold = Some(refund_threshold);
+            }
+
+            if let Some(min_offer_to_fulfilled) = min_offer_to_fulfilled {
+                orderbook_pair.min_offer_to_fulfilled = Some(min_offer_to_fulfilled);
+            }
+
+            if let Some(min_ask_to_fulfilled) = min_ask_to_fulfilled {
+                orderbook_pair.min_ask_to_fulfilled = Some(min_ask_to_fulfilled);
             }
 
             store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
@@ -329,6 +343,8 @@ pub fn execute_create_pair(
     spread: Option<Decimal>,
     min_quote_coin_amount: Uint128,
     refund_threshold: Option<Uint128>,
+    min_offer_to_fulfilled: Option<Uint128>,
+    min_ask_to_fulfilled: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -362,6 +378,8 @@ pub fn execute_create_pair(
         spread,
         min_quote_coin_amount,
         refund_threshold,
+        min_offer_to_fulfilled,
+        min_ask_to_fulfilled,
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 

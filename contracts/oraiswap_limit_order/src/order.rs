@@ -459,6 +459,27 @@ pub fn matching_order(
         OrderDirection::Sell => OrderBy::Descending,
     };
 
+    // check minimum offer & ask to mark a order as fulfilled
+    let (user_min_offer_to_fulfilled, user_min_ask_to_fulfilled) = match order.direction {
+        OrderDirection::Buy => (
+            orderbook_pair
+                .min_offer_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
+            orderbook_pair
+                .min_ask_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
+        ),
+        OrderDirection::Sell => (
+            orderbook_pair
+                .min_ask_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
+            orderbook_pair
+                .min_offer_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
+        ),
+    };
+
+    // in matching process of buy order, we don't check minimum remaining amount to mark user order as fulfilled, but only with a small threshold
     let mut cursor = positions_bucket.range(None, None, sort_order);
     loop {
         if let Some(Ok((k, _))) = cursor.next() {
@@ -537,8 +558,19 @@ pub fn matching_order(
                         }
                     }
 
-                    match_order.fill_order(user_offer_amount, user_ask_amount)?;
-                    user_order.fill_order(user_ask_amount, user_offer_amount)?;
+                    // with match order, since order direction is opposite to the user's order, so the params will be reverse
+                    match_order.fill_order(
+                        user_offer_amount,
+                        user_ask_amount,
+                        user_min_offer_to_fulfilled,
+                        user_min_ask_to_fulfilled,
+                    )?;
+                    user_order.fill_order(
+                        user_ask_amount,
+                        user_offer_amount,
+                        user_min_ask_to_fulfilled,
+                        user_min_offer_to_fulfilled,
+                    )?;
 
                     orders_matched.push(match_order);
                 }
@@ -548,6 +580,13 @@ pub fn matching_order(
         }
     }
 
+    // recheck user order is fulfilled
+    user_order.fill_order(
+        Uint128::zero(),
+        Uint128::zero(),
+        user_min_ask_to_fulfilled,
+        user_min_offer_to_fulfilled,
+    )?;
     user_order.filled_offer_this_round = user_order.filled_offer_amount;
     user_order.filled_ask_this_round = user_order.filled_ask_amount;
 

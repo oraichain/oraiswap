@@ -182,6 +182,8 @@ fn simulate_submit_orders(
         spread: Some(Decimal::from_ratio(1u128, 10u128)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(

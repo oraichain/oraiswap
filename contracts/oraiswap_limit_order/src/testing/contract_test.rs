@@ -85,6 +85,8 @@ fn basic_fixture() -> (MockApp, Addr) {
         spread: None,
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app
         .execute(
@@ -118,6 +120,8 @@ fn test_get_paid_and_quote_assets() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     // case 1: buy with base coin = asset_infos[0]
     let (paid_assets, quote_asset) = get_paid_and_quote_assets(
@@ -497,6 +501,8 @@ fn test_crate_and_update_orderbook_data() {
         spread: None,
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     assert_eq!(
         app.execute(
@@ -520,6 +526,8 @@ fn test_crate_and_update_orderbook_data() {
         spread: Some(Decimal::from_str("2").unwrap()),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     assert_eq!(
         app.execute(
@@ -546,6 +554,8 @@ fn test_crate_and_update_orderbook_data() {
         spread: Some(Decimal::from_str("0.1").unwrap()),
         min_quote_coin_amount: None,
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     assert_eq!(
         app.execute(
@@ -564,6 +574,8 @@ fn test_crate_and_update_orderbook_data() {
         spread: Some(Decimal::from_str("1.1").unwrap()),
         min_quote_coin_amount: None,
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     assert_eq!(
         app.execute(
@@ -583,6 +595,8 @@ fn test_crate_and_update_orderbook_data() {
         spread: Some(spread),
         min_quote_coin_amount: Some(Uint128::from(100u128)),
         refund_threshold: Some(Uint128::from(100u128)),
+        min_offer_to_fulfilled: Some(Uint128::from(10u128)),
+        min_ask_to_fulfilled: Some(Uint128::from(10u128)),
     };
     app.execute(
         Addr::unchecked("addr0000"),
@@ -605,6 +619,8 @@ fn test_crate_and_update_orderbook_data() {
     assert_eq!(orderbook.quote_coin_info, asset_infos[1]);
     assert_eq!(orderbook.min_quote_coin_amount, Uint128::from(100u128));
     assert_eq!(orderbook.refund_threshold, Uint128::from(100u128));
+    assert_eq!(orderbook.min_offer_to_fulfilled, Uint128::from(10u128));
+    assert_eq!(orderbook.min_ask_to_fulfilled, Uint128::from(10u128));
 }
 
 #[test]
@@ -741,6 +757,8 @@ fn submit_order() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1096,6 +1114,8 @@ fn submit_order() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1309,6 +1329,8 @@ fn cancel_order_native_token() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1649,6 +1671,8 @@ fn cancel_order_token() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1668,6 +1692,8 @@ fn cancel_order_token() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -1969,6 +1995,8 @@ fn execute_pair_native_token() {
         spread: None,
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -3084,6 +3112,8 @@ fn execute_pair_cw20_token() {
         spread: None,
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -4263,6 +4293,8 @@ fn simple_matching_test() {
         spread: Some(Decimal::percent(1)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -4504,6 +4536,8 @@ fn reward_to_executor_test() {
         spread: Some(Decimal::percent(10)),
         min_quote_coin_amount: Uint128::from(10000u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -4741,6 +4775,8 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
         spread: Some(Decimal::percent(10)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -4827,6 +4863,8 @@ fn remove_orderbook_pair() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -5159,6 +5197,8 @@ fn orders_querier() {
         spread: Some(Decimal::percent(10)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -5178,6 +5218,8 @@ fn orders_querier() {
         spread: None,
         min_quote_coin_amount: Uint128::zero(),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
     let _res = app.execute(
         Addr::unchecked("addr0000"),
@@ -6024,6 +6066,8 @@ fn test_market_order() {
         spread: Some(Decimal::from_ratio(1u128, 10u128)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(
@@ -6539,6 +6583,8 @@ fn test_query_simulate_market_order() {
         spread: Some(Decimal::from_ratio(1u128, 10u128)),
         min_quote_coin_amount: Uint128::from(10u128),
         refund_threshold: None,
+        min_offer_to_fulfilled: None,
+        min_ask_to_fulfilled: None,
     };
 
     let _res = app.execute(

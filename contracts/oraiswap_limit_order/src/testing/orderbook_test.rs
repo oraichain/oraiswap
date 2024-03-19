@@ -789,3 +789,135 @@ fn test_matching_order_process_offer_amount_smaller_than_lef_match_ask() {
         true
     )
 }
+
+#[test]
+fn test_match_orde_process_minimum_remaining_to_fulfilled() {
+    let offer_info = AssetInfoRaw::NativeToken {
+        denom: ATOM_DENOM.to_string(),
+    };
+    let ask_info = AssetInfoRaw::NativeToken {
+        denom: ORAI_DENOM.to_string(),
+    };
+
+    let mut deps = mock_dependencies();
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    let mut ob = OrderBook::new(ask_info.clone(), offer_info.clone(), None);
+    ob.min_ask_to_fulfilled = Some(100u128.into());
+    ob.min_offer_to_fulfilled = Some(100u128.into());
+
+    // case 1: matched_order if fulfilled because the remaining is less then threshold
+    // create a buy order at price 1
+    let order = Order {
+        direction: OrderDirection::Buy,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 1000000u128.into(),
+        ask_amount: 1000000u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
+
+    // create a sell order at price 1
+    let sell_order = Order {
+        direction: OrderDirection::Sell,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 999901u128.into(),
+        ask_amount: 999901u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+
+    // after matching process, all buy & sell order if fulfilled
+    let (sell_order, matched_orders) =
+        matching_order(deps.as_ref(), ob.clone(), &sell_order, Decimal::one()).unwrap();
+    assert_eq!(sell_order.status, OrderStatus::Fulfilled);
+    assert_eq!(matched_orders[0].status, OrderStatus::Fulfilled);
+
+    // case 2: user if fulfilled because the remaining is less then threshold
+    let mut deps = mock_dependencies();
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    let mut ob = OrderBook::new(ask_info.clone(), offer_info.clone(), None);
+    ob.min_ask_to_fulfilled = Some(100u128.into());
+    ob.min_offer_to_fulfilled = Some(100u128.into());
+    // create a buy order at price 1
+    let order = Order {
+        direction: OrderDirection::Sell,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 999901u128.into(),
+        ask_amount: 999901u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
+
+    // create a sell order at price 1
+    let buy_order = Order {
+        direction: OrderDirection::Buy,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 1000000u128.into(),
+        ask_amount: 1000000u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+
+    // after matching process, all buy & sell order if fulfilled
+    let (buy_order, matched_orders) =
+        matching_order(deps.as_ref(), ob.clone(), &buy_order, Decimal::one()).unwrap();
+    assert_eq!(buy_order.status, OrderStatus::Fulfilled);
+    assert_eq!(matched_orders[0].status, OrderStatus::Fulfilled);
+
+    // case 3, remaining greater threshold => PartialFilled
+
+    let mut deps = mock_dependencies();
+    let bidder_addr = deps.api.addr_canonicalize("addr0000").unwrap();
+
+    init_last_order_id(deps.as_mut().storage).unwrap();
+
+    let mut ob = OrderBook::new(ask_info.clone(), offer_info.clone(), None);
+    ob.min_ask_to_fulfilled = Some(100u128.into());
+    ob.min_offer_to_fulfilled = Some(100u128.into());
+    // create a buy order at price 1
+    let order = Order {
+        direction: OrderDirection::Sell,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 999899u128.into(),
+        ask_amount: 999899u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+    ob.add_order(deps.as_mut().storage, &order).unwrap();
+
+    // create a sell order at price 1
+    let buy_order = Order {
+        direction: OrderDirection::Buy,
+        order_id: increase_last_order_id(deps.as_mut().storage).unwrap(),
+        bidder_addr: bidder_addr.clone(),
+        offer_amount: 1000000u128.into(),
+        ask_amount: 1000000u128.into(),
+        filled_offer_amount: 0u128.into(),
+        filled_ask_amount: 0u128.into(),
+        status: OrderStatus::Open,
+    };
+
+    // after matching process, all buy & sell order if fulfilled
+    let (buy_order, matched_orders) =
+        matching_order(deps.as_ref(), ob.clone(), &buy_order, Decimal::one()).unwrap();
+    assert_eq!(buy_order.status, OrderStatus::PartialFilled);
+    assert_eq!(matched_orders[0].status, OrderStatus::Fulfilled);
+}

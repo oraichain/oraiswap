@@ -111,6 +111,8 @@ pub enum ExecuteMsg {
         spread: Option<Decimal>,
         min_quote_coin_amount: Uint128,
         refund_threshold: Option<Uint128>,
+        min_offer_to_fulfilled: Option<Uint128>,
+        min_ask_to_fulfilled: Option<Uint128>,
     },
 
     UpdateOrderbookPair {
@@ -118,6 +120,8 @@ pub enum ExecuteMsg {
         spread: Option<Decimal>,
         min_quote_coin_amount: Option<Uint128>,
         refund_threshold: Option<Uint128>,
+        min_offer_to_fulfilled: Option<Uint128>,
+        min_ask_to_fulfilled: Option<Uint128>,
     },
 
     ///////////////////////
@@ -259,6 +263,8 @@ pub struct OrderBookResponse {
     pub spread: Option<Decimal>,
     pub min_quote_coin_amount: Uint128,
     pub refund_threshold: Uint128,
+    pub min_offer_to_fulfilled: Uint128,
+    pub min_ask_to_fulfilled: Uint128,
 }
 
 #[cw_serde]
