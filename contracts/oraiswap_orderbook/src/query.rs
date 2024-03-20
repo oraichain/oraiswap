@@ -7,13 +7,13 @@ use crate::state::{
 };
 use cosmwasm_std::{Decimal, Deps, Order as OrderBy, StdError, StdResult, Storage, Uint128};
 use oraiswap::error::ContractError;
-use oraiswap::limit_order::{OrderStatus, SimulateMarketOrderResponse};
+use oraiswap::orderbook::{OrderStatus, SimulateMarketOrderResponse};
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
 use oraiswap::asset::{pair_key, AssetInfo};
 use oraiswap::{
-    limit_order::{
+    orderbook::{
         LastOrderIdResponse, OrderBookResponse, OrderBooksResponse, OrderDirection, OrderFilter,
         OrderResponse, OrdersResponse, TickResponse, TicksResponse,
     },

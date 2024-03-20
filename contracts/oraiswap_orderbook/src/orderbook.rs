@@ -4,7 +4,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_storage::ReadonlyBucket;
 use oraiswap::{
     asset::{pair_key_from_asset_keys, Asset, AssetInfo, AssetInfoRaw},
-    limit_order::{OrderBookResponse, OrderDirection, OrderResponse, OrderStatus},
+    orderbook::{OrderBookResponse, OrderDirection, OrderResponse, OrderStatus},
 };
 
 use cosmwasm_std::{Api, CanonicalAddr, Decimal, Order as OrderBy, StdResult, Storage, Uint128};

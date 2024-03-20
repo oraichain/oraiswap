@@ -22,13 +22,13 @@ use crate::state::{
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
-use oraiswap::limit_order::{
+use oraiswap::orderbook::{
     ContractInfo, ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
     OrderDirection, QueryMsg,
 };
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:oraiswap_limit_order";
+const CONTRACT_NAME: &str = "crates.io:oraiswap_orderbook";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // default commission rate = 0.1 %

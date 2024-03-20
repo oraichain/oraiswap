@@ -5,7 +5,7 @@ use cosmwasm_std::{to_binary, Addr, Coin, Decimal, Uint128};
 use oraiswap::{
     asset::{Asset, AssetInfo, ORAI_DENOM},
     create_entry_points_testing,
-    limit_order::{
+    orderbook::{
         Cw20HookMsg, ExecuteMsg, InstantiateMsg, OrderDirection, QueryMsg,
         SimulateMarketOrderResponse,
     },
@@ -159,7 +159,7 @@ fn simulate_submit_orders(
         reward_address: REWARD_ADDR.to_string(),
     };
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-    let limit_order_addr = app
+    let orderbook_addr = app
         .instantiate(
             code_id,
             Addr::unchecked("addr0000"),
@@ -188,7 +188,7 @@ fn simulate_submit_orders(
 
     let _res = app.execute(
         Addr::unchecked("addr0000"),
-        limit_order_addr.clone(),
+        orderbook_addr.clone(),
         &msg,
         &[],
     );
@@ -205,7 +205,7 @@ fn simulate_submit_orders(
             OrderType::Limit => match direction {
                 OrderDirection::Buy => {
                     let msg = cw20::Cw20ExecuteMsg::Send {
-                        contract: limit_order_addr.to_string(),
+                        contract: orderbook_addr.to_string(),
                         amount: offer_amount, // Fund must be equal to offer amount
                         msg: to_binary(&Cw20HookMsg::SubmitOrder {
                             direction: OrderDirection::Buy,
@@ -242,7 +242,7 @@ fn simulate_submit_orders(
 
                     app.execute(
                         Addr::unchecked(sender),
-                        limit_order_addr.clone(),
+                        orderbook_addr.clone(),
                         &msg,
                         &[Coin {
                             denom: ORAI_DENOM.to_string(),
@@ -255,7 +255,7 @@ fn simulate_submit_orders(
             OrderType::Market => match direction {
                 OrderDirection::Buy => {
                     let msg = cw20::Cw20ExecuteMsg::Send {
-                        contract: limit_order_addr.to_string(),
+                        contract: orderbook_addr.to_string(),
                         amount: offer_amount, // Fund must be equal to offer amount
                         msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
                             direction: OrderDirection::Buy,
@@ -267,7 +267,7 @@ fn simulate_submit_orders(
 
                     let simulate = app
                         .query::<SimulateMarketOrderResponse, _>(
-                            limit_order_addr.clone(),
+                            orderbook_addr.clone(),
                             &QueryMsg::SimulateMarketOrder {
                                 direction: OrderDirection::Buy,
                                 asset_infos: [orai_asset_info.clone(), usdt_asset_info.clone()],
@@ -292,7 +292,7 @@ fn simulate_submit_orders(
                     };
 
                     let simulate = app.query::<SimulateMarketOrderResponse, _>(
-                        limit_order_addr.clone(),
+                        orderbook_addr.clone(),
                         &QueryMsg::SimulateMarketOrder {
                             direction: OrderDirection::Sell,
                             asset_infos: [orai_asset_info.clone(), usdt_asset_info.clone()],
@@ -305,7 +305,7 @@ fn simulate_submit_orders(
                         let _res = app
                             .execute(
                                 Addr::unchecked(sender),
-                                limit_order_addr.clone(),
+                                orderbook_addr.clone(),
                                 &msg,
                                 &[Coin {
                                     denom: ORAI_DENOM.to_string(),
