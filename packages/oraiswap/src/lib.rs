@@ -2,7 +2,6 @@ pub mod asset;
 pub mod converter;
 pub mod error;
 pub mod factory;
-pub mod ibc;
 pub mod math;
 pub mod oracle;
 pub mod orderbook;
@@ -12,6 +11,7 @@ pub mod response;
 pub mod rewarder;
 pub mod router;
 pub mod staking;
+pub mod smartrouter;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use cw_multi_test;

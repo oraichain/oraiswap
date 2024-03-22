@@ -160,3 +160,16 @@ impl RouterController {
         )
     }
 }
+
+/// Swap Packet
+#[cw_serde]
+pub struct SwapPacket {
+    pub routes: Vec<SwapAmountInRoute>,
+    pub token_out_min_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct SwapAmountInRoute {
+    pub pair_addr: String,
+    pub token_out_denom: String,
+}
