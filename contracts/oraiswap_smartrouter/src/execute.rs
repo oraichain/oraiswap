@@ -1,5 +1,5 @@
 use cosmwasm_std::{DepsMut, MessageInfo, Response};
-use oraiswap::router::{RouterController, SwapAmountInRoute};
+use oraiswap::router::{RouterController, SwapOperation};
 
 use crate::error::ContractError;
 use crate::helpers::{check_is_contract_owner, validate_pool_route};
@@ -10,7 +10,7 @@ pub fn set_route(
     info: MessageInfo,
     input_denom: String,
     output_denom: String,
-    pool_route: Vec<SwapAmountInRoute>,
+    pool_route: Vec<SwapOperation>,
 ) -> Result<Response, ContractError> {
     // only owner
     check_is_contract_owner(deps.as_ref(), info.sender)?;

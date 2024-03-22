@@ -1,8 +1,8 @@
 use cosmwasm_std::{Addr, Deps};
-use oraiswap::router::SwapAmountInRoute;
+use oraiswap::router::SwapOperation;
 
 use crate::{
-    state::{ROUTING_TABLE, CONFIG},
+    state::{CONFIG, ROUTING_TABLE},
     ContractError,
 };
 
@@ -19,9 +19,9 @@ pub fn validate_pool_route(
     deps: Deps,
     input_denom: String,
     output_denom: String,
-    pool_route: Vec<SwapAmountInRoute>,
+    pool_route: Vec<SwapOperation>,
 ) -> Result<(), ContractError> {
-    // FIXME: try simulating 
+    // FIXME: try simulating
     Ok(())
 }
 

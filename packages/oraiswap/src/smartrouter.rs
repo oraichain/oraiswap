@@ -1,4 +1,4 @@
-use crate::{asset::AssetInfo, router::SwapAmountInRoute};
+use crate::{asset::AssetInfo, router::SwapOperation};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
@@ -28,7 +28,7 @@ pub enum ExecuteMsg {
     SetRoute {
         input_info: AssetInfo,
         output_info: AssetInfo,
-        pool_route: Vec<SwapAmountInRoute>,
+        pool_route: Vec<SwapOperation>,
     },
     DeleteRoute {
         input_info: AssetInfo,
@@ -38,7 +38,7 @@ pub enum ExecuteMsg {
        //     input_coin: Coin,
        //     output_denom: String,
        //     slippage: Slippage,
-       //     route: Option<Vec<SwapAmountInRoute>>,
+       //     route: Option<Vec<SwapOperation>>,
        // },
 }
 
@@ -70,14 +70,14 @@ pub struct GetConfigResponse {
 // Response for GetRoutes query
 #[cw_serde]
 pub struct GetRoutesResponse {
-    pub pool_routes: Vec<Vec<SwapAmountInRoute>>,
+    pub pool_routes: Vec<Vec<SwapOperation>>,
 }
 
 // Response for GetRoute query
 
 #[cw_serde]
 pub struct GetRouteResponse {
-    pub pool_route: Vec<SwapAmountInRoute>,
+    pub pool_route: Vec<SwapOperation>,
 }
 
 // Response for Swap
