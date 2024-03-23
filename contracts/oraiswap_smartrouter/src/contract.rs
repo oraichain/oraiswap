@@ -1,4 +1,4 @@
-#[cfg(not(feature = "imported"))]
+#[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
@@ -6,7 +6,7 @@ use oraiswap::router::RouterController;
 
 use crate::error::ContractError;
 use crate::execute::{delete_route, set_route, update_config};
-use crate::query::{query_config, query_route, query_routes};
+use crate::query::{query_config, query_route, query_routes, query_smart_route};
 use crate::state::{Config, CONFIG};
 use oraiswap::smartrouter::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
@@ -70,13 +70,7 @@ pub fn execute(
             input_info.to_string(),
             route_index,
         ),
-        // ExecuteMsg::Swap {
-        //     input_coin,
-        //     output_denom,
-        //     slippage,
-        //     route,
-        // } => trade_with_slippage_limit(deps, env, info, input_coin, output_denom, slippage, route),
-        ExecuteMsg::UpdateState {
+        ExecuteMsg::UpdateConfig {
             new_owner,
             new_router,
         } => update_config(deps, info, new_owner, new_router),
@@ -104,6 +98,20 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             deps,
             &input_info.to_string(),
             &output_info.to_string(),
+        )?),
+        QueryMsg::GetSmartRoute {
+            input_info,
+            output_info,
+            offer_amount,
+            expected_minimum_receive,
+            route_mode,
+        } => to_binary(&query_smart_route(
+            deps,
+            input_info,
+            output_info,
+            offer_amount,
+            expected_minimum_receive,
+            route_mode,
         )?),
     }
 }

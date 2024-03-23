@@ -52,14 +52,14 @@ fn proper_update_state() {
     let owner_info = mock_info(owner.as_str(), &vec![] as &Vec<Coin>);
 
     // valid addr, bad sender
-    let msg = ExecuteMsg::UpdateState {
+    let msg = ExecuteMsg::UpdateConfig {
         new_owner: Some(good_addr.clone()),
         new_router: None,
     };
     contract::execute(deps.as_mut(), mock_env(), other_info, msg).unwrap_err();
 
     // and transfer ownership
-    let msg = ExecuteMsg::UpdateState {
+    let msg = ExecuteMsg::UpdateConfig {
         new_owner: Some(good_addr.clone()),
         new_router: Some("new_router".to_string()),
     };

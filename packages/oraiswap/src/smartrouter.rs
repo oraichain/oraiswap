@@ -1,5 +1,12 @@
 use crate::{asset::AssetInfo, router::SwapOperation};
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::Uint128;
+
+#[cw_serde]
+pub enum SmartRouteMode {
+    NearestMinimumReceive,
+    FurthestMinimumReceive,
+}
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -21,7 +28,7 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    UpdateState {
+    UpdateConfig {
         new_owner: Option<String>,
         new_router: Option<String>,
     },
@@ -58,6 +65,14 @@ pub enum QueryMsg {
         output_info: AssetInfo,
         route_index: usize,
     },
+    #[returns(GetSmartRouteResponse)]
+    GetSmartRoute {
+        input_info: AssetInfo,
+        output_info: AssetInfo,
+        offer_amount: Uint128,
+        expected_minimum_receive: Uint128,
+        route_mode: Option<SmartRouteMode>,
+    },
 }
 
 // Response for GetOwner query
@@ -78,6 +93,12 @@ pub struct GetRoutesResponse {
 #[cw_serde]
 pub struct GetRouteResponse {
     pub pool_route: Vec<SwapOperation>,
+}
+
+#[cw_serde]
+pub struct GetSmartRouteResponse {
+    pub swap_ops: Vec<SwapOperation>,
+    pub actual_minimum_receive: Uint128,
 }
 
 // Response for Swap
