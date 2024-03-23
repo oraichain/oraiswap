@@ -55,8 +55,8 @@ pub fn execute(
         } => set_route(
             deps,
             info,
-            output_info.to_string(),
             input_info.to_string(),
+            output_info.to_string(),
             pool_route,
         ),
         ExecuteMsg::DeleteRoute {
@@ -66,8 +66,8 @@ pub fn execute(
         } => delete_route(
             deps,
             info,
-            output_info.to_string(),
             input_info.to_string(),
+            output_info.to_string(),
             route_index,
         ),
         ExecuteMsg::UpdateConfig {

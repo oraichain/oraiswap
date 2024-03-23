@@ -1,4 +1,4 @@
-use cosmwasm_std::{Deps, StdResult, Uint128};
+use cosmwasm_std::{Deps, StdError, StdResult, Uint128};
 
 use crate::state::{CONFIG, ROUTING_TABLE};
 use oraiswap::{
@@ -62,25 +62,41 @@ pub fn query_smart_route(
     )?;
     let mut route_simulate_result: (usize, Uint128) = (0usize, Uint128::zero());
     for (index, route) in pool_routes.to_owned().into_iter().enumerate() {
-        let simulate_result = router.simulate_swap(&deps.querier, offer_amount, route)?;
-        let prev_route_simulate_result = route_simulate_result.1;
-        match route_mode {
-            SmartRouteMode::NearestMinimumReceive => {
-                route_simulate_result.1 = route_simulate_result.1.min(expected_minimum_receive.abs_diff(simulate_result.amount));
+        match router
+            .simulate_swap(&deps.querier, offer_amount, route)
+            .ok()
+        {
+            Some(simulate_result) => {
+                let prev_route_simulate_result = route_simulate_result.1;
+                match route_mode {
+                    SmartRouteMode::NearestMinimumReceive => {
+                        route_simulate_result.1 = route_simulate_result
+                            .1
+                            .min(expected_minimum_receive.abs_diff(simulate_result.amount));
+                        if prev_route_simulate_result.ne(&route_simulate_result.1) {
+                            route_simulate_result.0 = index;
+                        }
+                    }
+                    SmartRouteMode::FurthestMinimumReceive => {
+                        route_simulate_result.1 = route_simulate_result
+                            .1
+                            .max(expected_minimum_receive.abs_diff(simulate_result.amount));
+                    }
+                }
                 if prev_route_simulate_result.ne(&route_simulate_result.1) {
                     route_simulate_result.0 = index;
                 }
-            },
-            SmartRouteMode::FurthestMinimumReceive => {
-                route_simulate_result.1 = route_simulate_result.1.max(expected_minimum_receive.abs_diff(simulate_result.amount));
-            },
+            }
+            None => continue,
         }
-        if prev_route_simulate_result.ne(&route_simulate_result.1) {
-            route_simulate_result.0 = index;
-        }
+    }
+    if route_simulate_result.1.is_zero() {
+        return Err(StdError::generic_err(
+            "Minimum receive of simulate smart route is 0. There's something wrong with the routes",
+        ));
     }
     Ok(GetSmartRouteResponse {
         swap_ops: pool_routes[route_simulate_result.0].to_owned(),
-        actual_minimum_receive: route_simulate_result.1
+        actual_minimum_receive: route_simulate_result.1,
     })
 }

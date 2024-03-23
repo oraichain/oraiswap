@@ -1,8 +1,12 @@
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_binary, Addr, Coin, DepsMut};
+use cosmwasm_std::{from_binary, Addr, Coin, DepsMut, StdError};
+use oraiswap::asset::AssetInfo;
+use oraiswap::router::SwapOperation;
 
-use crate::contract;
-use oraiswap::smartrouter::{ExecuteMsg, GetConfigResponse, InstantiateMsg, QueryMsg};
+use crate::{contract, ContractError};
+use oraiswap::smartrouter::{
+    ExecuteMsg, GetConfigResponse, GetRouteResponse, GetRoutesResponse, InstantiateMsg, QueryMsg,
+};
 
 static CREATOR_ADDRESS: &str = "creator";
 
@@ -70,4 +74,239 @@ fn proper_update_state() {
             .unwrap();
     assert_eq!(good_addr, res.owner);
     assert_eq!(res.router, "new_router");
+}
+
+#[test]
+fn test_set_and_get_route() {
+    let mut deps = mock_dependencies();
+    let owner = initialize_contract(deps.as_mut());
+    let orai = AssetInfo::NativeToken {
+        denom: "orai".to_string(),
+    };
+    let usdc = AssetInfo::Token {
+        contract_addr: Addr::unchecked("usdc"),
+    };
+    let oraix = AssetInfo::Token {
+        contract_addr: Addr::unchecked("oraix"),
+    };
+    let orai_usdc_simple_ops = vec![SwapOperation::OraiSwap {
+        offer_asset_info: orai.clone(),
+        ask_asset_info: usdc.clone(),
+    }];
+    let orai_usdc_oraix_ops = vec![
+        SwapOperation::OraiSwap {
+            offer_asset_info: orai.clone(),
+            ask_asset_info: oraix.clone(),
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: oraix.clone(),
+            ask_asset_info: usdc.clone(),
+        },
+    ];
+    let set_route_msg = ExecuteMsg::SetRoute {
+        input_info: orai.clone(),
+        output_info: usdc.clone(),
+        pool_route: orai_usdc_simple_ops.clone(),
+    };
+
+    // case 1: unauthorized
+    let err = contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("any", &vec![]),
+        set_route_msg.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(err.to_string(), ContractError::Unauthorized {}.to_string());
+
+    contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info(owner.as_str(), &vec![]),
+        set_route_msg,
+    )
+    .unwrap();
+
+    contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info(owner.as_str(), &vec![]),
+        ExecuteMsg::SetRoute {
+            input_info: orai.clone(),
+            output_info: usdc.clone(),
+            pool_route: orai_usdc_oraix_ops.clone(),
+        },
+    )
+    .unwrap();
+
+    // try querying all the routes. Should return 2 routes
+    let routes: GetRoutesResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoutes {
+                input_info: orai.clone(),
+                output_info: usdc.clone(),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(routes.pool_routes.len(), 2);
+
+    // try querying the first route
+    let route: GetRouteResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoute {
+                input_info: orai.clone(),
+                output_info: usdc.clone(),
+                route_index: 0,
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(route.pool_route, orai_usdc_simple_ops.clone());
+
+    // try querying the 2nd route
+    let route: GetRouteResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoute {
+                input_info: orai.clone(),
+                output_info: usdc.clone(),
+                route_index: 1,
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(route.pool_route, orai_usdc_oraix_ops.clone());
+
+    // try querying the 3rd route. Should return error
+    let err = &contract::query(
+        deps.as_ref(),
+        mock_env(),
+        QueryMsg::GetRoute {
+            input_info: orai.clone(),
+            output_info: usdc.clone(),
+            route_index: 2,
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        StdError::generic_err("Could not find route given the route index").to_string()
+    );
+}
+
+#[test]
+fn test_delete_route() {
+    let mut deps = mock_dependencies();
+    let owner = initialize_contract(deps.as_mut());
+    let orai = AssetInfo::NativeToken {
+        denom: "orai".to_string(),
+    };
+    let usdc = AssetInfo::Token {
+        contract_addr: Addr::unchecked("usdc"),
+    };
+    let oraix = AssetInfo::Token {
+        contract_addr: Addr::unchecked("oraix"),
+    };
+    let orai_usdc_simple_ops = vec![SwapOperation::OraiSwap {
+        offer_asset_info: orai.clone(),
+        ask_asset_info: usdc.clone(),
+    }];
+    let orai_usdc_oraix_ops = vec![
+        SwapOperation::OraiSwap {
+            offer_asset_info: orai.clone(),
+            ask_asset_info: oraix.clone(),
+        },
+        SwapOperation::OraiSwap {
+            offer_asset_info: oraix.clone(),
+            ask_asset_info: usdc.clone(),
+        },
+    ];
+
+    contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info(owner.as_str(), &vec![]),
+        ExecuteMsg::SetRoute {
+            input_info: orai.clone(),
+            output_info: usdc.clone(),
+            pool_route: orai_usdc_simple_ops.clone(),
+        },
+    )
+    .unwrap();
+
+    contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info(owner.as_str(), &vec![]),
+        ExecuteMsg::SetRoute {
+            input_info: orai.clone(),
+            output_info: usdc.clone(),
+            pool_route: orai_usdc_oraix_ops.clone(),
+        },
+    )
+    .unwrap();
+
+    let delete_route_msg = ExecuteMsg::DeleteRoute {
+        input_info: orai.clone(),
+        output_info: usdc.clone(),
+        route_index: 0,
+    };
+    // case 1: unauthorized. Cannot delete
+    let err = contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info("any", &vec![]),
+        delete_route_msg.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(err.to_string(), ContractError::Unauthorized {}.to_string());
+
+    // case 2: delete successfully
+    // case 1: unauthorized. Cannot delete
+    contract::execute(
+        deps.as_mut(),
+        mock_env(),
+        mock_info(owner.as_str(), &vec![]),
+        delete_route_msg,
+    )
+    .unwrap();
+
+    // try querying, now we only have one route left, which is the orai-oraix-usdc route
+    let routes: GetRoutesResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoutes {
+                input_info: orai.clone(),
+                output_info: usdc.clone(),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(routes.pool_routes.len(), 1);
+
+    let route: GetRouteResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoute {
+                input_info: orai.clone(),
+                output_info: usdc.clone(),
+                route_index: 0,
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(route.pool_route, orai_usdc_oraix_ops.clone());
 }

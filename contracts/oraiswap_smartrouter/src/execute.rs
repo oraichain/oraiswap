@@ -21,10 +21,18 @@ pub fn set_route(
         output_denom.clone(),
         pool_route.clone(),
     )?;
-    let mut routes = ROUTING_TABLE.load(deps.storage, (&input_denom, &output_denom))?;
-    routes.push(pool_route);
+    match ROUTING_TABLE.may_load(deps.storage, (&input_denom, &output_denom))? {
+        Some(mut routes) => {
+            routes.push(pool_route);
+            ROUTING_TABLE.save(deps.storage, (&input_denom, &output_denom), &routes)?;
+        }
+        None => ROUTING_TABLE.save(
+            deps.storage,
+            (&input_denom, &output_denom),
+            &vec![pool_route],
+        )?,
+    }
 
-    ROUTING_TABLE.save(deps.storage, (&input_denom, &output_denom), &routes)?;
     Ok(Response::new().add_attribute("action", "set_route"))
 }
 
