@@ -3,7 +3,7 @@ use oraiswap::router::{RouterController, SwapOperation};
 
 use crate::error::ContractError;
 use crate::helpers::{check_is_contract_owner, validate_pool_route};
-use crate::state::{CONFIG, ROUTING_TABLE};
+use crate::state::{store_route, CONFIG, ROUTING_TABLE};
 
 pub fn set_route(
     deps: DepsMut,
@@ -21,17 +21,11 @@ pub fn set_route(
         output_denom.clone(),
         pool_route.clone(),
     )?;
-    match ROUTING_TABLE.may_load(deps.storage, (&input_denom, &output_denom))? {
-        Some(mut routes) => {
-            routes.push(pool_route);
-            ROUTING_TABLE.save(deps.storage, (&input_denom, &output_denom), &routes)?;
-        }
-        None => ROUTING_TABLE.save(
-            deps.storage,
-            (&input_denom, &output_denom),
-            &vec![pool_route],
-        )?,
-    }
+    store_route(
+        deps.storage,
+        (&input_denom, &output_denom),
+        &pool_route,
+    )?;
 
     Ok(Response::new().add_attribute("action", "set_route"))
 }
