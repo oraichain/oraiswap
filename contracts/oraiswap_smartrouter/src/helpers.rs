@@ -1,10 +1,7 @@
 use cosmwasm_std::{Addr, Deps};
 use oraiswap::router::SwapOperation;
 
-use crate::{
-    state::{CONFIG, ROUTING_TABLE},
-    ContractError,
-};
+use crate::{state::CONFIG, ContractError};
 
 pub fn check_is_contract_owner(deps: Deps, sender: Addr) -> Result<(), ContractError> {
     let config = CONFIG.load(deps.storage)?;
@@ -16,10 +13,10 @@ pub fn check_is_contract_owner(deps: Deps, sender: Addr) -> Result<(), ContractE
 }
 
 pub fn validate_pool_route(
-    deps: Deps,
-    input_denom: String,
-    output_denom: String,
-    pool_route: Vec<SwapOperation>,
+    _deps: Deps,
+    _input_denom: String,
+    _output_denom: String,
+    _pool_route: Vec<SwapOperation>,
 ) -> Result<(), ContractError> {
     // FIXME: try simulating
     Ok(())

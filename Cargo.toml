@@ -38,6 +38,7 @@ oraiswap-oracle = { path = "./contracts/oraiswap_oracle" }
 oraiswap-token = { path = "./contracts/oraiswap_token" }
 oraiswap-pair = { path = "./contracts/oraiswap_pair" }
 oraiswap-factory = { path = "./contracts/oraiswap_factory" }
+oraiswap-router = { path = "./contracts/oraiswap_router" }
 
 cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git", rev = "77d6a49" }
 

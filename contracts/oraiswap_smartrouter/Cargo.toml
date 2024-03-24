@@ -26,3 +26,10 @@ oraiswap-token = { workspace = true }
 cw2 = { workspace = true }
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+oraiswap-oracle = { workspace = true }
+oraiswap-token = { workspace = true }
+oraiswap-pair = { workspace = true }
+oraiswap-factory = { workspace = true }
+oraiswap-router = { workspace = true }
