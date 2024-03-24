@@ -14,9 +14,6 @@ use oraiswap::smartrouter::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 const CONTRACT_NAME: &str = "crates.io:swaprouter";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// Msg Reply IDs
-pub const SWAP_REPLY_ID: u64 = 1u64;
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
