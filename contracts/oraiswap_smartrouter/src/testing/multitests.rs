@@ -260,14 +260,36 @@ mod test {
         )
         .unwrap();
 
+        // this route is faulty for testing. the pair doenst exist
+        app.execute(
+            Addr::unchecked(owner),
+            smart_router_addr.clone(),
+            &ExecuteMsg::SetRoute {
+                input_info: orai_info.clone(),
+                output_info: AssetInfo::NativeToken {
+                    denom: "random-denom".to_string(),
+                },
+                pool_route: vec![SwapOperation::OraiSwap {
+                    offer_asset_info: orai_info.clone(),
+                    ask_asset_info: AssetInfo::NativeToken {
+                        denom: "random-denom".to_string(),
+                    },
+                }],
+            },
+            &vec![],
+        )
+        .unwrap();
+
         // testing
-        let expected_min_receive = Uint128::from(500u128); // expect 1 ORAI ~ 5 USDC
-                                                           // case 1: get smart route with simulate problem -> return error
+        // expect 1 ORAI ~ 5 USDC
+        let expected_min_receive = Uint128::from(500u128);
+
+        // case 1: get smart route with simulate problem -> return error
         let err = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),
                 &QueryMsg::GetSmartRoute {
-                    input_info: usdc_info.clone(),
+                    input_info: orai_info.clone(),
                     output_info: AssetInfo::NativeToken {
                         denom: "random-denom".to_string(),
                     },
@@ -277,7 +299,7 @@ mod test {
                 },
             )
             .unwrap_err();
-        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: alloc::vec::Vec<alloc::vec::Vec<oraiswap::router::SwapOperation>> not found").to_string());
+        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. Err: \"Generic error: Querier contract error: Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
         let nearest_minimum_receive = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),

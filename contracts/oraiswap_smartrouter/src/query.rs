@@ -91,6 +91,7 @@ pub fn query_smart_route(
                 }
             }
             Err(err) => {
+                println!("err: {:?}", err);
                 simulate_swap_errors = simulate_swap_errors + &err.to_string() + ";";
                 continue;
             }

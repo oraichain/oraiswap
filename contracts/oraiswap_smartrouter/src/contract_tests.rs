@@ -405,6 +405,21 @@ fn test_delete_route() {
     )
     .unwrap();
 
+    // try querying all the routes of usdc->orai. Should return 2 routes
+    let routes: GetRoutesResponse = from_binary(
+        &contract::query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetRoutes {
+                input_info: usdc.clone(),
+                output_info: orai.clone(),
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(routes.pool_routes.len(), 2);
+
     let delete_route_msg = ExecuteMsg::DeleteRoute {
         input_info: orai.clone(),
         output_info: usdc.clone(),
