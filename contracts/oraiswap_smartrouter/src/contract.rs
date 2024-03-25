@@ -100,14 +100,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             input_info,
             output_info,
             offer_amount,
-            expected_minimum_receive,
             route_mode,
         } => to_binary(&query_smart_route(
             deps,
             input_info,
             output_info,
             offer_amount,
-            expected_minimum_receive,
             route_mode,
         )?),
     }

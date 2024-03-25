@@ -4,8 +4,7 @@ use cosmwasm_std::Uint128;
 
 #[cw_serde]
 pub enum SmartRouteMode {
-    NearestMinimumReceive,
-    FurthestMinimumReceive,
+    MaxMinimumReceive,
 }
 
 #[cw_serde]
@@ -70,7 +69,6 @@ pub enum QueryMsg {
         input_info: AssetInfo,
         output_info: AssetInfo,
         offer_amount: Uint128,
-        expected_minimum_receive: Uint128, // this value should be collected from external oracle or cex or orderbook or amm
         route_mode: Option<SmartRouteMode>,
     },
 }

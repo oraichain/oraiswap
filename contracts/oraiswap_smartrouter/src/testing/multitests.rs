@@ -280,10 +280,6 @@ mod test {
         )
         .unwrap();
 
-        // testing
-        // expect 1 ORAI ~ 5 USDC
-        let expected_min_receive = Uint128::from(500u128);
-
         // case 1: get smart route with simulate problem -> return error
         let err = app
             .query::<GetSmartRouteResponse, _>(
@@ -294,48 +290,25 @@ mod test {
                         denom: "random-denom".to_string(),
                     },
                     offer_amount: Uint128::from(100u128),
-                    expected_minimum_receive: expected_min_receive.clone(),
-                    route_mode: Some(SmartRouteMode::NearestMinimumReceive),
+                    route_mode: Some(SmartRouteMode::MaxMinimumReceive),
                 },
             )
             .unwrap_err();
         assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. Err: \"Generic error: Querier contract error: Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
-        let nearest_minimum_receive = app
+        let max_minimum_receive = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),
                 &QueryMsg::GetSmartRoute {
                     input_info: orai_info.clone(),
                     output_info: usdc_info.clone(),
                     offer_amount: Uint128::from(100u128),
-                    expected_minimum_receive: expected_min_receive.clone(),
-                    route_mode: Some(SmartRouteMode::NearestMinimumReceive),
-                },
-            )
-            .unwrap();
-
-        let furthest_minimum_receive = app
-            .query::<GetSmartRouteResponse, _>(
-                smart_router_addr.clone(),
-                &QueryMsg::GetSmartRoute {
-                    input_info: orai_info.clone(),
-                    output_info: usdc_info.clone(),
-                    offer_amount: Uint128::from(100u128),
-                    expected_minimum_receive: expected_min_receive.clone(),
-                    route_mode: Some(SmartRouteMode::FurthestMinimumReceive),
+                    route_mode: Some(SmartRouteMode::MaxMinimumReceive),
                 },
             )
             .unwrap();
 
         // assertion
         // we expect the actual min receive of mode NearestMinimumReceive to be nearer to the expected_min_receive than the mode FurthestMinimumReceive
-        assert_eq!(
-            nearest_minimum_receive
-                .actual_minimum_receive
-                .abs_diff(expected_min_receive.clone())
-                .lt(&furthest_minimum_receive
-                    .actual_minimum_receive
-                    .abs_diff(expected_min_receive.clone())),
-            true
-        );
+        assert_eq!(max_minimum_receive.swap_ops.len(), 1);
     }
 }

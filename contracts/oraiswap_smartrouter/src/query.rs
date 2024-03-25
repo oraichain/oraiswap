@@ -50,23 +50,19 @@ pub fn query_smart_route(
     input_info: AssetInfo,
     output_info: AssetInfo,
     offer_amount: Uint128,
-    expected_minimum_receive: Uint128,
     route_mode: Option<SmartRouteMode>,
 ) -> StdResult<GetSmartRouteResponse> {
     let config = CONFIG.load(deps.storage)?;
     let router = config.router_contract;
-    let route_mode = route_mode.unwrap_or(SmartRouteMode::NearestMinimumReceive);
+    let route_mode = route_mode.unwrap_or(SmartRouteMode::MaxMinimumReceive);
     let pool_routes = ROUTING_TABLE.load(
         deps.storage,
         (&input_info.to_string(), &output_info.to_string()),
     )?;
     let mut simulate_swap_errors: String = String::from("");
     let mut route_simulate_result: (usize, Uint128, Uint128) = (
-        0usize, // wanted route index
-        match route_mode {
-            SmartRouteMode::NearestMinimumReceive => Uint128::MAX,
-            SmartRouteMode::FurthestMinimumReceive => Uint128::zero(),
-        }, // diff between expected min receive versus actual amount
+        0usize,          // wanted route index
+        Uint128::zero(), // diff between simulate & expected min receive
         Uint128::zero(), // actual minimum receive
     );
     for (index, route) in pool_routes.to_owned().into_iter().enumerate() {
@@ -74,15 +70,9 @@ pub fn query_smart_route(
             Ok(simulate_result) => {
                 let prev_route_simulate_diff = route_simulate_result.1;
                 match route_mode {
-                    SmartRouteMode::NearestMinimumReceive => {
-                        route_simulate_result.1 = route_simulate_result
-                            .1
-                            .min(expected_minimum_receive.abs_diff(simulate_result.amount));
-                    }
-                    SmartRouteMode::FurthestMinimumReceive => {
-                        route_simulate_result.1 = route_simulate_result
-                            .1
-                            .max(expected_minimum_receive.abs_diff(simulate_result.amount));
+                    SmartRouteMode::MaxMinimumReceive => {
+                        route_simulate_result.2 =
+                            route_simulate_result.2.max(simulate_result.amount);
                     }
                 }
                 if prev_route_simulate_diff.ne(&route_simulate_result.1) {
