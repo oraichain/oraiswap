@@ -60,24 +60,22 @@ pub fn query_smart_route(
         (&input_info.to_string(), &output_info.to_string()),
     )?;
     let mut simulate_swap_errors: String = String::from("");
-    let mut route_simulate_result: (usize, Uint128, Uint128) = (
+    let mut route_simulate_result: (usize, Uint128) = (
         0usize,          // wanted route index
-        Uint128::zero(), // diff between simulate & expected min receive
         Uint128::zero(), // actual minimum receive
     );
     for (index, route) in pool_routes.to_owned().into_iter().enumerate() {
         match router.simulate_swap(&deps.querier, offer_amount, route) {
             Ok(simulate_result) => {
-                let prev_route_simulate_diff = route_simulate_result.1;
+                let prev_route_minimum_receive = route_simulate_result.1;
                 match route_mode {
                     SmartRouteMode::MaxMinimumReceive => {
-                        route_simulate_result.2 =
-                            route_simulate_result.2.max(simulate_result.amount);
+                        route_simulate_result.1 =
+                            route_simulate_result.1.max(simulate_result.amount);
                     }
                 }
-                if prev_route_simulate_diff.ne(&route_simulate_result.1) {
+                if prev_route_minimum_receive.ne(&route_simulate_result.1) {
                     route_simulate_result.0 = index;
-                    route_simulate_result.2 = simulate_result.amount;
                 }
             }
             Err(err) => {
@@ -87,7 +85,7 @@ pub fn query_smart_route(
             }
         }
     }
-    if route_simulate_result.2.is_zero() {
+    if route_simulate_result.1.is_zero() {
         return Err(StdError::generic_err(format!(
             "Minimum receive of simulate smart route is 0. Err: {:?}",
             simulate_swap_errors
@@ -95,6 +93,6 @@ pub fn query_smart_route(
     }
     Ok(GetSmartRouteResponse {
         swap_ops: pool_routes[route_simulate_result.0].to_owned(),
-        actual_minimum_receive: route_simulate_result.2,
+        actual_minimum_receive: route_simulate_result.1,
     })
 }
