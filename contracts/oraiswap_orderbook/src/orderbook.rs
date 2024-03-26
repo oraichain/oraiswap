@@ -41,7 +41,6 @@ pub struct OrderWithFee {
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
     pub reward_fee: Uint128,
-    pub relayer_fee: Uint128,
     pub filled_offer_this_round: Uint128,
     pub filled_ask_this_round: Uint128,
 }
@@ -128,7 +127,6 @@ impl OrderWithFee {
             ask_amount: order.ask_amount,
             filled_offer_amount: order.filled_offer_amount,
             filled_ask_amount: order.filled_ask_amount,
-            relayer_fee: Uint128::zero(),
             reward_fee: Uint128::zero(),
             filled_ask_this_round: Uint128::zero(),
             filled_offer_this_round: Uint128::zero(),
