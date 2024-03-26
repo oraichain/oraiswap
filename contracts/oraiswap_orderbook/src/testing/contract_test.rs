@@ -2967,11 +2967,11 @@ fn execute_pair_native_token() {
     let expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(969390u128),
+            amount: Uint128::from(969990u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(975755u128),
+            amount: Uint128::from(976045u128),
         },
     ]
     .to_vec();
@@ -2979,11 +2979,11 @@ fn execute_pair_native_token() {
     let expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(976900u128),
+            amount: Uint128::from(978100u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(967779u128),
+            amount: Uint128::from(968842u128),
         },
     ]
     .to_vec();
@@ -4166,13 +4166,13 @@ fn execute_pair_cw20_token() {
 
     let expected_balances = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(971238u128),
+        amount: Uint128::from(972688u128),
     }]
     .to_vec();
     assert_eq!(address0_balances, expected_balances,);
     let expected_balances = [Coin {
         denom: ORAI_DENOM.to_string(),
-        amount: Uint128::from(988037u128),
+        amount: Uint128::from(988937u128),
     }]
     .to_vec();
     assert_eq!(address1_balances, expected_balances,);
@@ -4333,8 +4333,8 @@ fn simple_matching_test() {
         .unwrap();
 
     // after submit order 2:
-    // - order 1 fulfilled, addr0 receive 75123400 - 75123400 * 0.001 - 300 * 7.51234 = 75046024 (after round number) usdt
-    // - order 2 partial filled, addr2 receive 10000000 - 10000000 * 0.001 - 300 = 9989700 orai
+    // - order 1 fulfilled, addr0 receive 75123400 - 75123400 * 0.001 = 75048276 (after round number) usdt
+    // - order 2 partial filled, addr2 receive 10000000 - 10000000 * 0.001  = 9990000 orai
 
     let mut address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     let mut address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
@@ -4350,7 +4350,7 @@ fn simple_matching_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(10075046024u128),
+            amount: Uint128::from(10075048277u128),
         },
     ]
     .to_vec();
@@ -4359,7 +4359,7 @@ fn simple_matching_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(10009989700u128),
+            amount: Uint128::from(10009990000u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4402,8 +4402,8 @@ fn simple_matching_test() {
         .unwrap();
 
     // after submit order 3:
-    // - order 3 fulfilled, addr0 receive 751234 - 751234 * 0.001 - 300 * 7.51234 = 748230 (after round number) usdt
-    // - order 2 partial filled, addr2 receive 751234/7.52 * 0.999 - 300 =  99499 orai
+    // - order 3 fulfilled, addr0 receive 751234 - 751234 * 0.001 = 750482 (after round number) usdt
+    // - order 2 partial filled, addr2 receive 751234/7.52 * 0.999 =  99798 orai
 
     address0_balances = app.query_all_balances(Addr::unchecked("addr0000")).unwrap();
     address1_balances = app.query_all_balances(Addr::unchecked("addr0001")).unwrap();
@@ -4419,7 +4419,7 @@ fn simple_matching_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(10075794254u128),
+            amount: Uint128::from(10075798760u128),
         },
     ]
     .to_vec();
@@ -4427,7 +4427,7 @@ fn simple_matching_test() {
     expected_balances = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(10010089199u128),
+            amount: Uint128::from(10010089799u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4640,7 +4640,7 @@ fn reward_to_executor_test() {
     let mut expected_balances: Vec<Coin> = [
         Coin {
             denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(1001207591u128),
+            amount: Uint128::from(1001208491u128),
         },
         Coin {
             denom: USDT_DENOM.to_string(),
@@ -4656,7 +4656,7 @@ fn reward_to_executor_test() {
         },
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(1000199702u128),
+            amount: Uint128::from(1000199800u128),
         },
     ]
     .to_vec();
@@ -6128,11 +6128,11 @@ fn test_market_order() {
     // order 1, order 2 fulfilled,
     // market order: matched 2000000 Orai (offer 2100000 usdt, refund 400000 usdt)
     // addr0 receive:
-    //    -  1000000 * 0.999 - 300 * 1 = 998700 usdt
+    //    -  1000000 * 0.999 = 999000 usdt
     //    -  1100000 * 0.999 - 200 * 1.1 = 1098570 usdt
     // total : 998700 + 1098570 = 2097270 usdt
-    // addr 1 receive : 2000000 * 0.999 - 300 = 1997700 orai
-    // balance after:  Addr0 (7000000 Orai, 12097270 usdt);  Addr1 (11997700 Orai, 7900000 usdt)
+    // addr 1 receive : 2000000 * 0.999 = 1998000 orai
+    // balance after:  Addr0 (7000000 Orai, 12097900 usdt);  Addr1 (11997700 Orai, 7900000 usdt)
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
@@ -6181,10 +6181,10 @@ fn test_market_order() {
         address0_token_balances[0],
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(12097270u128),
+            amount: Uint128::from(12097900u128),
         },
     );
-    assert_eq!(address1_native_balances, Uint128::from(11997700u128));
+    assert_eq!(address1_native_balances, Uint128::from(11998000u128));
     assert_eq!(
         address1_token_balances[0],
         Coin {
@@ -6230,18 +6230,18 @@ fn test_market_order() {
             .unwrap();
     }
 
-    // current balances: Addr0 (5000000 Orai, 12097270 usdt);  Addr1 (11997700 Orai, 7900000 usdt)
+    // current balances: Addr0 (5000000 Orai, 12097900 usdt);  Addr1 (11997700 Orai, 7900000 usdt)
 
     // create buy order (offer 3000000 usdt, slippage 50%)
     // sell order at price 1.2, 1.3 fulfilled, at price 1.4 partial filled
     // market buy order: matched 3000000 usdt
     // addr0 receive:
-    //    -  1200000 * 0.999 - 300 * 1.2 = 1198440 usdt
-    //    -  1200000 * 0.999 - 300 * 1.2 = 1198440 usdt
-    //    -  600000 * 0.999 - 300 * 1.3 = 599010 usdt
+    //    -  1200000 * 0.999 = 1198800 usdt
+    //    -  1200000 * 0.999  = 1198800 usdt
+    //    -  600000 * 0.999  = 599400 usdt
     // total : 1198440 + 1198440 + 599010 = 2995890 usdt
-    // addr 1 receive : 2000000 * 0.999 + 600000 / 1.3 * 0.999 - 300 = 2458777 orai
-    // balance after:  Addr0 (5000000 Orai, 15093160 usdt);  Addr1 (14456477 Orai, 4900000 usdt)
+    // addr 1 receive : 2000000 * 0.999 + 600000 / 1.3 * 0.999 = 2459076 orai
+    // balance after:  Addr0 (5000000 Orai, 15094900 usdt);  Addr1 (14457077 Orai, 4900000 usdt)
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
@@ -6288,10 +6288,10 @@ fn test_market_order() {
         address0_token_balances[0],
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(15093160u128),
+            amount: Uint128::from(15094900u128),
         },
     );
-    assert_eq!(address1_native_balances, Uint128::from(14456477u128));
+    assert_eq!(address1_native_balances, Uint128::from(14457077u128));
     assert_eq!(
         address1_token_balances[0],
         Coin {
@@ -6344,9 +6344,9 @@ fn test_market_order() {
     // create market sell order (offer 2500000 orai, slippage 50%)
     // buy order at price 1, 1.1, 1.2 fulfilled
     // market sell order: matched 2500000 orai
-    // addr0 receive: 2500000 * 0.999 - 3 * 300 = 2496600 orai
-    // addr 1 receive : 1200000 * 0.999 + 1100000 * 0.999 + 500000 * 1 * 0.999 - 300 * 1.2 = 2796840 usdt
-    // balance after:  Addr0 (7496600 Orai, 11793160 usdt);  Addr1 (11956477 Orai, 7696840 usdt)
+    // addr0 receive: 2500000 * 0.999 = 2497500 orai
+    // addr 1 receive : 1200000 * 0.999 + 1100000 * 0.999 + 500000 * 1 * 0.999 = 2797200 usdt
+    // balance after:  Addr0 (7497500 Orai, 11794900 usdt);  Addr1 (11957077 Orai, 7697200 usdt)
 
     let msg = ExecuteMsg::SubmitMarketOrder {
         direction: OrderDirection::Sell,
@@ -6403,20 +6403,20 @@ fn test_market_order() {
         .query_token_balances(Addr::unchecked("addr0001"))
         .unwrap();
 
-    assert_eq!(address0_native_balances, Uint128::from(7496600u128));
+    assert_eq!(address0_native_balances, Uint128::from(7497500u128));
     assert_eq!(
         address0_token_balances[0],
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(11793160u128),
+            amount: Uint128::from(11794900u128),
         },
     );
-    assert_eq!(address1_native_balances, Uint128::from(11956477u128));
+    assert_eq!(address1_native_balances, Uint128::from(11957077u128));
     assert_eq!(
         address1_token_balances[0],
         Coin {
             denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(7696840u128),
+            amount: Uint128::from(7697200u128),
         },
     );
 
@@ -6677,8 +6677,8 @@ fn test_submit_order_with_refunds_offer_asset() {
     // addr0001 submit a sell order at price 1 (offer 1000000 ORAI, ASK 1000000 USDT)
     // but the highest price of buy order in contract is 2, so user only needs 500000 orai to receive 1000000 usdt => refund 500000 orai
     // balances after:
-    // addr0000: 1000000000  + (500000 * 0.999 - 300) = 1000499200 ORAI, 998000000 USDT
-    // addr0001: 999500000 ORAI, 1000000000 + (1000000 * 0.999 - 300) =   1000998700 USDT
+    // addr0000: 1000000000  + (500000 * 0.999) = 1000499500 ORAI, 998000000 USDT
+    // addr0001: 999500000 ORAI, 1000000000 + (1000000 * 0.999 ) =  1000999000 USDT
 
     // Order 2
     let msg = ExecuteMsg::SubmitOrder {
@@ -6718,7 +6718,7 @@ fn test_submit_order_with_refunds_offer_asset() {
         vec![
             Coin {
                 denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(1000499200u128),
+                amount: Uint128::from(1000499500u128),
             },
             Coin {
                 denom: USDT_DENOM.to_string(),
@@ -6735,7 +6735,7 @@ fn test_submit_order_with_refunds_offer_asset() {
             },
             Coin {
                 denom: USDT_DENOM.to_string(),
-                amount: Uint128::from(1000998700u128),
+                amount: Uint128::from(1000999000u128),
             }
         ]
     );
@@ -6775,7 +6775,7 @@ fn test_submit_order_with_refunds_offer_asset() {
 
     // addr1 create a sell order at price 8, but the order status after matching is PartialFilled
     // balance before: 999500000 ORAI, 1000998700 USDT
-    // balance after submit Sell order:989500000 ORAI, 1000998700 + 10000000 * 0.999 - 300 * 8 = 1010986300 USDT
+    // balance after submit Sell order:989500000 ORAI, 1000999000 + 10000000 * 0.999 = 1010989000 USDT
 
     // Order 4
     let msg = ExecuteMsg::SubmitOrder {
@@ -6816,7 +6816,7 @@ fn test_submit_order_with_refunds_offer_asset() {
             },
             Coin {
                 denom: USDT_DENOM.to_string(),
-                amount: Uint128::from(1010986300u128),
+                amount: Uint128::from(1010989000u128),
             }
         ]
     );

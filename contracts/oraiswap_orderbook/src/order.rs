@@ -16,7 +16,6 @@ use oraiswap::asset::{pair_key, Asset, AssetInfo};
 use oraiswap::error::ContractError;
 use oraiswap::orderbook::{OrderDirection, OrderStatus, Payment};
 
-pub const RELAY_FEE: u128 = 300u128;
 pub const MIN_VOLUME: u128 = 10u128;
 const MIN_FEE: u128 = 1_000_000u128;
 pub const SLIPPAGE_DEFAULT: &str = "0.01"; // spread default 1%
@@ -281,7 +280,6 @@ fn to_events(order: &OrderWithFee, human_bidder: String) -> Event {
         attr("ask_amount", order.ask_amount.to_string()),
         attr("filled_ask_amount", order.filled_ask_amount.to_string()),
         attr("reward_fee", order.reward_fee),
-        attr("relayer_fee", order.relayer_fee),
         attr("filled_offer_this_round", order.filled_offer_this_round),
         attr("filled_ask_this_round", order.filled_ask_this_round),
     ]
@@ -354,35 +352,26 @@ fn process_list_trader(
 
 pub fn calculate_fee(
     commission_rate: Decimal,
-    relayer_quote_fee: Uint128,
     direction: OrderDirection,
     trader_ask_asset: &mut Asset,
     reward: &mut Executor,
-    relayer: &mut Executor,
-) -> StdResult<(Uint128, Uint128)> {
-    let relayer_fee: Uint128;
+) -> StdResult<Uint128> {
     let reward_fee = trader_ask_asset.amount * commission_rate;
-    let remaining_amount = trader_ask_asset.amount.checked_sub(reward_fee)?;
+
     match direction {
         OrderDirection::Buy => {
-            relayer_fee = Uint128::min(Uint128::from(RELAY_FEE), remaining_amount);
-
             reward.reward_assets[0].amount += reward_fee;
-            relayer.reward_assets[0].amount += relayer_fee;
         }
         OrderDirection::Sell => {
-            relayer_fee = Uint128::min(relayer_quote_fee, remaining_amount);
-
             reward.reward_assets[1].amount += reward_fee;
-            relayer.reward_assets[1].amount += relayer_fee;
         }
     }
 
     trader_ask_asset.amount = trader_ask_asset
         .amount
-        .checked_sub(reward_fee + relayer_fee)
+        .checked_sub(reward_fee)
         .unwrap_or_default();
-    return Ok((reward_fee, relayer_fee));
+    return Ok(reward_fee);
 }
 
 fn process_payment_list_orders(
@@ -392,13 +381,10 @@ fn process_payment_list_orders(
     orders: &mut Vec<OrderWithFee>,
     traders: &mut Vec<Payment>,
     reward: &mut Executor,
-    relayer: &mut Executor,
 ) -> StdResult<()> {
     for order in orders {
         let filled_offer = order.filled_offer_this_round;
         let filled_ask = order.filled_ask_this_round;
-
-        let relayer_quote_fee = Uint128::from(RELAY_FEE) * order.get_price();
 
         if !filled_ask.is_zero() && !filled_offer.is_zero() {
             let mut trader_ask_asset = Asset {
@@ -409,16 +395,13 @@ fn process_payment_list_orders(
                 amount: filled_ask,
             };
 
-            let (reward_fee, relayer_fee) = calculate_fee(
+            let reward_fee = calculate_fee(
                 commission_rate,
-                relayer_quote_fee,
                 order.direction,
                 &mut trader_ask_asset,
                 reward,
-                relayer,
             )?;
             order.reward_fee = reward_fee;
-            order.relayer_fee = relayer_fee;
             if !trader_ask_asset.amount.is_zero() {
                 let trader_payment: Payment = Payment {
                     address: deps.api.addr_humanize(&order.bidder_addr)?,
@@ -556,7 +539,7 @@ pub fn matching_order(
 
 pub fn process_matching(
     deps: DepsMut,
-    sender: Addr,
+    _sender: Addr,
     orderbook_pair: &OrderBook,
     order_id: u64,
     price_threshold: Decimal,
@@ -565,10 +548,6 @@ pub fn process_matching(
     let commission_rate = Decimal::from_str(&contract_info.commission_rate)?;
 
     // get default operator to receive reward
-    let relayer_addr = match contract_info.operator {
-        Some(addr) => addr,
-        None => deps.api.addr_canonicalize(sender.as_str())?,
-    };
     let pair_key = orderbook_pair.get_pair_key();
 
     let reward_assets = [
@@ -587,8 +566,6 @@ pub fn process_matching(
         contract_info.reward_address,
         reward_assets.clone(),
     );
-
-    let mut relayer = process_reward(deps.storage, &pair_key, relayer_addr, reward_assets);
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut list_trader: Vec<Payment> = vec![];
@@ -617,7 +594,6 @@ pub fn process_matching(
         &mut matched_orders,
         &mut list_trader,
         &mut reward,
-        &mut relayer,
     )?;
 
     let refund_threshold = orderbook_pair
@@ -657,10 +633,8 @@ pub fn process_matching(
     process_list_trader(&deps, list_trader, &mut messages)?;
 
     transfer_reward(&deps, &mut reward, &mut total_reward, &mut messages)?;
-    transfer_reward(&deps, &mut relayer, &mut total_reward, &mut messages)?;
 
     store_reward(deps.storage, &pair_key, &reward)?;
-    store_reward(deps.storage, &pair_key, &relayer)?;
 
     Ok(Response::new()
         .add_messages(messages)
