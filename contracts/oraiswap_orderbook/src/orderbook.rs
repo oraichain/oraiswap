@@ -41,7 +41,6 @@ pub struct OrderWithFee {
     pub filled_offer_amount: Uint128,
     pub filled_ask_amount: Uint128,
     pub reward_fee: Uint128,
-    pub relayer_fee: Uint128,
     pub filled_offer_this_round: Uint128,
     pub filled_ask_this_round: Uint128,
 }
@@ -128,7 +127,6 @@ impl OrderWithFee {
             ask_amount: order.ask_amount,
             filled_offer_amount: order.filled_offer_amount,
             filled_ask_amount: order.filled_ask_amount,
-            relayer_fee: Uint128::zero(),
             reward_fee: Uint128::zero(),
             filled_ask_this_round: Uint128::zero(),
             filled_offer_this_round: Uint128::zero(),
@@ -139,15 +137,21 @@ impl OrderWithFee {
         orders.into_iter().map(Self::from_order).collect()
     }
     // create new order given a price and an offer amount
-    pub fn fill_order(&mut self, ask_amount: Uint128, offer_amount: Uint128) -> StdResult<()> {
+    pub fn fill_order(
+        &mut self,
+        ask_amount: Uint128,
+        offer_amount: Uint128,
+        min_ask_to_fulfilled: Uint128,
+        min_offer_to_fulfilled: Uint128,
+    ) -> StdResult<()> {
         self.filled_ask_amount += ask_amount;
         self.filled_offer_amount += offer_amount;
 
         self.filled_ask_this_round = ask_amount;
         self.filled_offer_this_round = offer_amount;
 
-        if self.offer_amount.checked_sub(self.filled_offer_amount)? < MIN_VOLUME.into()
-            || self.ask_amount.checked_sub(self.filled_ask_amount)? < MIN_VOLUME.into()
+        if self.offer_amount.checked_sub(self.filled_offer_amount)? < min_offer_to_fulfilled
+            || self.ask_amount.checked_sub(self.filled_ask_amount)? < min_ask_to_fulfilled
         {
             self.status = OrderStatus::Fulfilled;
         } else {
@@ -218,6 +222,8 @@ pub struct OrderBook {
     pub spread: Option<Decimal>,
     pub min_quote_coin_amount: Uint128,
     pub refund_threshold: Option<Uint128>,
+    pub min_offer_to_fulfilled: Option<Uint128>,
+    pub min_ask_to_fulfilled: Option<Uint128>,
 }
 
 impl OrderBook {
@@ -232,6 +238,8 @@ impl OrderBook {
             spread,
             min_quote_coin_amount: Uint128::zero(),
             refund_threshold: None,
+            min_offer_to_fulfilled: None,
+            min_ask_to_fulfilled: None,
         }
     }
 
@@ -244,6 +252,12 @@ impl OrderBook {
             refund_threshold: self
                 .refund_threshold
                 .unwrap_or(Uint128::from(REFUNDS_THRESHOLD)),
+            min_offer_to_fulfilled: self
+                .min_offer_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
+            min_ask_to_fulfilled: self
+                .min_ask_to_fulfilled
+                .unwrap_or(Uint128::from(MIN_VOLUME)),
         })
     }
 
