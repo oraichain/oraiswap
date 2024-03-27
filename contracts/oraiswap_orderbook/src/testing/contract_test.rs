@@ -544,7 +544,7 @@ fn test_crate_and_update_orderbook_data() {
             denom: USDT_DENOM.to_string(),
         },
     ];
-    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+    let update_msg = ExecuteMsg::UpdateOrderBookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(Decimal::from_str("0.1").unwrap()),
         min_quote_coin_amount: None,
@@ -564,7 +564,7 @@ fn test_crate_and_update_orderbook_data() {
     );
 
     // update failed, spread > 1
-    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+    let update_msg = ExecuteMsg::UpdateOrderBookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(Decimal::from_str("1.1").unwrap()),
         min_quote_coin_amount: None,
@@ -585,7 +585,7 @@ fn test_crate_and_update_orderbook_data() {
 
     // case 2: good case, admin should update spread from None to something
     let spread = Decimal::from_str("0.1").unwrap();
-    let update_msg = ExecuteMsg::UpdateOrderbookPair {
+    let update_msg = ExecuteMsg::UpdateOrderBookPair {
         asset_infos: asset_infos.clone(),
         spread: Some(spread),
         min_quote_coin_amount: Some(Uint128::from(100u128)),

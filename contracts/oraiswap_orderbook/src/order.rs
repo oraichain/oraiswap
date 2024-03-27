@@ -443,23 +443,16 @@ pub fn matching_order(
     };
 
     // check minimum offer & ask to mark a order as fulfilled
+    let min_offer = orderbook_pair
+        .min_offer_to_fulfilled
+        .unwrap_or(Uint128::from(MIN_VOLUME));
+    let min_ask = orderbook_pair
+        .min_ask_to_fulfilled
+        .unwrap_or(Uint128::from(MIN_VOLUME));
+
     let (user_min_offer_to_fulfilled, user_min_ask_to_fulfilled) = match order.direction {
-        OrderDirection::Buy => (
-            orderbook_pair
-                .min_offer_to_fulfilled
-                .unwrap_or(Uint128::from(MIN_VOLUME)),
-            orderbook_pair
-                .min_ask_to_fulfilled
-                .unwrap_or(Uint128::from(MIN_VOLUME)),
-        ),
-        OrderDirection::Sell => (
-            orderbook_pair
-                .min_ask_to_fulfilled
-                .unwrap_or(Uint128::from(MIN_VOLUME)),
-            orderbook_pair
-                .min_offer_to_fulfilled
-                .unwrap_or(Uint128::from(MIN_VOLUME)),
-        ),
+        OrderDirection::Buy => (min_offer, min_ask),
+        OrderDirection::Sell => (min_ask, min_offer),
     };
 
     // in matching process of buy order, we don't check minimum remaining amount to mark user order as fulfilled, but only with a small threshold

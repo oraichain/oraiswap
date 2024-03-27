@@ -115,7 +115,7 @@ pub enum ExecuteMsg {
         min_ask_to_fulfilled: Option<Uint128>,
     },
 
-    UpdateOrderbookPair {
+    UpdateOrderBookPair {
         asset_infos: [AssetInfo; 2],
         spread: Option<Decimal>,
         min_quote_coin_amount: Option<Uint128>,

@@ -122,7 +122,7 @@ pub fn execute(
             min_offer_to_fulfilled,
             min_ask_to_fulfilled,
         ),
-        ExecuteMsg::UpdateOrderbookPair {
+        ExecuteMsg::UpdateOrderBookPair {
             asset_infos,
             spread,
             min_quote_coin_amount,
@@ -263,7 +263,7 @@ fn check_paused(deps: Deps, msg: &ExecuteMsg) -> Result<(), ContractError> {
                 | ExecuteMsg::UpdateConfig { .. }
                 | ExecuteMsg::Pause {}
                 | ExecuteMsg::Unpause {}
-                | ExecuteMsg::UpdateOrderbookPair { .. } => {
+                | ExecuteMsg::UpdateOrderBookPair { .. } => {
                     // still not paused
                 }
                 _ => return Err(ContractError::Paused {}),
