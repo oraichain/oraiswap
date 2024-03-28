@@ -76,6 +76,7 @@ fn test_convert_reverse() {
             },
             decimals: 6,
         },
+        is_mint_burn: false,
     };
 
     //register pair1
@@ -151,6 +152,7 @@ fn test_convert_reverse() {
             },
             decimals: 18,
         },
+        is_mint_burn: false,
     };
     let info = mock_info("addr", &[]);
     execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
@@ -233,6 +235,7 @@ fn test_remove_pair() {
             },
             decimals: 16,
         },
+        is_mint_burn: false,
     };
     let info = mock_info("addr", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();

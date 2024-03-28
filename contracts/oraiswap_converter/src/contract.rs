@@ -1,8 +1,8 @@
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    entry_point, from_binary, to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg,
+    Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap::math::Converter128;
 
 use crate::state::{
@@ -38,7 +38,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::UpdateConfig { owner } => update_config(deps, info, owner),
-        ExecuteMsg::UpdatePair { from, to } => update_pair(deps, info, from, to),
+        ExecuteMsg::UpdatePair {
+            from,
+            to,
+            is_mint_burn,
+        } => update_pair(deps, info, from, to, is_mint_burn),
         ExecuteMsg::UnregisterPair { from } => unregister_pair(deps, info, from),
         ExecuteMsg::Convert {} => convert(deps, env, info),
         ExecuteMsg::ConvertReverse { from_asset } => convert_reverse(deps, env, info, from_asset),
@@ -72,14 +76,12 @@ pub fn receive_cw20(
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
             let token_ratio = read_token_ratio(deps.storage, token_raw.as_slice())?;
             let amount = cw20_msg.amount * token_ratio.ratio;
-            let message = Asset {
-                info: token_ratio.info,
-                amount: amount.clone(),
-            }
-            .into_msg(
-                None,
-                &deps.querier,
-                deps.api.addr_validate(cw20_msg.sender.as_str())?,
+
+            let message = process_build_convert_msg(
+                token_ratio.info,
+                amount,
+                cw20_msg.sender,
+                token_ratio.is_mint_burn,
             )?;
 
             Ok(Response::new().add_message(message).add_attributes(vec![
@@ -92,27 +94,31 @@ pub fn receive_cw20(
             let asset_key = from.to_vec(deps.api)?;
             let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
 
-            if let AssetInfo::Token { contract_addr } = token_ratio.info {
+            if let AssetInfo::Token { contract_addr } = token_ratio.info.clone() {
                 if contract_addr != info.sender {
                     return Err(StdError::generic_err("invalid cw20 hook message"));
                 }
 
-                let amount = cw20_msg.amount.checked_div_decimal(token_ratio.ratio)?;
+                let amount_receive = cw20_msg.amount.checked_div_decimal(token_ratio.ratio)?;
 
-                let message = Asset {
-                    info: from,
-                    amount: amount.clone(),
-                }
-                .into_msg(
-                    None,
-                    &deps.querier,
-                    deps.api.addr_validate(cw20_msg.sender.as_str())?,
+                let msgs = process_build_convert_reverse_msg(
+                    deps.as_ref(),
+                    Asset {
+                        info: token_ratio.info,
+                        amount: cw20_msg.amount,
+                    },
+                    Asset {
+                        info: from,
+                        amount: amount_receive,
+                    },
+                    info.sender,
+                    token_ratio.is_mint_burn,
                 )?;
 
-                Ok(Response::new().add_message(message).add_attributes(vec![
+                Ok(Response::new().add_messages(msgs).add_attributes(vec![
                     ("action", "convert_token_reverse"),
                     ("from_amount", &cw20_msg.amount.to_string()),
-                    ("to_amount", &amount.to_string()),
+                    ("to_amount", &amount_receive.to_string()),
                 ]))
             } else {
                 return Err(StdError::generic_err("invalid cw20 hook message"));
@@ -127,6 +133,7 @@ pub fn update_pair(
     info: MessageInfo,
     from: TokenInfo,
     to: TokenInfo,
+    is_mint_burn: bool,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
     if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -135,12 +142,20 @@ pub fn update_pair(
 
     let asset_key = from.info.to_vec(deps.api)?;
 
+    // if is_mint_burn mechanism, check to_token must be cw20 token
+    if is_mint_burn && to.info.is_native_token() {
+        return Err(StdError::generic_err(
+            "With mint_burn mechanism, to_token must be cw20 token",
+        ));
+    }
+
     let token_ratio = TokenRatio {
         info: to.info,
         ratio: Decimal::from_ratio(
             10u128.pow(to.decimals.into()),
             10u128.pow(from.decimals.into()),
         ),
+        is_mint_burn,
     };
 
     store_token_ratio(deps.storage, &asset_key, &token_ratio)?;
@@ -176,13 +191,12 @@ pub fn convert(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Respons
 
         attributes.push(("to_amount", to_amount).into());
 
-        let message = Asset {
-            info: token_ratio.info,
-            amount: to_amount.clone(),
-        }
-        .into_msg(None, &deps.querier, info.sender.clone())?;
-
-        messages.push(message);
+        messages.push(process_build_convert_msg(
+            token_ratio.info,
+            amount,
+            info.sender.to_string(),
+            token_ratio.is_mint_burn,
+        )?)
     }
 
     Ok(Response::new()
@@ -199,21 +213,30 @@ pub fn convert_reverse(
     let asset_key = from_asset.to_vec(deps.api)?;
     let token_ratio = read_token_ratio(deps.storage, &asset_key)?;
 
-    if let AssetInfo::NativeToken { denom } = token_ratio.info {
+    if let AssetInfo::NativeToken { denom } = token_ratio.info.clone() {
         //check funds includes To token
         if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
-            let amount = native_coin.amount.checked_div_decimal(token_ratio.ratio)?;
-            let message = Asset {
-                info: from_asset,
-                amount: amount.clone(),
-            }
-            .into_msg(None, &deps.querier, info.sender.clone())?;
+            let amount_receive = native_coin.amount.checked_div_decimal(token_ratio.ratio)?;
 
-            return Ok(Response::new().add_message(message).add_attributes(vec![
+            let msgs = process_build_convert_reverse_msg(
+                deps.as_ref(),
+                Asset {
+                    info: token_ratio.info,
+                    amount: native_coin.amount,
+                },
+                Asset {
+                    info: from_asset,
+                    amount: amount_receive,
+                },
+                info.sender,
+                token_ratio.is_mint_burn,
+            )?;
+
+            return Ok(Response::new().add_messages(msgs).add_attributes(vec![
                 ("action", "convert_token_reverse"),
                 ("denom", native_coin.denom.as_str()),
                 ("from_amount", &native_coin.amount.to_string()),
-                ("to_amount", &amount.to_string()),
+                ("to_amount", &amount_receive.to_string()),
             ]));
         } else {
             return Err(StdError::generic_err("Cannot find the native token that matches the input to convert in convert_reverse()"));
@@ -221,6 +244,72 @@ pub fn convert_reverse(
     } else {
         return Err(StdError::generic_err("invalid cw20 hook message"));
     }
+}
+
+fn process_build_convert_msg(
+    to_token: AssetInfo,
+    amount: Uint128,
+    recipient: String,
+    is_mint_burn: bool,
+) -> StdResult<CosmosMsg> {
+    match to_token {
+        AssetInfo::NativeToken { denom } => {
+            if is_mint_burn {
+                return Err(StdError::generic_err(
+                    "With mint_burn mechanism, to_token must be cw20 token",
+                ));
+            }
+            Ok(CosmosMsg::Bank(BankMsg::Send {
+                to_address: recipient,
+                amount: vec![Coin { amount, denom }],
+            }))
+        }
+        AssetInfo::Token { contract_addr } => {
+            let cw20_msg = if is_mint_burn {
+                Cw20ExecuteMsg::Mint { recipient, amount }
+            } else {
+                Cw20ExecuteMsg::Transfer { recipient, amount }
+            };
+            Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: contract_addr.to_string(),
+                msg: to_binary(&cw20_msg).unwrap(),
+                funds: vec![],
+            }))
+        }
+    }
+}
+
+fn process_build_convert_reverse_msg(
+    deps: Deps,
+    from_asset: Asset,
+    to_asset: Asset,
+    recipient: Addr,
+    is_mint_burn: bool,
+) -> StdResult<Vec<CosmosMsg>> {
+    let mut msgs: Vec<CosmosMsg> = vec![to_asset.into_msg(None, &deps.querier, recipient)?];
+
+    match from_asset.info {
+        AssetInfo::NativeToken { denom: _ } => {
+            if is_mint_burn {
+                return Err(StdError::generic_err(
+                    "With mint_burn mechanism, to_token must be cw20 token",
+                ));
+            }
+        }
+        AssetInfo::Token { contract_addr } => {
+            if is_mint_burn {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: contract_addr.to_string(),
+                    msg: to_binary(&Cw20ExecuteMsg::Burn {
+                        amount: from_asset.amount,
+                    })?,
+                    funds: vec![],
+                }))
+            }
+        }
+    }
+
+    Ok(msgs)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
