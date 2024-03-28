@@ -15,6 +15,8 @@ pub struct TokenInfo {
 pub struct TokenRatio {
     pub info: AssetInfo,
     pub ratio: Decimal,
+    #[serde(default)]
+    pub is_mint_burn: bool,
 }
 
 #[cw_serde]
@@ -36,6 +38,7 @@ pub enum ExecuteMsg {
     UpdatePair {
         from: TokenInfo,
         to: TokenInfo,
+        is_mint_burn: bool,
     },
     UnregisterPair {
         from: TokenInfo,
