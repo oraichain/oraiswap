@@ -111,7 +111,7 @@ pub fn receive_cw20(
                         info: from,
                         amount: amount_receive,
                     },
-                    info.sender,
+                    deps.api.addr_validate(&cw20_msg.sender)?,
                     token_ratio.is_mint_burn,
                 )?;
 
@@ -193,7 +193,7 @@ pub fn convert(deps: DepsMut, _env: Env, info: MessageInfo) -> StdResult<Respons
 
         messages.push(process_build_convert_msg(
             token_ratio.info,
-            amount,
+            to_amount,
             info.sender.to_string(),
             token_ratio.is_mint_burn,
         )?)
