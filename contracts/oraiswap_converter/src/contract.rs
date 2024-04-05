@@ -218,21 +218,14 @@ pub fn convert_reverse(
         if let Some(native_coin) = info.funds.iter().find(|a| a.denom.eq(&denom)) {
             let amount_receive = native_coin.amount.checked_div_decimal(token_ratio.ratio)?;
 
-            let msgs = process_build_convert_reverse_msg(
-                deps.as_ref(),
-                Asset {
-                    info: token_ratio.info,
-                    amount: native_coin.amount,
-                },
-                Asset {
-                    info: from_asset,
-                    amount: amount_receive,
-                },
-                info.sender,
-                token_ratio.is_mint_burn,
-            )?;
+            // dont care about mint burn because the sent info must be native -> cannot mint burn
+            let message = Asset {
+                info: from_asset,
+                amount: amount_receive.clone(),
+            }
+            .into_msg(None, &deps.querier, info.sender.clone())?;
 
-            return Ok(Response::new().add_messages(msgs).add_attributes(vec![
+            return Ok(Response::new().add_message(message).add_attributes(vec![
                 ("action", "convert_token_reverse"),
                 ("denom", native_coin.denom.as_str()),
                 ("from_amount", &native_coin.amount.to_string()),
