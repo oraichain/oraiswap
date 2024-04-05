@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
 
-use crate::pair::DEFAULT_COMMISSION_RATE;
+use crate::pair::{DEFAULT_COMMISSION_RATE, DEFAULT_OPERATOR_FEE};
 use cw_multi_test::{next_block, App, AppResponse, Contract, Executor};
 
 pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
@@ -169,6 +169,7 @@ impl MockApp {
                     token_code_id: self.token_id,
                     oracle_addr: self.oracle_addr.clone(),
                     commission_rate: Some(DEFAULT_COMMISSION_RATE.to_string()),
+                    operator_fee: Some(DEFAULT_OPERATOR_FEE.to_string()),
                 },
                 &[],
                 "factory",
@@ -208,6 +209,7 @@ impl MockApp {
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
                         pair_admin: Some("admin".to_string()),
+                        operator: None,
                     },
                     &[],
                 )

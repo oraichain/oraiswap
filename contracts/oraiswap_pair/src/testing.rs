@@ -47,6 +47,8 @@ fn provide_liquidity_both_native() {
         token_code_id: app.token_id,
         commission_rate: None,
         admin: None,
+        operator_fee: None,
+        operator: None,
     };
 
     // we can just call .unwrap() to assert this was a success
@@ -140,6 +142,8 @@ fn provide_liquidity() {
         token_code_id: app.token_id,
         commission_rate: None,
         admin: None,
+        operator_fee: None,
+        operator: None,
     };
 
     // we can just call .unwrap() to assert this was a success
@@ -312,6 +316,8 @@ fn withdraw_liquidity() {
         token_code_id: app.token_id,
         commission_rate: None,
         admin: None,
+        operator_fee: None,
+        operator: None,
     };
 
     let pair_id = app.upload(Box::new(
@@ -445,6 +451,8 @@ fn test_pool_whitelist_for_trader() {
         token_code_id: app.token_id,
         commission_rate: None,
         admin: Some(Addr::unchecked("admin")),
+        operator_fee: None,
+        operator: None,
     };
 
     // we can just call .unwrap() to assert this was a success
