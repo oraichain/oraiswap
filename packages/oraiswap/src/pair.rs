@@ -112,6 +112,8 @@ pub enum QueryMsg {
     TraderIsWhitelisted { trader: Addr },
     #[returns(String)]
     Admin {},
+    #[returns(String)]
+    Operator {},
 }
 
 // We define a custom struct for each query response

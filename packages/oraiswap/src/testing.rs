@@ -209,7 +209,7 @@ impl MockApp {
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
                         pair_admin: Some("admin".to_string()),
-                        operator: None,
+                        operator: Some("operator".to_string()),
                     },
                     &[],
                 )

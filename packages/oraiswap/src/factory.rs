@@ -26,7 +26,7 @@ pub enum ExecuteMsg {
         /// Asset infos
         asset_infos: [AssetInfo; 2],
         pair_admin: Option<String>,
-        operator: Option<Addr>,
+        operator: Option<String>,
     },
     AddPair {
         pair_info: PairInfo,

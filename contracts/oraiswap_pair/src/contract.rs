@@ -511,7 +511,7 @@ pub fn swap(
                 messages.push(
                     Asset {
                         info: ask_pool.info.clone(),
-                        amount: return_amount,
+                        amount: operator_fee_amount,
                     }
                     .into_msg(
                         None,
@@ -645,6 +645,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractErr
             Ok(to_binary(&query_trader_is_whitelisted(deps, trader)?)?)
         }
         QueryMsg::Admin {} => Ok(to_binary(&query_admin(deps)?)?),
+        QueryMsg::Operator {} => Ok(to_binary(&query_operator(deps)?)?),
     }
 }
 
@@ -657,6 +658,14 @@ fn query_admin(deps: Deps) -> StdResult<String> {
     Ok(match admin {
         None => String::default(),
         Some(admin) => deps.api.addr_humanize(&admin)?.to_string(),
+    })
+}
+
+fn query_operator(deps: Deps) -> StdResult<String> {
+    let operator = OPERATOR.may_load(deps.storage)?;
+    Ok(match operator {
+        None => String::default(),
+        Some(operator) => deps.api.addr_humanize(&operator)?.to_string(),
     })
 }
 

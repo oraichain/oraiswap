@@ -138,7 +138,7 @@ pub fn execute_create_pair(
     _info: MessageInfo,
     asset_infos: [AssetInfo; 2],
     pair_admin: Option<String>,
-    operator: Option<Addr>,
+    operator: Option<String>,
 ) -> Result<Response, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     let raw_infos = [
@@ -167,6 +167,8 @@ pub fn execute_create_pair(
     )?;
     let pair_admin = pair_admin.unwrap_or(env.contract.address.to_string());
 
+    let operator_addr = operator.map(|op| deps.api.addr_validate(&op)).transpose()?;
+
     Ok(Response::new()
         .add_submessage(SubMsg::reply_on_success(
             WasmMsg::Instantiate {
@@ -181,7 +183,7 @@ pub fn execute_create_pair(
                     commission_rate: Some(config.commission_rate),
                     admin: Some(deps.api.addr_validate(&pair_admin)?),
                     operator_fee: Some(config.operator_fee),
-                    operator,
+                    operator: operator_addr,
                 })?,
             },
             INSTANTIATE_REPLY_ID,
