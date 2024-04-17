@@ -69,14 +69,14 @@ pub fn unbond(
     messages.extend(
         reward_assets
             .into_iter()
-            .map(|ra| Ok(ra.into_msg(None, &deps.querier, staker_addr.clone())?))
+            .map(|ra| ra.into_msg(None, &deps.querier, staker_addr.clone()))
             .collect::<StdResult<Vec<CosmosMsg>>>()?,
     );
 
     Ok(Response::new().add_messages(messages).add_attributes([
         attr("action", "unbond"),
         attr("staker_addr", staker_addr.as_str()),
-        attr("amount", &amount.to_string()),
+        attr("amount", amount.to_string()),
         attr("staking_token", staking_token_addr.as_str()),
     ]))
 }
@@ -305,7 +305,7 @@ fn _decrease_bond_amount(
         reward_assets = reward_info
             .pending_withdraw
             .into_iter()
-            .map(|ra| Ok(ra.to_normal(api)?))
+            .map(|ra| ra.to_normal(api))
             .collect::<StdResult<Vec<Asset>>>()?;
 
         rewards_store(storage, staker_addr).remove(&asset_key);

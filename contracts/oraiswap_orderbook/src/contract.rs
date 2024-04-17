@@ -544,7 +544,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             end,
             limit,
-            order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
+            order_by.and_then(|val| OrderBy::try_from(val).ok()),
         )?),
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[

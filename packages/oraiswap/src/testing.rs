@@ -432,13 +432,7 @@ impl MockApp {
         self.set_token_balances_from(Addr::unchecked(APP_OWNER), balances)
     }
 
-    pub fn approve_token(
-        &mut self,
-        token: &str,
-        approver: &str,
-        spender: &str,
-        amount: Uint128,
-    ) -> () {
+    pub fn approve_token(&mut self, token: &str, approver: &str, spender: &str, amount: Uint128) {
         let token_addr = self.token_map.get(token);
         match token_addr {
             Some(token_addr) => {

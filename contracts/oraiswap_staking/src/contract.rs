@@ -22,7 +22,7 @@ use cosmwasm_std::{
     from_binary, to_binary, Addr, Api, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
     MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
-use oraiswap::asset::{Asset, AssetRaw, ORAI_DENOM};
+use oraiswap::asset::{Asset, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
     PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
@@ -209,8 +209,8 @@ fn update_rewards_per_sec(
     // convert assets to raw_assets
     let raw_assets = assets
         .into_iter()
-        .map(|w| Ok(w.to_raw(deps.api)?))
-        .collect::<StdResult<Vec<AssetRaw>>>()?;
+        .map(|w| w.to_raw(deps.api))
+        .collect::<StdResult<_>>()?;
 
     store_rewards_per_sec(deps.storage, &asset_key, raw_assets)?;
 
@@ -290,12 +290,9 @@ fn deprecate_staking_token(
 
     Ok(Response::new().add_attributes([
         ("action", "depcrecate_staking_token"),
-        ("staking_token", &staking_token.as_str()),
-        (
-            "deprecated_staking_token",
-            &deprecated_token_addr.to_string(),
-        ),
-        ("new_staking_token", &new_staking_token.to_string()),
+        ("staking_token", staking_token.as_str()),
+        ("deprecated_staking_token", deprecated_token_addr.as_str()),
+        ("new_staking_token", new_staking_token.as_str()),
     ]))
 }
 
@@ -367,8 +364,8 @@ pub fn query_rewards_per_sec(deps: Deps, staking_token: Addr) -> StdResult<Rewar
 
     let assets = raw_assets
         .into_iter()
-        .map(|w| Ok(w.to_normal(deps.api)?))
-        .collect::<StdResult<Vec<Asset>>>()?;
+        .map(|w| w.to_normal(deps.api))
+        .collect::<StdResult<_>>()?;
 
     Ok(RewardsPerSecResponse { assets })
 }
@@ -393,7 +390,7 @@ pub fn parse_read_all_pool_infos(
                         .migration_params
                         .clone()
                         .map(|params| -> StdResult<Addr> {
-                            Ok(api.addr_humanize(&params.deprecated_staking_token)?)
+                            api.addr_humanize(&params.deprecated_staking_token)
                         })
                         .transpose()?,
                     migration_index_snapshot: pool_info

@@ -73,7 +73,7 @@ pub fn execute(
             asset_info,
             prev_balance,
             minimum_receive,
-            receiver.into(),
+            receiver,
         ),
     }
 }
@@ -93,7 +93,7 @@ pub fn receive_cw20(
             minimum_receive,
             to,
         } => {
-            let receiver = to.map_or(None, |addr| deps.api.addr_validate(addr.as_str()).ok());
+            let receiver = to.and_then(|addr| deps.api.addr_validate(addr.as_str()).ok());
             execute_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
         }
     }

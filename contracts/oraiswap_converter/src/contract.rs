@@ -121,7 +121,7 @@ pub fn receive_cw20(
                     ("to_amount", &amount_receive.to_string()),
                 ]))
             } else {
-                return Err(StdError::generic_err("invalid cw20 hook message"));
+                Err(StdError::generic_err("invalid cw20 hook message"))
             }
         }
         Err(_) => Err(StdError::generic_err("invalid cw20 hook message")),
@@ -221,21 +221,21 @@ pub fn convert_reverse(
             // dont care about mint burn because the sent info must be native -> cannot mint burn
             let message = Asset {
                 info: from_asset,
-                amount: amount_receive.clone(),
+                amount: amount_receive,
             }
             .into_msg(None, &deps.querier, info.sender.clone())?;
 
-            return Ok(Response::new().add_message(message).add_attributes(vec![
+            Ok(Response::new().add_message(message).add_attributes(vec![
                 ("action", "convert_token_reverse"),
                 ("denom", native_coin.denom.as_str()),
                 ("from_amount", &native_coin.amount.to_string()),
                 ("to_amount", &amount_receive.to_string()),
-            ]));
+            ]))
         } else {
-            return Err(StdError::generic_err("Cannot find the native token that matches the input to convert in convert_reverse()"));
-        };
+            Err(StdError::generic_err("Cannot find the native token that matches the input to convert in convert_reverse()"))
+        }
     } else {
-        return Err(StdError::generic_err("invalid cw20 hook message"));
+        Err(StdError::generic_err("invalid cw20 hook message"))
     }
 }
 
@@ -346,7 +346,7 @@ pub fn withdraw_tokens(
         let balance = asset.query_pool(&deps.querier, env.contract.address.clone())?;
         let message = Asset {
             info: asset,
-            amount: balance.clone(),
+            amount: balance,
         }
         .into_msg(None, &deps.querier, owner.clone())?;
         messages.push(message);
