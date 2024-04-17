@@ -2,7 +2,7 @@ use cosmwasm_std::{Api, CanonicalAddr, Order as OrderBy, StdError, StdResult, St
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
 use oraiswap::{
     error::ContractError,
-    limit_order::{ContractInfo, OrderDirection},
+    orderbook::{ContractInfo, OrderDirection},
     querier::calc_range_start,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -250,7 +250,7 @@ pub fn read_orders(
         .collect()
 }
 
-pub fn validate_admin(api: &dyn Api, admin: CanonicalAddr, sender: &str) -> StdResult<()> {
+pub fn validate_admin(api: &dyn Api, admin: &CanonicalAddr, sender: &str) -> StdResult<()> {
     let sender_addr = api.addr_canonicalize(sender)?;
     // check authorized
     if admin.ne(&sender_addr) {

@@ -1,8 +1,13 @@
-use cw_storage_plus::Item;
+use cosmwasm_std::{Addr, CanonicalAddr};
+use cw_storage_plus::{Item, Map};
 use oraiswap::asset::PairInfoRaw;
 
 // put the length bytes at the first for compatibility with legacy singleton store
 pub const PAIR_INFO: Item<PairInfoRaw> = Item::new("\u{0}\u{9}pair_info");
+
+pub const ADMIN: Item<CanonicalAddr> = Item::new("\u{0}\u{5}admin");
+pub const WHITELISTED: Item<bool> = Item::new("\u{0}\u{11}whitelisted");
+pub const WHITELISTED_TRADERS: Map<&Addr, bool> = Map::new("\u{0}\u{19}whitelisted_traders");
 
 #[cfg(test)]
 mod test {

@@ -82,7 +82,7 @@ fn simulate_swap_operations_test() {
     let _res = app
         .execute(
             Addr::unchecked("addr0000"),
-            pair_addr,
+            pair_addr.clone(),
             &msg,
             &[
                 Coin {
@@ -344,4 +344,102 @@ fn execute_swap_operations() {
         .unwrap();
 
     println!("{:?}", res.events);
+
+    // test swap on whitelisted pool
+
+    // enable  whitelisted pool
+    let _res = app
+        .execute(
+            Addr::unchecked("admin"),
+            pair_addr1.clone(),
+            &oraiswap::pair::ExecuteMsg::EnableWhitelist { status: true },
+            &[],
+        )
+        .unwrap();
+    let _res = app
+        .execute(
+            Addr::unchecked("admin"),
+            pair_addr2.clone(),
+            &oraiswap::pair::ExecuteMsg::EnableWhitelist { status: true },
+            &[],
+        )
+        .unwrap();
+
+    // whitelist swap router
+    app.execute(
+        Addr::unchecked("admin"),
+        pair_addr1.clone(),
+        &oraiswap::pair::ExecuteMsg::RegisterTrader {
+            traders: vec![router_addr.clone()],
+        },
+        &[],
+    )
+    .unwrap();
+    app.execute(
+        Addr::unchecked("admin"),
+        pair_addr2.clone(),
+        &oraiswap::pair::ExecuteMsg::RegisterTrader {
+            traders: vec![router_addr.clone()],
+        },
+        &[],
+    )
+    .unwrap();
+
+    // swap will be failed
+
+    let res = app.execute(
+        Addr::unchecked("addr0000"),
+        router_addr.clone(),
+        &msg,
+        &[
+            Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+            Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+        ],
+    );
+
+    app.assert_fail(res);
+
+    // whitelist trader
+    app.execute(
+        Addr::unchecked("admin"),
+        pair_addr1.clone(),
+        &oraiswap::pair::ExecuteMsg::RegisterTrader {
+            traders: vec![Addr::unchecked("addr0000")],
+        },
+        &[],
+    )
+    .unwrap();
+    app.execute(
+        Addr::unchecked("admin"),
+        pair_addr2.clone(),
+        &oraiswap::pair::ExecuteMsg::RegisterTrader {
+            traders: vec![Addr::unchecked("addr0000")],
+        },
+        &[],
+    )
+    .unwrap();
+
+    // swap successfully
+    app.execute(
+        Addr::unchecked("addr0000"),
+        router_addr.clone(),
+        &msg,
+        &[
+            Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+            Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(100u128),
+            },
+        ],
+    )
+    .unwrap();
 }

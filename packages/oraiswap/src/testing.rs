@@ -41,6 +41,7 @@ pub struct MockApp {
     pub token_id: u64,
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
+    pub router_addr: Addr,
 }
 
 impl MockApp {
@@ -76,6 +77,7 @@ impl MockApp {
             token_id: 0,
             oracle_addr: Addr::unchecked(""),
             factory_addr: Addr::unchecked(""),
+            router_addr: Addr::unchecked(""),
             token_map: HashMap::new(),
         }
     }
@@ -170,6 +172,22 @@ impl MockApp {
                 },
                 &[],
                 "factory",
+            )
+            .unwrap();
+    }
+
+    pub fn set_router_contract(&mut self, code: Box<dyn Contract<Empty>>, factory_addr: Addr) {
+        let code_id = self.upload(code);
+        self.router_addr = self
+            .instantiate(
+                code_id,
+                Addr::unchecked(APP_OWNER),
+                &crate::router::InstantiateMsg {
+                    factory_addr: factory_addr.clone(),
+                    factory_addr_v2: factory_addr.clone(),
+                },
+                &[],
+                "router",
             )
             .unwrap();
     }
@@ -412,6 +430,33 @@ impl MockApp {
         balances: &[(&String, &[(&String, &Uint128)])],
     ) -> Vec<Addr> {
         self.set_token_balances_from(Addr::unchecked(APP_OWNER), balances)
+    }
+
+    pub fn approve_token(
+        &mut self,
+        token: &str,
+        approver: &str,
+        spender: &str,
+        amount: Uint128,
+    ) -> () {
+        let token_addr = self.token_map.get(token);
+        match token_addr {
+            Some(token_addr) => {
+                self.execute(
+                    Addr::unchecked(approver),
+                    token_addr.to_owned(),
+                    &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                        spender: spender.to_string(),
+                        amount,
+                        expires: None,
+                    },
+                    &vec![],
+                )
+                .unwrap();
+                ()
+            }
+            None => (),
+        }
     }
 
     pub fn assert_fail(&self, res: Result<AppResponse, String>) {

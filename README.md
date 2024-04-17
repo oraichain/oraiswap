@@ -4,57 +4,43 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 
 ## Contracts
 
-| Name                                                     | Description                                              |
-| -------------------------------------------------------- | -------------------------------------------------------- |
-| [`oraiswap_factory`](contracts/oraiswap_factory)         | Proxy contract to create oraiswap_pair instance          |
-| [`oraiswap_oracle`](contracts/oraiswap_oracle)           | Global parameters updated by multisig wallet             |
-| [`oraiswap_pair`](contracts/oraiswap_pair)               | Logic for building liquidity pool and trade between pair |
-| [`oraiswap_router`](contracts/oraiswap_router)           | Facilitate multi-hop swap operations                     |
-| [`oraiswap_limit_order`](contracts/oraiswap_limit_order) | Orderbook implementation                                 |
-| [`oraiswap_staking`](contracts/oraiswap_staking)         | Stake LPs to get ORAIX reward                            |
-| [`oraiswap_token`](contracts/oraiswap_token)             | (ERC20 equivalent) token implementation, AIRI, ORAIX     |
+| Name                                                 | Description                                              |
+| ---------------------------------------------------- | -------------------------------------------------------- |
+| [`oraiswap_factory`](contracts/oraiswap_factory)     | Proxy contract to create oraiswap_pair instance          |
+| [`oraiswap_oracle`](contracts/oraiswap_oracle)       | Global parameters updated by multisig wallet             |
+| [`oraiswap_pair`](contracts/oraiswap_pair)           | Logic for building liquidity pool and trade between pair |
+| [`oraiswap_router`](contracts/oraiswap_router)       | Facilitate multi-hop swap operations                     |
+| [`oraiswap_orderbook`](contracts/oraiswap_orderbook) | Orderbook implementation                                 |
+| [`oraiswap_staking`](contracts/oraiswap_staking)     | Stake LPs to get ORAIX reward                            |
+| [`oraiswap_token`](contracts/oraiswap_token)         | (ERC20 equivalent) token implementation, AIRI, ORAIX     |
 
 - oraiswap_factory
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai167r4ut7avvgpp3rlzksz6vw5spmykluzagvmj3ht845fjschwugqjsqhst`](https://scan.orai.io/smart-contract/orai167r4ut7avvgpp3rlzksz6vw5spmykluzagvmj3ht845fjschwugqjsqhst)
 
 - oraiswap_oracle
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m`](https://scan.orai.io/smart-contract/orai18rgtdvlrev60plvucw2rz8nmj8pau9gst4q07m)
 
 - oraiswap_pair
 
-  Mainnet (CodeID): 4
-
-  Testnet (CodeID): 7869
+  Mainnet (CodeID): 1502
 
 - oraiswap_route
 
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
+  Mainnet: [`orai1j0r67r9k8t34pnhy00x3ftuxuwg0r6r4p8p6rrc8az0ednzr8y9s3sj2sf`](https://scan.orai.io/smart-contract/orai1j0r67r9k8t34pnhy00x3ftuxuwg0r6r4p8p6rrc8az0ednzr8y9s3sj2sf)
 
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+- oraiswap_orderbook
 
-- oraiswap_limit_order
-
-  Mainnet: `orai1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj`
-
-  Testnet: `orai18qpjm4zkvqnpjpw0zn0tdr8gdzvt8au35v45xf`
+  Mainnet: [`orai1nt58gcu4e63v7k55phnr3gaym9tvk3q4apqzqccjuwppgjuyjy6sxk8yzp`](https://scan.orai.io/smart-contract/orai1nt58gcu4e63v7k55phnr3gaym9tvk3q4apqzqccjuwppgjuyjy6sxk8yzp)
 
 - oraiswap_staking
 
-  Mainnet: `orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu`
-
-  Testnet: `orai1yzncqj7f8sculc3849w9hg9r4f4u79e3swnlr7`
+  Mainnet: [`orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu`](https://scan.orai.io/smart-contract/orai19p43y0tqnr5qlhfwnxft2u5unph5yn60y7tuvu)
 
 - oraiswap_token
 
-  Mainnet (CodeID): 3
-
-  Testnet (CodeID): 148
+  Mainnet (CodeID): 582
 
 ## Running this contract
 

@@ -2,36 +2,37 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Order as OrderBy, Response, StdError, StdResult, Uint128,
 };
+use cw_utils::one_coin;
 use oraiswap::error::ContractError;
 
 use crate::order::{
-    cancel_order, execute_matching_orders, get_paid_and_quote_assets, query_last_order_id,
-    query_order, query_orderbook, query_orderbook_is_matchable, query_orderbooks, query_orders,
-    remove_pair, submit_order,
+    cancel_order, get_paid_and_quote_assets, remove_pair, submit_market_order, submit_order,
 };
 use crate::orderbook::OrderBook;
+use crate::query::{
+    query_last_order_id, query_order, query_orderbook, query_orderbooks, query_orders,
+    query_simulate_market_order, query_tick, query_ticks_with_end,
+};
 use crate::state::{
     init_last_order_id, read_config, read_orderbook, store_config, store_orderbook, validate_admin,
 };
-use crate::tick::{query_tick, query_ticks_with_end};
 
 use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{pair_key, Asset, AssetInfo};
-use oraiswap::limit_order::{
+use oraiswap::orderbook::{
     ContractInfo, ContractInfoResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg,
     OrderDirection, QueryMsg,
 };
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:oraiswap_limit_order";
+const CONTRACT_NAME: &str = "crates.io:oraiswap_orderbook";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // default commission rate = 0.1 %
 const DEFAULT_COMMISSION_RATE: &str = "0.001";
-const REWARD_WALLET: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -41,11 +42,13 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let default_reward_address = deps.api.addr_canonicalize(REWARD_WALLET)?;
     let config = ContractInfo {
         name: msg.name.unwrap_or(CONTRACT_NAME.to_string()),
         version: msg.version.unwrap_or(CONTRACT_VERSION.to_string()),
-
+        operator: match msg.operator {
+            Some(addr) => Some(deps.api.addr_canonicalize(&addr)?),
+            None => None,
+        },
         // admin should be multisig
         admin: if let Some(admin) = msg.admin {
             deps.api.addr_canonicalize(admin.as_str())?
@@ -55,11 +58,8 @@ pub fn instantiate(
         commission_rate: msg
             .commission_rate
             .unwrap_or(DEFAULT_COMMISSION_RATE.to_string()),
-        reward_address: if let Some(reward_address) = msg.reward_address {
-            deps.api.addr_canonicalize(reward_address.as_str())?
-        } else {
-            default_reward_address
-        },
+        reward_address: deps.api.addr_canonicalize(msg.reward_address.as_str())?,
+        is_paused: false,
     };
 
     store_config(deps.storage, &config)?;
@@ -72,13 +72,33 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    // check has paused
+    check_paused(deps.as_ref(), &msg)?;
+
     match msg {
-        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::Pause {} => {
+            let mut config = read_config(deps.storage)?;
+            validate_admin(deps.api, &config.admin, info.sender.as_str())?;
+            config.is_paused = true;
+            store_config(deps.storage, &config)?;
+
+            Ok(Response::new().add_attribute("action", "pause"))
+        }
+        ExecuteMsg::Unpause {} => {
+            let mut config = read_config(deps.storage)?;
+            validate_admin(deps.api, &config.admin, info.sender.as_str())?;
+            config.is_paused = false;
+            store_config(deps.storage, &config)?;
+
+            Ok(Response::new().add_attribute("action", "unpause"))
+        }
         ExecuteMsg::UpdateAdmin { admin } => execute_update_admin(deps, info, admin),
+        ExecuteMsg::UpdateOperator { operator } => execute_update_operator(deps, info, operator),
         ExecuteMsg::UpdateConfig {
             reward_address,
             commission_rate,
@@ -88,6 +108,9 @@ pub fn execute(
             quote_coin_info,
             spread,
             min_quote_coin_amount,
+            refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         } => execute_create_pair(
             deps,
             info,
@@ -95,14 +118,21 @@ pub fn execute(
             quote_coin_info,
             spread,
             min_quote_coin_amount,
+            refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         ),
-        ExecuteMsg::UpdateOrderbookPair {
+        ExecuteMsg::UpdateOrderBookPair {
             asset_infos,
             spread,
+            min_quote_coin_amount,
+            refund_threshold,
+            min_offer_to_fulfilled,
+            min_ask_to_fulfilled,
         } => {
             validate_admin(
                 deps.api,
-                read_config(deps.storage)?.admin,
+                &read_config(deps.storage)?.admin,
                 info.sender.as_str(),
             )?;
             let pair_key = pair_key(&[
@@ -110,7 +140,31 @@ pub fn execute(
                 asset_infos[1].to_raw(deps.api)?,
             ]);
             let mut orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+            if let Some(spread) = spread {
+                if spread >= Decimal::one() {
+                    return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
+                }
+            }
             orderbook_pair.spread = spread;
+
+            // update new minium quote amount threshold
+            if let Some(min_quote_coin_amount) = min_quote_coin_amount {
+                orderbook_pair.min_quote_coin_amount = min_quote_coin_amount;
+            }
+
+            // update new refunds threshold
+            if let Some(refund_threshold) = refund_threshold {
+                orderbook_pair.refund_threshold = Some(refund_threshold);
+            }
+
+            if let Some(min_offer_to_fulfilled) = min_offer_to_fulfilled {
+                orderbook_pair.min_offer_to_fulfilled = Some(min_offer_to_fulfilled);
+            }
+
+            if let Some(min_ask_to_fulfilled) = min_ask_to_fulfilled {
+                orderbook_pair.min_ask_to_fulfilled = Some(min_ask_to_fulfilled);
+            }
+
             store_orderbook(deps.storage, &pair_key, &orderbook_pair)?;
             Ok(Response::new().add_attributes(vec![("action", "update_orderbook_data")]))
         }
@@ -128,11 +182,7 @@ pub fn execute(
             let (paid_assets, quote_asset) =
                 get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
-            // if paid asset is cw20, we check it in Cw20HookMessage
-            if !paid_assets[0].is_native_token() {
-                return Err(ContractError::MustProvideNativeToken {});
-            }
-
+            paid_assets[0].assert_if_asset_is_native_token()?;
             paid_assets[0].assert_sent_native_token_balance(&info)?;
 
             // require minimum amount for quote asset
@@ -144,24 +194,83 @@ pub fn execute(
             }
 
             // then submit order
-            submit_order(
+            submit_order(deps, &orderbook_pair, info.sender, direction, paid_assets)
+        }
+        ExecuteMsg::SubmitMarketOrder {
+            direction,
+            asset_infos,
+            slippage,
+        } => {
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+            let offer_asset_info = match direction {
+                OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+            };
+
+            // get asset_info
+            let funds = one_coin(&info)?;
+
+            let provided_asset = Asset {
+                info: AssetInfo::NativeToken { denom: funds.denom },
+                amount: funds.amount,
+            };
+
+            if offer_asset_info != provided_asset.info {
+                return Err(ContractError::InvalidFunds {});
+            }
+
+            // submit market order
+            submit_market_order(
                 deps,
                 &orderbook_pair,
                 info.sender,
-                &pair_key,
                 direction,
-                paid_assets,
+                provided_asset,
+                slippage,
             )
         }
         ExecuteMsg::CancelOrder {
             order_id,
             asset_infos,
         } => cancel_order(deps, info, order_id, asset_infos),
-        ExecuteMsg::ExecuteOrderBookPair { asset_infos, limit } => {
-            execute_matching_orders(deps, info, asset_infos, limit)
-        }
         ExecuteMsg::RemoveOrderBookPair { asset_infos } => remove_pair(deps, info, asset_infos),
+        ExecuteMsg::WithdrawToken { asset } => {
+            let contract_info = read_config(deps.storage)?;
+            validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
+            let msg = asset.into_msg(
+                None,
+                &deps.querier,
+                deps.api.addr_humanize(&contract_info.admin)?,
+            )?;
+            Ok(Response::new().add_message(msg).add_attributes(vec![
+                ("action", "withdraw_token"),
+                ("token", &asset.to_string()),
+            ]))
+        }
     }
+}
+
+fn check_paused(deps: Deps, msg: &ExecuteMsg) -> Result<(), ContractError> {
+    if let Ok(config) = read_config(deps.storage) {
+        if config.is_paused {
+            match msg {
+                ExecuteMsg::UpdateAdmin { admin: _ }
+                | ExecuteMsg::UpdateConfig { .. }
+                | ExecuteMsg::Pause {}
+                | ExecuteMsg::Unpause {}
+                | ExecuteMsg::UpdateOrderBookPair { .. } => {
+                    // still not paused
+                }
+                _ => return Err(ContractError::Paused {}),
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn execute_update_admin(
@@ -170,13 +279,32 @@ pub fn execute_update_admin(
     admin: Addr,
 ) -> Result<Response, ContractError> {
     let mut contract_info = read_config(deps.storage)?;
-    validate_admin(deps.api, contract_info.admin, info.sender.as_str())?;
+    validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
 
     // update new admin
     contract_info.admin = deps.api.addr_canonicalize(admin.as_str())?;
     store_config(deps.storage, &contract_info)?;
 
     Ok(Response::new().add_attributes(vec![("action", "execute_update_admin")]))
+}
+
+pub fn execute_update_operator(
+    deps: DepsMut,
+    info: MessageInfo,
+    operator: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut contract_info = read_config(deps.storage)?;
+    validate_admin(deps.api, &contract_info.admin, info.sender.as_str())?;
+
+    // if None then no operator to receive reward
+    contract_info.operator = match operator {
+        Some(addr) => Some(deps.api.addr_canonicalize(&addr)?),
+        None => None,
+    };
+
+    store_config(deps.storage, &contract_info)?;
+
+    Ok(Response::new().add_attributes(vec![("action", "execute_update_operator")]))
 }
 
 pub fn execute_update_config(
@@ -214,6 +342,9 @@ pub fn execute_create_pair(
     quote_coin_info: AssetInfo,
     spread: Option<Decimal>,
     min_quote_coin_amount: Uint128,
+    refund_threshold: Option<Uint128>,
+    min_offer_to_fulfilled: Option<Uint128>,
+    min_ask_to_fulfilled: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let contract_info = read_config(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -235,11 +366,20 @@ pub fn execute_create_pair(
         return Err(ContractError::OrderBookAlreadyExists {});
     }
 
+    if let Some(spread) = spread {
+        if spread >= Decimal::one() {
+            return Err(ContractError::SlippageMustLessThanOne { slippage: spread });
+        }
+    }
+
     let order_book = OrderBook {
         base_coin_info: base_coin_info.to_raw(deps.api)?,
         quote_coin_info: quote_coin_info.to_raw(deps.api)?,
         spread,
         min_quote_coin_amount,
+        refund_threshold,
+        min_offer_to_fulfilled,
+        min_ask_to_fulfilled,
     };
     store_orderbook(deps.storage, &pair_key, &order_book)?;
 
@@ -253,6 +393,7 @@ pub fn execute_create_pair(
 
 pub fn receive_cw20(
     deps: DepsMut,
+    _env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
@@ -272,12 +413,27 @@ pub fn receive_cw20(
                 assets[1].to_raw(deps.api)?.info,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+            // validate offer asset is valid
+            let is_valid_funds = match direction {
+                OrderDirection::Buy => orderbook_pair
+                    .quote_coin_info
+                    .eq(&provided_asset.info.to_raw(deps.api)?),
+                OrderDirection::Sell => orderbook_pair
+                    .base_coin_info
+                    .eq(&provided_asset.info.to_raw(deps.api)?),
+            };
+
+            if !is_valid_funds {
+                return Err(ContractError::InvalidFunds {});
+            }
+
             let (paid_assets, quote_asset) =
                 get_paid_and_quote_assets(deps.api, &orderbook_pair, assets, direction)?;
 
-            if paid_assets[0].amount != provided_asset.amount {
-                return Err(ContractError::AssetMismatch {});
-            }
+            if paid_assets[0] != provided_asset {
+                return Err(ContractError::InvalidFunds {});
+            };
 
             // require minimum amount for quote asset
             if quote_asset.amount.lt(&orderbook_pair.min_quote_coin_amount) {
@@ -288,13 +444,39 @@ pub fn receive_cw20(
             }
 
             // then submit order
-            submit_order(
+            submit_order(deps, &orderbook_pair, sender, direction, paid_assets)
+        }
+        Ok(Cw20HookMsg::SubmitMarketOrder {
+            direction,
+            asset_infos,
+            slippage,
+        }) => {
+            let pair_key = pair_key(&[
+                asset_infos[0].to_raw(deps.api)?,
+                asset_infos[1].to_raw(deps.api)?,
+            ]);
+
+            let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
+
+            let offer_asset_info = match direction {
+                OrderDirection::Buy => orderbook_pair.quote_coin_info.to_normal(deps.api)?,
+                OrderDirection::Sell => orderbook_pair.base_coin_info.to_normal(deps.api)?,
+            };
+
+            if offer_asset_info != provided_asset.info {
+                return Err(ContractError::InvalidFunds {});
+            }
+
+            let sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
+
+            // submit market order
+            submit_market_order(
                 deps,
                 &orderbook_pair,
-                sender,
-                &pair_key,
+                sender_addr,
                 direction,
-                paid_assets,
+                provided_asset,
+                slippage,
             )
         }
         Err(_) => Err(ContractError::InvalidCw20HookMessage {}),
@@ -362,38 +544,42 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             end,
             limit,
-            order_by,
+            order_by.map_or(None, |val| OrderBy::try_from(val).ok()),
         )?),
-        QueryMsg::OrderBookMatchable { asset_infos } => {
-            to_binary(&query_orderbook_is_matchable(deps, asset_infos)?)
-        }
         QueryMsg::MidPrice { asset_infos } => {
             let pair_key = pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
                 asset_infos[1].to_raw(deps.api)?,
             ]);
             let orderbook_pair = read_orderbook(deps.storage, &pair_key)?;
-            let (highest_buy_price, buy_found, _) =
-                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy);
-            let (lowest_sell_price, sell_found, _) =
-                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell);
-            let best_buy_price = if buy_found {
-                highest_buy_price
-            } else {
-                Decimal::zero()
+            let mid_price = match (
+                orderbook_pair.highest_price(deps.storage, OrderDirection::Buy),
+                orderbook_pair.lowest_price(deps.storage, OrderDirection::Sell),
+            ) {
+                (Some((best_buy_price, _)), Some((best_sell_price, _))) => {
+                    (best_buy_price + best_sell_price) * Decimal::from_ratio(1u128, 2u128)
+                }
+                _ => {
+                    return Err(StdError::generic_err(
+                        ContractError::NoMatchedPrice {}.to_string(),
+                    ))
+                }
             };
-            let best_sell_price = if sell_found {
-                lowest_sell_price
-            } else {
-                Decimal::zero()
-            };
-            let mid_price = best_buy_price
-                .checked_add(best_sell_price)
-                .unwrap_or_default()
-                .checked_div(Decimal::from_ratio(2u128, 1u128))
-                .unwrap_or_default();
+
             to_binary(&mid_price)
         }
+        QueryMsg::SimulateMarketOrder {
+            direction,
+            asset_infos,
+            slippage,
+            offer_amount,
+        } => to_binary(&query_simulate_market_order(
+            deps,
+            direction,
+            asset_infos,
+            slippage,
+            offer_amount,
+        )?),
     }
 }
 
@@ -405,6 +591,12 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
         admin: deps.api.addr_humanize(&info.admin)?,
         commission_rate: info.commission_rate,
         reward_address: deps.api.addr_humanize(&info.reward_address)?,
+        operator: if let Some(operator) = info.operator {
+            Some(deps.api.addr_humanize(&operator)?)
+        } else {
+            None
+        },
+        is_paused: info.is_paused,
     })
 }
 

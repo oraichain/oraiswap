@@ -1,8 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use std::fmt;
 
-use crate::oracle::OracleContract;
 use crate::querier::query_token_balance;
+use crate::{error::ContractError, oracle::OracleContract};
 
 use cosmwasm_std::{
     coin, to_binary, Addr, Api, BankMsg, CanonicalAddr, CosmosMsg, Decimal, MessageInfo,
@@ -114,6 +114,26 @@ impl Asset {
         } else {
             Ok(())
         }
+    }
+
+    pub fn assert_if_asset_is_native_token(&self) -> StdResult<()> {
+        // if paid asset is cw20, we check it in Cw20HookMessage
+        if !self.is_native_token() {
+            return Err(StdError::generic_err(
+                ContractError::MustProvideNativeToken {}.to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn assert_if_asset_is_zero(&self) -> StdResult<()> {
+        // if paid asset is cw20, we check it in Cw20HookMessage
+        if self.amount.is_zero() {
+            return Err(StdError::generic_err(
+                ContractError::AssetMustNotBeZero {}.to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn to_raw(&self, api: &dyn Api) -> StdResult<AssetRaw> {

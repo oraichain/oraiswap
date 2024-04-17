@@ -1,4 +1,5 @@
 use cosmwasm_std::{Decimal, OverflowError, StdError, Uint128};
+use cw_utils::PaymentError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -8,6 +9,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     OverflowError(#[from] OverflowError),
+
+    #[error("{0}")]
+    Payment(#[from] PaymentError),
 
     #[error("Unauthorized")]
     Unauthorized {},
@@ -70,8 +74,43 @@ pub enum ContractError {
         quote_coin: String,
         min_quote_amount: Uint128,
     },
+
     #[error("Price {price} must not be zero")]
     PriceMustNotBeZero { price: Decimal },
+
+    #[error("Offer amount {offer_amount} is too small")]
+    OfferAmountTooSmall { offer_amount: Uint128 },
+
+    #[error("Slippage {slippage} must be less than one")]
+    SlippageMustLessThanOne { slippage: Decimal },
+
+    #[error("Unable to find market order")]
+    UnableToFindMarketOrder {},
+
+    #[error("Unable to excute matching orders")]
+    UnableToExecuteMatching {},
+
     #[error("The contract upgrading process has not completed yet. Please come back after a while, thank you for your patience!")]
     ContractUpgrade {},
+
+    #[error("This pool is not open to everyone, only whitelisted traders can swap")]
+    PoolWhitelisted {},
+
+    #[error("Cannot find a matched price")]
+    NoMatchedPrice {},
+
+    #[error("Price cannot be greater than {price}")]
+    PriceNotGreaterThan { price: Decimal },
+
+    #[error("Price cannot be less than {price}")]
+    PriceNotLessThan { price: Decimal },
+
+    #[error("Cannot create market order")]
+    CannotCreateMarketOrder {},
+
+    #[error("Invalid funds")]
+    InvalidFunds {},
+
+    #[error("Contract paused")]
+    Paused {},
 }
