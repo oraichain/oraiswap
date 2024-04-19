@@ -133,7 +133,7 @@ mod test {
                 Addr::unchecked(owner),
                 oraix_usdc_pair.contract_addr.clone(),
                 &msg,
-                &vec![],
+                &[],
             )
             .unwrap();
 
@@ -222,7 +222,7 @@ mod test {
                     ask_asset_info: oraix_info.clone(),
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
         app.execute(
@@ -236,7 +236,7 @@ mod test {
                     ask_asset_info: usdc_info.clone(),
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
         app.execute(
@@ -256,7 +256,7 @@ mod test {
                     },
                 ],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
 
@@ -276,7 +276,7 @@ mod test {
                     },
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
 

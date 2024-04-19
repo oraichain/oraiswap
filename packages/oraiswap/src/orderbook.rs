@@ -24,10 +24,7 @@ pub enum OrderType {
 
 impl OrderType {
     pub fn is_limit(&self) -> bool {
-        match self {
-            OrderType::Limit => true,
-            _ => false,
-        }
+        matches!(self, OrderType::Limit)
     }
 
     pub fn is_market(&self) -> bool {
@@ -36,8 +33,9 @@ impl OrderType {
 }
 
 #[cw_serde]
-#[derive(Copy)]
+#[derive(Copy, Default)]
 pub enum OrderDirection {
+    #[default]
     Buy,
     Sell,
 }
@@ -71,11 +69,6 @@ impl OrderStatus {
     }
 }
 
-impl Default for OrderDirection {
-    fn default() -> Self {
-        OrderDirection::Buy
-    }
-}
 #[cw_serde]
 pub struct InstantiateMsg {
     pub name: Option<String>,

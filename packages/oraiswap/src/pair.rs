@@ -161,15 +161,9 @@ pub fn compute_swap(
     // commission will be absorbed to pool
     let return_amount = return_amount - commission_amount;
     Ok((
-        return_amount
-            .try_into()
-            .map_err(|err| StdError::from(err))?,
-        spread_amount
-            .try_into()
-            .map_err(|err| StdError::from(err))?,
-        commission_amount
-            .try_into()
-            .map_err(|err| StdError::from(err))?,
+        return_amount.try_into().map_err(StdError::from)?,
+        spread_amount.try_into().map_err(StdError::from)?,
+        commission_amount.try_into().map_err(StdError::from)?,
     ))
 }
 
@@ -207,12 +201,8 @@ pub fn compute_offer_amount(
     let commission_amount = before_commission_deduction * commission_rate;
 
     Ok((
-        offer_amount.try_into().map_err(|err| StdError::from(err))?,
-        spread_amount
-            .try_into()
-            .map_err(|err| StdError::from(err))?,
-        commission_amount
-            .try_into()
-            .map_err(|err| StdError::from(err))?,
+        offer_amount.try_into().map_err(StdError::from)?,
+        spread_amount.try_into().map_err(StdError::from)?,
+        commission_amount.try_into().map_err(StdError::from)?,
     ))
 }
