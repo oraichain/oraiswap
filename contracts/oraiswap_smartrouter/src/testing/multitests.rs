@@ -133,7 +133,7 @@ mod test {
                 Addr::unchecked(owner),
                 oraix_usdc_pair.contract_addr.clone(),
                 &msg,
-                &vec![],
+                &[],
             )
             .unwrap();
 
@@ -222,7 +222,7 @@ mod test {
                     ask_asset_info: oraix_info.clone(),
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
         app.execute(
@@ -236,7 +236,7 @@ mod test {
                     ask_asset_info: usdc_info.clone(),
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
         app.execute(
@@ -256,7 +256,7 @@ mod test {
                     },
                 ],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
 
@@ -276,7 +276,7 @@ mod test {
                     },
                 }],
             },
-            &vec![],
+            &[],
         )
         .unwrap();
 
@@ -294,7 +294,9 @@ mod test {
                 },
             )
             .unwrap_err();
-        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. Err: \"Generic error: Querier contract error: Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
+        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. \
+         Err: \"Generic error: Querier contract error: \
+         Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
         let max_minimum_receive = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),

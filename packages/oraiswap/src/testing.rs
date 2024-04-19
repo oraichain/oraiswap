@@ -278,7 +278,7 @@ impl MockApp {
                     self.oracle_addr.clone(),
                     &crate::oracle::ExecuteMsg::UpdateTaxCap {
                         denom: denom.to_string(),
-                        cap: cap.clone(),
+                        cap,
                     },
                     &[],
                 )
@@ -396,7 +396,7 @@ impl MockApp {
         let mut contract_addrs = vec![];
         for (token, balances) in balances.iter() {
             let contract_addr = match self.token_map.get(*token) {
-                None => self.create_token(&token),
+                None => self.create_token(token),
                 Some(addr) => addr.clone(),
             };
             contract_addrs.push(contract_addr.clone());
@@ -432,13 +432,7 @@ impl MockApp {
         self.set_token_balances_from(Addr::unchecked(APP_OWNER), balances)
     }
 
-    pub fn approve_token(
-        &mut self,
-        token: &str,
-        approver: &str,
-        spender: &str,
-        amount: Uint128,
-    ) -> () {
+    pub fn approve_token(&mut self, token: &str, approver: &str, spender: &str, amount: Uint128) {
         let token_addr = self.token_map.get(token);
         match token_addr {
             Some(token_addr) => {
@@ -450,19 +444,18 @@ impl MockApp {
                         amount,
                         expires: None,
                     },
-                    &vec![],
+                    &[],
                 )
                 .unwrap();
-                ()
             }
-            None => (),
+            None => {}
         }
     }
 
     pub fn assert_fail(&self, res: Result<AppResponse, String>) {
         // new version of cosmwasm does not return detail error
         match res.err() {
-            Some(msg) => assert_eq!(msg.contains("error executing WasmMsg"), true),
+            Some(msg) => assert!(msg.contains("error executing WasmMsg")),
             None => panic!("Must return generic error"),
         }
     }

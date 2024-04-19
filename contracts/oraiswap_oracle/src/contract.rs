@@ -287,7 +287,7 @@ pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
 
 /// query_contract_balance: return native balance, currently only Orai denom
 pub fn query_contract_balance(deps: Deps, env: Env, denom: String) -> StdResult<Coin> {
-    deps.querier.query_balance(env.contract.address, &denom)
+    deps.querier.query_balance(env.contract.address, denom)
 }
 
 fn get_orai_exchange_rate(deps: Deps, denom: &str) -> StdResult<Decimal> {

@@ -55,13 +55,13 @@ pub fn execute_swap_operation(
             })?;
 
             // If there is an error, the default is for the pool to be open to everyone
-            let is_whitelisted: bool = match deps.querier.query_wasm_smart(
-                pair_info.contract_addr.to_string(),
-                &PairQueryMsg::TraderIsWhitelisted { trader: sender },
-            ) {
-                Ok(val) => val,
-                Err(_) => true,
-            };
+            let is_whitelisted = deps
+                .querier
+                .query_wasm_smart(
+                    pair_info.contract_addr.to_string(),
+                    &PairQueryMsg::TraderIsWhitelisted { trader: sender },
+                )
+                .unwrap_or(true);
 
             if !is_whitelisted {
                 return Err(ContractError::PoolWhitelisted {});
@@ -70,11 +70,11 @@ pub fn execute_swap_operation(
             let amount = match offer_asset_info.clone() {
                 AssetInfo::NativeToken { denom } => {
                     deps.querier
-                        .query_balance(env.contract.address, &denom)?
+                        .query_balance(env.contract.address, denom)?
                         .amount
                 }
                 AssetInfo::Token { contract_addr } => {
-                    query_token_balance(&deps.querier, contract_addr.into(), env.contract.address)?
+                    query_token_balance(&deps.querier, contract_addr, env.contract.address)?
                 }
             };
             let offer_asset: Asset = Asset {
