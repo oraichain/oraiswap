@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -29,6 +29,7 @@ pub enum ExecuteMsg {
     },
     RegisterAsset {
         staking_token: Addr,
+        unbonding_period: Option<u64>,
     },
     DeprecateStakingToken {
         staking_token: Addr,
@@ -74,6 +75,13 @@ pub enum ExecuteMsg {
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
+    UpdateUnbondingPeriod {
+        staking_token: Addr,
+        unbonding_period: u64,
+    },
+    Restake {
+        staking_token: Addr,
+    },
 }
 
 #[cw_serde]
@@ -92,6 +100,11 @@ pub struct AmountInfo {
     pub asset_info: AssetInfo,
     pub amount: Uint128,
     // pub new_staking_token: Addr,
+}
+#[cw_serde]
+pub struct LockInfo {
+    pub amount: Uint128,
+    pub unlock_time: Timestamp,
 }
 
 #[cw_serde]
@@ -121,6 +134,15 @@ pub enum QueryMsg {
     GetPoolsInformation {},
     #[returns(cosmwasm_std::Binary)]
     QueryOldStore { store_type: OldStoreType },
+    #[returns(LockInfosResponse)]
+    LockInfos {
+        staker_addr: Addr,
+        staking_token: Addr,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        // so can convert or throw error
+        order: Option<i32>,
+    },
 }
 
 // We define a custom struct for each query response
@@ -186,4 +208,16 @@ pub enum OldStoreType {
     Rewards { staker: String },
     IsMigrated { staker: String },
     RewardsPerSec {},
+}
+
+#[cw_serde]
+pub struct LockInfoResponse {
+    pub amount: Uint128,
+    pub unlock_time: u64,
+}
+#[cw_serde]
+pub struct LockInfosResponse {
+    pub staker_addr: Addr,
+    pub staking_token: Addr,
+    pub lock_infos: Vec<LockInfoResponse>,
 }

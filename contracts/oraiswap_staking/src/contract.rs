@@ -10,12 +10,12 @@ use crate::rewards::{
     deposit_reward, process_reward_assets, query_all_reward_infos, query_reward_info,
     withdraw_reward, withdraw_reward_others,
 };
-use crate::staking::{auto_stake, auto_stake_hook, bond, unbond};
+use crate::staking::{auto_stake, auto_stake_hook, bond, restake, unbond};
 use crate::state::{
     read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
-    read_rewards_per_sec, remove_pool_info, stakers_read, store_config,
-    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec, Config,
-    MigrationParams, PoolInfo,
+    read_rewards_per_sec, read_user_lock_info, remove_pool_info, stakers_read, store_config,
+    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec,
+    store_unbonding_period, Config, MigrationParams, PoolInfo,
 };
 
 use cosmwasm_std::{
@@ -24,8 +24,9 @@ use cosmwasm_std::{
 };
 use oraiswap::asset::{Asset, ORAI_DENOM};
 use oraiswap::staking::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, OldStoreType,
-    PoolInfoResponse, QueryMsg, QueryPoolInfoResponse, RewardsPerSecResponse,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockInfoResponse, LockInfosResponse,
+    MigrateMsg, OldStoreType, PoolInfoResponse, QueryMsg, QueryPoolInfoResponse,
+    RewardsPerSecResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -70,7 +71,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             assets,
         } => update_rewards_per_sec(deps, info, staking_token, assets),
         ExecuteMsg::DepositReward { rewards } => deposit_reward(deps, info, rewards),
-        ExecuteMsg::RegisterAsset { staking_token } => register_asset(deps, info, staking_token),
+        ExecuteMsg::RegisterAsset {
+            staking_token,
+            unbonding_period,
+        } => register_asset(deps, info, staking_token, unbonding_period),
         ExecuteMsg::DeprecateStakingToken {
             staking_token,
             new_staking_token,
@@ -100,6 +104,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
+        ExecuteMsg::UpdateUnbondingPeriod {
+            staking_token,
+            unbonding_period,
+        } => execute_update_unbonding_period(deps, info, staking_token, unbonding_period),
+        ExecuteMsg::Restake { staking_token } => restake(deps, env, info.sender, staking_token),
     }
 }
 
@@ -217,7 +226,12 @@ fn update_rewards_per_sec(
     Ok(Response::new().add_attribute("action", "update_rewards_per_sec"))
 }
 
-fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdResult<Response> {
+fn register_asset(
+    deps: DepsMut,
+    info: MessageInfo,
+    staking_token: Addr,
+    unbonding_period: Option<u64>,
+) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
 
@@ -235,7 +249,7 @@ fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdR
         deps.storage,
         &asset_key.clone(),
         &PoolInfo {
-            staking_token: asset_key,
+            staking_token: asset_key.clone(),
             total_bond_amount: Uint128::zero(),
             reward_index: Decimal::zero(),
             pending_reward: Uint128::zero(),
@@ -243,9 +257,19 @@ fn register_asset(deps: DepsMut, info: MessageInfo, staking_token: Addr) -> StdR
         },
     )?;
 
+    if let Some(unbonding_period) = unbonding_period {
+        if unbonding_period > 0 {
+            store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
+        }
+    }
+
     Ok(Response::new().add_attributes([
         ("action", "register_asset"),
         ("staking_token", staking_token.as_str()),
+        (
+            "unbonding_period",
+            &unbonding_period.unwrap_or(0).to_string(),
+        ),
     ]))
 }
 
@@ -296,8 +320,28 @@ fn deprecate_staking_token(
     ]))
 }
 
+fn execute_update_unbonding_period(
+    deps: DepsMut,
+    info: MessageInfo,
+    staking_token: Addr,
+    unbonding_period: u64,
+) -> StdResult<Response> {
+    let config: Config = read_config(deps.storage)?;
+
+    if config.owner != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
+    store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "update_unbonding_period")
+        .add_attribute("unbonding_period", unbonding_period.to_string()))
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::PoolInfo { staking_token } => to_binary(&query_pool_info(deps, staking_token)?),
@@ -322,6 +366,21 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
         QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
+        QueryMsg::LockInfos {
+            staker_addr,
+            staking_token,
+            start_after,
+            limit,
+            order,
+        } => to_binary(&query_lock_infos(
+            deps,
+            env,
+            staker_addr,
+            staking_token,
+            start_after,
+            limit,
+            order,
+        )?),
     }
 }
 
@@ -444,6 +503,36 @@ pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Bi
             to_binary(&list_old_rewards_store)
         }
     }
+}
+
+pub fn query_lock_infos(
+    deps: Deps,
+    _env: Env,
+    staker_addr: Addr,
+    staking_token: Addr,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+    order: Option<i32>,
+) -> StdResult<LockInfosResponse> {
+    let lock_infos = read_user_lock_info(
+        deps.storage,
+        staking_token.as_bytes(),
+        staker_addr.as_bytes(),
+        start_after,
+        limit,
+        order,
+    )?;
+    Ok(LockInfosResponse {
+        staker_addr,
+        staking_token,
+        lock_infos: lock_infos
+            .into_iter()
+            .map(|lock| LockInfoResponse {
+                amount: lock.amount,
+                unlock_time: lock.unlock_time.seconds(),
+            })
+            .collect(),
+    })
 }
 
 // migrate contract

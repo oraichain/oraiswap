@@ -119,6 +119,7 @@ fn test_register() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
     };
 
     // failed with unauthorized error
@@ -193,6 +194,7 @@ fn test_query_staker_pagination() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
     };
 
     let info = mock_info("owner", &[]);

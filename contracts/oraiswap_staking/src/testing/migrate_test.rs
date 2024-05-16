@@ -210,7 +210,8 @@ fn test_validate_migrate_store_status_with_execute_msg() {
             mock_env(),
             owner.clone(),
             ExecuteMsg::RegisterAsset {
-                staking_token: empty_addr.clone()
+                staking_token: empty_addr.clone(),
+                unbonding_period: None,
             }
         ),
         Err(StdError::generic_err(
