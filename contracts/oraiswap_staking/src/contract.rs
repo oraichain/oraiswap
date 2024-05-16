@@ -50,6 +50,9 @@ pub fn instantiate(
             factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
             // default base_denom pass to factory is orai token
             base_denom: msg.base_denom.unwrap_or(ORAI_DENOM.to_string()),
+            operator_addr: deps
+                .api
+                .addr_canonicalize(msg.operator_addr.unwrap_or(info.sender.clone()).as_str())?,
         },
     )?;
     // set to true to enable normal execute handling when instantiate
@@ -66,7 +69,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             rewarder,
             owner,
             migrate_store_status,
-        } => update_config(deps, info, owner, rewarder, migrate_store_status),
+            operator_addr,
+        } => update_config(
+            deps,
+            info,
+            owner,
+            rewarder,
+            migrate_store_status,
+            operator_addr,
+        ),
         ExecuteMsg::UpdateRewardsPerSec {
             staking_token,
             assets,
@@ -90,7 +101,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::Unbond {
             staking_token,
             amount,
-        } => unbond(deps, env, info.sender, staking_token, amount),
+            instant_unbond,
+        } => unbond(
+            deps,
+            env,
+            info.sender,
+            staking_token,
+            amount,
+            instant_unbond,
+        ),
         ExecuteMsg::Withdraw { staking_token } => withdraw_reward(deps, env, info, staking_token),
         ExecuteMsg::WithdrawOthers {
             staking_token,
@@ -169,6 +188,7 @@ pub fn update_config(
     owner: Option<Addr>,
     rewarder: Option<Addr>,
     migrate_store_status: Option<bool>,
+    operator_addr: Option<Addr>,
 ) -> StdResult<Response> {
     let mut config = read_config(deps.storage)?;
 
@@ -186,6 +206,9 @@ pub fn update_config(
 
     if let Some(migrate_store_status) = migrate_store_status {
         store_finish_migrate_store_status(deps.storage, migrate_store_status)?;
+    }
+    if let Some(operator_addr) = operator_addr {
+        config.operator_addr = deps.api.addr_canonicalize(operator_addr.as_str())?;
     }
 
     store_config(deps.storage, &config)?;
@@ -416,6 +439,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         oracle_addr: deps.api.addr_humanize(&state.oracle_addr)?,
         factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
         base_denom: state.base_denom,
+        operator_addr: deps.api.addr_humanize(&state.operator_addr)?,
     };
 
     Ok(resp)

@@ -13,6 +13,8 @@ pub struct InstantiateMsg {
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub base_denom: Option<String>,
+    // default is sender
+    pub operator_addr: Option<Addr>,
 }
 
 #[cw_serde]
@@ -26,6 +28,7 @@ pub enum ExecuteMsg {
         rewarder: Option<Addr>,
         owner: Option<Addr>,
         migrate_store_status: Option<bool>,
+        operator_addr: Option<Addr>,
     },
     RegisterAsset {
         staking_token: Addr,
@@ -53,6 +56,7 @@ pub enum ExecuteMsg {
     Unbond {
         staking_token: Addr,
         amount: Uint128,
+        instant_unbond: Option<bool>,
     },
     /// Withdraw pending rewards
     Withdraw {
@@ -155,6 +159,7 @@ pub struct ConfigResponse {
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub base_denom: String,
+    pub operator_addr: Addr,
 }
 
 #[cw_serde]

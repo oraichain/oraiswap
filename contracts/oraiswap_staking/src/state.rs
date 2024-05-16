@@ -28,6 +28,7 @@ pub struct Config {
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,
+    pub operator_addr: CanonicalAddr,
 }
 
 #[cw_serde]

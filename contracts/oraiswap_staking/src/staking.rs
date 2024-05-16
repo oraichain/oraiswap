@@ -45,9 +45,15 @@ pub fn unbond(
     staker_addr: Addr,
     staking_token: Addr,
     amount: Uint128,
+    instant_unbond: Option<bool>,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
+    let config = read_config(deps.storage)?;
+    let operator_addr = deps.api.addr_humanize(&config.operator_addr)?;
+
     let staker_addr_raw: CanonicalAddr = deps.api.addr_canonicalize(staker_addr.as_str())?;
+    // default don;t unbond instant
+    let instant_unbond = instant_unbond.unwrap_or_default();
 
     let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
     // withdraw_avaiable_lock
@@ -77,7 +83,7 @@ pub fn unbond(
                 instant_withdraw_fee: Decimal::zero(),
             });
 
-        if unbonding_config.unbonding_period > 0 {
+        if unbonding_config.unbonding_period > 0 && !instant_unbond {
             let unlock_time = env
                 .block
                 .time
@@ -100,7 +106,19 @@ pub fn unbond(
                 attr("unlock_time", unlock_time.seconds().to_string()),
             ])
         } else {
-            let unbond_response = _unbond(&staker_addr, &staking_token, amount)?;
+            let unbond_fee = if instant_unbond {
+                unbonding_config.instant_withdraw_fee
+            } else {
+                Decimal::zero()
+            };
+
+            let unbond_response = _unbond(
+                &staker_addr,
+                &staking_token,
+                amount,
+                unbond_fee,
+                &operator_addr,
+            )?;
             response = response
                 .add_submessages(unbond_response.messages)
                 .add_attributes(unbond_response.attributes);
@@ -368,28 +386,63 @@ pub fn _withdraw_lock(
         return Ok(Response::new());
     }
 
-    let unbond_response = _unbond(staker_addr, staking_token, unlock_amount)?;
+    let unbond_response = _unbond(
+        staker_addr,
+        staking_token,
+        unlock_amount,
+        Decimal::zero(),
+        staker_addr,
+    )?;
 
     Ok(unbond_response)
 }
 
-fn _unbond(staker_addr: &Addr, staking_token_addr: &Addr, amount: Uint128) -> StdResult<Response> {
-    let messages: Vec<CosmosMsg> = vec![WasmMsg::Execute {
-        contract_addr: staking_token_addr.to_string(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: staker_addr.to_string(),
-            amount,
-        })?,
-        funds: vec![],
-    }
-    .into()];
-
-    Ok(Response::new().add_messages(messages).add_attributes([
+fn _unbond(
+    staker_addr: &Addr,
+    staking_token_addr: &Addr,
+    amount: Uint128,
+    unbond_fee: Decimal,
+    operator_addr: &Addr,
+) -> StdResult<Response> {
+    let mut messages: Vec<CosmosMsg> = vec![];
+    let mut attrs = vec![
         attr("action", "unbond"),
         attr("staker_addr", staker_addr.as_str()),
         attr("amount", amount.to_string()),
         attr("staking_token", staking_token_addr.as_str()),
-    ]))
+    ];
+
+    let mut unbond_amount = amount;
+    if unbond_fee != Decimal::zero() {
+        let fee_amount = unbond_amount * unbond_fee;
+        unbond_amount -= fee_amount;
+        messages.push(
+            WasmMsg::Execute {
+                contract_addr: staking_token_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: operator_addr.to_string(),
+                    amount: fee_amount,
+                })?,
+                funds: vec![],
+            }
+            .into(),
+        );
+        attrs.push(attr("unbond_fee", fee_amount.to_string()))
+    }
+
+    messages.push(
+        WasmMsg::Execute {
+            contract_addr: staking_token_addr.to_string(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: staker_addr.to_string(),
+                amount: unbond_amount,
+            })?,
+            funds: vec![],
+        }
+        .into(),
+    );
+
+    Ok(Response::new().add_messages(messages).add_attributes(attrs))
 }
 
 pub fn restake(
