@@ -137,6 +137,7 @@ fn test_register() {
         vec![
             attr("action", "register_asset"),
             attr("staking_token", "staking"),
+            attr("unbonding_period", "0")
         ]
     );
 
