@@ -30,6 +30,7 @@ pub enum ExecuteMsg {
     RegisterAsset {
         staking_token: Addr,
         unbonding_period: Option<u64>,
+        instant_withdraw_fee: Option<Decimal>,
     },
     DeprecateStakingToken {
         staking_token: Addr,
@@ -77,7 +78,8 @@ pub enum ExecuteMsg {
     },
     UpdateUnbondingPeriod {
         staking_token: Addr,
-        unbonding_period: u64,
+        unbonding_period: Option<u64>,
+        instant_withdraw_fee: Option<Decimal>,
     },
     Restake {
         staking_token: Addr,

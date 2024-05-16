@@ -1,9 +1,10 @@
 use crate::contract::validate_migrate_store_status;
 use crate::rewards::before_share_change;
 use crate::state::{
-    insert_lock_info, read_config, read_is_migrated, read_pool_info, read_unbonding_period,
+    insert_lock_info, read_config, read_is_migrated, read_pool_info, read_unbonding_config,
     remove_and_accumulate_lock_info, remove_and_accumulate_lock_info_restake, rewards_read,
     rewards_store, stakers_store, store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
+    UnbondingConfig,
 };
 use cosmwasm_std::{
     attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
@@ -70,8 +71,17 @@ pub fn unbond(
         );
 
         // checking bonding period
-        if let Ok(period) = read_unbonding_period(deps.storage, &asset_key) {
-            let unlock_time = env.block.time.plus_seconds(period);
+        let unbonding_config =
+            read_unbonding_config(deps.storage, &asset_key).unwrap_or(UnbondingConfig {
+                unbonding_period: 0,
+                instant_withdraw_fee: Decimal::zero(),
+            });
+
+        if unbonding_config.unbonding_period > 0 {
+            let unlock_time = env
+                .block
+                .time
+                .plus_seconds(unbonding_config.unbonding_period);
             insert_lock_info(
                 deps.storage,
                 staking_token.as_bytes(),

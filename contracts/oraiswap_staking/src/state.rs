@@ -16,7 +16,7 @@ pub static PREFIX_REWARDS_PER_SEC: &[u8] = b"rewards_per_sec_v3";
 pub static KEY_MIGRATE_STORE_CHECK: &[u8] = b"migrate_store_check";
 
 // Unbonded
-pub static UNBONDING_PERIOD: &[u8] = b"unbonding_period";
+pub static UNBONDING_CONFIG: &[u8] = b"unbonding_config";
 pub static LOCK_INFO: &[u8] = b"locking_users";
 pub const DEFAULT_LIMIT: u32 = 10;
 pub const MAX_LIMIT: u32 = 30;
@@ -28,6 +28,12 @@ pub struct Config {
     pub oracle_addr: CanonicalAddr,
     pub factory_addr: CanonicalAddr,
     pub base_denom: String,
+}
+
+#[cw_serde]
+pub struct UnbondingConfig {
+    pub unbonding_period: u64,
+    pub instant_withdraw_fee: Decimal,
 }
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
@@ -147,16 +153,19 @@ pub fn read_rewards_per_sec(storage: &dyn Storage, asset_key: &[u8]) -> StdResul
     weight_bucket.load(asset_key)
 }
 
-pub fn store_unbonding_period(
+pub fn store_unbonding_config(
     storage: &mut dyn Storage,
     asset_key: &[u8],
-    period: u64,
+    unbonding_config: UnbondingConfig,
 ) -> StdResult<()> {
-    Bucket::new(storage, UNBONDING_PERIOD).save(asset_key, &period)
+    Bucket::new(storage, UNBONDING_CONFIG).save(asset_key, &unbonding_config)
 }
 
-pub fn read_unbonding_period(storage: &dyn Storage, asset_key: &[u8]) -> StdResult<u64> {
-    ReadonlyBucket::new(storage, UNBONDING_PERIOD).load(asset_key)
+pub fn read_unbonding_config(
+    storage: &dyn Storage,
+    asset_key: &[u8],
+) -> StdResult<UnbondingConfig> {
+    ReadonlyBucket::new(storage, UNBONDING_CONFIG).load(asset_key)
 }
 
 pub fn insert_lock_info(

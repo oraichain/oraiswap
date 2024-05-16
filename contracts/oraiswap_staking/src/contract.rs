@@ -13,9 +13,10 @@ use crate::rewards::{
 use crate::staking::{auto_stake, auto_stake_hook, bond, restake, unbond};
 use crate::state::{
     read_all_pool_infos, read_config, read_finish_migrate_store_status, read_pool_info,
-    read_rewards_per_sec, read_user_lock_info, remove_pool_info, stakers_read, store_config,
-    store_finish_migrate_store_status, store_pool_info, store_rewards_per_sec,
-    store_unbonding_period, Config, MigrationParams, PoolInfo,
+    read_rewards_per_sec, read_unbonding_config, read_user_lock_info, remove_pool_info,
+    stakers_read, store_config, store_finish_migrate_store_status, store_pool_info,
+    store_rewards_per_sec, store_unbonding_config, Config, MigrationParams, PoolInfo,
+    UnbondingConfig,
 };
 
 use cosmwasm_std::{
@@ -74,7 +75,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::RegisterAsset {
             staking_token,
             unbonding_period,
-        } => register_asset(deps, info, staking_token, unbonding_period),
+            instant_withdraw_fee,
+        } => register_asset(
+            deps,
+            info,
+            staking_token,
+            unbonding_period,
+            instant_withdraw_fee,
+        ),
         ExecuteMsg::DeprecateStakingToken {
             staking_token,
             new_staking_token,
@@ -107,7 +115,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::UpdateUnbondingPeriod {
             staking_token,
             unbonding_period,
-        } => execute_update_unbonding_period(deps, info, staking_token, unbonding_period),
+            instant_withdraw_fee,
+        } => execute_update_unbonding_config(
+            deps,
+            info,
+            staking_token,
+            unbonding_period,
+            instant_withdraw_fee,
+        ),
         ExecuteMsg::Restake { staking_token } => restake(deps, env, info.sender, staking_token),
     }
 }
@@ -231,6 +246,7 @@ fn register_asset(
     info: MessageInfo,
     staking_token: Addr,
     unbonding_period: Option<u64>,
+    instant_withdraw_fee: Option<Decimal>,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
@@ -257,11 +273,12 @@ fn register_asset(
         },
     )?;
 
-    if let Some(unbonding_period) = unbonding_period {
-        if unbonding_period > 0 {
-            store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
-        }
-    }
+    let unbonding_config = UnbondingConfig {
+        unbonding_period: unbonding_period.unwrap_or_default(),
+        instant_withdraw_fee: instant_withdraw_fee.unwrap_or_default(),
+    };
+
+    store_unbonding_config(deps.storage, &asset_key, unbonding_config)?;
 
     Ok(Response::new().add_attributes([
         ("action", "register_asset"),
@@ -320,11 +337,12 @@ fn deprecate_staking_token(
     ]))
 }
 
-fn execute_update_unbonding_period(
+fn execute_update_unbonding_config(
     deps: DepsMut,
     info: MessageInfo,
     staking_token: Addr,
-    unbonding_period: u64,
+    unbonding_period: Option<u64>,
+    instant_withdraw_fee: Option<Decimal>,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
@@ -333,11 +351,17 @@ fn execute_update_unbonding_period(
     }
 
     let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
-    store_unbonding_period(deps.storage, &asset_key, unbonding_period)?;
+    let mut unbonding_config = read_unbonding_config(deps.storage, &asset_key)?;
+    if let Some(unbonding_period) = unbonding_period {
+        unbonding_config.unbonding_period = unbonding_period;
+    }
+    if let Some(instant_withdraw_fee) = instant_withdraw_fee {
+        unbonding_config.instant_withdraw_fee = instant_withdraw_fee;
+    }
 
-    Ok(Response::new()
-        .add_attribute("action", "update_unbonding_period")
-        .add_attribute("unbonding_period", unbonding_period.to_string()))
+    store_unbonding_config(deps.storage, &asset_key, unbonding_config)?;
+
+    Ok(Response::new().add_attribute("action", "update_unbonding_config"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

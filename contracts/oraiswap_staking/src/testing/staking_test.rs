@@ -83,6 +83,7 @@ fn test_bond_tokens() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -217,6 +218,7 @@ fn test_unbond() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -472,6 +474,7 @@ fn test_auto_stake() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: pair_info.liquidity_token.clone(),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let _res = app

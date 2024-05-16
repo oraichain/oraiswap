@@ -55,6 +55,7 @@ fn test_deposit_reward() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: staking_token.clone(),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -186,6 +187,7 @@ fn test_deposit_reward_when_no_bonding() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -305,6 +307,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -515,6 +518,7 @@ fn test_withdraw() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: lp_addr.clone(),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let _res = app
@@ -626,6 +630,7 @@ fn test_update_rewards_per_sec() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: staking_token.clone(),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -771,6 +776,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
+        instant_withdraw_fee: None,
     };
 
     let info = mock_info("owner", &[]);
