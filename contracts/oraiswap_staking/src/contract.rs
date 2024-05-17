@@ -131,7 +131,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             staker_addr,
             prev_staking_token_amount,
         ),
-        ExecuteMsg::UpdateUnbondingPeriod {
+        ExecuteMsg::UpdateUnbondingConfig {
             staking_token,
             unbonding_period,
             instant_unbond_fee,

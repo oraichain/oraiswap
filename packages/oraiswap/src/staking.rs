@@ -80,7 +80,7 @@ pub enum ExecuteMsg {
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
-    UpdateUnbondingPeriod {
+    UpdateUnbondingConfig {
         staking_token: Addr,
         unbonding_period: Option<u64>,
         instant_unbond_fee: Option<Decimal>,
