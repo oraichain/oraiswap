@@ -48,6 +48,7 @@ pub fn unbond(
     instant_unbond: Option<bool>,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
+
     let config = read_config(deps.storage)?;
     let operator_addr = deps.api.addr_humanize(&config.operator_addr)?;
 
@@ -333,7 +334,6 @@ fn _decrease_bond_amount(
 
     // Distribute reward to pending reward; before changing share
     before_share_change(pool_index, &mut reward_info)?;
-
     // Decrease total bond amount
     if !should_migrate {
         // if it should migrate, we dont need to decrease from the current total bond amount

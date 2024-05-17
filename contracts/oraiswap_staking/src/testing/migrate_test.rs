@@ -68,6 +68,7 @@ fn test_validate_migrate_store_status() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
     let owner = mock_info("owner", &[]);
     let _res = instantiate(deps.as_mut(), mock_env(), owner.clone(), msg).unwrap();
@@ -82,6 +83,7 @@ fn test_validate_migrate_store_status() {
             rewarder: None,
             owner: None,
             migrate_store_status: Some(false),
+            operator_addr: None,
         },
     )
     .unwrap();
@@ -105,6 +107,7 @@ fn test_validate_migrate_store_status_with_execute_msg() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
     let owner = mock_info("owner", &[]);
     let empty_addr = Addr::unchecked("");
@@ -118,6 +121,7 @@ fn test_validate_migrate_store_status_with_execute_msg() {
             rewarder: None,
             owner: None,
             migrate_store_status: Some(false),
+            operator_addr: None,
         },
     )
     .unwrap();
@@ -226,7 +230,8 @@ fn test_validate_migrate_store_status_with_execute_msg() {
             owner.clone(),
             ExecuteMsg::Unbond {
                 staking_token: empty_addr.clone(),
-                amount: Uint128::zero()
+                amount: Uint128::zero(),
+                instant_unbond: Some(false),
             }
         ),
         Err(StdError::generic_err(

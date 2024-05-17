@@ -26,6 +26,7 @@ fn test_deposit_reward() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -158,6 +159,7 @@ fn test_deposit_reward_when_no_bonding() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -278,6 +280,7 @@ fn test_before_share_changes() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -387,6 +390,7 @@ fn test_before_share_changes() {
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
         amount: Uint128::from(100u128),
+        instant_unbond: Some(false),
     };
     let info = mock_info("addr", &[]);
     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -450,6 +454,7 @@ fn test_withdraw() {
         oracle_addr: app.oracle_addr.clone(),
         factory_addr: app.factory_addr.clone(),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
@@ -600,6 +605,7 @@ fn test_update_rewards_per_sec() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
     let staking_token = Addr::unchecked("staking_token");
 
@@ -747,6 +753,7 @@ fn test_update_rewards_per_sec_with_multiple_bond() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);

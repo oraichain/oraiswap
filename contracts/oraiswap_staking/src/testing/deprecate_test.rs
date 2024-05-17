@@ -24,6 +24,7 @@ fn test_deprecate() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -208,6 +209,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("new_staking"),
         amount: Uint128::from(100u128),
+        instant_unbond: Some(false),
     };
     let info = mock_info("addr", &[]);
     let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
