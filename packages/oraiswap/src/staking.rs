@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::asset::{Asset, AssetInfo};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[cw_serde]
@@ -13,6 +13,8 @@ pub struct InstantiateMsg {
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub base_denom: Option<String>,
+    // default is sender
+    pub operator_addr: Option<Addr>,
 }
 
 #[cw_serde]
@@ -26,9 +28,12 @@ pub enum ExecuteMsg {
         rewarder: Option<Addr>,
         owner: Option<Addr>,
         migrate_store_status: Option<bool>,
+        operator_addr: Option<Addr>,
     },
     RegisterAsset {
         staking_token: Addr,
+        unbonding_period: Option<u64>,
+        instant_unbond_fee: Option<Decimal>,
     },
     DeprecateStakingToken {
         staking_token: Addr,
@@ -51,6 +56,7 @@ pub enum ExecuteMsg {
     Unbond {
         staking_token: Addr,
         amount: Uint128,
+        instant_unbond: Option<bool>,
     },
     /// Withdraw pending rewards
     Withdraw {
@@ -74,6 +80,14 @@ pub enum ExecuteMsg {
         staker_addr: Addr,
         prev_staking_token_amount: Uint128,
     },
+    UpdateUnbondingConfig {
+        staking_token: Addr,
+        unbonding_period: Option<u64>,
+        instant_unbond_fee: Option<Decimal>,
+    },
+    Restake {
+        staking_token: Addr,
+    },
 }
 
 #[cw_serde]
@@ -92,6 +106,11 @@ pub struct AmountInfo {
     pub asset_info: AssetInfo,
     pub amount: Uint128,
     // pub new_staking_token: Addr,
+}
+#[cw_serde]
+pub struct LockInfo {
+    pub amount: Uint128,
+    pub unlock_time: Timestamp,
 }
 
 #[cw_serde]
@@ -121,6 +140,17 @@ pub enum QueryMsg {
     GetPoolsInformation {},
     #[returns(cosmwasm_std::Binary)]
     QueryOldStore { store_type: OldStoreType },
+    #[returns(LockInfosResponse)]
+    LockInfos {
+        staker_addr: Addr,
+        staking_token: Addr,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        // so can convert or throw error
+        order: Option<i32>,
+    },
+    #[returns(UnbondConfigResponse)]
+    UnbondConfig { staking_token: Addr },
 }
 
 // We define a custom struct for each query response
@@ -131,6 +161,7 @@ pub struct ConfigResponse {
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub base_denom: String,
+    pub operator_addr: Addr,
 }
 
 #[cw_serde]
@@ -186,4 +217,22 @@ pub enum OldStoreType {
     Rewards { staker: String },
     IsMigrated { staker: String },
     RewardsPerSec {},
+}
+
+#[cw_serde]
+pub struct LockInfoResponse {
+    pub amount: Uint128,
+    pub unlock_time: u64,
+}
+#[cw_serde]
+pub struct LockInfosResponse {
+    pub staker_addr: Addr,
+    pub staking_token: Addr,
+    pub lock_infos: Vec<LockInfoResponse>,
+}
+
+#[cw_serde]
+pub struct UnbondConfigResponse {
+    pub unbonding_period: u64,
+    pub instant_unbond_fee: Decimal,
 }
