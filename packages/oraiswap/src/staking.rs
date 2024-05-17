@@ -149,6 +149,8 @@ pub enum QueryMsg {
         // so can convert or throw error
         order: Option<i32>,
     },
+    #[returns(UnbondConfigResponse)]
+    UnbondConfig { staking_token: Addr },
 }
 
 // We define a custom struct for each query response
@@ -227,4 +229,10 @@ pub struct LockInfosResponse {
     pub staker_addr: Addr,
     pub staking_token: Addr,
     pub lock_infos: Vec<LockInfoResponse>,
+}
+
+#[cw_serde]
+pub struct UnbondConfigResponse {
+    pub unbonding_period: u64,
+    pub instant_unbond_fee: Decimal,
 }

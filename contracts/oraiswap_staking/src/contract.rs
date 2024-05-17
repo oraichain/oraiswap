@@ -27,7 +27,7 @@ use oraiswap::asset::{Asset, ORAI_DENOM};
 use oraiswap::staking::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockInfoResponse, LockInfosResponse,
     MigrateMsg, OldStoreType, PoolInfoResponse, QueryMsg, QueryPoolInfoResponse,
-    RewardsPerSecResponse,
+    RewardsPerSecResponse, UnbondConfigResponse,
 };
 
 use cw20::Cw20ReceiveMsg;
@@ -428,7 +428,24 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order,
         )?),
+        QueryMsg::UnbondConfig { staking_token } => {
+            to_binary(&query_unbond_config(deps, staking_token)?)
+        }
     }
+}
+
+fn query_unbond_config(deps: Deps, staking_token: Addr) -> StdResult<UnbondConfigResponse> {
+    let asset_key = deps.api.addr_canonicalize(staking_token.as_str())?;
+    let unbond_config =
+        read_unbonding_config(deps.storage, &asset_key).unwrap_or(UnbondingConfig {
+            unbonding_period: 0,
+            instant_unbond_fee: Decimal::zero(),
+        });
+
+    Ok(UnbondConfigResponse {
+        unbonding_period: unbond_config.unbonding_period,
+        instant_unbond_fee: unbond_config.instant_unbond_fee,
+    })
 }
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
