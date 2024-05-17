@@ -33,7 +33,7 @@ fn test_deprecate() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
-        instant_withdraw_fee: None,
+        instant_unbond_fee: None,
     };
 
     let info = mock_info("owner", &[]);

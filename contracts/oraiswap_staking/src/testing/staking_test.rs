@@ -85,7 +85,7 @@ fn test_bond_tokens() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
-        instant_withdraw_fee: None,
+        instant_unbond_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -221,7 +221,7 @@ fn test_unbond() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period: None,
-        instant_withdraw_fee: None,
+        instant_unbond_fee: None,
     };
 
     let info = mock_info("owner", &[]);
@@ -480,7 +480,7 @@ fn test_auto_stake() {
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: pair_info.liquidity_token.clone(),
         unbonding_period: None,
-        instant_withdraw_fee: None,
+        instant_unbond_fee: None,
     };
 
     let _res = app
@@ -635,9 +635,9 @@ fn test_auto_stake() {
 #[test]
 fn test_unbonding_period_happy_case() {
     let unbonding_period = 100;
-    let instant_withdraw_fee = Decimal::from_ratio(1u128, 100u128);
+    let instant_unbond_fee = Decimal::from_ratio(1u128, 100u128);
 
-    let mut deps = _setup_staking(Some(unbonding_period), Some(instant_withdraw_fee));
+    let mut deps = _setup_staking(Some(unbonding_period), Some(instant_unbond_fee));
 
     let msg = ExecuteMsg::Unbond {
         staking_token: Addr::unchecked("staking"),
@@ -810,8 +810,8 @@ fn test_unbonding_period_happy_case() {
 #[test]
 pub fn test_multiple_lock() {
     let unbonding_period = 10000;
-    let instant_withdraw_fee = Decimal::zero();
-    let mut deps = _setup_staking(Some(unbonding_period), Some(instant_withdraw_fee));
+    let instant_unbond_fee = Decimal::zero();
+    let mut deps = _setup_staking(Some(unbonding_period), Some(instant_unbond_fee));
     let info = mock_info("addr", &[]);
     let mut unbond_env = mock_env();
 
@@ -899,7 +899,7 @@ pub fn test_multiple_lock() {
 
 fn _setup_staking(
     unbonding_period: Option<u64>,
-    instant_withdraw_fee: Option<Decimal>,
+    instant_unbond_fee: Option<Decimal>,
 ) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let mut deps = mock_dependencies_with_balance(&[
         coin(10000000000u128, ORAI_DENOM),
@@ -944,7 +944,7 @@ fn _setup_staking(
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
         unbonding_period,
-        instant_withdraw_fee,
+        instant_unbond_fee,
     };
 
     let info = mock_info("owner", &[]);
@@ -1029,8 +1029,8 @@ fn _setup_staking(
 fn test_restake() {
     // Arrange
     let unbonding_period = 10000;
-    let instant_withdraw_fee = Decimal::from_ratio(1u128, 100u128);
-    let mut deps = _setup_staking(Some(unbonding_period), Some((instant_withdraw_fee)));
+    let instant_unbond_fee = Decimal::from_ratio(1u128, 100u128);
+    let mut deps = _setup_staking(Some(unbonding_period), Some((instant_unbond_fee)));
     let info = mock_info("addr", &[]);
     let unbond_env = mock_env();
 

@@ -34,7 +34,7 @@ pub struct Config {
 #[cw_serde]
 pub struct UnbondingConfig {
     pub unbonding_period: u64,
-    pub instant_withdraw_fee: Decimal,
+    pub instant_unbond_fee: Decimal,
 }
 
 pub fn store_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {

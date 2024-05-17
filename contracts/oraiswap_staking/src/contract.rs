@@ -86,13 +86,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::RegisterAsset {
             staking_token,
             unbonding_period,
-            instant_withdraw_fee,
+            instant_unbond_fee,
         } => register_asset(
             deps,
             info,
             staking_token,
             unbonding_period,
-            instant_withdraw_fee,
+            instant_unbond_fee,
         ),
         ExecuteMsg::DeprecateStakingToken {
             staking_token,
@@ -134,13 +134,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::UpdateUnbondingPeriod {
             staking_token,
             unbonding_period,
-            instant_withdraw_fee,
+            instant_unbond_fee,
         } => execute_update_unbonding_config(
             deps,
             info,
             staking_token,
             unbonding_period,
-            instant_withdraw_fee,
+            instant_unbond_fee,
         ),
         ExecuteMsg::Restake { staking_token } => restake(deps, env, info.sender, staking_token),
     }
@@ -269,7 +269,7 @@ fn register_asset(
     info: MessageInfo,
     staking_token: Addr,
     unbonding_period: Option<u64>,
-    instant_withdraw_fee: Option<Decimal>,
+    instant_unbond_fee: Option<Decimal>,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
     let config: Config = read_config(deps.storage)?;
@@ -298,7 +298,7 @@ fn register_asset(
 
     let unbonding_config = UnbondingConfig {
         unbonding_period: unbonding_period.unwrap_or_default(),
-        instant_withdraw_fee: instant_withdraw_fee.unwrap_or_default(),
+        instant_unbond_fee: instant_unbond_fee.unwrap_or_default(),
     };
 
     store_unbonding_config(deps.storage, &asset_key, unbonding_config)?;
@@ -365,7 +365,7 @@ fn execute_update_unbonding_config(
     info: MessageInfo,
     staking_token: Addr,
     unbonding_period: Option<u64>,
-    instant_withdraw_fee: Option<Decimal>,
+    instant_unbond_fee: Option<Decimal>,
 ) -> StdResult<Response> {
     let config: Config = read_config(deps.storage)?;
 
@@ -378,8 +378,8 @@ fn execute_update_unbonding_config(
     if let Some(unbonding_period) = unbonding_period {
         unbonding_config.unbonding_period = unbonding_period;
     }
-    if let Some(instant_withdraw_fee) = instant_withdraw_fee {
-        unbonding_config.instant_withdraw_fee = instant_withdraw_fee;
+    if let Some(instant_unbond_fee) = instant_unbond_fee {
+        unbonding_config.instant_unbond_fee = instant_unbond_fee;
     }
 
     store_unbonding_config(deps.storage, &asset_key, unbonding_config)?;

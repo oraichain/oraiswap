@@ -81,7 +81,7 @@ pub fn unbond(
         let unbonding_config =
             read_unbonding_config(deps.storage, &asset_key).unwrap_or(UnbondingConfig {
                 unbonding_period: 0,
-                instant_withdraw_fee: Decimal::zero(),
+                instant_unbond_fee: Decimal::zero(),
             });
 
         if unbonding_config.unbonding_period > 0 && !instant_unbond {
@@ -108,7 +108,7 @@ pub fn unbond(
             ])
         } else {
             let unbond_fee = if instant_unbond {
-                unbonding_config.instant_withdraw_fee
+                unbonding_config.instant_unbond_fee
             } else {
                 Decimal::zero()
             };
