@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use cosmwasm_std::{Api, CanonicalAddr, Order, StdError, StdResult, Storage};
 use cosmwasm_storage::{Bucket, ReadonlyBucket};
 use oraiswap::asset::AssetRaw;

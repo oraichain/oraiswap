@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use cosmwasm_std::{Api, Order, Response, StdResult, Storage};
 use oraiswap::asset::AssetInfo;
 
