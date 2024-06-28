@@ -645,6 +645,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "decimal"
+version = "0.1.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=0f10ca377b33379aae97ad109b022be6c3702933#0f10ca377b33379aae97ad109b022be6c3702933"
+dependencies = [
+ "decimal-core",
+ "integer-sqrt",
+ "num-traits",
+ "uint",
+]
+
+[[package]]
+name = "decimal-core"
+version = "0.1.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=0f10ca377b33379aae97ad109b022be6c3702933#0f10ca377b33379aae97ad109b022be6c3702933"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.53",
+]
+
+[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1265,6 +1287,7 @@ dependencies = [
  "cw-utils 0.16.0",
  "cw20",
  "cw20-base",
+ "oraiswap-v3",
  "protobuf",
  "schemars",
  "serde",
@@ -1294,6 +1317,23 @@ dependencies = [
  "oraiswap-oracle",
  "oraiswap-pair",
  "oraiswap-token",
+]
+
+[[package]]
+name = "oraiswap-mixed-router"
+version = "0.2.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus 1.0.1",
+ "cw20",
+ "oraiswap",
+ "oraiswap-factory",
+ "oraiswap-oracle",
+ "oraiswap-pair",
+ "oraiswap-token",
+ "oraiswap-v3",
 ]
 
 [[package]]
@@ -1412,6 +1452,21 @@ dependencies = [
  "cw20",
  "cw20-base",
  "oraiswap",
+ "thiserror",
+]
+
+[[package]]
+name = "oraiswap-v3"
+version = "0.1.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=0f10ca377b33379aae97ad109b022be6c3702933#0f10ca377b33379aae97ad109b022be6c3702933"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus 1.0.1",
+ "cw2 1.0.1",
+ "cw20",
+ "decimal",
  "thiserror",
 ]
 
@@ -1613,6 +1668,31 @@ dependencies = [
  "rustc-hash",
  "smallvec",
 ]
+
+[[package]]
+name = "regex"
+version = "1.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b91213439dad192326a0d7c6ee3955910425f441d7038e0d6933b0aec5c4517f"
+dependencies = [
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38caf58cc5ef2fed281f89292ef23f6365465ed9a41b7a7754eb4e26496c92df"
+dependencies = [
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 
 [[package]]
 name = "region"

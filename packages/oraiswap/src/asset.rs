@@ -169,6 +169,16 @@ impl fmt::Display for AssetInfo {
 }
 
 impl AssetInfo {
+    pub fn from_denom(api: &dyn Api, denom: &str) -> Self {
+        if let Ok(contract_addr) = api.addr_validate(denom) {
+            Self::Token { contract_addr }
+        } else {
+            Self::NativeToken {
+                denom: denom.to_string(),
+            }
+        }
+    }
+
     pub fn to_vec(&self, api: &dyn Api) -> StdResult<Vec<u8>> {
         match self {
             AssetInfo::NativeToken { denom } => Ok(denom.as_bytes().to_vec()),
