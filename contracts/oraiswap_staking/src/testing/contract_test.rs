@@ -21,6 +21,7 @@ fn proper_initialization() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -38,6 +39,7 @@ fn proper_initialization() {
             oracle_addr: Addr::unchecked("oracle"),
             factory_addr: Addr::unchecked("factory"),
             base_denom: ORAI_DENOM.to_string(),
+            operator_addr: Addr::unchecked("operator"),
         },
         config
     );
@@ -54,6 +56,7 @@ fn update_config() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -65,6 +68,7 @@ fn update_config() {
         owner: Some(Addr::unchecked("owner2")),
         rewarder: None,
         migrate_store_status: Some(true),
+        operator_addr: Some(Addr::unchecked("operator2")),
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -80,6 +84,7 @@ fn update_config() {
             oracle_addr: Addr::unchecked("oracle"),
             factory_addr: Addr::unchecked("factory"),
             base_denom: ORAI_DENOM.to_string(),
+            operator_addr: Addr::unchecked("operator2"),
         },
         config
     );
@@ -90,6 +95,7 @@ fn update_config() {
         rewarder: None,
         owner: None,
         migrate_store_status: None,
+        operator_addr: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info, msg);
@@ -110,6 +116,7 @@ fn test_register() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -119,6 +126,8 @@ fn test_register() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
+        instant_unbond_fee: None,
     };
 
     // failed with unauthorized error
@@ -136,6 +145,7 @@ fn test_register() {
         vec![
             attr("action", "register_asset"),
             attr("staking_token", "staking"),
+            attr("unbonding_period", "0")
         ]
     );
 
@@ -172,6 +182,7 @@ fn test_query_staker_pagination() {
         oracle_addr: Addr::unchecked("oracle"),
         factory_addr: Addr::unchecked("factory"),
         base_denom: None,
+        operator_addr: Some(Addr::unchecked("operator")),
     };
 
     let info = mock_info("addr", &[]);
@@ -193,6 +204,8 @@ fn test_query_staker_pagination() {
 
     let msg = ExecuteMsg::RegisterAsset {
         staking_token: Addr::unchecked("staking"),
+        unbonding_period: None,
+        instant_unbond_fee: None,
     };
 
     let info = mock_info("owner", &[]);
