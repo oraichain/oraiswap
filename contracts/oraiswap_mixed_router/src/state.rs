@@ -37,6 +37,7 @@ mod test {
             &Config {
                 factory_addr: deps.api.addr_canonicalize("addr0000").unwrap(),
                 factory_addr_v2: deps.api.addr_canonicalize("addr0000_v2").unwrap(),
+                oraiswap_v3: deps.api.addr_canonicalize("oraiswap_v3").unwrap(),
             },
         )
         .unwrap();
