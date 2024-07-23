@@ -40,7 +40,8 @@ message Memo {
   // transfer
   message PostAction {
     optional IbcTransfer ibc_transfer_msg = 1;
-    optional ContractCall contract_call = 2;
+    optional IbcWasmTransfer ibc_wasm_transfer_msg = 2;
+    optional ContractCall contract_call = 3;
   }
 
   message IbcTransfer {
@@ -49,6 +50,20 @@ message Memo {
     string receiver = 3;
     string memo = 4;
     string recover_address = 5;
+  }
+
+  message IbcWasmTransfer {
+    /// the local ibc endpoint you want to send tokens back on
+    string local_channel_id = 1;
+    string remote_address = 2; // can be 0x or bech32
+    /// remote denom so that we know what denom to filter when we query based on
+    /// the asset info. Most likely be: oraib0x... or eth0x...
+    string remote_denom = 3;
+    /// How long the packet lives in seconds. If not specified, use
+    /// default_timeout
+    optional uint64 timeout = 4;
+    /// metadata of the transfer to suit the new fungible token transfer
+    optional string memo = 5;
   }
 
   message ContractCall {

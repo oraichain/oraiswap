@@ -71,6 +71,8 @@ pub mod memo {
         #[prost(message, optional, tag="1")]
         pub ibc_transfer_msg: ::core::option::Option<IbcTransfer>,
         #[prost(message, optional, tag="2")]
+        pub ibc_wasm_transfer_msg: ::core::option::Option<IbcWasmTransfer>,
+        #[prost(message, optional, tag="3")]
         pub contract_call: ::core::option::Option<ContractCall>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -86,6 +88,27 @@ pub mod memo {
         pub memo: ::prost::alloc::string::String,
         #[prost(string, tag="5")]
         pub recover_address: ::prost::alloc::string::String,
+    }
+    #[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct IbcWasmTransfer {
+        /// / the local ibc endpoint you want to send tokens back on
+        #[prost(string, tag="1")]
+        pub local_channel_id: ::prost::alloc::string::String,
+        /// can be 0x or bech32
+        #[prost(string, tag="2")]
+        pub remote_address: ::prost::alloc::string::String,
+        /// / remote denom so that we know what denom to filter when we query based on
+        /// / the asset info. Most likely be: oraib0x... or eth0x...
+        #[prost(string, tag="3")]
+        pub remote_denom: ::prost::alloc::string::String,
+        /// / How long the packet lives in seconds. If not specified, use
+        /// / default_timeout
+        #[prost(uint64, optional, tag="4")]
+        pub timeout: ::core::option::Option<u64>,
+        /// / metadata of the transfer to suit the new fungible token transfer
+        #[prost(string, optional, tag="5")]
+        pub memo: ::core::option::Option<::prost::alloc::string::String>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
