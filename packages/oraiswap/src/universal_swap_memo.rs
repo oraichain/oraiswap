@@ -20,10 +20,8 @@ pub mod memo {
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SwapExactAssetIn {
-        #[prost(string, tag="1")]
-        pub offer_amount: ::prost::alloc::string::String,
-        #[prost(message, repeated, tag="2")]
-        pub operations: ::prost::alloc::vec::Vec<SwapOperation>,
+        #[prost(message, optional, tag="1")]
+        pub route: ::core::option::Option<Route>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
