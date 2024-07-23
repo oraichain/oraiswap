@@ -44,6 +44,10 @@ pub mod memo {
     pub struct SwapOperation {
         #[prost(string, tag="1")]
         pub pool_id: ::prost::alloc::string::String,
+        #[prost(string, tag="2")]
+        pub denom_in: ::prost::alloc::string::String,
+        #[prost(string, tag="3")]
+        pub denom_out: ::prost::alloc::string::String,
     }
     /// if none is provided -> error, if more than one attributes are provided ->
     /// error

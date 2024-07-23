@@ -23,6 +23,8 @@ message Memo {
 
   message SwapOperation {
     string poolId = 1;
+    string denomIn = 2;
+    string denomOut = 3;
   }
 
   // if none is provided -> error, if more than one attributes are provided ->
