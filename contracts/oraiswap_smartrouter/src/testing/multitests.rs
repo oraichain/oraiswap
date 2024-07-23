@@ -294,9 +294,12 @@ mod test {
                 },
             )
             .unwrap_err();
-        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. \
-         Err: \"Generic error: Querier contract error: \
-         Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
+        assert!(err.to_string().contains(
+            "Querier contract error: Generic error: Minimum receive of simulate smart route is 0."
+        ));
+        assert!(err
+            .to_string()
+            .contains("Querier contract error: type: oraiswap::asset::PairInfoRaw"));
         let max_minimum_receive = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),

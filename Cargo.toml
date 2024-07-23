@@ -19,10 +19,10 @@ exclude = [
 ]
 
 [workspace.dependencies]
-cosmwasm-std = { version = "1.2.8" }
-cosmwasm-schema = { version = "1.2.8" }
-cosmwasm-storage = { version = "1.2.8" }
-cosmwasm-vm = { version = "1.2.8" }
+cosmwasm-std = { version = "1.5.0" }
+cosmwasm-schema = { version = "1.5.0" }
+cosmwasm-storage = { version = "1.5.0" }
+cosmwasm-vm = { version = "1.5.0" }
 
 thiserror = "1.0.26"
 
@@ -30,7 +30,7 @@ cw2 = { version = "1.0.1" }
 cw20 = { version = "1.0.1" }
 cw20-base = { version = "1.0.1" }
 cw-storage-plus = { version = "1.0.1" }
-cw-multi-test = "0.16.6"
+cw-multi-test = "0.20.0"
 cw-utils = "0.16.0"
 
 oraiswap = { path = "./packages/oraiswap" }
@@ -40,7 +40,7 @@ oraiswap-pair = { path = "./contracts/oraiswap_pair" }
 oraiswap-factory = { path = "./contracts/oraiswap_factory" }
 oraiswap-router = { path = "./contracts/oraiswap_router" }
 
-cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git", rev = "77d6a49" }
+cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git", rev = "33a262f" }
 
 [profile.release]
 opt-level = 3

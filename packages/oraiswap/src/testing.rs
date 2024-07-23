@@ -455,7 +455,9 @@ impl MockApp {
     pub fn assert_fail(&self, res: Result<AppResponse, String>) {
         // new version of cosmwasm does not return detail error
         match res.err() {
-            Some(msg) => assert!(msg.contains("error executing WasmMsg")),
+            Some(msg) => {
+                assert!(msg.contains("Error executing WasmMsg"))
+            }
             None => panic!("Must return generic error"),
         }
     }
