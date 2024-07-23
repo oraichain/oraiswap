@@ -6,7 +6,8 @@ use cosmwasm_std::{
     MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
-use oraiswap_v3::msg::{QueryMsg as SwapV3QueryMsg, QuoteResult};
+use oraiswap_v3::interface::QuoteResult;
+use oraiswap_v3::msg::QueryMsg as SwapV3QueryMsg;
 use oraiswap_v3::sqrt_price::SqrtPrice;
 use oraiswap_v3::token_amount::TokenAmount;
 use oraiswap_v3::{MAX_TICK, MIN_TICK};
