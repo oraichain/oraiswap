@@ -42,39 +42,8 @@ pub mod memo {
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SwapOperation {
-        #[prost(message, optional, tag="1")]
-        pub pool_id: ::core::option::Option<PoolId>,
-    }
-    #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct FeeTier {
-        #[prost(uint64, tag="1")]
-        pub fee: u64,
-        #[prost(uint32, tag="2")]
-        pub tick_spacing: u32,
-    }
-    #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct PoolKey {
         #[prost(string, tag="1")]
-        pub token_x: ::prost::alloc::string::String,
-        #[prost(string, tag="2")]
-        pub token_y: ::prost::alloc::string::String,
-        #[prost(message, optional, tag="3")]
-        pub fee_tier: ::core::option::Option<FeeTier>,
-    }
-    #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct PoolId {
-        /// v2
-        #[prost(string, optional, tag="1")]
-        pub pair_address: ::core::option::Option<::prost::alloc::string::String>,
-        /// v3
-        #[prost(message, optional, tag="2")]
-        pub pool_key: ::core::option::Option<PoolKey>,
-        /// we can use this to create v2 swap operation as well
-        #[prost(bool, tag="3")]
-        pub x_to_y: bool,
+        pub pool_id: ::prost::alloc::string::String,
     }
     /// if none is provided -> error, if more than one attributes are provided ->
     /// error

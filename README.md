@@ -80,5 +80,5 @@ brew install protobuf
 
 cargo install protoc-gen-prost
 
-protoc --prost_out packages/oraiswap/src --proto_path packages/oraiswap/src -I proto packages/oraiswap/src/universal-swap-memo.proto && mv packages/oraiswap/src/_ packages/oraiswap/src/universal_swap_memo.rs
+protoc --prost_out packages/oraiswap/src --proto_path packages/oraiswap/src -I proto packages/oraiswap/src/universal_swap_memo.proto && mv packages/oraiswap/src/_ packages/oraiswap/src/universal_swap_memo.rs
 ```

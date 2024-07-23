@@ -21,26 +21,8 @@ message Memo {
     repeated SwapOperation operations = 2;
   }
 
-  message SwapOperation { PoolId poolId = 1; }
-
-  message FeeTier {
-    uint64 fee = 1;
-    uint32 tick_spacing = 2;
-  }
-
-  message PoolKey {
-    string token_x = 1;
-    string token_y = 2;
-    optional FeeTier feeTier = 3;
-  }
-
-  message PoolId {
-    // v2
-    optional string pairAddress = 1;
-    // v3
-    optional PoolKey poolKey = 2;
-    // we can use this to create v2 swap operation as well
-    bool x_to_y = 3;
+  message SwapOperation {
+    string poolId = 1;
   }
 
   // if none is provided -> error, if more than one attributes are provided ->
