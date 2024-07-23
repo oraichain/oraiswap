@@ -17,11 +17,13 @@ pub struct Memo {
 }
 /// Nested message and enum types in `Memo`.
 pub mod memo {
+    /// we dont need swap amount since it will be sent via cw20 or native, and we
+    /// use that
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SwapExactAssetIn {
-        #[prost(message, optional, tag="1")]
-        pub route: ::core::option::Option<Route>,
+        #[prost(message, repeated, tag="2")]
+        pub operations: ::prost::alloc::vec::Vec<SwapOperation>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

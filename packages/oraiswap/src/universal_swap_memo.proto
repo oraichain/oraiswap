@@ -9,7 +9,9 @@ message Memo {
   PostAction post_swap_action = 4;
   string recovery_addr = 5;
 
-  message SwapExactAssetIn { Route route = 1; }
+  // we dont need swap amount since it will be sent via cw20 or native, and we
+  // use that
+  message SwapExactAssetIn { repeated SwapOperation operations = 2; }
 
   message SmartSwapExactAssetIn { repeated Route routes = 1; }
 
