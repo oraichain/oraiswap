@@ -22,19 +22,13 @@ pub mod memo {
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SwapExactAssetIn {
-        /// or adapter name so that the smart router can redirect to the right swap
-        /// router.
-        #[prost(string, tag="1")]
-        pub swap_venue_name: ::prost::alloc::string::String,
-        #[prost(message, repeated, tag="2")]
+        #[prost(message, repeated, tag="1")]
         pub operations: ::prost::alloc::vec::Vec<SwapOperation>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SmartSwapExactAssetIn {
-        #[prost(string, tag="1")]
-        pub swap_venue_name: ::prost::alloc::string::String,
-        #[prost(message, repeated, tag="2")]
+        #[prost(message, repeated, tag="1")]
         pub routes: ::prost::alloc::vec::Vec<Route>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -60,9 +54,13 @@ pub mod memo {
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct UserSwap {
-        #[prost(message, optional, tag="1")]
-        pub swap_exact_asset_in: ::core::option::Option<SwapExactAssetIn>,
+        /// or adapter name so that the smart router can redirect to the right swap
+        /// router.
+        #[prost(string, tag="1")]
+        pub swap_venue_name: ::prost::alloc::string::String,
         #[prost(message, optional, tag="2")]
+        pub swap_exact_asset_in: ::core::option::Option<SwapExactAssetIn>,
+        #[prost(message, optional, tag="3")]
         pub smart_swap_exact_asset_in: ::core::option::Option<SmartSwapExactAssetIn>,
     }
     /// Can possibly have both? -> if both then always contract_call first then ibc
