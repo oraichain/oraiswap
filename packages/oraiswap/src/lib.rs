@@ -13,6 +13,7 @@ pub mod rewarder;
 pub mod router;
 pub mod smartrouter;
 pub mod staking;
+pub mod universal_swap_memo;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use cw_multi_test;

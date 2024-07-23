@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+message Memo {
+
+  UserSwap user_swap = 1;
+  // string because the minimum receive may be very high due to decimal points
+  string minimum_receive = 2;
+  uint64 timeout_timestamp = 3;
+  PostAction post_swap_action = 4;
+  string recovery_addr = 5;
+
+  message SwapExactAssetIn {
+    string offer_amount = 1;
+    repeated SwapOperation operations = 2;
+  }
+
+  message SmartSwapExactAssetIn { repeated Route routes = 1; }
+
+  message Route {
+    string offer_amount = 1;
+    repeated SwapOperation operations = 2;
+  }
+
+  message SwapOperation { PoolId poolId = 1; }
+
+  message FeeTier {
+    uint64 fee = 1;
+    uint32 tick_spacing = 2;
+  }
+
+  message PoolKey {
+    string token_x = 1;
+    string token_y = 2;
+    optional FeeTier feeTier = 3;
+  }
+
+  message PoolId {
+    // v2
+    optional string pairAddress = 1;
+    // v3
+    optional PoolKey poolKey = 2;
+    // we can use this to create v2 swap operation as well
+    bool x_to_y = 3;
+  }
+
+  // if none is provided -> error, if more than one attributes are provided ->
+  // error
+  message UserSwap {
+    optional SwapExactAssetIn swap_exact_asset_in = 1;
+    optional SmartSwapExactAssetIn smart_swap_exact_asset_in = 2;
+  }
+
+  // Can possibly have both? -> if both then always contract_call first then ibc
+  // transfer
+  message PostAction {
+    optional IbcTransfer ibc_transfer_msg = 1;
+    optional ContractCall contract_call = 2;
+  }
+
+  message IbcTransfer {
+    string source_channel = 1;
+    string source_port = 2;
+    string receiver = 3;
+    string memo = 4;
+    string recover_address = 5;
+  }
+
+  message ContractCall {
+    string contract_address = 1;
+    string msg = 2;
+  }
+}
