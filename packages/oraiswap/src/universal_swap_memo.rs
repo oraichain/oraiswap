@@ -22,13 +22,19 @@ pub mod memo {
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SwapExactAssetIn {
+        /// or adapter name so that the smart router can redirect to the right swap
+        /// router.
+        #[prost(string, tag="1")]
+        pub swap_venue_name: ::prost::alloc::string::String,
         #[prost(message, repeated, tag="2")]
         pub operations: ::prost::alloc::vec::Vec<SwapOperation>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SmartSwapExactAssetIn {
-        #[prost(message, repeated, tag="1")]
+        #[prost(string, tag="1")]
+        pub swap_venue_name: ::prost::alloc::string::String,
+        #[prost(message, repeated, tag="2")]
         pub routes: ::prost::alloc::vec::Vec<Route>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]

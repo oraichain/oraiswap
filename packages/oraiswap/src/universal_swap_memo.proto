@@ -11,9 +11,17 @@ message Memo {
 
   // we dont need swap amount since it will be sent via cw20 or native, and we
   // use that
-  message SwapExactAssetIn { repeated SwapOperation operations = 2; }
+  message SwapExactAssetIn {
+    // or adapter name so that the smart router can redirect to the right swap
+    // router.
+    string swap_venue_name = 1;
+    repeated SwapOperation operations = 2;
+  }
 
-  message SmartSwapExactAssetIn { repeated Route routes = 1; }
+  message SmartSwapExactAssetIn {
+    string swap_venue_name = 1;
+    repeated Route routes = 2;
+  }
 
   message Route {
     string offer_amount = 1;
