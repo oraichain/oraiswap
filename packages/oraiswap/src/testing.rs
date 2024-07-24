@@ -4,6 +4,7 @@ use cosmwasm_std::{
     coin, Addr, AllBalanceResponse, Attribute, BalanceResponse, BankQuery, Coin, Decimal, Empty,
     QuerierWrapper, QueryRequest, StdResult, Uint128,
 };
+use oraiswap_v3::percentage::Percentage;
 use std::collections::HashMap;
 
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
@@ -42,6 +43,7 @@ pub struct MockApp {
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub router_addr: Addr,
+    pub v3_addr: Addr,
 }
 
 impl MockApp {
@@ -79,6 +81,7 @@ impl MockApp {
             factory_addr: Addr::unchecked(""),
             router_addr: Addr::unchecked(""),
             token_map: HashMap::new(),
+            v3_addr: Addr::unchecked(""),
         }
     }
 
@@ -450,6 +453,21 @@ impl MockApp {
             }
             None => {}
         }
+    }
+
+    pub fn create_v3(&mut self, code: Box<dyn Contract<Empty>>) {
+        let code_id = self.upload(code);
+        self.v3_addr = self
+            .instantiate(
+                code_id,
+                Addr::unchecked(APP_OWNER),
+                &oraiswap_v3::msg::InstantiateMsg {
+                    protocol_fee: Percentage(0),
+                },
+                &[],
+                "router",
+            )
+            .unwrap();
     }
 
     pub fn assert_fail(&self, res: Result<AppResponse, String>) {
