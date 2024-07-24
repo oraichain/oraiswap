@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    coin, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    coin, from_json, to_json_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
@@ -92,7 +92,7 @@ pub fn receive_cw20(
     let sender = deps.api.addr_validate(&cw20_msg.sender)?;
 
     // throw empty data as well when decoding
-    match from_binary(&cw20_msg.msg)? {
+    match from_json(&cw20_msg.msg)? {
         Cw20HookMsg::ExecuteSwapOperations {
             operations,
             minimum_receive,
@@ -128,7 +128,7 @@ fn assert_minium_receive_and_transfer(
         }),
         AssetInfo::Token { contract_addr } => CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: contract_addr.to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: receiver.to_string(),
                 amount: curr_balance,
             })?,
@@ -142,11 +142,11 @@ fn assert_minium_receive_and_transfer(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::SimulateSwapOperations {
             offer_amount,
             operations,
-        } => to_binary(&simulate_swap_operations(deps, offer_amount, operations)?),
+        } => to_json_binary(&simulate_swap_operations(deps, offer_amount, operations)?),
     }
 }
 
@@ -155,6 +155,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let resp = ConfigResponse {
         factory_addr: deps.api.addr_humanize(&state.factory_addr)?,
         factory_addr_v2: deps.api.addr_humanize(&state.factory_addr_v2)?,
+        oraiswap_v3: deps.api.addr_humanize(&state.oraiswap_v3)?,
     };
 
     Ok(resp)

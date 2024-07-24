@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
+    coin, to_json_binary, Addr, Api, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use oraiswap_v3::PoolKey;
@@ -95,6 +95,7 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub factory_addr: Addr,
     pub factory_addr_v2: Addr,
+    pub oraiswap_v3: Addr,
 }
 
 // We define a custom struct for each query response
@@ -104,9 +105,9 @@ pub struct SimulateSwapOperationsResponse {
 }
 
 #[cw_serde]
-pub struct RouterController(pub String);
+pub struct MixedRouterController(pub String);
 
-impl RouterController {
+impl MixedRouterController {
     pub fn addr(&self) -> String {
         self.0.clone()
     }
@@ -125,10 +126,10 @@ impl RouterController {
         let cosmos_msg: CosmosMsg = match swap_asset_info {
             AssetInfo::Token { contract_addr } => WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
-                msg: to_binary(&Cw20ExecuteMsg::Send {
+                msg: to_json_binary(&Cw20ExecuteMsg::Send {
                     contract: self.addr(),
                     amount,
-                    msg: to_binary(&Cw20HookMsg::ExecuteSwapOperations {
+                    msg: to_json_binary(&Cw20HookMsg::ExecuteSwapOperations {
                         operations,
                         minimum_receive,
                         to: swap_to.map(|to| to.into_string()),
@@ -139,7 +140,7 @@ impl RouterController {
             .into(),
             AssetInfo::NativeToken { denom } => WasmMsg::Execute {
                 contract_addr: self.addr(),
-                msg: to_binary(&ExecuteMsg::ExecuteSwapOperations {
+                msg: to_json_binary(&ExecuteMsg::ExecuteSwapOperations {
                     operations,
                     minimum_receive,
                     to: swap_to,

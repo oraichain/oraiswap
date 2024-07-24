@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
+    coin, to_json_binary, Addr, Api, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
     Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
@@ -118,7 +118,7 @@ pub fn execute_swap_operation(
                         .amount;
                     msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                         contract_addr: oraiswap_v3.to_string(),
-                        msg: to_binary(&OraiswapV3ExecuteMsg::Swap {
+                        msg: to_json_binary(&OraiswapV3ExecuteMsg::Swap {
                             pool_key,
                             x_to_y,
                             amount: TokenAmount(balance.into()),
@@ -138,7 +138,7 @@ pub fn execute_swap_operation(
                     // approve first
                     msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                         contract_addr: contract_addr.to_string(),
-                        msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                        msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                             spender: oraiswap_v3.to_string(),
                             amount: balance.clone(),
                             expires: None,
@@ -147,7 +147,7 @@ pub fn execute_swap_operation(
                     }));
                     msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                         contract_addr: oraiswap_v3.to_string(),
-                        msg: to_binary(&OraiswapV3ExecuteMsg::Swap {
+                        msg: to_json_binary(&OraiswapV3ExecuteMsg::Swap {
                             pool_key,
                             x_to_y,
                             amount: TokenAmount(balance.into()),
@@ -194,7 +194,7 @@ pub fn execute_swap_operations(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: env.contract.address.to_string(),
                 funds: vec![],
-                msg: to_binary(&ExecuteMsg::ExecuteSwapOperation {
+                msg: to_json_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: op,
                     to: None,
                     sender: sender.clone(),
@@ -209,7 +209,7 @@ pub fn execute_swap_operations(
     messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: env.contract.address.to_string(),
         funds: vec![],
-        msg: to_binary(&ExecuteMsg::AssertMinimumReceiveAndTransfer {
+        msg: to_json_binary(&ExecuteMsg::AssertMinimumReceiveAndTransfer {
             asset_info: target_asset_info,
             minimum_receive,
             receiver: to,
@@ -244,7 +244,7 @@ fn asset_into_swap_msg(
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: pair_contract.to_string(),
                 funds: vec![Coin { denom, amount }],
-                msg: to_binary(&PairExecuteMsg::Swap {
+                msg: to_json_binary(&PairExecuteMsg::Swap {
                     offer_asset: Asset {
                         amount,
                         ..offer_asset
@@ -258,10 +258,10 @@ fn asset_into_swap_msg(
         AssetInfo::Token { contract_addr } => Ok(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: contract_addr.to_string(),
             funds: vec![],
-            msg: to_binary(&Cw20ExecuteMsg::Send {
+            msg: to_json_binary(&Cw20ExecuteMsg::Send {
                 contract: pair_contract.to_string(),
                 amount: offer_asset.amount,
-                msg: to_binary(&PairExecuteMsgCw20::Swap {
+                msg: to_json_binary(&PairExecuteMsgCw20::Swap {
                     belief_price: None,
                     max_spread,
                     to,
