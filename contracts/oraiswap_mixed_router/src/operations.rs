@@ -184,6 +184,7 @@ pub fn execute_swap_operations(
     assert_operations(deps.api, &operations)?;
 
     let to = to.unwrap_or(sender.clone());
+
     let target_asset_info = operations.last().unwrap().get_target_asset_info(deps.api);
 
     let mut operation_index = 0;

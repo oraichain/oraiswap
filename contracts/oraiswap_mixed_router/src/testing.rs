@@ -862,17 +862,50 @@ fn execute_mixed_swap_operations() {
         to: None,
     };
 
-    let res = app
-        .execute(
-            Addr::unchecked("addr0000"),
-            token_x.clone(),
-            &Cw20ExecuteMsg::Send {
-                contract: router_addr.to_string(),
-                amount: Uint128::new(1000000),
-                msg: to_json_binary(&msg_swap).unwrap(),
-            },
-            &[],
-        )
+    let mut balances_before = app
+        .query_token_balances(Addr::unchecked("addr0000"))
         .unwrap();
-    println!("{:?}", res.events);
+    balances_before.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances_before,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(997402498276)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(998500149965)
+            }
+        ]
+    );
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        token_x.clone(),
+        &Cw20ExecuteMsg::Send {
+            contract: router_addr.to_string(),
+            amount: Uint128::new(1000000),
+            msg: to_json_binary(&msg_swap).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+    let mut balances_after = app
+        .query_token_balances(Addr::unchecked("addr0000"))
+        .unwrap();
+    balances_after.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances_after,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(997402498276)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(998499249564)
+            }
+        ]
+    );
 }
