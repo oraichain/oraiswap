@@ -173,19 +173,18 @@ impl Memo {
     }
 
     pub fn validate(&self) -> StdResult<()> {
-        if self.user_swap.is_none() {
-            return Err(StdError::generic_err("No user swap"));
+        if let Some(user_swap) = self.user_swap.clone() {
+            if user_swap.swap_exact_asset_in.is_none()
+                && user_swap.smart_swap_exact_asset_in.is_none()
+            {
+                return Err(StdError::generic_err("No swap messages"));
+            }
+            if user_swap.swap_exact_asset_in.is_some()
+                && user_swap.smart_swap_exact_asset_in.is_some()
+            {
+                return Err(StdError::generic_err("Cannot have two swap exacts"));
+            }
         }
-        let user_swap = self.user_swap.clone().unwrap();
-        if user_swap.swap_exact_asset_in.is_none() && user_swap.smart_swap_exact_asset_in.is_none()
-        {
-            return Err(StdError::generic_err("No swap messages"));
-        }
-        if user_swap.swap_exact_asset_in.is_some() && user_swap.smart_swap_exact_asset_in.is_some()
-        {
-            return Err(StdError::generic_err("Cannot have two swap exacts"));
-        }
-
         Ok(())
     }
 }
