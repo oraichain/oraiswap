@@ -50,7 +50,7 @@ fn basic_fixture() -> (MockApp, Addr) {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    app.set_token_balances(&[(&"asset".to_string(), &[("addr0000", 1000000000u128)])]);
+    app.set_token_balances(&[("asset", &[("addr0000", 1000000000u128)])]);
 
     let msg = InstantiateMsg {
         name: None,
@@ -1618,11 +1618,11 @@ fn cancel_order_token() {
 
     let token_addrs = app.set_token_balances(&[
         (
-            &"assetA".to_string(),
+            "assetA",
             &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
         (
-            &"assetB".to_string(),
+            "assetB",
             &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
     ]);
@@ -3051,7 +3051,7 @@ fn execute_pair_cw20_token() {
 
     let token_addrs = app.set_token_balances(&[
         (
-            &"usdt".to_string(),
+            "usdt",
             &[
                 ("addr0000", 1000000u128),
                 ("addr0001", 1000000u128),
@@ -3059,7 +3059,7 @@ fn execute_pair_cw20_token() {
             ],
         ),
         (
-            &"uusd".to_string(),
+            "uusd",
             &[
                 ("addr0000", 1000000u128),
                 ("addr0001", 1000000u128),
@@ -5138,11 +5138,11 @@ fn orders_querier() {
 
     let token_addrs = app.set_token_balances(&[
         (
-            &"assetA".to_string(),
+            "assetA",
             &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
         (
-            &"assetB".to_string(),
+            "assetB",
             &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
     ]);
@@ -6008,7 +6008,7 @@ fn test_market_order() {
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     let token_addrs = app.set_token_balances(&[(
-        &"usdt".to_string(),
+        "usdt",
         &[
             ("addr0000", 10000000u128),
             ("addr0001", 10000000u128),
@@ -6451,7 +6451,7 @@ fn test_market_order() {
 
     // case submit cw20 market order failed, invalid funds
     let new_tokens = app.set_token_balances(&[(
-        &"uusd".to_string(),
+        "uusd",
         &[
             ("addr0000", 10000000u128),
             ("addr0001", 10000000u128),
@@ -6525,7 +6525,7 @@ fn test_query_simulate_market_order() {
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     let token_addrs = app.set_token_balances(&[(
-        &"usdt".to_string(),
+        "usdt",
         &[
             ("addr0000", 10000000u128),
             ("addr0001", 10000000u128),

@@ -428,8 +428,8 @@ fn test_withdraw() {
 
     // update other contract token balance
     app.set_token_balances(&[
-        (&"reward".to_string(), &[("addr", 10000000000u128)]),
-        (&"asset".to_string(), &[("addr", 10000000000u128)]),
+        ("reward", &[("addr", 10000000000u128)]),
+        ("asset", &[("addr", 10000000000u128)]),
     ])
     .unwrap();
 

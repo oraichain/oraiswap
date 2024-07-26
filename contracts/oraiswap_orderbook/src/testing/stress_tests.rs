@@ -137,7 +137,7 @@ fn simulate_submit_orders(
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     // init token
-    let usdt_addr = app.set_token_balances(&[(&"usdt".to_string(), &[])]);
+    let usdt_addr = app.set_token_balances(&[("usdt", &[])]);
 
     for sender in senders.iter() {
         app.set_balances(&[(
@@ -145,7 +145,7 @@ fn simulate_submit_orders(
             &[(sender, 10000000000000u128)],
         )]);
         app.set_token_balances(&[(
-            &"usdt".to_string(),
+            "usdt",
             &[(sender, 10000000000000u128)],
         )]);
     }

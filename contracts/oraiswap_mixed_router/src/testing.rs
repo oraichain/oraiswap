@@ -174,7 +174,7 @@ fn execute_swap_operations() {
     let asset_addr = app.create_token("asset");
 
     app.set_token_balances(&[(
-        &"asset".to_string(),
+        "asset",
         &[("addr0000", 1000000u128)],
     )]);
 
@@ -565,11 +565,11 @@ fn simulate_mixed_swap() {
     let token_y = app.create_token(token_y_name);
 
     app.set_token_balances(&[(
-        &"tokenx".to_string(),
+        "tokenx",
         &[("addr0000", 1000000000000u128)],
     )]);
     app.set_token_balances(&[(
-        &"tokeny".to_string(),
+        "tokeny",
         &[("addr0000", 1000000000000u128)],
     )]);
 
@@ -713,11 +713,11 @@ fn execute_mixed_swap_operations() {
     let token_y = app.create_token(token_y_name);
 
     app.set_token_balances(&[(
-        &"tokenx".to_string(),
+        "tokenx",
         &[("addr0000", 1000000000000u128)],
     )]);
     app.set_token_balances(&[(
-        &"tokeny".to_string(),
+        "tokeny",
         &[("addr0000", 1000000000000u128)],
     )]);
 

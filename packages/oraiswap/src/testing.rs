@@ -331,9 +331,9 @@ mod tests {
             "LPA",
             &[
                 (&MOCK_CONTRACT_ADDR.to_string(), 123u128),
-                (&"addr00000".to_string(), 123u128),
-                (&"addr00001".to_string(), 123u128),
-                (&"addr00002".to_string(), 123u128),
+                ("addr00000", 123u128),
+                ("addr00001", 123u128),
+                ("addr00002", 123u128),
             ],
         )])
         .unwrap();
@@ -363,9 +363,9 @@ mod tests {
             "ASSET",
             &[
                 (&MOCK_CONTRACT_ADDR.to_string(), 123u128),
-                (&"addr00000".to_string(), 123u128),
-                (&"addr00001".to_string(), 123u128),
-                (&"addr00002".to_string(), 123u128),
+                ("addr00000", 123u128),
+                ("addr00001", 123u128),
+                ("addr00002", 123u128),
             ],
         )])
         .unwrap();

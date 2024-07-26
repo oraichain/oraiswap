@@ -167,7 +167,7 @@ fn execute_swap_operations() {
 
     let asset_addr = app.create_token("asset");
 
-    app.set_token_balances(&[(&"asset".to_string(), &[("addr0000", 1000000u128)])])
+    app.set_token_balances(&[("asset", &[("addr0000", 1000000u128)])])
         .unwrap();
 
     let asset_infos1 = [
