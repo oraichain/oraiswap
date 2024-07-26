@@ -16,7 +16,7 @@ pub mod staking;
 pub mod universal_swap_memo;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use cw_multi_test;
+pub use cosmwasm_testing_util;
 
 // for other to use, but not compile to wasm
 #[cfg(not(target_arch = "wasm32"))]

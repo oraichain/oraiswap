@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::{Addr, Coin, Decimal, StdError, Uint128};
+    use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
     use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
     use oraiswap::create_entry_points_testing;
     use oraiswap::router::SwapOperation;

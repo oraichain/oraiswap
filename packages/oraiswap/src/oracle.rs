@@ -2,8 +2,8 @@ use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{
-    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult, Uint128,
-    WasmMsg,
+    to_json_binary, Addr, Api, CanonicalAddr, CosmosMsg, Decimal, QuerierWrapper, StdResult,
+    Uint128, WasmMsg,
 };
 
 #[cw_serde]
@@ -162,7 +162,7 @@ impl OracleContract {
     }
 
     pub fn call(&self, msg: ExecuteMsg) -> StdResult<CosmosMsg> {
-        let msg = to_binary(&msg)?;
+        let msg = to_json_binary(&msg)?;
         Ok(WasmMsg::Execute {
             contract_addr: self.to_string(),
             msg,

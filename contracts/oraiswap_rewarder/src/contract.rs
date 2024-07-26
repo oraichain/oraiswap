@@ -1,6 +1,6 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper, Response,
+    to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, QuerierWrapper, Response,
     StdError, StdResult, Uint128, WasmMsg,
 };
 
@@ -136,7 +136,7 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: staking_contract.to_string(),
-            msg: to_binary(&StakingExecuteMsg::DepositReward { rewards })?,
+            msg: to_json_binary(&StakingExecuteMsg::DepositReward { rewards })?,
             funds: vec![],
         }))
         .add_attribute("action", "distribute"))
@@ -145,12 +145,12 @@ pub fn distribute(deps: DepsMut, env: Env, staking_tokens: Vec<Addr>) -> StdResu
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::DistributionInfo { staking_token } => {
-            to_binary(&query_distribution_info(deps, staking_token)?)
+            to_json_binary(&query_distribution_info(deps, staking_token)?)
         }
         QueryMsg::RewardAmountPerSec { staking_token } => {
-            to_binary(&query_reward_amount_per_sec(deps, staking_token)?)
+            to_json_binary(&query_reward_amount_per_sec(deps, staking_token)?)
         }
     }
 }
