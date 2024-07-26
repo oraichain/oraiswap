@@ -137,17 +137,12 @@ fn simulate_submit_orders(
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     // init token
-    let usdt_addr = app.set_token_balances(&[("usdt", &[])]);
+    let usdt_addr = app.set_token_balances(&[("usdt", &[])]).unwrap();
 
     for sender in senders.iter() {
-        app.set_balances(&[(
-            &ORAI_DENOM.to_string(),
-            &[(sender, 10000000000000u128)],
-        )]);
-        app.set_token_balances(&[(
-            "usdt",
-            &[(sender, 10000000000000u128)],
-        )]);
+        app.set_balances(&[(&ORAI_DENOM.to_string(), &[(sender, 10000000000000u128)])]);
+        app.set_token_balances(&[("usdt", &[(sender, 10000000000000u128)])])
+            .unwrap();
     }
 
     let msg = InstantiateMsg {

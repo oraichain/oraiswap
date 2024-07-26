@@ -127,6 +127,10 @@ impl MockApp {
         self.app.create_token(APP_OWNER, token, 0)
     }
 
+    pub fn set_balances(&mut self, balances: &[(&str, &[(&str, u128)])]) {
+        self.app.set_balances(APP_OWNER, balances)
+    }
+
     pub fn create_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
         if !self.factory_addr.as_str().is_empty() {
             let contract_addr = self.factory_addr.clone();
