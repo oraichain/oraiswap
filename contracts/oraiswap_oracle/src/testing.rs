@@ -1,5 +1,5 @@
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
-use cosmwasm_std::{to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, Uint128, WasmMsg};
 
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
@@ -167,7 +167,7 @@ fn test_asset() {
             .unwrap(),
         CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "asset0000".into(),
-            msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
+            msg: to_json_binary(&cw20::Cw20ExecuteMsg::Transfer {
                 recipient: "addr0000".into(),
                 amount: Uint128::from(123123u128),
             })

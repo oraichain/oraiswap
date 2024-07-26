@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg,
+    entry_point, from_json, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg,
     Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -70,7 +70,7 @@ pub fn receive_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
-    match from_binary(&cw20_msg.msg) {
+    match from_json(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Convert {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -265,7 +265,7 @@ fn process_build_convert_msg(
             };
             Ok(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
-                msg: to_binary(&cw20_msg).unwrap(),
+                msg: to_json_binary(&cw20_msg).unwrap(),
                 funds: vec![],
             }))
         }
@@ -293,7 +293,7 @@ fn process_build_convert_reverse_msg(
             if is_mint_burn {
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),
-                    msg: to_binary(&Cw20ExecuteMsg::Burn {
+                    msg: to_json_binary(&Cw20ExecuteMsg::Burn {
                         amount: from_asset.amount,
                     })?,
                     funds: vec![],
@@ -308,8 +308,10 @@ fn process_build_convert_reverse_msg(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::ConvertInfo { asset_info } => to_binary(&query_convert_info(deps, asset_info)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::ConvertInfo { asset_info } => {
+            to_json_binary(&query_convert_info(deps, asset_info)?)
+        }
     }
 }
 

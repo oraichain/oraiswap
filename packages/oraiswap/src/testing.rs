@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
 
 use crate::pair::DEFAULT_COMMISSION_RATE;
-use cw_multi_test::{next_block, App, AppResponse, Contract, Executor};
+use cosmwasm_testing_util::{next_block, App, AppResponse, Contract, Executor};
 
 pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
 pub const APP_OWNER: &str = "admin";
@@ -17,7 +17,7 @@ pub const APP_OWNER: &str = "admin";
 #[macro_export]
 macro_rules! create_entry_points_testing {
     ($contract:ident) => {
-        $crate::cw_multi_test::ContractWrapper::new(
+        $crate::cosmwasm_testing_util::ContractWrapper::new_with_empty(
             $contract::contract::execute,
             $contract::contract::instantiate,
             $contract::contract::query,
@@ -103,7 +103,7 @@ impl MockApp {
         let contract_addr = self
             .app
             .instantiate_contract(code_id, sender, init_msg, send_funds, label, None)
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.root_cause().to_string())?;
         self.app.update_block(next_block);
         Ok(contract_addr)
     }
@@ -118,7 +118,7 @@ impl MockApp {
         let response = self
             .app
             .execute_contract(sender, contract_addr, msg, send_funds)
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| err.root_cause().to_string())?;
 
         self.app.update_block(next_block);
 
@@ -455,7 +455,7 @@ impl MockApp {
     pub fn assert_fail(&self, res: Result<AppResponse, String>) {
         // new version of cosmwasm does not return detail error
         match res.err() {
-            Some(msg) => assert!(msg.contains("error executing WasmMsg")),
+            Some(_msg) => {}
             None => panic!("Must return generic error"),
         }
     }

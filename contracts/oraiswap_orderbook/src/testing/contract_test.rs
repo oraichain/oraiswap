@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_std::testing::mock_dependencies;
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -1122,7 +1122,7 @@ fn submit_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1212121u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -1700,7 +1700,7 @@ fn cancel_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1234567u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -1723,7 +1723,7 @@ fn cancel_order_token() {
     let msg2 = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333335u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1746,7 +1746,7 @@ fn cancel_order_token() {
     let msg3 = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333336u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1796,7 +1796,7 @@ fn cancel_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1223344u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -3122,7 +3122,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3157,7 +3157,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(9u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3254,7 +3254,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3285,7 +3285,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3319,7 +3319,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3352,7 +3352,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3417,7 +3417,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3450,7 +3450,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3514,7 +3514,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3547,7 +3547,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3704,7 +3704,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3737,7 +3737,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3771,7 +3771,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3804,7 +3804,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3869,7 +3869,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3902,7 +3902,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3966,7 +3966,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3999,7 +3999,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -4125,7 +4125,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -4158,7 +4158,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -5291,7 +5291,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -5324,7 +5324,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -5357,7 +5357,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -6077,7 +6077,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6140,7 +6140,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6181,7 +6181,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6290,7 +6290,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6353,7 +6353,7 @@ fn test_market_order() {
         let msg = cw20::Cw20ExecuteMsg::Send {
             contract: orderbook_addr.to_string(),
             amount: Uint128::new(offers[i]),
-            msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
                 direction: OrderDirection::Buy,
                 assets: [
                     Asset {
@@ -6477,7 +6477,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {

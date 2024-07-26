@@ -3,7 +3,7 @@ use crate::state::{ADMIN, PAIR_INFO, WHITELISTED, WHITELISTED_TRADERS};
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Decimal256,
+    from_json, to_json_binary, Addr, Binary, CanonicalAddr, Coin, CosmosMsg, Decimal, Decimal256,
     Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128,
     Uint256, WasmMsg,
 };
@@ -61,7 +61,7 @@ pub fn instantiate(
         WasmMsg::Instantiate {
             admin: None,
             code_id: msg.token_code_id,
-            msg: to_binary(&TokenInstantiateMsg {
+            msg: to_json_binary(&TokenInstantiateMsg {
                 name: "oraiswap liquidity token".to_string(),
                 symbol: "uLP".to_string(),
                 decimals: 6,
@@ -140,7 +140,7 @@ pub fn receive_cw20(
 ) -> Result<Response, ContractError> {
     let contract_addr = info.sender.clone();
 
-    match from_binary(&cw20_msg.msg) {
+    match from_json(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Swap {
             belief_price,
             max_spread,
@@ -255,7 +255,7 @@ pub fn provide_liquidity(
         if let AssetInfo::Token { contract_addr, .. } = &pool.info {
             messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract_addr.to_owned().into(),
-                msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+                msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
                     owner: info.sender.to_string(),
                     recipient: env.contract.address.to_string(),
                     amount: deposits[i],
@@ -301,7 +301,7 @@ pub fn provide_liquidity(
             .api
             .addr_humanize(&pair_info.liquidity_token)?
             .to_string(),
-        msg: to_binary(&Cw20ExecuteMsg::Mint {
+        msg: to_json_binary(&Cw20ExecuteMsg::Mint {
             recipient: receiver.to_string(),
             amount: share,
         })?,
@@ -362,7 +362,7 @@ pub fn withdraw_liquidity(
                 .api
                 .addr_humanize(&pair_info.liquidity_token)?
                 .to_string(),
-            msg: to_binary(&Cw20ExecuteMsg::Burn { amount })?,
+            msg: to_json_binary(&Cw20ExecuteMsg::Burn { amount })?,
             funds: vec![],
         }
         .into(),
@@ -547,18 +547,18 @@ fn assert_is_open_for_whitelisted_trader(deps: Deps, trader: Addr) -> Result<(),
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
-        QueryMsg::Pair {} => Ok(to_binary(&query_pair_info(deps)?)?),
-        QueryMsg::Pool {} => Ok(to_binary(&query_pool(deps)?)?),
+        QueryMsg::Pair {} => Ok(to_json_binary(&query_pair_info(deps)?)?),
+        QueryMsg::Pool {} => Ok(to_json_binary(&query_pool(deps)?)?),
         QueryMsg::Simulation { offer_asset } => {
-            Ok(to_binary(&query_simulation(deps, offer_asset)?)?)
+            Ok(to_json_binary(&query_simulation(deps, offer_asset)?)?)
         }
         QueryMsg::ReverseSimulation { ask_asset } => {
-            Ok(to_binary(&query_reverse_simulation(deps, ask_asset)?)?)
+            Ok(to_json_binary(&query_reverse_simulation(deps, ask_asset)?)?)
         }
         QueryMsg::TraderIsWhitelisted { trader } => {
-            Ok(to_binary(&query_trader_is_whitelisted(deps, trader)?)?)
+            Ok(to_json_binary(&query_trader_is_whitelisted(deps, trader)?)?)
         }
-        QueryMsg::Admin {} => Ok(to_binary(&query_admin(deps)?)?),
+        QueryMsg::Admin {} => Ok(to_json_binary(&query_admin(deps)?)?),
     }
 }
 
