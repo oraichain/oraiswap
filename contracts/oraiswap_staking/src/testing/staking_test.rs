@@ -347,7 +347,7 @@ fn test_unbond() {
 
 #[test]
 fn test_auto_stake() {
-    let mut app = MockApp::new(&[(&"addr".to_string(), &[coin(10000000000u128, ORAI_DENOM)])]);
+    let mut app = MockApp::new(&[("addr", &[coin(10000000000u128, ORAI_DENOM)])]);
 
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 

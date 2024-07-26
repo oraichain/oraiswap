@@ -21,7 +21,7 @@ const REWARD_ADDR: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
 fn basic_fixture() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -34,7 +34,7 @@ fn basic_fixture() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -50,10 +50,7 @@ fn basic_fixture() -> (MockApp, Addr) {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    app.set_token_balances(&[(
-        &"asset".to_string(),
-        &[(&"addr0000".to_string(), 1000000000u128)],
-    )]);
+    app.set_token_balances(&[(&"asset".to_string(), &[("addr0000", 1000000000u128)])]);
 
     let msg = InstantiateMsg {
         name: None,
@@ -1267,7 +1264,7 @@ fn submit_order() {
 fn cancel_order_native_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1280,7 +1277,7 @@ fn cancel_order_native_token() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1611,7 +1608,7 @@ fn cancel_order_native_token() {
 #[test]
 fn cancel_order_token() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[Coin {
             denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(1000000000u128),
@@ -1622,17 +1619,11 @@ fn cancel_order_token() {
     let token_addrs = app.set_token_balances(&[
         (
             &"assetA".to_string(),
-            &[
-                (&"addr0000".to_string(), 1000000000u128),
-                (&"addr0001".to_string(), 1000000000u128),
-            ],
+            &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
         (
             &"assetB".to_string(),
-            &[
-                (&"addr0000".to_string(), 1000000000u128),
-                (&"addr0001".to_string(), 1000000000u128),
-            ],
+            &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
     ]);
 
@@ -1920,7 +1911,7 @@ fn cancel_order_token() {
 fn execute_pair_native_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1933,7 +1924,7 @@ fn execute_pair_native_token() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1946,7 +1937,7 @@ fn execute_pair_native_token() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -3034,21 +3025,21 @@ fn execute_pair_native_token() {
 fn execute_pair_cw20_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
@@ -3062,17 +3053,17 @@ fn execute_pair_cw20_token() {
         (
             &"usdt".to_string(),
             &[
-                (&"addr0000".to_string(), 1000000u128),
-                (&"addr0001".to_string(), 1000000u128),
-                (&"addr0002".to_string(), 1000000u128),
+                ("addr0000", 1000000u128),
+                ("addr0001", 1000000u128),
+                ("addr0002", 1000000u128),
             ],
         ),
         (
             &"uusd".to_string(),
             &[
-                (&"addr0000".to_string(), 1000000u128),
-                (&"addr0001".to_string(), 1000000u128),
-                (&"addr0002".to_string(), 1000000u128),
+                ("addr0000", 1000000u128),
+                ("addr0001", 1000000u128),
+                ("addr0002", 1000000u128),
             ],
         ),
     ]);
@@ -4218,7 +4209,7 @@ fn execute_pair_cw20_token() {
 fn simple_matching_test() {
     let mut app: MockApp = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4231,7 +4222,7 @@ fn simple_matching_test() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4244,7 +4235,7 @@ fn simple_matching_test() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4474,7 +4465,7 @@ fn simple_matching_test() {
 fn reward_to_executor_test() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4487,7 +4478,7 @@ fn reward_to_executor_test() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4700,7 +4691,7 @@ fn reward_to_executor_test() {
 fn mock_basic_query_data() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4713,7 +4704,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4726,7 +4717,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4787,7 +4778,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
 fn remove_orderbook_pair() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -4800,7 +4791,7 @@ fn remove_orderbook_pair() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -4813,7 +4804,7 @@ fn remove_orderbook_pair() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5116,7 +5107,7 @@ fn remove_orderbook_pair() {
 fn orders_querier() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5129,7 +5120,7 @@ fn orders_querier() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5148,17 +5139,11 @@ fn orders_querier() {
     let token_addrs = app.set_token_balances(&[
         (
             &"assetA".to_string(),
-            &[
-                (&"addr0000".to_string(), 1000000000u128),
-                (&"addr0001".to_string(), 1000000000u128),
-            ],
+            &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
         (
             &"assetB".to_string(),
-            &[
-                (&"addr0000".to_string(), 1000000000u128),
-                (&"addr0001".to_string(), 1000000000u128),
-            ],
+            &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
         ),
     ]);
 
@@ -5991,28 +5976,28 @@ fn test_query_ticks_with_end() {
 fn test_market_order() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
@@ -6025,9 +6010,9 @@ fn test_market_order() {
     let token_addrs = app.set_token_balances(&[(
         &"usdt".to_string(),
         &[
-            (&"addr0000".to_string(), 10000000u128),
-            (&"addr0001".to_string(), 10000000u128),
-            (&"addr0002".to_string(), 10000000u128),
+            ("addr0000", 10000000u128),
+            ("addr0001", 10000000u128),
+            ("addr0002", 10000000u128),
         ],
     )]);
 
@@ -6468,9 +6453,9 @@ fn test_market_order() {
     let new_tokens = app.set_token_balances(&[(
         &"uusd".to_string(),
         &[
-            (&"addr0000".to_string(), 10000000u128),
-            (&"addr0001".to_string(), 10000000u128),
-            (&"addr0002".to_string(), 10000000u128),
+            ("addr0000", 10000000u128),
+            ("addr0001", 10000000u128),
+            ("addr0002", 10000000u128),
         ],
     )]);
 
@@ -6508,28 +6493,28 @@ fn test_market_order() {
 fn test_query_simulate_market_order() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
@@ -6542,9 +6527,9 @@ fn test_query_simulate_market_order() {
     let token_addrs = app.set_token_balances(&[(
         &"usdt".to_string(),
         &[
-            (&"addr0000".to_string(), 10000000u128),
-            (&"addr0001".to_string(), 10000000u128),
-            (&"addr0002".to_string(), 10000000u128),
+            ("addr0000", 10000000u128),
+            ("addr0001", 10000000u128),
+            ("addr0002", 10000000u128),
         ],
     )]);
 

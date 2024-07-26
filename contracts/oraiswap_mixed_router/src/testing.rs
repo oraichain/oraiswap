@@ -15,7 +15,7 @@ use oraiswap_v3::{FeeTier, PoolKey, MAX_TICK, MIN_TICK};
 #[test]
 fn simulate_swap_operations_test() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -135,7 +135,7 @@ fn simulate_swap_operations_test() {
 #[test]
 fn execute_swap_operations() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -175,7 +175,7 @@ fn execute_swap_operations() {
 
     app.set_token_balances(&[(
         &"asset".to_string(),
-        &[(&"addr0000".to_string(), 1000000u128)],
+        &[("addr0000", 1000000u128)],
     )]);
 
     let asset_infos1 = [
@@ -544,7 +544,7 @@ fn init_v3(
 #[test]
 fn simulate_mixed_swap() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -566,11 +566,11 @@ fn simulate_mixed_swap() {
 
     app.set_token_balances(&[(
         &"tokenx".to_string(),
-        &[(&"addr0000".to_string(), 1000000000000u128)],
+        &[("addr0000", 1000000000000u128)],
     )]);
     app.set_token_balances(&[(
         &"tokeny".to_string(),
-        &[(&"addr0000".to_string(), 1000000000000u128)],
+        &[("addr0000", 1000000000000u128)],
     )]);
 
     let pool_key = init_v3(
@@ -692,7 +692,7 @@ fn simulate_mixed_swap() {
 #[test]
 fn execute_mixed_swap_operations() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -714,11 +714,11 @@ fn execute_mixed_swap_operations() {
 
     app.set_token_balances(&[(
         &"tokenx".to_string(),
-        &[(&"addr0000".to_string(), 1000000000000u128)],
+        &[("addr0000", 1000000000000u128)],
     )]);
     app.set_token_balances(&[(
         &"tokeny".to_string(),
-        &[(&"addr0000".to_string(), 1000000000000u128)],
+        &[("addr0000", 1000000000000u128)],
     )]);
 
     let pool_key = init_v3(

@@ -276,7 +276,7 @@ fn provide_liquidity() {
 #[test]
 fn withdraw_liquidity() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[Coin {
             denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(1000u128),
@@ -289,10 +289,7 @@ fn withdraw_liquidity() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    app.set_token_balances(&[(
-        &"liquidity".to_string(),
-        &[(&"addr0000".to_string(), 1000u128)],
-    )]);
+    app.set_token_balances(&[(&"liquidity".to_string(), &[("addr0000", 1000u128)])]);
 
     let liquidity_addr = app.get_token_addr("liquidity").unwrap();
 
@@ -421,7 +418,7 @@ fn test_pool_whitelist_for_trader() {
             &"asset".to_string(),
             &[(&MOCK_CONTRACT_ADDR.to_string(), 1000u128)],
         ),
-        (&"asset".to_string(), &[(&"addr0000".to_string(), 1000u128)]),
+        (&"asset".to_string(), &[("addr0000", 1000u128)]),
     ]);
 
     let asset_addr = app.get_token_addr("asset").unwrap();

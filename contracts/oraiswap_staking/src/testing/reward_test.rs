@@ -402,7 +402,7 @@ fn test_before_share_changes() {
 #[test]
 fn test_withdraw() {
     let mut app = MockApp::new(&[(
-        &"addr".to_string(),
+        "addr",
         &[
             coin(10000000000u128, ORAI_DENOM),
             coin(20000000000u128, ATOM_DENOM),
@@ -428,14 +428,8 @@ fn test_withdraw() {
 
     // update other contract token balance
     app.set_token_balances(&[
-        (
-            &"reward".to_string(),
-            &[(&"addr".to_string(), 10000000000u128)],
-        ),
-        (
-            &"asset".to_string(),
-            &[(&"addr".to_string(), 10000000000u128)],
-        ),
+        (&"reward".to_string(), &[("addr", 10000000000u128)]),
+        (&"asset".to_string(), &[("addr", 10000000000u128)]),
     ])
     .unwrap();
 

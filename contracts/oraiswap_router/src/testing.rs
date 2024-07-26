@@ -10,7 +10,7 @@ use oraiswap::testing::{MockApp, ATOM_DENOM};
 #[test]
 fn simulate_swap_operations_test() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -129,7 +129,7 @@ fn simulate_swap_operations_test() {
 #[test]
 fn execute_swap_operations() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[
             Coin {
                 denom: ORAI_DENOM.to_string(),
@@ -167,10 +167,8 @@ fn execute_swap_operations() {
 
     let asset_addr = app.create_token("asset");
 
-    app.set_token_balances(&[(
-        &"asset".to_string(),
-        &[(&"addr0000".to_string(), 1000000u128)],
-    )]);
+    app.set_token_balances(&[(&"asset".to_string(), &[("addr0000", 1000000u128)])])
+        .unwrap();
 
     let asset_infos1 = [
         AssetInfo::NativeToken {
@@ -301,8 +299,13 @@ fn execute_swap_operations() {
         to: None,
     };
 
-    let res = app.execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[]);
-    app.assert_fail(res);
+    let error = app
+        .execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[])
+        .unwrap_err();
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("must provide operations"));
 
     let msg = ExecuteMsg::ExecuteSwapOperations {
         operations: vec![
@@ -389,23 +392,28 @@ fn execute_swap_operations() {
 
     // swap will be failed
 
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        router_addr.clone(),
-        &msg,
-        &[
-            Coin {
-                denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-            Coin {
-                denom: ATOM_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-        ],
-    );
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            router_addr.clone(),
+            &msg,
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+                Coin {
+                    denom: ATOM_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+            ],
+        )
+        .unwrap_err();
 
-    app.assert_fail(res);
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("This pool is not open to everyone, only whitelisted traders can swap"));
 
     // whitelist trader
     app.execute(
