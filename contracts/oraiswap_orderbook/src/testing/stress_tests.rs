@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Coin, Decimal, Uint128};
 use oraiswap::{
     asset::{Asset, AssetInfo, ORAI_DENOM},
     create_entry_points_testing,
@@ -207,7 +207,7 @@ fn simulate_submit_orders(
                     let msg = cw20::Cw20ExecuteMsg::Send {
                         contract: orderbook_addr.to_string(),
                         amount: offer_amount, // Fund must be equal to offer amount
-                        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+                        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
                             direction: OrderDirection::Buy,
                             assets: [
                                 Asset {
@@ -257,7 +257,7 @@ fn simulate_submit_orders(
                     let msg = cw20::Cw20ExecuteMsg::Send {
                         contract: orderbook_addr.to_string(),
                         amount: offer_amount, // Fund must be equal to offer amount
-                        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+                        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
                             direction: OrderDirection::Buy,
                             asset_infos: [orai_asset_info.clone(), usdt_asset_info.clone()],
                             slippage,

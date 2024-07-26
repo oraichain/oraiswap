@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    from_json, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
     Order as OrderBy, Response, StdError, StdResult, Uint128,
 };
 use cw_utils::one_coin;
@@ -406,7 +406,7 @@ pub fn receive_cw20(
         amount: cw20_msg.amount,
     };
 
-    match from_binary(&cw20_msg.msg) {
+    match from_json(&cw20_msg.msg) {
         Ok(Cw20HookMsg::SubmitOrder { direction, assets }) => {
             let pair_key = pair_key(&[
                 assets[0].to_raw(deps.api)?.info,
@@ -486,17 +486,17 @@ pub fn receive_cw20(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+        QueryMsg::ContractInfo {} => to_json_binary(&query_contract_info(deps)?),
         QueryMsg::Order {
             order_id,
             asset_infos,
-        } => to_binary(&query_order(deps, asset_infos, order_id)?),
-        QueryMsg::OrderBook { asset_infos } => to_binary(&query_orderbook(deps, asset_infos)?),
+        } => to_json_binary(&query_order(deps, asset_infos, order_id)?),
+        QueryMsg::OrderBook { asset_infos } => to_json_binary(&query_orderbook(deps, asset_infos)?),
         QueryMsg::OrderBooks {
             start_after,
             limit,
             order_by,
-        } => to_binary(&query_orderbooks(deps, start_after, limit, order_by)?),
+        } => to_json_binary(&query_orderbooks(deps, start_after, limit, order_by)?),
         QueryMsg::Orders {
             asset_infos,
             direction,
@@ -504,7 +504,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             order_by,
-        } => to_binary(&query_orders(
+        } => to_json_binary(&query_orders(
             deps,
             asset_infos,
             direction,
@@ -513,12 +513,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             limit,
             order_by,
         )?),
-        QueryMsg::LastOrderId {} => to_binary(&query_last_order_id(deps)?),
+        QueryMsg::LastOrderId {} => to_json_binary(&query_last_order_id(deps)?),
         QueryMsg::Tick {
             price,
             asset_infos,
             direction,
-        } => to_binary(&query_tick(
+        } => to_json_binary(&query_tick(
             deps.storage,
             &pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
@@ -534,7 +534,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             end,
             limit,
             order_by,
-        } => to_binary(&query_ticks_with_end(
+        } => to_json_binary(&query_ticks_with_end(
             deps.storage,
             &pair_key(&[
                 asset_infos[0].to_raw(deps.api)?,
@@ -566,14 +566,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 }
             };
 
-            to_binary(&mid_price)
+            to_json_binary(&mid_price)
         }
         QueryMsg::SimulateMarketOrder {
             direction,
             asset_infos,
             slippage,
             offer_amount,
-        } => to_binary(&query_simulate_market_order(
+        } => to_json_binary(&query_simulate_market_order(
             deps,
             direction,
             asset_infos,

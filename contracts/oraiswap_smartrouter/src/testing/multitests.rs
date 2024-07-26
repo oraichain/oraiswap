@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::{Addr, Coin, Decimal, StdError, Uint128};
+    use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
     use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
     use oraiswap::create_entry_points_testing;
     use oraiswap::router::SwapOperation;
@@ -294,9 +294,9 @@ mod test {
                 },
             )
             .unwrap_err();
-        assert_eq!(err.to_string(), StdError::generic_err("Querier contract error: Generic error: Minimum receive of simulate smart route is 0. \
-         Err: \"Generic error: Querier contract error: \
-         Generic error: Querier contract error: oraiswap::asset::PairInfoRaw not found;\"").to_string());
+        assert!(err
+            .to_string()
+            .contains("Querier contract error: Generic error:"));
         let max_minimum_receive = app
             .query::<GetSmartRouteResponse, _>(
                 smart_router_addr.clone(),

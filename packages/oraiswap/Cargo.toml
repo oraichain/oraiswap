@@ -34,4 +34,4 @@ serde = "1.0.193"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # this import is for testing library
-cw-multi-test = { workspace = true }
+cosmwasm-testing-util = { workspace = true }
