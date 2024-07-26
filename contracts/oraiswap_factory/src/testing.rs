@@ -13,9 +13,10 @@ fn create_pair() {
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
     app.set_factory_and_pair_contract(
-        Box::new(create_entry_points_testing!(crate).with_reply(crate::contract::reply)),
+        Box::new(create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply)),
         Box::new(
-            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+            create_entry_points_testing!(oraiswap_pair)
+                .with_reply_empty(oraiswap_pair::contract::reply),
         ),
     );
 
@@ -58,9 +59,10 @@ fn add_pair() {
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
     app.set_factory_and_pair_contract(
-        Box::new(create_entry_points_testing!(crate).with_reply(crate::contract::reply)),
+        Box::new(create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply)),
         Box::new(
-            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+            create_entry_points_testing!(oraiswap_pair)
+                .with_reply_empty(oraiswap_pair::contract::reply),
         ),
     );
 

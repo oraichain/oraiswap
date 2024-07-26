@@ -101,10 +101,10 @@ fn test_asset() {
     app.set_token_balances(&[(
         &"asset".to_string(),
         &[
-            (&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(123u128)),
-            (&"addr00000".to_string(), &Uint128::from(123u128)),
-            (&"addr00001".to_string(), &Uint128::from(123u128)),
-            (&"addr00002".to_string(), &Uint128::from(123u128)),
+            (&MOCK_CONTRACT_ADDR.to_string(), 123u128),
+            (&"addr00000".to_string(), 123u128),
+            (&"addr00001".to_string(), 123u128),
+            (&"addr00002".to_string(), 123u128),
         ],
     )]);
 
@@ -113,7 +113,7 @@ fn test_asset() {
 
     app.set_tax(
         Decimal::percent(1),
-        &[(&"uusd".to_string(), &Uint128::from(1000000u128))],
+        &[(&"uusd".to_string(), 1000000u128)],
     );
 
     let token_asset = Asset {

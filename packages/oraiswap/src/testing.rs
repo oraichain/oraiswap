@@ -198,7 +198,7 @@ impl MockApp {
         self.set_token_balances_from(APP_OWNER, balances)
     }
 
-    pub fn set_tax(&mut self, rate: Decimal, caps: &[(&String, &Uint128)]) {
+    pub fn set_tax(&mut self, rate: Decimal, caps: &[(&str, u128)]) {
         if !self.oracle_addr.as_str().is_empty() {
             let contract_addr = self.oracle_addr.clone();
             // update rate
@@ -211,13 +211,13 @@ impl MockApp {
             .unwrap();
 
             // update caps
-            for (denom, &cap) in caps.iter() {
+            for (denom, cap) in caps.iter() {
                 self.execute(
                     Addr::unchecked(APP_OWNER),
                     contract_addr.clone(),
                     &crate::oracle::ExecuteMsg::UpdateTaxCap {
                         denom: denom.to_string(),
-                        cap,
+                        cap: Uint128::from(*cap),
                     },
                     &[],
                 )

@@ -142,11 +142,11 @@ fn simulate_submit_orders(
     for sender in senders.iter() {
         app.set_balances(&[(
             &ORAI_DENOM.to_string(),
-            &[(sender, &Uint128::from(10000000000000u128))],
+            &[(sender, 10000000000000u128)],
         )]);
         app.set_token_balances(&[(
             &"usdt".to_string(),
-            &[(sender, &Uint128::from(10000000000000u128))],
+            &[(sender, 10000000000000u128)],
         )]);
     }
 

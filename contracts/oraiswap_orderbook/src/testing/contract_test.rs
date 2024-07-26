@@ -52,7 +52,7 @@ fn basic_fixture() -> (MockApp, Addr) {
 
     app.set_token_balances(&[(
         &"asset".to_string(),
-        &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
+        &[(&"addr0000".to_string(), 1000000000u128)],
     )]);
 
     let msg = InstantiateMsg {
@@ -1623,15 +1623,15 @@ fn cancel_order_token() {
         (
             &"assetA".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), 1000000000u128),
+                (&"addr0001".to_string(), 1000000000u128),
             ],
         ),
         (
             &"assetB".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), 1000000000u128),
+                (&"addr0001".to_string(), 1000000000u128),
             ],
         ),
     ]);
@@ -3062,17 +3062,17 @@ fn execute_pair_cw20_token() {
         (
             &"usdt".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0000".to_string(), 1000000u128),
+                (&"addr0001".to_string(), 1000000u128),
+                (&"addr0002".to_string(), 1000000u128),
             ],
         ),
         (
             &"uusd".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
+                (&"addr0000".to_string(), 1000000u128),
+                (&"addr0001".to_string(), 1000000u128),
+                (&"addr0002".to_string(), 1000000u128),
             ],
         ),
     ]);
@@ -5149,15 +5149,15 @@ fn orders_querier() {
         (
             &"assetA".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), 1000000000u128),
+                (&"addr0001".to_string(), 1000000000u128),
             ],
         ),
         (
             &"assetB".to_string(),
             &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
+                (&"addr0000".to_string(), 1000000000u128),
+                (&"addr0001".to_string(), 1000000000u128),
             ],
         ),
     ]);
@@ -6025,9 +6025,9 @@ fn test_market_order() {
     let token_addrs = app.set_token_balances(&[(
         &"usdt".to_string(),
         &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0000".to_string(), 10000000u128),
+            (&"addr0001".to_string(), 10000000u128),
+            (&"addr0002".to_string(), 10000000u128),
         ],
     )]);
 
@@ -6468,9 +6468,9 @@ fn test_market_order() {
     let new_tokens = app.set_token_balances(&[(
         &"uusd".to_string(),
         &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0000".to_string(), 10000000u128),
+            (&"addr0001".to_string(), 10000000u128),
+            (&"addr0002".to_string(), 10000000u128),
         ],
     )]);
 
@@ -6542,9 +6542,9 @@ fn test_query_simulate_market_order() {
     let token_addrs = app.set_token_balances(&[(
         &"usdt".to_string(),
         &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
+            (&"addr0000".to_string(), 10000000u128),
+            (&"addr0001".to_string(), 10000000u128),
+            (&"addr0002".to_string(), 10000000u128),
         ],
     )]);
 

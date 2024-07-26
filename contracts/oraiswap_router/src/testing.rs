@@ -30,10 +30,11 @@ fn simulate_swap_operations_test() {
     app.set_factory_and_pair_contract(
         Box::new(
             create_entry_points_testing!(oraiswap_factory)
-                .with_reply(oraiswap_factory::contract::reply),
+                .with_reply_empty(oraiswap_factory::contract::reply),
         ),
         Box::new(
-            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+            create_entry_points_testing!(oraiswap_pair)
+                .with_reply_empty(oraiswap_pair::contract::reply),
         ),
     );
 
@@ -41,8 +42,8 @@ fn simulate_swap_operations_test() {
     app.set_tax(
         Decimal::permille(3),
         &[
-            (&ORAI_DENOM.to_string(), &Uint128::from(10000000u128)),
-            (&ATOM_DENOM.to_string(), &Uint128::from(10000000u128)),
+            (&ORAI_DENOM.to_string(), 10000000u128),
+            (&ATOM_DENOM.to_string(), 10000000u128),
         ],
     );
 
@@ -148,18 +149,19 @@ fn execute_swap_operations() {
     app.set_factory_and_pair_contract(
         Box::new(
             create_entry_points_testing!(oraiswap_factory)
-                .with_reply(oraiswap_factory::contract::reply),
+                .with_reply_empty(oraiswap_factory::contract::reply),
         ),
         Box::new(
-            create_entry_points_testing!(oraiswap_pair).with_reply(oraiswap_pair::contract::reply),
+            create_entry_points_testing!(oraiswap_pair)
+                .with_reply_empty(oraiswap_pair::contract::reply),
         ),
     );
     // set tax rate as 0.3%
     app.set_tax(
         Decimal::permille(3),
         &[
-            (&ORAI_DENOM.to_string(), &Uint128::from(10000000u128)),
-            (&ATOM_DENOM.to_string(), &Uint128::from(10000000u128)),
+            (&ORAI_DENOM.to_string(), 10000000u128),
+            (&ATOM_DENOM.to_string(), 10000000u128),
         ],
     );
 
@@ -167,7 +169,7 @@ fn execute_swap_operations() {
 
     app.set_token_balances(&[(
         &"asset".to_string(),
-        &[(&"addr0000".to_string(), &Uint128::from(1000000u128))],
+        &[(&"addr0000".to_string(), 1000000u128)],
     )]);
 
     let asset_infos1 = [

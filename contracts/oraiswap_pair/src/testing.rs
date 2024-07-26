@@ -51,7 +51,7 @@ fn provide_liquidity_both_native() {
 
     // we can just call .unwrap() to assert this was a success
     let code_id = app.upload(Box::new(
-        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+        create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply),
     ));
 
     let pair_addr = app
@@ -117,11 +117,11 @@ fn provide_liquidity() {
     app.set_token_balances(&[
         (
             &"liquidity".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
+            &[(&MOCK_CONTRACT_ADDR.to_string(), 1000u128)],
         ),
         (
             &"asset".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
+            &[(&MOCK_CONTRACT_ADDR.to_string(), 1000u128)],
         ),
     ]);
 
@@ -144,7 +144,7 @@ fn provide_liquidity() {
 
     // we can just call .unwrap() to assert this was a success
     let code_id = app.upload(Box::new(
-        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+        create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply),
     ));
     let pair_addr = app
         .instantiate(code_id, Addr::unchecked("owner"), &msg, &[], "pair")
@@ -285,16 +285,13 @@ fn withdraw_liquidity() {
 
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
-    app.set_tax(
-        Decimal::zero(),
-        &[(&ORAI_DENOM.to_string(), &Uint128::from(1000000u128))],
-    );
+    app.set_tax(Decimal::zero(), &[(&ORAI_DENOM.to_string(), 1000000u128)]);
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     app.set_token_balances(&[(
         &"liquidity".to_string(),
-        &[(&"addr0000".to_string(), &Uint128::from(1000u128))],
+        &[(&"addr0000".to_string(), 1000u128)],
     )]);
 
     let liquidity_addr = app.get_token_addr("liquidity").unwrap();
@@ -315,7 +312,7 @@ fn withdraw_liquidity() {
     };
 
     let pair_id = app.upload(Box::new(
-        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+        create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply),
     ));
     // we can just call .unwrap() to assert this was a success
     let pair_addr = app
@@ -418,16 +415,13 @@ fn test_pool_whitelist_for_trader() {
     app.set_token_balances(&[
         (
             &"liquidity".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
+            &[(&MOCK_CONTRACT_ADDR.to_string(), 1000u128)],
         ),
         (
             &"asset".to_string(),
-            &[(&MOCK_CONTRACT_ADDR.to_string(), &Uint128::from(1000u128))],
+            &[(&MOCK_CONTRACT_ADDR.to_string(), 1000u128)],
         ),
-        (
-            &"asset".to_string(),
-            &[(&"addr0000".to_string(), &Uint128::from(1000u128))],
-        ),
+        (&"asset".to_string(), &[(&"addr0000".to_string(), 1000u128)]),
     ]);
 
     let asset_addr = app.get_token_addr("asset").unwrap();
@@ -449,7 +443,7 @@ fn test_pool_whitelist_for_trader() {
 
     // we can just call .unwrap() to assert this was a success
     let code_id = app.upload(Box::new(
-        create_entry_points_testing!(crate).with_reply(crate::contract::reply),
+        create_entry_points_testing!(crate).with_reply_empty(crate::contract::reply),
     ));
     let pair_addr = app
         .instantiate(code_id, Addr::unchecked("owner"), &msg, &[], "pair")
