@@ -173,10 +173,8 @@ fn execute_swap_operations() {
 
     let asset_addr = app.create_token("asset");
 
-    app.set_token_balances(&[(
-        "asset",
-        &[("addr0000", 1000000u128)],
-    )]);
+    app.set_token_balances(&[("asset", &[("addr0000", 1000000u128)])])
+        .unwrap();
 
     let asset_infos1 = [
         AssetInfo::NativeToken {
@@ -308,8 +306,13 @@ fn execute_swap_operations() {
         to: None,
     };
 
-    let res = app.execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[]);
-    app.assert_fail(res);
+    let error = app
+        .execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[])
+        .unwrap_err();
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("must provide operations"));
 
     let msg = ExecuteMsg::ExecuteSwapOperations {
         operations: vec![
@@ -396,23 +399,28 @@ fn execute_swap_operations() {
 
     // swap will be failed
 
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        router_addr.clone(),
-        &msg,
-        &[
-            Coin {
-                denom: ORAI_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-            Coin {
-                denom: ATOM_DENOM.to_string(),
-                amount: Uint128::from(100u128),
-            },
-        ],
-    );
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            router_addr.clone(),
+            &msg,
+            &[
+                Coin {
+                    denom: ORAI_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+                Coin {
+                    denom: ATOM_DENOM.to_string(),
+                    amount: Uint128::from(100u128),
+                },
+            ],
+        )
+        .unwrap_err();
 
-    app.assert_fail(res);
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("This pool is not open to everyone, only whitelisted traders can swap"));
 
     // whitelist trader
     app.execute(
@@ -464,9 +472,10 @@ fn init_v3(
 
     let protocol_fee = Percentage(100);
     let fee_tier = FeeTier::new(protocol_fee, 10).unwrap();
+    let contract_addr = app.v3_addr.clone();
     app.execute(
         Addr::unchecked(APP_OWNER),
-        app.v3_addr.clone(),
+        contract_addr.clone(),
         &OraiswapV3ExecuteMsg::AddFeeTier { fee_tier },
         &[],
     )
@@ -477,7 +486,7 @@ fn init_v3(
 
     app.execute(
         Addr::unchecked(APP_OWNER),
-        app.v3_addr.clone(),
+        contract_addr.clone(),
         &OraiswapV3ExecuteMsg::CreatePool {
             token_0: token_x.to_string(),
             token_1: token_y.to_string(),
@@ -499,19 +508,21 @@ fn init_v3(
     app.approve_token(
         token_x_name,
         "addr0000",
-        app.v3_addr.clone().as_str(),
+        contract_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
     app.approve_token(
         token_y_name,
         "addr0000",
-        app.v3_addr.clone().as_str(),
+        contract_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
 
     app.execute(
         Addr::unchecked("addr0000"),
-        app.v3_addr.clone(),
+        contract_addr.clone(),
         &OraiswapV3ExecuteMsg::CreatePosition {
             pool_key: pool_key.clone(),
             lower_tick: lower_tick_index,
@@ -526,7 +537,7 @@ fn init_v3(
 
     app.execute(
         Addr::unchecked("addr0000"),
-        app.v3_addr.clone(),
+        contract_addr.clone(),
         &OraiswapV3ExecuteMsg::CreatePosition {
             pool_key: pool_key.clone(),
             lower_tick: lower_tick_index - 20,
@@ -564,14 +575,10 @@ fn simulate_mixed_swap() {
     let token_x = app.create_token(token_x_name);
     let token_y = app.create_token(token_y_name);
 
-    app.set_token_balances(&[(
-        "tokenx",
-        &[("addr0000", 1000000000000u128)],
-    )]);
-    app.set_token_balances(&[(
-        "tokeny",
-        &[("addr0000", 1000000000000u128)],
-    )]);
+    app.set_token_balances(&[("tokenx", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
+    app.set_token_balances(&[("tokeny", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
 
     let pool_key = init_v3(
         &mut app,
@@ -623,13 +630,15 @@ fn simulate_mixed_swap() {
         "addr0000",
         pair_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
     app.approve_token(
         token_y_name,
         "addr0000",
         pair_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
     let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
@@ -712,14 +721,10 @@ fn execute_mixed_swap_operations() {
     let token_x = app.create_token(token_x_name);
     let token_y = app.create_token(token_y_name);
 
-    app.set_token_balances(&[(
-        "tokenx",
-        &[("addr0000", 1000000000000u128)],
-    )]);
-    app.set_token_balances(&[(
-        "tokeny",
-        &[("addr0000", 1000000000000u128)],
-    )]);
+    app.set_token_balances(&[("tokenx", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
+    app.set_token_balances(&[("tokeny", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
 
     let pool_key = init_v3(
         &mut app,
@@ -771,13 +776,15 @@ fn execute_mixed_swap_operations() {
         "addr0000",
         pair_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
     app.approve_token(
         token_y_name,
         "addr0000",
         pair_addr.clone().as_str(),
         u128::MAX,
-    );
+    )
+    .unwrap();
     let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
         assets: [
             Asset {
@@ -834,17 +841,19 @@ fn execute_mixed_swap_operations() {
         to: None,
     };
 
-    let err = app.execute(
-        Addr::unchecked("addr0000"),
-        token_x.clone(),
-        &Cw20ExecuteMsg::Send {
-            contract: router_addr.to_string(),
-            amount: Uint128::new(1000000),
-            msg: to_json_binary(&msg_swap).unwrap(),
-        },
-        &[],
-    );
-    app.assert_fail(err);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            token_x.clone(),
+            &Cw20ExecuteMsg::Send {
+                contract: router_addr.to_string(),
+                amount: Uint128::new(1000000),
+                msg: to_json_binary(&msg_swap).unwrap(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert!(error.root_cause().to_string().contains("amount is zero"));
 
     // case 2: swap successful
     let msg_swap = ExecuteMsg::ExecuteSwapOperations {
@@ -866,9 +875,7 @@ fn execute_mixed_swap_operations() {
         to: None,
     };
 
-    let mut balances_before = app
-        .query_token_balances(Addr::unchecked("addr0000"))
-        .unwrap();
+    let mut balances_before = app.query_token_balances("addr0000").unwrap();
     balances_before.sort_by(|a, b| b.denom.cmp(&a.denom));
     assert_eq!(
         balances_before,
@@ -895,9 +902,7 @@ fn execute_mixed_swap_operations() {
         &[],
     )
     .unwrap();
-    let mut balances_after = app
-        .query_token_balances(Addr::unchecked("addr0000"))
-        .unwrap();
+    let mut balances_after = app.query_token_balances("addr0000").unwrap();
     balances_after.sort_by(|a, b| b.denom.cmp(&a.denom));
     assert_eq!(
         balances_after,
