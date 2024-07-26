@@ -36,7 +36,8 @@ fn create_pair() {
     let contract_addr = app.create_pair(asset_infos.clone()).unwrap();
 
     // query pair info
-    let pair_info = query_pair_info_from_pair(&app.as_querier(), contract_addr.clone()).unwrap();
+    let pair_info =
+        query_pair_info_from_pair(&app.as_querier().into_empty(), contract_addr.clone()).unwrap();
 
     // should never change commission rate once deployed
     let pair_res = app.query_pair(asset_infos.clone()).unwrap();
