@@ -8,6 +8,7 @@ pub struct Config {
     pub factory_addr: CanonicalAddr,
     pub factory_addr_v2: CanonicalAddr,
     pub oraiswap_v3: CanonicalAddr,
+    pub owner: CanonicalAddr,
 }
 
 // put the length bytes at the first for compatibility with legacy singleton store

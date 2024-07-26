@@ -67,6 +67,11 @@ pub enum ExecuteMsg {
         minimum_receive: Uint128,
         receiver: Addr,
     },
+    UpdateConfig {
+        factory_addr: Option<String>,
+        factory_addr_v2: Option<String>,
+        oraiswap_v3: Option<String>,
+    },
 }
 
 #[cw_serde]

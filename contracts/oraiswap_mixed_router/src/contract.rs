@@ -29,7 +29,7 @@ use oraiswap::querier::{query_pair_config, query_pair_info};
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     CONFIG.save(
@@ -38,6 +38,7 @@ pub fn instantiate(
             factory_addr: deps.api.addr_canonicalize(msg.factory_addr.as_str())?,
             factory_addr_v2: deps.api.addr_canonicalize(msg.factory_addr_v2.as_str())?,
             oraiswap_v3: deps.api.addr_canonicalize(msg.oraiswap_v3.as_str())?,
+            owner: deps.api.addr_canonicalize(info.sender.as_str())?,
         },
     )?;
 
@@ -80,7 +81,42 @@ pub fn execute(
             minimum_receive,
             receiver,
         ),
+        ExecuteMsg::UpdateConfig {
+            factory_addr,
+            factory_addr_v2,
+            oraiswap_v3,
+        } => execute_update_config(deps, info, factory_addr, factory_addr_v2, oraiswap_v3),
     }
+}
+
+pub fn execute_update_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    factory_addr: Option<String>,
+    factory_addr_v2: Option<String>,
+    oraiswap_v3: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut config = CONFIG.load(deps.storage)?;
+    let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    // check authorized
+    if config.owner.ne(&sender_addr) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // update new reward address
+    if let Some(factory_addr) = factory_addr {
+        config.factory_addr = deps.api.addr_canonicalize(&factory_addr)?;
+    }
+    if let Some(factory_addr_v2) = factory_addr_v2 {
+        config.factory_addr_v2 = deps.api.addr_canonicalize(&factory_addr_v2)?;
+    }
+    if let Some(oraiswap_v3) = oraiswap_v3 {
+        config.oraiswap_v3 = deps.api.addr_canonicalize(&oraiswap_v3)?;
+    }
+
+    CONFIG.save(deps.storage, &config)?;
+    Ok(Response::new().add_attributes(vec![("action", "execute_update_config")]))
 }
 
 pub fn receive_cw20(
