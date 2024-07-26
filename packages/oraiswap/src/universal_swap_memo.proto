@@ -42,6 +42,7 @@ message Memo {
     optional IbcTransfer ibc_transfer_msg = 1;
     optional IbcWasmTransfer ibc_wasm_transfer_msg = 2;
     optional ContractCall contract_call = 3;
+    optional Transfer transfer_msg = 4;
   }
 
   message IbcTransfer {
@@ -69,5 +70,9 @@ message Memo {
   message ContractCall {
     string contract_address = 1;
     string msg = 2;
+  }
+
+  message Transfer {
+    string to_address = 1;
   }
 }
