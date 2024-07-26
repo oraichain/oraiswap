@@ -30,19 +30,14 @@ fn proper_initialization() {
     };
 
     let oracle_contract = OracleContract(app.oracle_addr.clone());
-
+    let contract_addr = app.oracle_addr.clone();
     let _res = app
-        .execute(
-            Addr::unchecked(APP_OWNER),
-            app.oracle_addr.clone(),
-            &msg,
-            &[],
-        )
+        .execute(Addr::unchecked(APP_OWNER), contract_addr, &msg, &[])
         .unwrap();
 
     let exchange_rate_res = oracle_contract
         .query_exchange_rate(
-            &app.as_querier(),
+            &app.as_querier().into_empty(),
             "usdt".to_string(),
             ORAI_DENOM.to_string(),
         )
@@ -55,17 +50,17 @@ fn proper_initialization() {
         exchange_rate: Decimal::percent(1), // 1 orai = 100 airi
     };
 
+    let contract_addr = app.oracle_addr.clone();
     let _res = app
-        .execute(
-            Addr::unchecked(APP_OWNER),
-            app.oracle_addr.clone(),
-            &msg,
-            &[],
-        )
+        .execute(Addr::unchecked(APP_OWNER), contract_addr, &msg, &[])
         .unwrap();
 
     let exchange_rate_res = oracle_contract
-        .query_exchange_rate(&app.as_querier(), "airi".to_string(), "usdt".to_string())
+        .query_exchange_rate(
+            &app.as_querier().into_empty(),
+            "airi".to_string(),
+            "usdt".to_string(),
+        )
         .unwrap();
 
     // 1 usdt = 10 airi
@@ -78,7 +73,7 @@ fn tax_cap_notfound() {
 
     let oracle_contract = OracleContract(app.oracle_addr.clone());
 
-    let res = oracle_contract.query_tax_cap(&app.as_querier(), "airi".to_string());
+    let res = oracle_contract.query_tax_cap(&app.as_querier().into_empty(), "airi".to_string());
     println!("{:?}", res);
     match res {
         Err(err) => {
@@ -106,15 +101,13 @@ fn test_asset() {
             ("addr00001", 123u128),
             ("addr00002", 123u128),
         ],
-    )]);
+    )])
+    .unwrap();
 
     // set code implementation
     app.set_oracle_contract(Box::new(create_entry_points_testing!(crate)));
 
-    app.set_tax(
-        Decimal::percent(1),
-        &[("uusd", 1000000u128)],
-    );
+    app.set_tax(Decimal::percent(1), &[("uusd", 1000000u128)]);
 
     let token_asset = Asset {
         amount: Uint128::from(123123u128),
@@ -134,13 +127,13 @@ fn test_asset() {
 
     assert_eq!(
         token_asset
-            .compute_tax(&orai_oracle, &app.as_querier())
+            .compute_tax(&orai_oracle, &app.as_querier().into_empty())
             .unwrap(),
         Uint128::zero()
     );
     assert_eq!(
         native_token_asset
-            .compute_tax(&orai_oracle, &app.as_querier())
+            .compute_tax(&orai_oracle, &app.as_querier().into_empty())
             .unwrap(),
         Uint128::from(1220u128)
     );
@@ -150,7 +143,7 @@ fn test_asset() {
             .amount
             .checked_sub(
                 native_token_asset
-                    .compute_tax(&orai_oracle, &app.as_querier())
+                    .compute_tax(&orai_oracle, &app.as_querier().into_empty())
                     .unwrap()
             )
             .unwrap(),
@@ -161,7 +154,7 @@ fn test_asset() {
         token_asset
             .into_msg(
                 Some(&orai_oracle),
-                &app.as_querier(),
+                &app.as_querier().into_empty(),
                 Addr::unchecked("addr0000")
             )
             .unwrap(),
@@ -180,7 +173,7 @@ fn test_asset() {
         native_token_asset
             .into_msg(
                 Some(&orai_oracle),
-                &app.as_querier(),
+                &app.as_querier().into_empty(),
                 Addr::unchecked("addr0000")
             )
             .unwrap(),
