@@ -85,7 +85,8 @@ pub fn execute(
             factory_addr,
             factory_addr_v2,
             oraiswap_v3,
-        } => execute_update_config(deps, info, factory_addr, factory_addr_v2, oraiswap_v3),
+            owner,
+        } => execute_update_config(deps, info, factory_addr, factory_addr_v2, oraiswap_v3, owner),
     }
 }
 
@@ -95,6 +96,7 @@ pub fn execute_update_config(
     factory_addr: Option<String>,
     factory_addr_v2: Option<String>,
     oraiswap_v3: Option<String>,
+    owner: Option<String>,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     let sender_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -113,6 +115,9 @@ pub fn execute_update_config(
     }
     if let Some(oraiswap_v3) = oraiswap_v3 {
         config.oraiswap_v3 = deps.api.addr_canonicalize(&oraiswap_v3)?;
+    }
+    if let Some(owner) = owner {
+        config.owner = deps.api.addr_canonicalize(&owner)?;
     }
 
     CONFIG.save(deps.storage, &config)?;

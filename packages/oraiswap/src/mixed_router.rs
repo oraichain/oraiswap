@@ -71,6 +71,7 @@ pub enum ExecuteMsg {
         factory_addr: Option<String>,
         factory_addr_v2: Option<String>,
         oraiswap_v3: Option<String>,
+        owner: Option<String>,
     },
 }
 
