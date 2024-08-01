@@ -1,18 +1,18 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cosmwasm_std::{
-    coin, to_json_binary, Addr, Binary, CosmosMsg, QuerierWrapper, StdError, StdResult, Uint128,
-    WasmMsg,
+    coin, to_json_binary, Addr, Api, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-use prost::Message;
+use oraiswap_v3::PoolKey;
 
-use crate::{asset::AssetInfo, universal_swap_memo::Memo};
+use crate::asset::AssetInfo;
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub factory_addr: Addr,
     pub factory_addr_v2: Addr,
+    pub oraiswap_v3: Addr,
 }
 
 #[cw_serde]
@@ -25,12 +25,20 @@ pub enum SwapOperation {
         offer_asset_info: AssetInfo,
         ask_asset_info: AssetInfo,
     },
+    SwapV3 {
+        pool_key: PoolKey,
+        x_to_y: bool,
+    },
 }
 
 impl SwapOperation {
-    pub fn get_target_asset_info(&self) -> AssetInfo {
+    pub fn get_target_asset_info(&self, api: &dyn Api) -> AssetInfo {
         match self {
             SwapOperation::OraiSwap { ask_asset_info, .. } => ask_asset_info.clone(),
+            SwapOperation::SwapV3 { pool_key, x_to_y } => match x_to_y {
+                true => AssetInfo::from_denom(api, &pool_key.token_y),
+                false => AssetInfo::from_denom(api, &pool_key.token_x),
+            },
         }
     }
 }
@@ -54,11 +62,16 @@ pub enum ExecuteMsg {
     },
     /// Internal use
     /// Check the swap amount is exceed minimum_receive
-    AssertMinimumReceive {
+    AssertMinimumReceiveAndTransfer {
         asset_info: AssetInfo,
-        prev_balance: Uint128,
         minimum_receive: Uint128,
         receiver: Addr,
+    },
+    UpdateConfig {
+        factory_addr: Option<String>,
+        factory_addr_v2: Option<String>,
+        oraiswap_v3: Option<String>,
+        owner: Option<String>,
     },
 }
 
@@ -88,6 +101,7 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub factory_addr: Addr,
     pub factory_addr_v2: Addr,
+    pub oraiswap_v3: Addr,
 }
 
 // We define a custom struct for each query response
@@ -97,9 +111,9 @@ pub struct SimulateSwapOperationsResponse {
 }
 
 #[cw_serde]
-pub struct RouterController(pub String);
+pub struct MixedRouterController(pub String);
 
-impl RouterController {
+impl MixedRouterController {
     pub fn addr(&self) -> String {
         self.0.clone()
     }
@@ -163,57 +177,4 @@ impl RouterController {
             },
         )
     }
-}
-
-impl Memo {
-    pub fn decode_memo(memo: Binary) -> Result<Self, StdError> {
-        let memo =
-            Memo::decode(memo.0.as_ref()).map_err(|err| StdError::generic_err(err.to_string()))?;
-        memo.validate()?;
-        Ok(memo)
-    }
-
-    pub fn validate(&self) -> StdResult<()> {
-        if let Some(user_swap) = self.user_swap.clone() {
-            if user_swap.swap_exact_asset_in.is_none()
-                && user_swap.smart_swap_exact_asset_in.is_none()
-            {
-                return Err(StdError::generic_err("No swap messages"));
-            }
-            if user_swap.swap_exact_asset_in.is_some()
-                && user_swap.smart_swap_exact_asset_in.is_some()
-            {
-                return Err(StdError::generic_err("Cannot have two swap exacts"));
-            }
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // use cosmwasm_std::Binary;
-
-    // use crate::universal_swap_memo::Memo;
-
-    // #[test]
-    // fn test_parse_memo_prost_valid() {
-    //     let memo_base64 = "CkoKSAoFMTAwMDASPwo9EjkKBG9yYWkSK29yYWkxMmh6anhmaDc3d2w1NzJnZHpjdDJmeHYyYXJ4Y3doNmd5a2M3cWgaBAgBEAEYARIINDAwMDAwMDA=";
-    //     let memo = Memo::decode_memo(Binary::from_base64(memo_base64).unwrap()).unwrap();
-    //     println!("memo: {:?}", memo.user_swap);
-    //     assert_eq!(memo.minimum_receive, "40000000");
-    //     let user_swap = memo.user_swap.clone().unwrap();
-    //     let swap = user_swap.swap_exact_asset_in.clone().unwrap();
-    //     assert_eq!(swap.offer_amount, "10000");
-    //     assert_eq!(swap.operations.len(), 1);
-    //     let pool_id = swap.operations[0].clone().pool_id.unwrap();
-    //     assert_eq!(pool_id.x_to_y, true);
-    //     let pool_key = pool_id.pool_key.unwrap();
-    //     assert_eq!(pool_key.fee_tier.is_none(), false);
-    //     assert_eq!(pool_key.token_x, "orai");
-    //     assert_eq!(
-    //         pool_key.token_y,
-    //         "orai12hzjxfh77wl572gdzct2fxv2arxcwh6gykc7qh"
-    //     ); // usdt
-    // }
 }

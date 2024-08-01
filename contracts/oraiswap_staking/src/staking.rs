@@ -5,8 +5,8 @@ use crate::state::{
     store_is_migrated, store_pool_info, Config, PoolInfo, RewardInfo,
 };
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, to_json_binary, Addr, Api, CanonicalAddr, Coin, CosmosMsg, Decimal, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
@@ -57,7 +57,7 @@ pub fn unbond(
     let staking_token_addr = deps.api.addr_humanize(&staking_token)?;
     let mut messages = vec![WasmMsg::Execute {
         contract_addr: staking_token_addr.to_string(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+        msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
             recipient: staker_addr.to_string(),
             amount,
         })?,
@@ -133,7 +133,7 @@ pub fn auto_stake(
                 // require transfer and increase allowance
                 msgs.push(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),
-                    msg: to_binary(&Cw20ExecuteMsg::TransferFrom {
+                    msg: to_json_binary(&Cw20ExecuteMsg::TransferFrom {
                         owner: info.sender.to_string(),
                         recipient: env.contract.address.to_string(),
                         amount: asset.amount,
@@ -142,7 +142,7 @@ pub fn auto_stake(
                 });
                 msgs.push(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),
-                    msg: to_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                    msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                         spender: oraiswap_pair.contract_addr.to_string(),
                         amount: asset.amount,
                         expires: None,
@@ -157,7 +157,7 @@ pub fn auto_stake(
     // provide liquidity with funds from native tokens, run first
     msgs.push(WasmMsg::Execute {
         contract_addr: oraiswap_pair.contract_addr.to_string(),
-        msg: to_binary(&PairExecuteMsg::ProvideLiquidity {
+        msg: to_json_binary(&PairExecuteMsg::ProvideLiquidity {
             assets: assets.clone(),
             slippage_tolerance,
             receiver: None,
@@ -169,7 +169,7 @@ pub fn auto_stake(
     // then auto stake hoook
     msgs.push(WasmMsg::Execute {
         contract_addr: env.contract.address.to_string(),
-        msg: to_binary(&ExecuteMsg::AutoStakeHook {
+        msg: to_json_binary(&ExecuteMsg::AutoStakeHook {
             staking_token: oraiswap_pair.liquidity_token.clone(),
             staker_addr: info.sender,
             prev_staking_token_amount,

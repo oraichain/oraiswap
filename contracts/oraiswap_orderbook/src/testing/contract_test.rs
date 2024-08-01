@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_std::testing::mock_dependencies;
-use cosmwasm_std::{to_binary, Addr, Coin, Decimal, StdError, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
 use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
 
@@ -21,7 +21,7 @@ const REWARD_ADDR: &str = "orai16stq6f4pnrfpz75n9ujv6qg3czcfa4qyjux5en";
 fn basic_fixture() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -34,7 +34,7 @@ fn basic_fixture() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -50,10 +50,8 @@ fn basic_fixture() -> (MockApp, Addr) {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    app.set_token_balances(&[(
-        &"asset".to_string(),
-        &[(&"addr0000".to_string(), &Uint128::from(1000000000u128))],
-    )]);
+    app.set_token_balances(&[("asset", &[("addr0000", 1000000000u128)])])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,
@@ -755,13 +753,19 @@ fn submit_order() {
         min_offer_to_fulfilled: None,
         min_ask_to_fulfilled: None,
     };
-    let _res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(_res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("Order book pair already exists"));
 
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Buy,
@@ -782,13 +786,19 @@ fn submit_order() {
     };
 
     // offer asset is null
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("Native token balance mismatch between the argument and the transferred"));
 
     let msg = ExecuteMsg::SubmitOrder {
         direction: OrderDirection::Sell,
@@ -809,16 +819,22 @@ fn submit_order() {
     };
 
     // Offer ammount 5 usdt (min 10 usdt) is too low
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[Coin {
-            denom: ORAI_DENOM.to_string(),
-            amount: Uint128::from(50u128),
-        }],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(50u128),
+            }],
+        )
+        .unwrap_err();
+
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("Amount of usdt must be greater than 10"));
 
     // paid 150 usdt to get 150 orai'
     // order 1:
@@ -873,16 +889,22 @@ fn submit_order() {
     };
 
     // Asset must not be zero
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[Coin {
-            denom: USDT_DENOM.to_string(),
-            amount: Uint128::from(0u128),
-        }],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[Coin {
+                denom: USDT_DENOM.to_string(),
+                amount: Uint128::from(0u128),
+            }],
+        )
+        .unwrap_err();
+
+    assert!(error
+        .root_cause()
+        .to_string()
+        .contains("Cannot transfer empty coins amount"));
 
     let order_1 = OrderResponse {
         order_id: 1u64,
@@ -1122,7 +1144,7 @@ fn submit_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1212121u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -1267,7 +1289,7 @@ fn submit_order() {
 fn cancel_order_native_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1280,7 +1302,7 @@ fn cancel_order_native_token() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1407,13 +1429,16 @@ fn cancel_order_native_token() {
     };
 
     // verfication failed
-    let res = app.execute(
-        Addr::unchecked("addr0001"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0001"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+
+    assert!(error.root_cause().to_string().contains("Unauthorized"));
 
     let res = app
         .execute(
@@ -1469,13 +1494,16 @@ fn cancel_order_native_token() {
     assert_eq!(address1_balances, expected_balances,);
 
     // failed no order exists
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+
+    assert!(error.root_cause().to_string().contains("Order not found"));
 
     let msg = ExecuteMsg::CancelOrder {
         order_id: 2,
@@ -1611,7 +1639,7 @@ fn cancel_order_native_token() {
 #[test]
 fn cancel_order_token() {
     let mut app = MockApp::new(&[(
-        &"addr0000".to_string(),
+        "addr0000",
         &[Coin {
             denom: ORAI_DENOM.to_string(),
             amount: Uint128::from(1000000000u128),
@@ -1619,22 +1647,18 @@ fn cancel_order_token() {
     )]);
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[
-        (
-            &"assetA".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
-            ],
-        ),
-        (
-            &"assetB".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
-            ],
-        ),
-    ]);
+    let token_addrs = app
+        .set_token_balances(&[
+            (
+                "assetA",
+                &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
+            ),
+            (
+                "assetB",
+                &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
+            ),
+        ])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,
@@ -1700,7 +1724,7 @@ fn cancel_order_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1234567u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -1723,7 +1747,7 @@ fn cancel_order_token() {
     let msg2 = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333335u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1746,7 +1770,7 @@ fn cancel_order_token() {
     let msg3 = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3333336u128), // Fund must be equal to offer amount
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1785,18 +1809,20 @@ fn cancel_order_token() {
         .unwrap();
 
     // provided and paid asset are different
-    let res = app.execute(
-        Addr::unchecked("addr0001"),
-        token_addrs[1].clone(),
-        &msg3,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0001"),
+            token_addrs[1].clone(),
+            &msg3,
+            &[],
+        )
+        .unwrap_err();
+    assert!(error.root_cause().to_string().contains("Invalid funds"));
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1223344u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -1838,13 +1864,15 @@ fn cancel_order_token() {
     };
 
     // failed verfication failed
-    let res = app.execute(
-        Addr::unchecked("addr0001"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0001"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+    assert!(error.root_cause().to_string().contains("Unauthorized"));
 
     let res = app
         .execute(
@@ -1907,20 +1935,22 @@ fn cancel_order_token() {
     );
 
     // failed no order exists
-    let res = app.execute(
-        Addr::unchecked("addr0000"),
-        orderbook_addr.clone(),
-        &msg,
-        &[],
-    );
-    app.assert_fail(res);
+    let error = app
+        .execute(
+            Addr::unchecked("addr0000"),
+            orderbook_addr.clone(),
+            &msg,
+            &[],
+        )
+        .unwrap_err();
+    assert!(error.root_cause().to_string().contains("Order not found"));
 }
 
 #[test]
 fn execute_pair_native_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1933,7 +1963,7 @@ fn execute_pair_native_token() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -1946,7 +1976,7 @@ fn execute_pair_native_token() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -3034,21 +3064,21 @@ fn execute_pair_native_token() {
 fn execute_pair_cw20_token() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(1000000u128),
@@ -3058,24 +3088,26 @@ fn execute_pair_cw20_token() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[
-        (
-            &"usdt".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
-            ],
-        ),
-        (
-            &"uusd".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000u128)),
-                (&"addr0002".to_string(), &Uint128::from(1000000u128)),
-            ],
-        ),
-    ]);
+    let token_addrs = app
+        .set_token_balances(&[
+            (
+                "usdt",
+                &[
+                    ("addr0000", 1000000u128),
+                    ("addr0001", 1000000u128),
+                    ("addr0002", 1000000u128),
+                ],
+            ),
+            (
+                "uusd",
+                &[
+                    ("addr0000", 1000000u128),
+                    ("addr0001", 1000000u128),
+                    ("addr0002", 1000000u128),
+                ],
+            ),
+        ])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,
@@ -3122,7 +3154,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3157,7 +3189,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(9u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3254,7 +3286,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3285,7 +3317,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3319,7 +3351,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3352,7 +3384,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3417,7 +3449,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3450,7 +3482,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3514,7 +3546,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3547,7 +3579,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3704,7 +3736,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(13000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3737,7 +3769,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(5000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3771,7 +3803,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(4400u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3804,7 +3836,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(7000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3869,7 +3901,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3902,7 +3934,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(10000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3966,7 +3998,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -3999,7 +4031,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -4125,7 +4157,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -4158,7 +4190,7 @@ fn execute_pair_cw20_token() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(1200u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -4218,7 +4250,7 @@ fn execute_pair_cw20_token() {
 fn simple_matching_test() {
     let mut app: MockApp = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4231,7 +4263,7 @@ fn simple_matching_test() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4244,7 +4276,7 @@ fn simple_matching_test() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4474,7 +4506,7 @@ fn simple_matching_test() {
 fn reward_to_executor_test() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4487,7 +4519,7 @@ fn reward_to_executor_test() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4700,7 +4732,7 @@ fn reward_to_executor_test() {
 fn mock_basic_query_data() -> (MockApp, Addr) {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4713,7 +4745,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4726,7 +4758,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ORAI_DENOM.to_string(),
@@ -4787,7 +4819,7 @@ fn mock_basic_query_data() -> (MockApp, Addr) {
 fn remove_orderbook_pair() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -4800,7 +4832,7 @@ fn remove_orderbook_pair() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -4813,7 +4845,7 @@ fn remove_orderbook_pair() {
             ],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5116,7 +5148,7 @@ fn remove_orderbook_pair() {
 fn orders_querier() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5129,7 +5161,7 @@ fn orders_querier() {
             ],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[
                 Coin {
                     denom: ATOM_DENOM.to_string(),
@@ -5145,22 +5177,18 @@ fn orders_querier() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[
-        (
-            &"assetA".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
-            ],
-        ),
-        (
-            &"assetB".to_string(),
-            &[
-                (&"addr0000".to_string(), &Uint128::from(1000000000u128)),
-                (&"addr0001".to_string(), &Uint128::from(1000000000u128)),
-            ],
-        ),
-    ]);
+    let token_addrs = app
+        .set_token_balances(&[
+            (
+                "assetA",
+                &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
+            ),
+            (
+                "assetB",
+                &[("addr0000", 1000000000u128), ("addr0001", 1000000000u128)],
+            ),
+        ])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,
@@ -5291,7 +5319,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Buy,
             assets: [
                 Asset {
@@ -5324,7 +5352,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -5357,7 +5385,7 @@ fn orders_querier() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::from(1000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
             direction: OrderDirection::Sell,
             assets: [
                 Asset {
@@ -5991,28 +6019,28 @@ fn test_query_ticks_with_end() {
 fn test_market_order() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
@@ -6022,14 +6050,16 @@ fn test_market_order() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[(
-        &"usdt".to_string(),
-        &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
-        ],
-    )]);
+    let token_addrs = app
+        .set_token_balances(&[(
+            "usdt",
+            &[
+                ("addr0000", 10000000u128),
+                ("addr0001", 10000000u128),
+                ("addr0002", 10000000u128),
+            ],
+        )])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,
@@ -6077,7 +6107,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6140,7 +6170,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6181,7 +6211,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(2500000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6213,12 +6243,8 @@ fn test_market_order() {
     let address1_native_balances = app
         .query_balance(Addr::unchecked("addr0001"), ORAI_DENOM.to_string())
         .unwrap();
-    let address0_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0000"))
-        .unwrap();
-    let address1_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0001"))
-        .unwrap();
+    let address0_token_balances = app.query_token_balances("addr0000").unwrap();
+    let address1_token_balances = app.query_token_balances("addr0001").unwrap();
 
     assert_eq!(address0_native_balances, Uint128::from(7000000u128));
     assert_eq!(
@@ -6290,7 +6316,7 @@ fn test_market_order() {
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6320,12 +6346,8 @@ fn test_market_order() {
     let address1_native_balances = app
         .query_balance(Addr::unchecked("addr0001"), ORAI_DENOM.to_string())
         .unwrap();
-    let address0_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0000"))
-        .unwrap();
-    let address1_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0001"))
-        .unwrap();
+    let address0_token_balances = app.query_token_balances("addr0000").unwrap();
+    let address1_token_balances = app.query_token_balances("addr0001").unwrap();
 
     assert_eq!(address0_native_balances, Uint128::from(5000000u128));
     assert_eq!(
@@ -6353,7 +6375,7 @@ fn test_market_order() {
         let msg = cw20::Cw20ExecuteMsg::Send {
             contract: orderbook_addr.to_string(),
             amount: Uint128::new(offers[i]),
-            msg: to_binary(&Cw20HookMsg::SubmitOrder {
+            msg: to_json_binary(&Cw20HookMsg::SubmitOrder {
                 direction: OrderDirection::Buy,
                 assets: [
                     Asset {
@@ -6440,12 +6462,8 @@ fn test_market_order() {
     let address1_native_balances = app
         .query_balance(Addr::unchecked("addr0001"), ORAI_DENOM.to_string())
         .unwrap();
-    let address0_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0000"))
-        .unwrap();
-    let address1_token_balances = app
-        .query_token_balances(Addr::unchecked("addr0001"))
-        .unwrap();
+    let address0_token_balances = app.query_token_balances("addr0000").unwrap();
+    let address1_token_balances = app.query_token_balances("addr0001").unwrap();
 
     assert_eq!(address0_native_balances, Uint128::from(7497500u128));
     assert_eq!(
@@ -6465,19 +6483,21 @@ fn test_market_order() {
     );
 
     // case submit cw20 market order failed, invalid funds
-    let new_tokens = app.set_token_balances(&[(
-        &"uusd".to_string(),
-        &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
-        ],
-    )]);
+    let new_tokens = app
+        .set_token_balances(&[(
+            "uusd",
+            &[
+                ("addr0000", 10000000u128),
+                ("addr0001", 10000000u128),
+                ("addr0002", 10000000u128),
+            ],
+        )])
+        .unwrap();
 
     let msg = cw20::Cw20ExecuteMsg::Send {
         contract: orderbook_addr.to_string(),
         amount: Uint128::new(3000000u128),
-        msg: to_binary(&Cw20HookMsg::SubmitMarketOrder {
+        msg: to_json_binary(&Cw20HookMsg::SubmitMarketOrder {
             direction: OrderDirection::Buy,
             asset_infos: [
                 AssetInfo::NativeToken {
@@ -6508,28 +6528,28 @@ fn test_market_order() {
 fn test_query_simulate_market_order() {
     let mut app = MockApp::new(&[
         (
-            &"addr0000".to_string(),
+            "addr0000",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0001".to_string(),
+            "addr0001",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ORAI_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
             }],
         ),
         (
-            &"addr0002".to_string(),
+            "addr0002",
             &[Coin {
                 denom: ATOM_DENOM.to_string(),
                 amount: Uint128::from(10000000u128),
@@ -6539,14 +6559,16 @@ fn test_query_simulate_market_order() {
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
-    let token_addrs = app.set_token_balances(&[(
-        &"usdt".to_string(),
-        &[
-            (&"addr0000".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0001".to_string(), &Uint128::from(10000000u128)),
-            (&"addr0002".to_string(), &Uint128::from(10000000u128)),
-        ],
-    )]);
+    let token_addrs = app
+        .set_token_balances(&[(
+            "usdt",
+            &[
+                ("addr0000", 10000000u128),
+                ("addr0001", 10000000u128),
+                ("addr0002", 10000000u128),
+            ],
+        )])
+        .unwrap();
 
     let msg = InstantiateMsg {
         name: None,

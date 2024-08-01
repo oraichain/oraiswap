@@ -13,6 +13,7 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 | [`oraiswap_orderbook`](contracts/oraiswap_orderbook) | Orderbook implementation                                 |
 | [`oraiswap_staking`](contracts/oraiswap_staking)     | Stake LPs to get ORAIX reward                            |
 | [`oraiswap_token`](contracts/oraiswap_token)         | (ERC20 equivalent) token implementation, AIRI, ORAIX     |
+| [`oraiswap_mixed_router`](contracts/oraiswap_mixedrouter)         | Facilitate multi-hop swap operations between v2 & v3     |
 
 - oraiswap_factory
 
@@ -73,4 +74,12 @@ impl ::std::convert::TryFrom<&[u8]> for MsgInstantiateContractResponse {
     }
 }
 END
+
+# gen proto using prost
+# macos
+brew install protobuf
+
+cargo install protoc-gen-prost
+
+protoc --prost_out packages/oraiswap/src --proto_path packages/oraiswap/src -I proto packages/oraiswap/src/universal_swap_memo.proto && mv packages/oraiswap/src/_ packages/oraiswap/src/universal_swap_memo.rs
 ```

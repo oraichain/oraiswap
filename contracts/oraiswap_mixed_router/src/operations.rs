@@ -1,19 +1,24 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128, WasmMsg,
+    coin, to_json_binary, Addr, Api, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
+
+use oraiswap_v3::token_amount::TokenAmount;
+use oraiswap_v3::{sqrt_price::SqrtPrice, PoolKey};
+use oraiswap_v3::{MAX_TICK, MIN_TICK};
 
 use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
+use oraiswap::mixed_router::{ExecuteMsg, SwapOperation};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20, QueryMsg as PairQueryMsg};
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
-use oraiswap::router::{ExecuteMsg, SwapOperation};
+use oraiswap_v3::msg::ExecuteMsg as OraiswapV3ExecuteMsg;
 
 /// Execute swap operation
 /// swap all offer asset to ask asset
@@ -30,6 +35,7 @@ pub fn execute_swap_operation(
     }
 
     let config: Config = CONFIG.load(deps.storage)?;
+    let oraiswap_v3 = deps.api.addr_humanize(&config.oraiswap_v3)?;
     let factory_addr = deps.api.addr_humanize(&config.factory_addr)?;
     let factory_addr_v2 = deps.api.addr_humanize(&config.factory_addr_v2)?;
     let pair_config = query_pair_config(&deps.querier, factory_addr.clone())
@@ -92,6 +98,70 @@ pub fn execute_swap_operation(
                 to,
             )?]
         }
+        SwapOperation::SwapV3 { pool_key, x_to_y } => {
+            // only support swap by amount in
+            let (offer_asset_info, _) = get_swap_v3_asset_info(deps.api, &pool_key, &x_to_y);
+
+            let mut msgs: Vec<CosmosMsg> = vec![];
+
+            let sqrt_price_limit = if x_to_y {
+                SqrtPrice::from_tick(MIN_TICK).unwrap()
+            } else {
+                SqrtPrice::from_tick(MAX_TICK).unwrap()
+            };
+
+            match offer_asset_info.clone() {
+                AssetInfo::NativeToken { denom } => {
+                    let balance = deps
+                        .querier
+                        .query_balance(env.contract.address, denom.clone())?
+                        .amount;
+                    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: oraiswap_v3.to_string(),
+                        msg: to_json_binary(&OraiswapV3ExecuteMsg::Swap {
+                            pool_key,
+                            x_to_y,
+                            amount: TokenAmount(balance.into()),
+                            by_amount_in: true,
+                            sqrt_price_limit,
+                        })
+                        .unwrap(),
+                        funds: vec![coin(balance.into(), denom)],
+                    }))
+                }
+                AssetInfo::Token { contract_addr } => {
+                    let balance = query_token_balance(
+                        &deps.querier,
+                        contract_addr.clone(),
+                        env.contract.address,
+                    )?;
+                    // approve first
+                    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: contract_addr.to_string(),
+                        msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                            spender: oraiswap_v3.to_string(),
+                            amount: balance.clone(),
+                            expires: None,
+                        })?,
+                        funds: vec![],
+                    }));
+                    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: oraiswap_v3.to_string(),
+                        msg: to_json_binary(&OraiswapV3ExecuteMsg::Swap {
+                            pool_key,
+                            x_to_y,
+                            amount: TokenAmount(balance.into()),
+                            by_amount_in: true,
+                            sqrt_price_limit,
+                        })
+                        .unwrap(),
+                        funds: vec![],
+                    }))
+                }
+            };
+
+            msgs
+        }
     };
 
     Ok(Response::new().add_messages(messages))
@@ -111,10 +181,11 @@ pub fn execute_swap_operations(
     }
 
     // Assert the operations are properly set
-    assert_operations(&operations)?;
+    assert_operations(deps.api, &operations)?;
 
     let to = to.unwrap_or(sender.clone());
-    let target_asset_info = operations.last().unwrap().get_target_asset_info();
+
+    let target_asset_info = operations.last().unwrap().get_target_asset_info(deps.api);
 
     let mut operation_index = 0;
     let mut messages: Vec<CosmosMsg> = operations
@@ -126,11 +197,7 @@ pub fn execute_swap_operations(
                 funds: vec![],
                 msg: to_json_binary(&ExecuteMsg::ExecuteSwapOperation {
                     operation: op,
-                    to: if operation_index == operations_len {
-                        Some(to.clone())
-                    } else {
-                        None
-                    },
+                    to: None,
                     sender: sender.clone(),
                 })?,
             }))
@@ -138,20 +205,17 @@ pub fn execute_swap_operations(
         .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
     // Execute minimum amount assertion
-    if let Some(minimum_receive) = minimum_receive {
-        let receiver_balance = target_asset_info.query_pool(&deps.querier, to.clone())?;
+    let minimum_receive = minimum_receive.unwrap_or_default();
 
-        messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: env.contract.address.to_string(),
-            funds: vec![],
-            msg: to_json_binary(&ExecuteMsg::AssertMinimumReceive {
-                asset_info: target_asset_info,
-                prev_balance: receiver_balance,
-                minimum_receive,
-                receiver: to,
-            })?,
-        }))
-    }
+    messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: env.contract.address.to_string(),
+        funds: vec![],
+        msg: to_json_binary(&ExecuteMsg::AssertMinimumReceiveAndTransfer {
+            asset_info: target_asset_info,
+            minimum_receive,
+            receiver: to,
+        })?,
+    }));
 
     Ok(Response::new().add_messages(messages))
 }
@@ -208,7 +272,7 @@ fn asset_into_swap_msg(
     }
 }
 
-pub fn assert_operations(operations: &[SwapOperation]) -> StdResult<()> {
+pub fn assert_operations(api: &dyn Api, operations: &[SwapOperation]) -> StdResult<()> {
     let mut ask_asset_map: HashMap<String, bool> = HashMap::new();
     for operation in operations.iter() {
         let (offer_asset, ask_asset) = match operation {
@@ -216,6 +280,9 @@ pub fn assert_operations(operations: &[SwapOperation]) -> StdResult<()> {
                 offer_asset_info,
                 ask_asset_info,
             } => (offer_asset_info.clone(), ask_asset_info.clone()),
+            SwapOperation::SwapV3 { pool_key, x_to_y } => {
+                get_swap_v3_asset_info(api, pool_key, x_to_y)
+            }
         };
 
         ask_asset_map.remove(&offer_asset.to_string());
@@ -229,4 +296,22 @@ pub fn assert_operations(operations: &[SwapOperation]) -> StdResult<()> {
     }
 
     Ok(())
+}
+
+pub fn get_swap_v3_asset_info(
+    api: &dyn Api,
+    pool_key: &PoolKey,
+    x_to_y: &bool,
+) -> (AssetInfo, AssetInfo) {
+    if *x_to_y {
+        (
+            AssetInfo::from_denom(api, &pool_key.token_x),
+            AssetInfo::from_denom(api, &pool_key.token_y),
+        )
+    } else {
+        (
+            AssetInfo::from_denom(api, &pool_key.token_y),
+            AssetInfo::from_denom(api, &pool_key.token_x),
+        )
+    }
 }

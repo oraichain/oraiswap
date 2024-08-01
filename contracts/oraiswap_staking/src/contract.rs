@@ -19,7 +19,7 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Api, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
+    from_json, to_json_binary, Addr, Api, Binary, CanonicalAddr, Decimal, Deps, DepsMut, Env,
     MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 use oraiswap::asset::{Asset, ORAI_DENOM};
@@ -109,7 +109,7 @@ pub fn receive_cw20(
     cw20_msg: Cw20ReceiveMsg,
 ) -> StdResult<Response> {
     validate_migrate_store_status(deps.storage)?;
-    match from_binary(&cw20_msg.msg) {
+    match from_json(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Bond {}) => {
             // check permission
             let token_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
@@ -299,28 +299,30 @@ fn deprecate_staking_token(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::PoolInfo { staking_token } => to_binary(&query_pool_info(deps, staking_token)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::PoolInfo { staking_token } => {
+            to_json_binary(&query_pool_info(deps, staking_token)?)
+        }
         QueryMsg::RewardsPerSec { staking_token } => {
-            to_binary(&query_rewards_per_sec(deps, staking_token)?)
+            to_json_binary(&query_rewards_per_sec(deps, staking_token)?)
         }
         QueryMsg::RewardInfo {
             staker_addr,
             staking_token,
-        } => to_binary(&query_reward_info(deps, staker_addr, staking_token)?),
+        } => to_json_binary(&query_reward_info(deps, staker_addr, staking_token)?),
         QueryMsg::RewardInfos {
             staking_token,
             start_after,
             limit,
             order,
-        } => to_binary(&query_all_reward_infos(
+        } => to_json_binary(&query_all_reward_infos(
             deps,
             staking_token,
             start_after,
             limit,
             order,
         )?),
-        QueryMsg::GetPoolsInformation {} => to_binary(&query_get_pools_infomation(deps)?),
+        QueryMsg::GetPoolsInformation {} => to_json_binary(&query_get_pools_infomation(deps)?),
         QueryMsg::QueryOldStore { store_type } => query_old_store(deps, store_type),
     }
 }
@@ -412,7 +414,7 @@ pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Bi
         OldStoreType::Pools {} => {
             let old_pool_infos = old_read_all_pool_infos(deps.storage)?;
             let all_pools = parse_read_all_pool_infos(deps.api, old_pool_infos)?;
-            to_binary(&all_pools)
+            to_json_binary(&all_pools)
         }
         OldStoreType::Stakers { asset_info } => {
             let asset_key = asset_info.to_vec(deps.api)?;
@@ -424,11 +426,11 @@ pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Bi
                     })
                 })
                 .collect::<StdResult<Vec<(Addr, bool)>>>()?;
-            to_binary(&all_stakers_given_key)
+            to_json_binary(&all_stakers_given_key)
         }
         OldStoreType::RewardsPerSec {} => {
             let list_old_rw_per_sec = old_read_all_rewards_per_sec(deps.storage, deps.api);
-            to_binary(&list_old_rw_per_sec)
+            to_json_binary(&list_old_rw_per_sec)
         }
         OldStoreType::IsMigrated { staker } => {
             let list_is_migrated_given_staker = old_read_all_is_migrated_key_parsed(
@@ -436,12 +438,12 @@ pub fn query_old_store(deps: Deps, old_store_type: OldStoreType) -> StdResult<Bi
                 deps.api,
                 deps.api.addr_canonicalize(&staker)?,
             );
-            to_binary(&list_is_migrated_given_staker)
+            to_json_binary(&list_is_migrated_given_staker)
         }
         OldStoreType::Rewards { staker } => {
             let list_old_rewards_store =
                 old_rewards_read_all(deps.storage, deps.api, deps.api.addr_canonicalize(&staker)?);
-            to_binary(&list_old_rewards_store)
+            to_json_binary(&list_old_rewards_store)
         }
     }
 }
