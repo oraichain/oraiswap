@@ -304,6 +304,7 @@ fn execute_swap_operations() {
         operations: vec![],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let error = app
@@ -335,6 +336,7 @@ fn execute_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let res = app
@@ -839,6 +841,7 @@ fn execute_mixed_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let error = app
@@ -873,6 +876,7 @@ fn execute_mixed_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let mut balances_before = app.query_token_balances("addr0000").unwrap();
