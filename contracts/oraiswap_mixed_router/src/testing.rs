@@ -3,7 +3,7 @@ use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, ORAI_DENOM};
 use oraiswap::create_entry_points_testing;
 use oraiswap::mixed_router::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, SimulateSwapOperationsResponse, SwapOperation,
+    Affiliate, ExecuteMsg, InstantiateMsg, QueryMsg, SimulateSwapOperationsResponse, SwapOperation,
 };
 
 use oraiswap::testing::{MockApp, APP_OWNER, ATOM_DENOM};
@@ -304,6 +304,7 @@ fn execute_swap_operations() {
         operations: vec![],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let error = app
@@ -335,6 +336,7 @@ fn execute_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let res = app
@@ -552,6 +554,7 @@ fn init_v3(
 
     pool_key
 }
+
 #[test]
 fn simulate_mixed_swap() {
     let mut app = MockApp::new(&[(
@@ -839,6 +842,7 @@ fn execute_mixed_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let error = app
@@ -873,6 +877,7 @@ fn execute_mixed_swap_operations() {
         ],
         minimum_receive: None,
         to: None,
+        affiliates: None,
     };
 
     let mut balances_before = app.query_token_balances("addr0000").unwrap();
@@ -914,6 +919,262 @@ fn execute_mixed_swap_operations() {
             Coin {
                 denom: token_x_name.to_string(),
                 amount: Uint128::new(998499249564)
+            }
+        ]
+    );
+}
+
+#[test]
+fn test_affiliates() {
+    let mut app = MockApp::new(&[(
+        "addr0000",
+        &[
+            Coin {
+                denom: ORAI_DENOM.to_string(),
+                amount: Uint128::from(1000000000000u128),
+            },
+            Coin {
+                denom: ATOM_DENOM.to_string(),
+                amount: Uint128::from(1000000000000u128),
+            },
+        ],
+    )]);
+
+    app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
+
+    let token_x_name = "tokenx";
+    let token_y_name = "tokeny";
+    let token_x = app.create_token(token_x_name);
+    let token_y = app.create_token(token_y_name);
+
+    app.set_token_balances(&[("tokenx", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
+    app.set_token_balances(&[("tokeny", &[("addr0000", 1000000000000u128)])])
+        .unwrap();
+
+    app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
+
+    app.set_factory_and_pair_contract(
+        Box::new(
+            create_entry_points_testing!(oraiswap_factory)
+                .with_reply_empty(oraiswap_factory::contract::reply),
+        ),
+        Box::new(
+            create_entry_points_testing!(oraiswap_pair)
+                .with_reply_empty(oraiswap_pair::contract::reply),
+        ),
+    );
+
+    // set tax rate as 0.3%
+    app.set_tax(
+        Decimal::permille(3),
+        &[
+            (&ORAI_DENOM.to_string(), 10000000u128),
+            (&ATOM_DENOM.to_string(), 10000000u128),
+        ],
+    );
+
+    let asset_infos = [
+        AssetInfo::Token {
+            contract_addr: token_x.clone(),
+        },
+        AssetInfo::Token {
+            contract_addr: token_y.clone(),
+        },
+    ];
+
+    // create pair
+    let pair_addr = app.create_pair(asset_infos.clone()).unwrap();
+
+    // provide liquidity
+    // successfully provide liquidity for the exist pool
+
+    app.approve_token(
+        token_x_name,
+        "addr0000",
+        pair_addr.clone().as_str(),
+        u128::MAX,
+    )
+    .unwrap();
+    app.approve_token(
+        token_y_name,
+        "addr0000",
+        pair_addr.clone().as_str(),
+        u128::MAX,
+    )
+    .unwrap();
+    let msg = oraiswap::pair::ExecuteMsg::ProvideLiquidity {
+        assets: [
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: token_x.clone(),
+                },
+                amount: Uint128::from(1000000000u128),
+            },
+            Asset {
+                info: AssetInfo::Token {
+                    contract_addr: token_y.clone(),
+                },
+                amount: Uint128::from(100000000u128),
+            },
+        ],
+        slippage_tolerance: None,
+        receiver: None,
+    };
+
+    let _res = app
+        .execute(Addr::unchecked("addr0000"), pair_addr.clone(), &msg, &[])
+        .unwrap();
+
+    init_v3(
+        &mut app,
+        token_x.clone(),
+        token_x_name,
+        token_y.clone(),
+        token_y_name,
+    );
+
+    let msg = InstantiateMsg {
+        factory_addr: app.factory_addr.clone(),
+        factory_addr_v2: Addr::unchecked("addr0000_v2"),
+        oraiswap_v3: app.v3_addr.clone(),
+    };
+
+    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
+
+    // we can just call .unwrap() to assert this was a success
+    let router_addr = app
+        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .unwrap();
+
+    // case 1: swap x to y => receive y
+    let msg_swap = ExecuteMsg::ExecuteSwapOperations {
+        operations: vec![SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::Token {
+                contract_addr: token_x.clone(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: token_y.clone(),
+            },
+        }],
+        minimum_receive: None,
+        to: None,
+        affiliates: Some(vec![
+            Affiliate {
+                basis_points_fee: Uint128::new(100), // 1%
+                address: Addr::unchecked("affiliate_1"),
+            },
+            Affiliate {
+                basis_points_fee: Uint128::new(1000), // 10%
+                address: Addr::unchecked("affiliate_2"),
+            },
+        ]),
+    };
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        token_x.clone(),
+        &Cw20ExecuteMsg::Send {
+            contract: router_addr.to_string(),
+            amount: Uint128::new(1000000),
+            msg: to_json_binary(&msg_swap).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+    let mut balances = app.query_token_balances("affiliate_1").unwrap();
+    balances.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(996)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(0)
+            }
+        ]
+    );
+    let mut balances = app.query_token_balances("affiliate_2").unwrap();
+    balances.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(9960)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(0)
+            }
+        ]
+    );
+
+    // swap y to x => receive x
+    let msg_swap = ExecuteMsg::ExecuteSwapOperations {
+        operations: vec![SwapOperation::OraiSwap {
+            offer_asset_info: AssetInfo::Token {
+                contract_addr: token_y.clone(),
+            },
+            ask_asset_info: AssetInfo::Token {
+                contract_addr: token_x.clone(),
+            },
+        }],
+        minimum_receive: None,
+        to: None,
+        affiliates: Some(vec![
+            Affiliate {
+                basis_points_fee: Uint128::new(100), // 1%
+                address: Addr::unchecked("affiliate_1"),
+            },
+            Affiliate {
+                basis_points_fee: Uint128::new(1000), // 10%
+                address: Addr::unchecked("affiliate_2"),
+            },
+        ]),
+    };
+
+    app.execute(
+        Addr::unchecked("addr0000"),
+        token_x.clone(),
+        &Cw20ExecuteMsg::Send {
+            contract: router_addr.to_string(),
+            amount: Uint128::new(1000000),
+            msg: to_json_binary(&msg_swap).unwrap(),
+        },
+        &[],
+    )
+    .unwrap();
+    let mut balances = app.query_token_balances("affiliate_1").unwrap();
+    balances.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(996)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(10000)
+            }
+        ]
+    );
+    let mut balances = app.query_token_balances("affiliate_2").unwrap();
+    balances.sort_by(|a, b| b.denom.cmp(&a.denom));
+    assert_eq!(
+        balances,
+        vec![
+            Coin {
+                denom: token_y_name.to_string(),
+                amount: Uint128::new(9960)
+            },
+            Coin {
+                denom: token_x_name.to_string(),
+                amount: Uint128::new(100000)
             }
         ]
     );

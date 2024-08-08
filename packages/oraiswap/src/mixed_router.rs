@@ -51,6 +51,7 @@ pub enum ExecuteMsg {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
         to: Option<Addr>,
+        affiliates: Option<Vec<Affiliate>>,
     },
 
     /// Internal use
@@ -66,6 +67,7 @@ pub enum ExecuteMsg {
         asset_info: AssetInfo,
         minimum_receive: Uint128,
         receiver: Addr,
+        affiliates: Vec<Affiliate>,
     },
     UpdateConfig {
         factory_addr: Option<String>,
@@ -81,6 +83,7 @@ pub enum Cw20HookMsg {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
         to: Option<String>,
+        affiliates: Option<Vec<Affiliate>>,
     },
 }
 
@@ -128,6 +131,7 @@ impl MixedRouterController {
         operations: Vec<SwapOperation>,
         minimum_receive: Option<Uint128>,
         swap_to: Option<Addr>,
+        affiliates: Option<Vec<Affiliate>>,
     ) -> StdResult<CosmosMsg> {
         let cosmos_msg: CosmosMsg = match swap_asset_info {
             AssetInfo::Token { contract_addr } => WasmMsg::Execute {
@@ -139,6 +143,7 @@ impl MixedRouterController {
                         operations,
                         minimum_receive,
                         to: swap_to.map(|to| to.into_string()),
+                        affiliates,
                     })?,
                 })?,
                 funds: vec![],
@@ -150,6 +155,7 @@ impl MixedRouterController {
                     operations,
                     minimum_receive,
                     to: swap_to,
+                    affiliates,
                 })?,
                 funds: vec![coin(amount.u128(), denom)],
             }
@@ -177,4 +183,10 @@ impl MixedRouterController {
             },
         )
     }
+}
+
+#[cw_serde]
+pub struct Affiliate {
+    pub basis_points_fee: Uint128,
+    pub address: Addr,
 }

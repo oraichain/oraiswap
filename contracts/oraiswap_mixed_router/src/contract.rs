@@ -2,8 +2,8 @@
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    coin, from_json, to_json_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    attr, from_json, to_json_binary, Addr, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::error::ContractError;
 use oraiswap_v3::interface::QuoteResult;
@@ -15,10 +15,10 @@ use oraiswap_v3::{MAX_TICK, MIN_TICK};
 use crate::operations::{execute_swap_operation, execute_swap_operations};
 use crate::state::{Config, CONFIG};
 
-use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::Cw20ReceiveMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
 use oraiswap::mixed_router::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+    Affiliate, ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
     SimulateSwapOperationsResponse, SwapOperation,
 };
 use oraiswap::oracle::OracleContract;
@@ -63,7 +63,16 @@ pub fn execute(
             operations,
             minimum_receive,
             to,
-        } => execute_swap_operations(deps, env, info.sender, operations, minimum_receive, to),
+            affiliates,
+        } => execute_swap_operations(
+            deps,
+            env,
+            info.sender,
+            operations,
+            minimum_receive,
+            to,
+            affiliates.unwrap_or_default(),
+        ),
         ExecuteMsg::ExecuteSwapOperation {
             operation,
             to,
@@ -74,19 +83,28 @@ pub fn execute(
             asset_info,
             minimum_receive,
             receiver,
+            affiliates,
         } => assert_minium_receive_and_transfer(
             deps.as_ref(),
             env,
             asset_info,
             minimum_receive,
             receiver,
+            affiliates,
         ),
         ExecuteMsg::UpdateConfig {
             factory_addr,
             factory_addr_v2,
             oraiswap_v3,
             owner,
-        } => execute_update_config(deps, info, factory_addr, factory_addr_v2, oraiswap_v3, owner),
+        } => execute_update_config(
+            deps,
+            info,
+            factory_addr,
+            factory_addr_v2,
+            oraiswap_v3,
+            owner,
+        ),
     }
 }
 
@@ -138,9 +156,18 @@ pub fn receive_cw20(
             operations,
             minimum_receive,
             to,
+            affiliates,
         } => {
             let receiver = to.and_then(|addr| deps.api.addr_validate(addr.as_str()).ok());
-            execute_swap_operations(deps, env, sender, operations, minimum_receive, receiver)
+            execute_swap_operations(
+                deps,
+                env,
+                sender,
+                operations,
+                minimum_receive,
+                receiver,
+                affiliates.unwrap_or_default(),
+            )
         }
     }
 }
@@ -151,8 +178,9 @@ fn assert_minium_receive_and_transfer(
     asset_info: AssetInfo,
     minium_receive: Uint128,
     receiver: Addr,
+    affiliates: Vec<Affiliate>,
 ) -> Result<Response, ContractError> {
-    let curr_balance = asset_info.query_pool(&deps.querier, env.contract.address)?;
+    let mut curr_balance = asset_info.query_pool(&deps.querier, env.contract.address)?;
 
     if curr_balance < minium_receive {
         return Err(ContractError::SwapAssertionFailure {
@@ -161,23 +189,49 @@ fn assert_minium_receive_and_transfer(
         });
     }
 
-    // transfer to user
-    let msg = match asset_info {
-        AssetInfo::NativeToken { denom } => CosmosMsg::Bank(BankMsg::Send {
-            to_address: receiver.to_string(),
-            amount: vec![coin(curr_balance.into(), denom)],
-        }),
-        AssetInfo::Token { contract_addr } => CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: contract_addr.to_string(),
-            msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: receiver.to_string(),
-                amount: curr_balance,
-            })?,
-            funds: vec![],
-        }),
+    let mut asset = Asset {
+        info: asset_info,
+        amount: Uint128::zero(),
     };
 
-    Ok(Response::new().add_message(msg))
+    // Create affiliate response and total affiliate fee amount
+    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut attrs: Vec<Attribute> = vec![];
+    let mut total_affiliate_fee_amount: Uint128 = Uint128::zero();
+
+    // If affiliates exist, create the affiliate fee messages and attributes and
+    // add them to the affiliate response, updating the total affiliate fee amount
+    for affiliate in affiliates.iter() {
+        // Get the affiliate fee amount by multiplying the min_asset
+        // amount by the affiliate basis points fee divided by 10000
+        let affiliate_fee_amount =
+            curr_balance.multiply_ratio(affiliate.basis_points_fee, Uint128::new(10000));
+
+        if affiliate_fee_amount > Uint128::zero() {
+            // Add the affiliate fee amount to the total affiliate fee amount
+            total_affiliate_fee_amount =
+                total_affiliate_fee_amount.checked_add(affiliate_fee_amount)?;
+
+            // Create the affiliate_fee_asset
+            asset.amount = affiliate_fee_amount;
+
+            // Create the affiliate fee message
+            msgs.push(asset.into_msg(None, &deps.querier, affiliate.address.clone())?);
+
+            // Add the affiliate attributes to the response
+            attrs.push(attr("affiliate_receiver", affiliate.address.as_str()));
+            attrs.push(attr("affiliate_amount", &affiliate_fee_amount.to_string()))
+        }
+    }
+
+    // transfer to user
+    if total_affiliate_fee_amount < curr_balance {
+        curr_balance = curr_balance - total_affiliate_fee_amount;
+        asset.amount = curr_balance;
+        msgs.push(asset.into_msg(None, &deps.querier, receiver)?);
+    }
+
+    Ok(Response::new().add_messages(msgs).add_attributes(attrs))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

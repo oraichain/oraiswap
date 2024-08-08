@@ -14,7 +14,7 @@ use crate::state::{Config, CONFIG};
 
 use cw20::Cw20ExecuteMsg;
 use oraiswap::asset::{Asset, AssetInfo, PairInfo};
-use oraiswap::mixed_router::{ExecuteMsg, SwapOperation};
+use oraiswap::mixed_router::{Affiliate, ExecuteMsg, SwapOperation};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20, QueryMsg as PairQueryMsg};
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
@@ -174,6 +174,7 @@ pub fn execute_swap_operations(
     operations: Vec<SwapOperation>,
     minimum_receive: Option<Uint128>,
     to: Option<Addr>,
+    affiliates: Vec<Affiliate>,
 ) -> Result<Response, ContractError> {
     let operations_len = operations.len();
     if operations_len == 0 {
@@ -214,6 +215,7 @@ pub fn execute_swap_operations(
             asset_info: target_asset_info,
             minimum_receive,
             receiver: to,
+            affiliates,
         })?,
     }));
 

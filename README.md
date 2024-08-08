@@ -43,6 +43,10 @@ Uniswap-inspired automated market-maker (AMM) protocol powered by Smart Contract
 
   Mainnet (CodeID): 582
 
+- oraiswap_mixed_router
+
+  Mainnet: [`orai1cy2pc5czxm5qlacp6j0hfq7qj9wh8zuhxgpdartcfrdljknq0arsuc4znj`](https://scan.orai.io/smart-contract/orai1cy2pc5czxm5qlacp6j0hfq7qj9wh8zuhxgpdartcfrdljknq0arsuc4znj)
+
 ## Running this contract
 
 You will need Rust 1.44.1+ with wasm32-unknown-unknown target installed.
