@@ -1062,11 +1062,11 @@ fn test_affiliates() {
         affiliates: Some(vec![
             Affiliate {
                 basis_points_fee: Uint128::new(100), // 1%
-                address: Addr::unchecked("affiliate_1"),
+                address: "affiliate_1".to_string(),
             },
             Affiliate {
                 basis_points_fee: Uint128::new(1000), // 10%
-                address: Addr::unchecked("affiliate_2"),
+                address: "affiliate_2".to_string(),
             },
         ]),
     };
@@ -1128,11 +1128,11 @@ fn test_affiliates() {
         affiliates: Some(vec![
             Affiliate {
                 basis_points_fee: Uint128::new(100), // 1%
-                address: Addr::unchecked("affiliate_1"),
+                address: "affiliate_1".to_string(),
             },
             Affiliate {
                 basis_points_fee: Uint128::new(1000), // 10%
-                address: Addr::unchecked("affiliate_2"),
+                address: "affiliate_2".to_string(),
             },
         ]),
     };

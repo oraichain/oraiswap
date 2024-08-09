@@ -188,5 +188,5 @@ impl MixedRouterController {
 #[cw_serde]
 pub struct Affiliate {
     pub basis_points_fee: Uint128,
-    pub address: Addr,
+    pub address: String,
 }

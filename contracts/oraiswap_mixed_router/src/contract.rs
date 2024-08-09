@@ -202,6 +202,11 @@ fn assert_minium_receive_and_transfer(
     // If affiliates exist, create the affiliate fee messages and attributes and
     // add them to the affiliate response, updating the total affiliate fee amount
     for affiliate in affiliates.iter() {
+        let affiliate_addr = deps.api.addr_validate(&affiliate.address);
+        if affiliate_addr.is_err() {
+            continue;
+        }
+
         // Get the affiliate fee amount by multiplying the min_asset
         // amount by the affiliate basis points fee divided by 10000
         let affiliate_fee_amount =
@@ -216,7 +221,7 @@ fn assert_minium_receive_and_transfer(
             asset.amount = affiliate_fee_amount;
 
             // Create the affiliate fee message
-            msgs.push(asset.into_msg(None, &deps.querier, affiliate.address.clone())?);
+            msgs.push(asset.into_msg(None, &deps.querier, affiliate_addr.unwrap())?);
 
             // Add the affiliate attributes to the response
             attrs.push(attr("affiliate_receiver", affiliate.address.as_str()));
