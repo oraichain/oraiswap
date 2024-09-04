@@ -42,7 +42,7 @@ oraiswap-v3 = { git = "https://github.com/oraichain/oraiswap-v3.git", rev = "7d1
   "library",
 ] }
 
-cosmwasm-testing-util = { git = "https://github.com/oraichain/cosmwasm-testing-util.git", rev = "6ca82e7" }
+cosmwasm-testing-util = { path = "/Users/phamtu/Projects/cosmwasm-testing-util" }
 
 [profile.release]
 opt-level = 3

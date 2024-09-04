@@ -15,7 +15,7 @@ use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem, RewardMsg,
 };
-use oraiswap::testing::{MockApp, ATOM_DENOM};
+use oraiswap::testing::{MockApp, APP_OWNER, ATOM_DENOM};
 
 #[test]
 fn test_query_all_pool_keys() {
@@ -460,7 +460,7 @@ fn test_auto_stake() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("owner"), staking_addr.clone(), &msg, &[])
+        .execute(Addr::unchecked(APP_OWNER), staking_addr.clone(), &msg, &[])
         .unwrap();
 
     // no token asset

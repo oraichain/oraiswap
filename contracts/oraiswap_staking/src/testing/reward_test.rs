@@ -9,7 +9,7 @@ use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem, RewardMsg,
 };
-use oraiswap::testing::{MockApp, ATOM_DENOM};
+use oraiswap::testing::{MockApp, APP_OWNER, ATOM_DENOM};
 
 #[test]
 fn test_deposit_reward() {
@@ -487,7 +487,7 @@ fn test_withdraw() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("owner"), staking_addr.clone(), &msg, &[])
+        .execute(Addr::unchecked(APP_OWNER), staking_addr.clone(), &msg, &[])
         .unwrap();
 
     let lp_addr = app.create_token("lptoken");
@@ -497,7 +497,7 @@ fn test_withdraw() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("owner"), staking_addr.clone(), &msg, &[])
+        .execute(Addr::unchecked(APP_OWNER), staking_addr.clone(), &msg, &[])
         .unwrap();
 
     // bond 100 tokens

@@ -156,16 +156,17 @@ impl MockApp {
         let code_id;
         #[cfg(feature = "test-tube")]
         {
-            code_id = self.upload(include_bytes!("testdata/oraiswap-router.wasm"));
+            code_id = self.upload(include_bytes!("testdata/oraiswap-staking.wasm"));
         }
         #[cfg(not(feature = "test-tube"))]
         {
             code_id = self.upload(code);
         }
+        let owner = Addr::unchecked(self.get_account(APP_OWNER));
         let msg = crate::staking::InstantiateMsg {
-            owner: Some(Addr::unchecked(APP_OWNER)),
+            owner: Some(owner.clone()),
             rewarder: reward_addr,
-            minter: Some(Addr::unchecked("mint")),
+            minter: Some(owner),
             oracle_addr: self.oracle_addr.clone(),
             factory_addr: self.factory_addr.clone(),
             base_denom: None,
@@ -193,13 +194,14 @@ impl MockApp {
     pub fn create_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
         if !self.factory_addr.as_str().is_empty() {
             let contract_addr = self.factory_addr.clone();
+            let admin = self.get_account(APP_OWNER);
             let res = self
                 .execute(
-                    Addr::unchecked(APP_OWNER),
+                    Addr::unchecked(admin.as_str()),
                     contract_addr,
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
-                        pair_admin: Some("admin".to_string()),
+                        pair_admin: Some(admin),
                     },
                     &[],
                 )
