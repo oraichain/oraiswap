@@ -17,6 +17,7 @@ readme = "README.md"
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
+test-tube = []
 
 [dependencies]
 cosmwasm-schema = { workspace = true }

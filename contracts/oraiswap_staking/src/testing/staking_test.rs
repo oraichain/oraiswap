@@ -15,7 +15,7 @@ use oraiswap::staking::{
     Cw20HookMsg, ExecuteMsg, InstantiateMsg, PoolInfoResponse, QueryMsg, RewardInfoResponse,
     RewardInfoResponseItem, RewardMsg,
 };
-use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
+use oraiswap::testing::{MockApp, ATOM_DENOM};
 
 #[test]
 fn test_query_all_pool_keys() {

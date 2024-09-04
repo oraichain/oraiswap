@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::testing::mock_dependencies;
 use cosmwasm_std::{to_json_binary, Addr, Coin, Decimal, StdError, Uint128};
 use oraiswap::create_entry_points_testing;
-use oraiswap::testing::{AttributeUtil, MockApp, ATOM_DENOM};
+use oraiswap::testing::{MockApp, ATOM_DENOM};
 
 use oraiswap::asset::{Asset, AssetInfo, AssetInfoRaw, ORAI_DENOM};
 use oraiswap::orderbook::{

@@ -1,10 +1,10 @@
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
-use cosmwasm_std::{coin, Addr, Attribute, Coin, Decimal, StdResult, Uint128};
+use cosmwasm_std::{coin, Addr, Coin, Decimal, StdResult, Uint128};
 use derive_more::{Deref, DerefMut};
 use oraiswap_v3::percentage::Percentage;
 
 use crate::pair::DEFAULT_COMMISSION_RATE;
-use cosmwasm_testing_util::{AppResponse, Code, MockResult};
+use cosmwasm_testing_util::{Code, MockResult};
 
 pub const ATOM_DENOM: &str = "ibc/1777D03C5392415FE659F0E8ECB2CE553C6550542A68E4707D5D46949116790B";
 pub const APP_OWNER: &str = "admin";
@@ -20,21 +20,16 @@ macro_rules! create_entry_points_testing {
     };
 }
 
-pub trait AttributeUtil {
-    fn get_attributes(&self, index: usize) -> Vec<Attribute>;
-}
-
-impl AttributeUtil for AppResponse {
-    fn get_attributes(&self, index: usize) -> Vec<Attribute> {
-        self.events[index].attributes[1..].to_vec()
-    }
-}
+#[cfg(not(feature = "test-tube"))]
+pub type TestMockApp = cosmwasm_testing_util::MultiTestMockApp;
+#[cfg(feature = "test-tube")]
+pub type TestMockApp = cosmwasm_testing_util::TestTubeMockApp;
 
 #[derive(Deref, DerefMut)]
 pub struct MockApp {
     #[deref]
     #[deref_mut]
-    app: cosmwasm_testing_util::MockApp,
+    app: TestMockApp,
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub router_addr: Addr,
@@ -49,7 +44,7 @@ impl MockApp {
             coin(1000000000000000000u128, ATOM_DENOM),
         ];
         init_balances.push((APP_OWNER, &owner_balances));
-        let app = cosmwasm_testing_util::MockApp::new(&init_balances);
+        let (app, _) = TestMockApp::new(&init_balances);
 
         MockApp {
             app,
@@ -61,7 +56,15 @@ impl MockApp {
     }
 
     pub fn set_oracle_contract(&mut self, code: Code) {
-        let code_id = self.upload(code);
+        let code_id;
+        #[cfg(feature = "test-tube")]
+        {
+            code_id = app.upload(include_bytes!("testdata/oraiswap-oracle.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            code_id = self.upload(code);
+        }
         self.oracle_addr = self
             .instantiate(
                 code_id,
@@ -80,8 +83,19 @@ impl MockApp {
     }
 
     pub fn set_factory_and_pair_contract(&mut self, factory_code: Code, pair_code: Code) {
-        let factory_id = self.upload(factory_code);
-        let pair_code_id = self.upload(pair_code);
+        let factory_id;
+        let pair_code_id;
+        #[cfg(feature = "test-tube")]
+        {
+            factory_id = app.upload(include_bytes!("testdata/oraiswap-factory.wasm"));
+            pair_code_id = app.upload(include_bytes!("testdata/oraiswap-pair.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            factory_id = self.upload(factory_code);
+            pair_code_id = self.upload(pair_code);
+        }
+
         let token_code_id = self.token_id();
         let oracle_addr = self.oracle_addr.clone();
         self.factory_addr = self
@@ -101,7 +115,15 @@ impl MockApp {
     }
 
     pub fn set_router_contract(&mut self, code: Code, factory_addr: Addr) {
-        let code_id = self.upload(code);
+        let code_id;
+        #[cfg(feature = "test-tube")]
+        {
+            code_id = app.upload(include_bytes!("testdata/oraiswap-router.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            code_id = self.upload(code);
+        }
         self.router_addr = self
             .instantiate(
                 code_id,
