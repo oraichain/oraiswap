@@ -34,6 +34,7 @@ pub struct MockApp {
     pub factory_addr: Addr,
     pub router_addr: Addr,
     pub v3_addr: Addr,
+    pub staking_addr: Addr,
 }
 
 impl MockApp {
@@ -52,6 +53,19 @@ impl MockApp {
             factory_addr: Addr::unchecked(""),
             router_addr: Addr::unchecked(""),
             v3_addr: Addr::unchecked(""),
+            staking_addr: Addr::unchecked(""),
+        }
+    }
+
+    pub fn set_token_contract(&mut self, code: Code) {
+        #[cfg(feature = "test-tube")]
+        {
+            self.app
+                .set_token_contract(include_bytes!("testdata/oraiswap-token.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            self.app.set_token_contract(code);
         }
     }
 
@@ -59,7 +73,7 @@ impl MockApp {
         let code_id;
         #[cfg(feature = "test-tube")]
         {
-            code_id = app.upload(include_bytes!("testdata/oraiswap-oracle.wasm"));
+            code_id = self.upload(include_bytes!("testdata/oraiswap-oracle.wasm"));
         }
         #[cfg(not(feature = "test-tube"))]
         {
@@ -87,8 +101,8 @@ impl MockApp {
         let pair_code_id;
         #[cfg(feature = "test-tube")]
         {
-            factory_id = app.upload(include_bytes!("testdata/oraiswap-factory.wasm"));
-            pair_code_id = app.upload(include_bytes!("testdata/oraiswap-pair.wasm"));
+            factory_id = self.upload(include_bytes!("testdata/oraiswap-factory.wasm"));
+            pair_code_id = self.upload(include_bytes!("testdata/oraiswap-pair.wasm"));
         }
         #[cfg(not(feature = "test-tube"))]
         {
@@ -118,7 +132,7 @@ impl MockApp {
         let code_id;
         #[cfg(feature = "test-tube")]
         {
-            code_id = app.upload(include_bytes!("testdata/oraiswap-router.wasm"));
+            code_id = self.upload(include_bytes!("testdata/oraiswap-router.wasm"));
         }
         #[cfg(not(feature = "test-tube"))]
         {
@@ -135,6 +149,29 @@ impl MockApp {
                 &[],
                 "router",
             )
+            .unwrap();
+    }
+
+    pub fn set_staking_contract(&mut self, code: Code, reward_addr: Addr) {
+        let code_id;
+        #[cfg(feature = "test-tube")]
+        {
+            code_id = self.upload(include_bytes!("testdata/oraiswap-router.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            code_id = self.upload(code);
+        }
+        let msg = crate::staking::InstantiateMsg {
+            owner: Some(Addr::unchecked(APP_OWNER)),
+            rewarder: reward_addr,
+            minter: Some(Addr::unchecked("mint")),
+            oracle_addr: self.oracle_addr.clone(),
+            factory_addr: self.factory_addr.clone(),
+            base_denom: None,
+        };
+        self.staking_addr = self
+            .instantiate(code_id, Addr::unchecked(APP_OWNER), &msg, &[], "staking")
             .unwrap();
     }
 
@@ -206,7 +243,7 @@ impl MockApp {
 
     pub fn query_pair(&self, asset_infos: [AssetInfo; 2]) -> StdResult<PairInfo> {
         if !self.factory_addr.as_str().is_empty() {
-            return self.app.as_querier().query_wasm_smart(
+            return self.app.query(
                 self.factory_addr.clone(),
                 &crate::factory::QueryMsg::Pair { asset_infos },
             );
@@ -216,12 +253,22 @@ impl MockApp {
         })
     }
 
+    pub fn query_pool(&self, asset_info: AssetInfo, pool_addr: Addr) -> MockResult<Uint128> {
+        match asset_info {
+            AssetInfo::Token { contract_addr, .. } => {
+                self.query_token_balance(contract_addr.as_str(), pool_addr.as_str())
+            }
+            AssetInfo::NativeToken { denom, .. } => self.query_balance(pool_addr, denom),
+        }
+    }
+
     // configure the mint whitelist mock querier
     pub fn set_token_balances(
         &mut self,
         balances: &[(&str, &[(&str, u128)])],
     ) -> MockResult<Vec<Addr>> {
-        self.set_token_balances_from(APP_OWNER, balances)
+        let sender = self.get_account(APP_OWNER);
+        self.set_token_balances_from(&sender, balances)
     }
 
     pub fn set_tax(&mut self, rate: Decimal, caps: &[(&str, u128)]) {
@@ -253,7 +300,15 @@ impl MockApp {
     }
 
     pub fn create_v3(&mut self, code: Code) {
-        let code_id = self.upload(code);
+        let code_id;
+        #[cfg(feature = "test-tube")]
+        {
+            code_id = self.upload(include_bytes!("testdata/oraiswap-v3.wasm"));
+        }
+        #[cfg(not(feature = "test-tube"))]
+        {
+            code_id = self.upload(code);
+        }
         self.v3_addr = self
             .instantiate(
                 code_id,
@@ -272,11 +327,7 @@ impl MockApp {
 mod tests {
     use cosmwasm_std::{testing::MOCK_CONTRACT_ADDR, Addr, Coin, Uint128};
 
-    use crate::{
-        asset::AssetInfo,
-        querier::{query_supply, query_token_balance},
-        testing::MockApp,
-    };
+    use crate::{asset::AssetInfo, testing::MockApp};
 
     #[test]
     fn token_balance_querier() {
@@ -286,15 +337,12 @@ mod tests {
 
         app.set_token_balances(&[("AIRI", &[(&MOCK_CONTRACT_ADDR.to_string(), 123u128)])])
             .unwrap();
+        let token_addr = app.get_token_addr("AIRI").unwrap();
 
         assert_eq!(
             Uint128::from(123u128),
-            query_token_balance(
-                &app.as_querier().into_empty(),
-                app.get_token_addr("AIRI").unwrap(),
-                Addr::unchecked(MOCK_CONTRACT_ADDR),
-            )
-            .unwrap()
+            app.query_token_balance(token_addr.as_str(), MOCK_CONTRACT_ADDR,)
+                .unwrap()
         );
     }
 
@@ -363,13 +411,10 @@ mod tests {
             ],
         )])
         .unwrap();
-
         assert_eq!(
-            query_supply(
-                &app.as_querier().into_empty(),
-                app.get_token_addr("LPA").unwrap()
-            )
-            .unwrap(),
+            app.query_token_info(app.get_token_addr("LPA").unwrap())
+                .unwrap()
+                .total_supply,
             Uint128::from(492u128)
         )
     }
@@ -408,20 +453,12 @@ mod tests {
         assert!(!token_info.is_native_token());
 
         assert_eq!(
-            token_info
-                .query_pool(
-                    &app.as_querier().into_empty(),
-                    Addr::unchecked(MOCK_CONTRACT_ADDR)
-                )
+            app.query_pool(token_info, Addr::unchecked(MOCK_CONTRACT_ADDR))
                 .unwrap(),
             Uint128::from(123u128)
         );
         assert_eq!(
-            native_token_info
-                .query_pool(
-                    &app.as_querier().into_empty(),
-                    Addr::unchecked(MOCK_CONTRACT_ADDR)
-                )
+            app.query_pool(native_token_info, Addr::unchecked(MOCK_CONTRACT_ADDR))
                 .unwrap(),
             Uint128::from(123u128)
         );

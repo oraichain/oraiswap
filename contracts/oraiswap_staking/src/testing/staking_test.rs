@@ -436,20 +436,11 @@ fn test_auto_stake() {
         )
         .unwrap();
 
-    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-
-    let msg = InstantiateMsg {
-        owner: Some(Addr::unchecked("owner")),
-        rewarder: reward_addr.clone(),
-        minter: Some(Addr::unchecked("mint")),
-        oracle_addr: app.oracle_addr.clone(),
-        factory_addr: app.factory_addr.clone(),
-        base_denom: None,
-    };
-
-    let staking_addr = app
-        .instantiate(code_id, Addr::unchecked("addr"), &msg, &[], "staking")
-        .unwrap();
+    app.set_staking_contract(
+        Box::new(create_entry_points_testing!(crate)),
+        reward_addr.clone(),
+    );
+    let staking_addr = app.staking_addr.clone();
 
     // set allowance
     app.execute(

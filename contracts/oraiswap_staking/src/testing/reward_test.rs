@@ -433,20 +433,12 @@ fn test_withdraw() {
     ])
     .unwrap();
 
-    let msg = InstantiateMsg {
-        owner: Some(Addr::unchecked("owner")),
-        rewarder: reward_addr.clone(),
-        minter: Some(Addr::unchecked("mint")),
-        oracle_addr: app.oracle_addr.clone(),
-        factory_addr: app.factory_addr.clone(),
-        base_denom: None,
-    };
+    app.set_staking_contract(
+        Box::new(create_entry_points_testing!(crate)),
+        reward_addr.clone(),
+    );
 
-    let code_id = app.upload(Box::new(create_entry_points_testing!(crate)));
-
-    let staking_addr = app
-        .instantiate(code_id, Addr::unchecked("addr"), &msg, &[], "staking")
-        .unwrap();
+    let staking_addr = app.staking_addr.clone();
 
     // funding some balances to the staking contract from rewarder
     app.set_balances_from(
