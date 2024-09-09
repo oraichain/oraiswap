@@ -6,11 +6,11 @@ use cosmwasm_std::{
     MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use oraiswap::error::ContractError;
-use oraiswap_v3::interface::QuoteResult;
-use oraiswap_v3::msg::QueryMsg as SwapV3QueryMsg;
-use oraiswap_v3::sqrt_price::SqrtPrice;
-use oraiswap_v3::token_amount::TokenAmount;
-use oraiswap_v3::{MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::interface::QuoteResult;
+use oraiswap_v3_common::math::sqrt_price::SqrtPrice;
+use oraiswap_v3_common::math::token_amount::TokenAmount;
+use oraiswap_v3_common::math::{MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::oraiswap_v3_msg::QueryMsg as SwapV3QueryMsg;
 
 use crate::operations::{execute_swap_operation, execute_swap_operations};
 use crate::state::{Config, CONFIG};

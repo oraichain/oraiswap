@@ -1,7 +1,8 @@
 use crate::asset::{AssetInfo, PairInfo, ORAI_DENOM};
 use cosmwasm_std::{coin, Addr, Attribute, Coin, Decimal, StdResult, Uint128};
 use derive_more::{Deref, DerefMut};
-use oraiswap_v3::percentage::Percentage;
+use oraiswap_v3_common::math::percentage::Percentage;
+// use oraiswap_v3_common::percentage::Percentage;
 
 use crate::pair::DEFAULT_COMMISSION_RATE;
 use cosmwasm_testing_util::{AppResponse, Code, MockResult};
@@ -236,8 +237,9 @@ impl MockApp {
             .instantiate(
                 code_id,
                 Addr::unchecked(APP_OWNER),
-                &oraiswap_v3::msg::InstantiateMsg {
+                &oraiswap_v3_common::oraiswap_v3_msg::InstantiateMsg {
                     protocol_fee: Percentage(0),
+                    incentives_fund_manager: Addr::unchecked("incentives_fund_manager"),
                 },
                 &[],
                 "router",

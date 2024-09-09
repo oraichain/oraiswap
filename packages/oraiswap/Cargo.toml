@@ -32,8 +32,8 @@ schemars = "0.8.3"
 protobuf = { version = "3.3.0", features = ["with-bytes"] }
 prost = "0.11"                                              # or the latest version
 serde = "1.0.193"
-oraiswap-v3 = { workspace = true }
 derive_more = "0.99.17"
+oraiswap-v3-common = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # this import is for testing library

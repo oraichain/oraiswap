@@ -7,11 +7,12 @@ use oraiswap::mixed_router::{
 };
 
 use oraiswap::testing::{MockApp, APP_OWNER, ATOM_DENOM};
-use oraiswap_v3::liquidity::Liquidity;
-use oraiswap_v3::msg::ExecuteMsg as OraiswapV3ExecuteMsg;
-use oraiswap_v3::percentage::Percentage;
-use oraiswap_v3::sqrt_price::{calculate_sqrt_price, SqrtPrice};
-use oraiswap_v3::{FeeTier, PoolKey, MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::math::liquidity::Liquidity;
+use oraiswap_v3_common::math::percentage::Percentage;
+use oraiswap_v3_common::math::sqrt_price::{calculate_sqrt_price, SqrtPrice};
+use oraiswap_v3_common::math::{MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::oraiswap_v3_msg::ExecuteMsg as OraiswapV3ExecuteMsg;
+use oraiswap_v3_common::storage::{FeeTier, PoolKey};
 #[test]
 fn simulate_swap_operations_test() {
     let mut app = MockApp::new(&[(

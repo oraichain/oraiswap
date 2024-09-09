@@ -24,7 +24,7 @@ cosmwasm-std = { workspace = true }
 oraiswap = { workspace = true }
 cw-storage-plus = { workspace = true }
 cosmwasm-schema = { workspace = true }
-oraiswap-v3 = { workspace = true }
+oraiswap-v3-common = { workspace = true }
 
 [dev-dependencies]
 cosmwasm-storage = { workspace = true }
@@ -32,3 +32,4 @@ oraiswap-oracle = { workspace = true }
 oraiswap-token = { workspace = true }
 oraiswap-pair = { workspace = true }
 oraiswap-factory = { workspace = true }
+oraiswap-v3 = { workspace = true }

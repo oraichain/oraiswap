@@ -5,10 +5,10 @@ use cosmwasm_std::{
     Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use oraiswap::error::ContractError;
-
-use oraiswap_v3::token_amount::TokenAmount;
-use oraiswap_v3::{sqrt_price::SqrtPrice, PoolKey};
-use oraiswap_v3::{MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::math::sqrt_price::SqrtPrice;
+use oraiswap_v3_common::math::token_amount::TokenAmount;
+use oraiswap_v3_common::math::{MAX_TICK, MIN_TICK};
+use oraiswap_v3_common::storage::PoolKey;
 
 use crate::state::{Config, CONFIG};
 
@@ -18,7 +18,7 @@ use oraiswap::mixed_router::{Affiliate, ExecuteMsg, SwapOperation};
 use oraiswap::oracle::OracleContract;
 use oraiswap::pair::{ExecuteMsg as PairExecuteMsg, PairExecuteMsgCw20, QueryMsg as PairQueryMsg};
 use oraiswap::querier::{query_pair_config, query_pair_info, query_token_balance};
-use oraiswap_v3::msg::ExecuteMsg as OraiswapV3ExecuteMsg;
+use oraiswap_v3_common::oraiswap_v3_msg::ExecuteMsg as OraiswapV3ExecuteMsg;
 
 /// Execute swap operation
 /// swap all offer asset to ask asset

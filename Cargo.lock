@@ -700,8 +700,8 @@ dependencies = [
 
 [[package]]
 name = "decimal"
-version = "0.1.0"
-source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=7f2b8ac#7f2b8ac6a239790006d7a662e6f56c175e189be0"
+version = "0.2.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=ff19464#ff194644131c04cccbb43fc220d5736cc7fd2850"
 dependencies = [
  "decimal-core",
  "integer-sqrt",
@@ -711,8 +711,8 @@ dependencies = [
 
 [[package]]
 name = "decimal-core"
-version = "0.1.0"
-source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=7f2b8ac#7f2b8ac6a239790006d7a662e6f56c175e189be0"
+version = "0.2.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=ff19464#ff194644131c04cccbb43fc220d5736cc7fd2850"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1276,7 +1276,7 @@ dependencies = [
  "cw20",
  "cw20-base",
  "derive_more",
- "oraiswap-v3",
+ "oraiswap-v3-common",
  "prost 0.11.9",
  "protobuf",
  "schemars",
@@ -1324,6 +1324,7 @@ dependencies = [
  "oraiswap-pair",
  "oraiswap-token",
  "oraiswap-v3",
+ "oraiswap-v3-common",
 ]
 
 [[package]]
@@ -1447,8 +1448,8 @@ dependencies = [
 
 [[package]]
 name = "oraiswap-v3"
-version = "0.1.0"
-source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=7f2b8ac#7f2b8ac6a239790006d7a662e6f56c175e189be0"
+version = "0.2.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=ff19464#ff194644131c04cccbb43fc220d5736cc7fd2850"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1458,6 +1459,21 @@ dependencies = [
  "cw20",
  "decimal",
  "derive_more",
+ "oraiswap-v3-common",
+ "thiserror",
+]
+
+[[package]]
+name = "oraiswap-v3-common"
+version = "0.2.0"
+source = "git+https://github.com/oraichain/oraiswap-v3.git?rev=ff19464#ff194644131c04cccbb43fc220d5736cc7fd2850"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus 1.2.0",
+ "cw20",
+ "decimal",
  "thiserror",
 ]
 

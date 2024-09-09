@@ -4,7 +4,7 @@ use cosmwasm_std::{
     coin, to_json_binary, Addr, Api, CosmosMsg, QuerierWrapper, StdResult, Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-use oraiswap_v3::PoolKey;
+use oraiswap_v3_common::storage::PoolKey;
 
 use crate::asset::AssetInfo;
 
