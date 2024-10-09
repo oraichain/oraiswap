@@ -27,6 +27,7 @@ fn simulate_swap_operations_test() {
             },
         ],
     )]);
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
 
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
@@ -87,7 +88,7 @@ fn simulate_swap_operations_test() {
 
     let _res = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             pair_addr.clone(),
             &msg,
             &[
@@ -113,7 +114,7 @@ fn simulate_swap_operations_test() {
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .instantiate(code_id, addr0000.clone(), &msg, &[], "router")
         .unwrap();
 
     let msg = QueryMsg::SimulateSwapOperations {
@@ -148,6 +149,8 @@ fn execute_swap_operations() {
         ],
     )]);
 
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
+
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
 
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
@@ -173,7 +176,7 @@ fn execute_swap_operations() {
 
     let asset_addr = app.create_token("asset");
 
-    app.set_token_balances(&[("asset", &[("addr0000", 1000000u128)])])
+    app.set_token_balances(&[("asset", &[(addr0000.as_str(), 1000000u128)])])
         .unwrap();
 
     let asset_infos1 = [
@@ -220,7 +223,7 @@ fn execute_swap_operations() {
 
     // set allowance
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         asset_addr.clone(),
         &cw20::Cw20ExecuteMsg::IncreaseAllowance {
             spender: pair_addr1.to_string(),
@@ -233,7 +236,7 @@ fn execute_swap_operations() {
 
     let _res = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             pair_addr1.clone(),
             &msg,
             &[Coin {
@@ -264,7 +267,7 @@ fn execute_swap_operations() {
 
     // set allowance
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         asset_addr.clone(),
         &cw20::Cw20ExecuteMsg::IncreaseAllowance {
             spender: pair_addr2.to_string(),
@@ -277,7 +280,7 @@ fn execute_swap_operations() {
 
     let _res = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             pair_addr2.clone(),
             &msg,
             &[Coin {
@@ -297,7 +300,7 @@ fn execute_swap_operations() {
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .instantiate(code_id, addr0000.clone(), &msg, &[], "router")
         .unwrap();
 
     let msg: ExecuteMsg = ExecuteMsg::ExecuteSwapOperations {
@@ -308,7 +311,7 @@ fn execute_swap_operations() {
     };
 
     let error = app
-        .execute(Addr::unchecked("addr0000"), router_addr.clone(), &msg, &[])
+        .execute(addr0000.clone(), router_addr.clone(), &msg, &[])
         .unwrap_err();
     assert!(error
         .root_cause()
@@ -341,7 +344,7 @@ fn execute_swap_operations() {
 
     let res = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             router_addr.clone(),
             &msg,
             &[
@@ -403,7 +406,7 @@ fn execute_swap_operations() {
 
     let error = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             router_addr.clone(),
             &msg,
             &[
@@ -429,7 +432,7 @@ fn execute_swap_operations() {
         Addr::unchecked("admin"),
         pair_addr1.clone(),
         &oraiswap::pair::ExecuteMsg::RegisterTrader {
-            traders: vec![Addr::unchecked("addr0000")],
+            traders: vec![addr0000.clone()],
         },
         &[],
     )
@@ -438,7 +441,7 @@ fn execute_swap_operations() {
         Addr::unchecked("admin"),
         pair_addr2.clone(),
         &oraiswap::pair::ExecuteMsg::RegisterTrader {
-            traders: vec![Addr::unchecked("addr0000")],
+            traders: vec![addr0000.clone()],
         },
         &[],
     )
@@ -446,7 +449,7 @@ fn execute_swap_operations() {
 
     // swap successfully
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         router_addr.clone(),
         &msg,
         &[
@@ -505,25 +508,25 @@ fn init_v3(
     let lower_tick_index = -20;
     let middle_tick_index = -10;
     let upper_tick_index = 10;
-
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
     let liquidity_delta = Liquidity(1000000000000000000);
     app.approve_token(
         token_x_name,
-        "addr0000",
+        addr0000.as_str(),
         contract_addr.clone().as_str(),
         u128::MAX,
     )
     .unwrap();
     app.approve_token(
         token_y_name,
-        "addr0000",
+        addr0000.as_str(),
         contract_addr.clone().as_str(),
         u128::MAX,
     )
     .unwrap();
 
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         contract_addr.clone(),
         &OraiswapV3ExecuteMsg::CreatePosition {
             pool_key: pool_key.clone(),
@@ -538,7 +541,7 @@ fn init_v3(
     .unwrap();
 
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         contract_addr.clone(),
         &OraiswapV3ExecuteMsg::CreatePosition {
             pool_key: pool_key.clone(),
@@ -570,7 +573,7 @@ fn simulate_mixed_swap() {
             },
         ],
     )]);
-
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     let token_x_name = "tokenx";
@@ -630,14 +633,14 @@ fn simulate_mixed_swap() {
 
     app.approve_token(
         token_x_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
     .unwrap();
     app.approve_token(
         token_y_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
@@ -662,7 +665,7 @@ fn simulate_mixed_swap() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("addr0000"), pair_addr.clone(), &msg, &[])
+        .execute(addr0000.clone(), pair_addr.clone(), &msg, &[])
         .unwrap();
 
     let msg = InstantiateMsg {
@@ -675,7 +678,7 @@ fn simulate_mixed_swap() {
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .instantiate(code_id, addr0000.clone(), &msg, &[], "router")
         .unwrap();
 
     let msg = QueryMsg::SimulateSwapOperations {
@@ -716,7 +719,7 @@ fn execute_mixed_swap_operations() {
             },
         ],
     )]);
-
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     let token_x_name = "tokenx";
@@ -724,9 +727,9 @@ fn execute_mixed_swap_operations() {
     let token_x = app.create_token(token_x_name);
     let token_y = app.create_token(token_y_name);
 
-    app.set_token_balances(&[("tokenx", &[("addr0000", 1000000000000u128)])])
+    app.set_token_balances(&[("tokenx", &[(addr0000.as_str(), 1000000000000u128)])])
         .unwrap();
-    app.set_token_balances(&[("tokeny", &[("addr0000", 1000000000000u128)])])
+    app.set_token_balances(&[("tokeny", &[(addr0000.as_str(), 1000000000000u128)])])
         .unwrap();
 
     let pool_key = init_v3(
@@ -776,14 +779,14 @@ fn execute_mixed_swap_operations() {
 
     app.approve_token(
         token_x_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
     .unwrap();
     app.approve_token(
         token_y_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
@@ -808,7 +811,7 @@ fn execute_mixed_swap_operations() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("addr0000"), pair_addr.clone(), &msg, &[])
+        .execute(addr0000.clone(), pair_addr.clone(), &msg, &[])
         .unwrap();
 
     let msg = InstantiateMsg {
@@ -821,7 +824,7 @@ fn execute_mixed_swap_operations() {
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .instantiate(code_id, addr0000.clone(), &msg, &[], "router")
         .unwrap();
 
     // first case: invalid route, can't swap
@@ -847,7 +850,7 @@ fn execute_mixed_swap_operations() {
 
     let error = app
         .execute(
-            Addr::unchecked("addr0000"),
+            addr0000.clone(),
             token_x.clone(),
             &Cw20ExecuteMsg::Send {
                 contract: router_addr.to_string(),
@@ -897,7 +900,7 @@ fn execute_mixed_swap_operations() {
     );
 
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         token_x.clone(),
         &Cw20ExecuteMsg::Send {
             contract: router_addr.to_string(),
@@ -939,7 +942,7 @@ fn test_affiliates() {
             },
         ],
     )]);
-
+    let addr0000 = Addr::unchecked(&app.accounts[0]);
     app.set_token_contract(Box::new(create_entry_points_testing!(oraiswap_token)));
 
     let token_x_name = "tokenx";
@@ -947,9 +950,9 @@ fn test_affiliates() {
     let token_x = app.create_token(token_x_name);
     let token_y = app.create_token(token_y_name);
 
-    app.set_token_balances(&[("tokenx", &[("addr0000", 1000000000000u128)])])
+    app.set_token_balances(&[("tokenx", &[(addr0000.as_str(), 1000000000000u128)])])
         .unwrap();
-    app.set_token_balances(&[("tokeny", &[("addr0000", 1000000000000u128)])])
+    app.set_token_balances(&[("tokeny", &[(addr0000.as_str(), 1000000000000u128)])])
         .unwrap();
 
     app.set_oracle_contract(Box::new(create_entry_points_testing!(oraiswap_oracle)));
@@ -991,14 +994,14 @@ fn test_affiliates() {
 
     app.approve_token(
         token_x_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
     .unwrap();
     app.approve_token(
         token_y_name,
-        "addr0000",
+        addr0000.as_str(),
         pair_addr.clone().as_str(),
         u128::MAX,
     )
@@ -1023,7 +1026,7 @@ fn test_affiliates() {
     };
 
     let _res = app
-        .execute(Addr::unchecked("addr0000"), pair_addr.clone(), &msg, &[])
+        .execute(addr0000.clone(), pair_addr.clone(), &msg, &[])
         .unwrap();
 
     init_v3(
@@ -1044,7 +1047,7 @@ fn test_affiliates() {
 
     // we can just call .unwrap() to assert this was a success
     let router_addr = app
-        .instantiate(code_id, Addr::unchecked("addr0000"), &msg, &[], "router")
+        .instantiate(code_id, addr0000.clone(), &msg, &[], "router")
         .unwrap();
 
     // case 1: swap x to y => receive y
@@ -1072,7 +1075,7 @@ fn test_affiliates() {
     };
 
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         token_x.clone(),
         &Cw20ExecuteMsg::Send {
             contract: router_addr.to_string(),
@@ -1138,7 +1141,7 @@ fn test_affiliates() {
     };
 
     app.execute(
-        Addr::unchecked("addr0000"),
+        addr0000.clone(),
         token_x.clone(),
         &Cw20ExecuteMsg::Send {
             contract: router_addr.to_string(),

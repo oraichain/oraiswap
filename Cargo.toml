@@ -30,7 +30,7 @@ cw2 = { version = "1.0.1" }
 cw20 = { version = "1.0.1" }
 cw20-base = { version = "1.0.1" }
 cw-storage-plus = { version = "1.0.1" }
-cw-utils = "0.16.0"
+cw-utils = "1.0.3"
 
 oraiswap = { path = "./packages/oraiswap" }
 oraiswap-oracle = { path = "./contracts/oraiswap_oracle" }

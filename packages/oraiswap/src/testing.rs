@@ -30,6 +30,8 @@ pub struct MockApp {
     #[deref]
     #[deref_mut]
     app: TestMockApp,
+    owner: Addr,
+    pub accounts: Vec<String>,
     pub oracle_addr: Addr,
     pub factory_addr: Addr,
     pub router_addr: Addr,
@@ -44,11 +46,12 @@ impl MockApp {
             coin(1000000000000000000u128, ORAI_DENOM),
             coin(1000000000000000000u128, ATOM_DENOM),
         ];
-        init_balances.push((APP_OWNER, &owner_balances));
-        let (app, _) = TestMockApp::new(&init_balances);
-
+        init_balances.insert(0, (APP_OWNER, &owner_balances));
+        let (app, accounts) = TestMockApp::new(&init_balances);
         MockApp {
             app,
+            owner: Addr::unchecked(&accounts[0]),
+            accounts: accounts.into_iter().skip(1).collect(),
             oracle_addr: Addr::unchecked(""),
             factory_addr: Addr::unchecked(""),
             router_addr: Addr::unchecked(""),
@@ -162,11 +165,11 @@ impl MockApp {
         {
             code_id = self.upload(code);
         }
-        let owner = Addr::unchecked(self.get_account(APP_OWNER));
+
         let msg = crate::staking::InstantiateMsg {
-            owner: Some(owner.clone()),
+            owner: Some(self.owner.clone()),
             rewarder: reward_addr,
-            minter: Some(owner),
+            minter: Some(self.owner.clone()),
             oracle_addr: self.oracle_addr.clone(),
             factory_addr: self.factory_addr.clone(),
             base_denom: None,
@@ -194,14 +197,14 @@ impl MockApp {
     pub fn create_pair(&mut self, asset_infos: [AssetInfo; 2]) -> Option<Addr> {
         if !self.factory_addr.as_str().is_empty() {
             let contract_addr = self.factory_addr.clone();
-            let admin = self.get_account(APP_OWNER);
+            let admin = self.owner.clone();
             let res = self
                 .execute(
-                    Addr::unchecked(admin.as_str()),
+                    admin.clone(),
                     contract_addr,
                     &crate::factory::ExecuteMsg::CreatePair {
                         asset_infos: asset_infos.clone(),
-                        pair_admin: Some(admin),
+                        pair_admin: Some(admin.to_string()),
                     },
                     &[],
                 )
@@ -269,7 +272,7 @@ impl MockApp {
         &mut self,
         balances: &[(&str, &[(&str, u128)])],
     ) -> MockResult<Vec<Addr>> {
-        let sender = self.get_account(APP_OWNER);
+        let sender = self.owner.to_string();
         self.set_token_balances_from(&sender, balances)
     }
 
